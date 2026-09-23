@@ -16,20 +16,12 @@ export/
 *.pck
 *.zip
 
-# Generated characters (MakeHuman/MPFB pipeline, ~10 MB each). Rebuild with:
-#   blender -b --python assets/blender/build_characters.py
-assets/models/figure_*.glb
-assets/models/figure_*.glb.import
-assets/models/cast_*.glb
-assets/models/cast_*.glb.import
-assets/models/npc_*.glb
-assets/models/npc_*.glb.import
-assets/models/town_*.glb
-assets/models/dist_*.glb
-assets/models/dist_*.glb.import
-assets/models/town_*.glb.import
-assets/models/watchman.glb
-assets/models/watchman.glb.import
+# Generated models (buildings, props, interiors, animals, characters). Not tracked: ~1.3 GB of glTF.
+# Either download the "models" zip from the GitHub release or rebuild with tools/build_all.sh.
+assets/models/*.glb
+assets/models/*.glb.import
+assets/ground/*.png
+assets/ground/*.png.import
 __pycache__/
 *.pyc
 assets/models/*.png
@@ -37,3 +29,7 @@ assets/models/*.png.import
 docs/**/*.import
 assets/models/*.jpg
 assets/models/*.jpg.import
+
+# Third-party animal sources, fetched by tools/fetch_animals.sh (only the LICENSE.txt files are committed)
+assets/third_party/*/*
+!assets/third_party/*/LICENSE.txt

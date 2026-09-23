@@ -10,7 +10,7 @@ godot --headless --path . --quit-after 2000 -- --smoke   # headless loop test
 ```
 
 ## Controls
-WASD move, Shift sprint, Ctrl or C crouch, mouse look, Esc release mouse.
+WASD move, Shift sprint, Ctrl or C crouch, E interact, F or left mouse attack, mouse look, Esc pause.
 
 ## Layout
 - `data/` factions, origins, districts (JSON, loaded by `GameState`)
@@ -84,9 +84,20 @@ Change either if you prefer; nothing else in the repository constrains the choic
   as history; all characters are fictional.
 
 ## Building from a fresh clone
+The generated models (`assets/models/*.glb`, about 1.3 GB) are not in git. Two ways to get them:
+
+**A. Download** the `krakow-1795-models-<tag>.zip` asset from the latest
+[GitHub release](https://github.com/r-melvin/krakow-1795/releases) and unzip it in the project root
+(it contains `assets/models/` and `assets/ground/`), then `godot --headless --import --path .` and `godot --path .`.
+
+**B. Rebuild** everything from the scripts:
 1. Install Godot 4.7 and Blender 5.2, then the MPFB2 extension and the MakeHuman system assets pack (see
    *Characters* above).
-2. `blender -b --python assets/blender/build_assets.py` (buildings and props; bakes textures on first run),
-   `blender -b --python assets/blender/build_assets.py -- --animals`, `blender -b --python assets/blender/build_interiors.py`,
-   `blender -b --python assets/blender/build_characters.py`.
-3. `godot --headless --import --path .` then `godot --path .`.
+2. `tools/build_all.sh` runs, in order: textures and buildings/props (`build_assets.py`), the district and farm
+   sets, animals and the dragon (`--animals`), interiors (`build_interiors.py`), the third-party animal fetch
+   and conversion (`tools/fetch_animals.sh`, `build_animals.py`), the animation library (`build_animations.py`),
+   all characters (`build_characters.py`, the slow part: ~2-4 min each), and finally the Godot import.
+   `tools/build_all.sh --no-characters` skips the people; `--only assets,interiors` picks stages.
+3. `godot --path .`
+
+`tools/make_release.sh <tag>` zips the models and attaches them to a GitHub release (maintainers).
