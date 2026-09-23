@@ -17,3 +17,5 @@ assets/models/watchman.glb
 assets/models/watchman.glb.import
 __pycache__/
 *.pyc
+assets/models/*.png
+assets/models/*.png.import
