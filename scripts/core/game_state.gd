@@ -11,7 +11,7 @@ signal settings_changed
 const NIGHT_START_MINUTES := 21 * 60   ## night missions begin at 21:00
 const SETTINGS_PATH := "user://settings.json"
 const SAVE_PATH := "user://save.json"
-const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true}
+const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true}
 
 enum Phase { SPLASH, MENU, ORIGIN_SELECT, DAY, NIGHT, DAWN }
 
@@ -256,6 +256,15 @@ func apply_settings() -> void:
 		if want_full != is_full:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if want_full else DisplayServer.WINDOW_MODE_WINDOWED)
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if settings["vsync"] else DisplayServer.VSYNC_DISABLED)
+	# Edge quality: 4x multisampling for geometry edges, temporal AA for the specular shimmer on wet cobbles,
+	# lantern glass and hair. Both on by default; either can be turned off in Options for weaker GPUs.
+	var vp := get_viewport()
+	if vp:
+		vp.msaa_3d = Viewport.MSAA_4X if bool(settings.get("msaa", true)) else Viewport.MSAA_DISABLED
+		vp.use_taa = bool(settings.get("taa", true))
+		vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if bool(settings.get("msaa", true)) else Viewport.SCREEN_SPACE_AA_FXAA
+		vp.use_debanding = true
+		vp.anisotropic_filtering_level = Viewport.ANISOTROPY_16X
 	settings_changed.emit()
 
 

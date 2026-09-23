@@ -96,6 +96,15 @@ carried Ottoman and Persian goods (spices, dyes, silks, carpets, coffee); Hungar
 Scots pedlars, German and Italian craftsmen, Flemish printers and French émigrés fleeing the Revolution all lived in
 the city. These appear as named traders and tradesmen in the districts and as contacts with foreign courts.
 
+**Street trade.** The Rynek at night keeps its hawkers (data/vendors.json, scripts/city/vendors.gd): an obwarzanek
+(ring-bread) woman at the Cloth Hall, a chestnut roaster with a glowing brazier-cart, a hot-beer (grzaniec) seller at
+the inn door and a fish barrow up from the Vistula stay all night; a knife grinder, candle and herb women, a ballad
+seller and a shoe-black keep pitches until 22:00-23:30; a water carrier, milk woman, firewood seller and a Jewish
+pedlar walk short rounds. Each calls period cries in Polish, German or Yiddish (with an English gloss), draws passing
+townsfolk to haggle (two customers make a crowd to blend into) and sells to the player for a coin: food restores
+health, and every seller has a line of street talk that hints at the night's mission. The ballad seller's sheets are
+seditious; she runs when the watch raises the alarm, and her sheet is a future intel item (flag `ballad_sheet`).
+
 ## World simulation (the living city)
 Reference points: Hitman's schedules and opportunities, the recent 007's crowd and NPC routines.
 - **Clock.** The night mission runs on a world clock (default 1 real second = 1 game minute, from 21:00). Curfew
@@ -155,3 +164,55 @@ visible but greyed with a period reason ("Not for a woman here.", "Not your incl
 **Language.** Polish, German and Yiddish lines are kept as the people would have said them, always with an
 English gloss beneath (speech bubbles show "text\n(gloss)"; JSON lines carry a `gloss` field). Period words
 used in the UI carry their meaning in `data/glossary.json`, shown in the journal's Glossary tab.
+
+## Buildings and the winter townscape
+
+All architecture is generated headlessly in `assets/blender/build_assets.py` and placed at runtime: the Rynek by
+`scripts/city/greybox_district.gd`, the outer streets and everything past the tenement rows by
+`scripts/city/outer_city.gd`. Stylised-realistic, period Kraków c. 1795-1805, deep winter.
+
+**Snow and ice.** Every roof carries a conformal snow blanket (`snow_shell`): the upward faces of the roof are
+subdivided, lifted and solidified 5-9 cm thick, thicker on the lee slope, scoured thin at the ridge, drifted up
+against chimneys, dormers and parapets, with rounded bare patches and downslope slide strips that show the tiles,
+and a lip curling over the eaves. Icicles hang under eaves, cornices, balconies, gutters and fountain bowls; sills,
+hoods, copings, finials, pinnacle balls and dome ribs carry thin snow; chimneys and back walls take a frost crust.
+The snow texture has wind ripples, crystal grain, cold blue hollows and sparse low-roughness glints.
+
+**Masonry and openings.** Rusticated ground floors, quoins, string courses, keystones and carved mascarons on
+portals, Gothic bond brick with glazed headers and old lime-wash, damp tide lines on plinths. Windows sit in real
+reveals with frames, mullions, sills with drips and lintels; shutters are louvred or boarded, painted per district
+(green, ox-blood, ochre, blue, grey, brown), mostly folded back with a few standing half open. Wrought-iron
+balconies on carved consoles, timber courtyard galleries (ganki), iron wall anchors (kotwy), lead downpipes with
+hoppers, stove chimneys with pots.
+
+**House types.** Five kamienice for the square (`tenement_a..e`) plus nine for the outer streets: Renaissance attic
+house (`ten_renaissance`, `_b`, 9 m), narrow Gothic gable house (`ten_gothic`, `_b`, 6.5 m), Baroque palace front
+(`ten_baroque`, 14 m), plastered burgher house with a shop arcade (`ten_burgher`, `_b`, 10 m), half-timbered gable
+house (`ten_timber`, 8 m), wooden suburban house (`ten_wooden`, 9 m).
+
+**Water.** A public fountain with lion-mask spouts frozen mid-flow, wells with windlass roofs, a wooden pump-post
+with a lever (cast iron pumps come later), stone horse troughs, and open street gutters (rynsztok) in stone channels
+carrying dark snow-melt down the outer streets.
+
+**Industry on the outer streets.** Post mill (bare sails, canvas furled), water mill on a raised race of the
+Młynówka with an iced undershot wheel, bell foundry with a furnace stack and glowing furnace mouth, open-fronted
+forge with hearth glow, anvil and tools, propination brewhouse with a copper kettle and malt-kiln cowl, cooper's
+yard, tanners' drying frame. Fires carry `Furnace_n` markers and get a flickering light at runtime.
+
+**Faith.** St Mary's with stained glass (emissive, faintly lit at night) and stone tracery, louvred belfry openings
+and a ribbed, snow-capped helm dome; a free-standing campanile with a clock and visible bells; the Town Hall tower
+with four real dials and hands (11:50); the Old Synagogue (Gothic hall, Renaissance attic, buttresses) and a
+smaller synagogue with a three-tier shingled roof and a women's gallery; a Greek Catholic (Uniate) church with an
+onion cupola and three-bar crosses (Orthodox proper had no church in Kraków in 1795); a towerless Protestant prayer
+house with a ridge turret; a column shrine (figura) and a pillar kapliczka; a monastery gate and enclosure wall.
+
+**The castle.** Wawel as a low-detail skyline set (hill, curtain wall, Senators' and Sandomierska towers, the
+palace roofs, the cathedral towers and the gold Sigismund Chapel dome) far to the south-west, and a near castle
+gate with round flanking towers and a lowered drawbridge.
+
+**Justice.** Pillory (pręgierz) in front of the Town Hall; stocks, whipping post with the town drum and gallows are
+exported for the street-life scenes.
+
+**Runtime markers.** Buildings export empties as children of the asset root: `Chimney_<n>` at each flue top,
+`Window_<n>` on the sill of each openable ground- and first-floor street window (its Blender -Y, which is
+Godot +Z, points out into the street), `Furnace_<n>` at forge, foundry, brewery and cooper fires.

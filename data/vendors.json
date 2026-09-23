@@ -1,0 +1,241 @@
+{
+  "_doc": "Street trade (scripts/city/vendors.gd). Coordinates are Godot metres on the Rynek; facing is rot_y (0 looks north -Z, PI south, -PI/2 east, PI/2 west). Pitches keep 3 m clear of the carriage lanes (population.gd routes: z=-22.5 on the north side, the (-10,-22.5)-(-26,-25) bend, the (17,-22.5)-(22.5,-14)-(25,-10.5) turn by St Mary's) and stand within ~1.6 m of a wall, off the street corridors. Every foreign-language line carries an English gloss. closing: \"HH:MM\" on the night clock, or \"\" to stay all night.",
+  "price": 1,
+  "cry_interval": [12, 20],
+  "sale_interval": [22, 50],
+  "customer_radius": 16.0,
+  "second_customer_chance": 0.4,
+  "haggle_secs": [5.0, 8.0],
+  "carry_secs": 20.0,
+  "customer_cooldown": 90.0,
+  "return_after_calm": 90.0,
+  "exits": [[-14.0, -26.9], [2.0, -26.9], [18.0, -26.9], [8.0, 26.9], [-10.0, 26.9], [-20.0, 26.9], [-26.9, -10.0], [27.2, 8.0]],
+  "haggle_seller": [
+    {"text": "Dwa grosze, nie mniej!", "gloss": "Two groszy, not a grosz less!"},
+    {"text": "Dla pana taniej.", "gloss": "Cheaper for you, sir."},
+    {"text": "Taniej nie dam!", "gloss": "I can't go lower!"},
+    {"text": "Nu, far dir, billik!", "gloss": "Well, for you, cheap!"}
+  ],
+  "haggle_buyer": [
+    {"text": "Za drogo!", "gloss": "Too dear!"},
+    {"text": "Grosz i ani szeląga więcej.", "gloss": "One grosz and not a shilling more."},
+    {"text": "Zu teuer!", "gloss": "Too expensive!"},
+    {"text": "No dobrze, niech będzie.", "gloss": "All right, have it your way."}
+  ],
+  "closing_lines": [
+    {"text": "Na dziś koniec.", "gloss": "That's all for today."},
+    {"text": "Do domu, zimno jak w psiarni.", "gloss": "Home, it's cold as a kennel."},
+    {"text": "Feierabend!", "gloss": "Closing time!"}
+  ],
+  "flee_lines": [
+    {"text": "Straż! Uciekać!", "gloss": "The watch! Run!"},
+    {"text": "Wache! Weg da!", "gloss": "The watch! Out of the way!"}
+  ],
+  "vendors": [
+    {
+      "id": "obwarzanki", "name": "ring-bread woman", "ware": "obwarzanek (ring-bread)", "item": "obwarzanek",
+      "model": ["town_market_woman_f", "dist_market_woman_f", "npc_f_05"], "kind": "stationary",
+      "pos": [-9.0, 0, -5.7], "facing": 0.0, "serve": 1.25, "closing": "23:00",
+      "prop": "vendor_obwarzanki", "prop_at": [0.72, 0, -0.05], "prop_rot": 3.14159, "prop_col": [0.55, 0.9, 0.55],
+      "heal": 1,
+      "cries": [
+        {"text": "Obwarzanki, gorące!", "gloss": "Hot ring-breads!"},
+        {"text": "Obwarzanki krakowskie, świeże z pieca!", "gloss": "Kraków ring-breads, fresh from the oven!"},
+        {"text": "Frische Kringel!", "gloss": "Fresh ring-breads!"}
+      ],
+      "pitch": "Obwarzanki from the baker on Floriańska, still warm. One coin, and you can warm your hands on it.",
+      "thanks": "There, and a pinch of salt on top. Smacznego (enjoy it)!",
+      "gossip": ["The man in the grey coat who stands by the middle lanterns? Never buys, never leaves. He watches the Cloth Hall like a cat at a mousehole.",
+                 "The watch walks the north side and back along the stalls. When the Town Hall bell strikes ten they clear the square."]
+    },
+    {
+      "id": "kasztany", "name": "chestnut roaster", "ware": "roast chestnuts", "item": "chestnuts",
+      "model": ["dist_peasant", "dist_carter", "npc_m_02"], "kind": "stationary",
+      "pos": [-8.5, 0, 24.3], "facing": 0.0, "serve": 2.05, "closing": "",
+      "prop": "vendor_chestnut_cart", "prop_at": [0.0, 0, -0.85], "prop_rot": 3.14159, "prop_col": [1.3, 0.95, 0.75],
+      "lamp": {"at": [0.0, 1.05, -0.85], "energy": 2.2, "range": 6.5, "color": [1.0, 0.5, 0.2]},
+      "fx": "smoke", "fx_at": [0.0, 1.05, -0.85], "heal": 1,
+      "cries": [
+        {"text": "Kasztany! Gorące kasztany!", "gloss": "Chestnuts! Hot chestnuts!"},
+        {"text": "Heiße Maroni!", "gloss": "Hot chestnuts!"},
+        {"text": "Kasztany pieczone, grosz za tutkę!", "gloss": "Roast chestnuts, a grosz a paper cone!"}
+      ],
+      "pitch": "Chestnuts off the coals, a cone for one coin. They keep your pockets warm till the bell.",
+      "thanks": "Mind your fingers, they bite.",
+      "gossip": ["Boatmen don't come up from the Vistula for my chestnuts. There's one standing in the alley by St Adalbert's, waiting on somebody.",
+                 "I'm here all night, and I see who comes and goes. The south-east corner past St Adalbert's is busier after midnight than at noon."]
+    },
+    {
+      "id": "szlifierz", "name": "knife grinder", "ware": "a knife sharpened", "item": "sharpened knife",
+      "model": ["dist_flemish_journeyman", "town_blacksmith", "npc_m_03"], "kind": "stationary",
+      "pos": [14.2, 0, -26.25], "facing": 3.14159, "serve": 1.9, "closing": "22:00",
+      "prop": "vendor_grinder", "prop_at": [0.0, 0, -0.8], "prop_rot": 3.14159, "prop_col": [0.6, 0.9, 1.0],
+      "fx": "sparks", "fx_at": [0.0, 0.92, -1.02], "work_clip": "haggle",
+      "cries": [
+        {"text": "Noże, nożyce ostrzę!", "gloss": "Knives and scissors sharpened!"},
+        {"text": "Scheren schleifen, Messer schleifen!", "gloss": "Scissors ground, knives ground!"}
+      ],
+      "pitch": "A blade that won't cut bread is a blade that won't cut anything. One coin and she'll split a hair.",
+      "thanks": "Try it on your thumb. Carefully.",
+      "gossip": ["The Austrian corporal pays a złoty for a name. There are people on this square who'd sell their own mother for less.",
+                 "The watch changes at the Town Hall at ten. For the time it takes to pass the word, nobody is looking at the north row."]
+    },
+    {
+      "id": "ryby", "name": "fish seller", "ware": "salted herring", "item": "herring",
+      "model": ["dist_raftsman", "dist_ferryman", "npc_m_04"], "kind": "stationary",
+      "pos": [13.0, 0, 25.0], "facing": 0.0, "serve": 2.0, "closing": "",
+      "prop": "vendor_fish_barrow", "prop_at": [0.0, 0, -0.9], "prop_rot": 3.14159, "prop_col": [1.2, 0.9, 1.4],
+      "lamp": {"at": [0.42, 1.55, -1.4], "energy": 1.6, "range": 6.0, "color": [1.0, 0.72, 0.42]},
+      "cries": [
+        {"text": "Ryby! Śledzie solone!", "gloss": "Fish! Salted herring!"},
+        {"text": "Karp i szczupak z Wisły!", "gloss": "Carp and pike from the Vistula!"},
+        {"text": "Heringe! Gesalzene Heringe!", "gloss": "Herring! Salted herring!"}
+      ],
+      "pitch": "Herring from the salt barges at Kazimierz, carp from the Vistula under the ice. One coin a fish.",
+      "thanks": "Wrap it in your coat, not your pocket, or you'll smell of it till Easter.",
+      "gossip": ["The rafts tie up below Wawel. The boatmen carry more than fish up these streets, and they don't carry it past the watch.",
+                 "There's a cellar door at the south-east corner, past St Adalbert's. Things go in there that never come out by daylight."]
+    },
+    {
+      "id": "grzaniec", "name": "hot-beer seller", "ware": "a cup of mulled beer", "item": "mulled beer",
+      "model": ["dist_tavern_keeper", "dist_brewer", "npc_m_05"], "kind": "stationary",
+      "pos": [26.7, 0, 1.0], "facing": 1.5708, "serve": 1.3, "closing": "",
+      "prop": "vendor_beer_can", "prop_at": [0.72, 0, 0.0], "prop_rot": 3.14159, "prop_col": [0.6, 1.0, 0.6],
+      "lamp": {"at": [0.72, 0.6, 0.0], "energy": 0.9, "range": 3.5, "color": [1.0, 0.55, 0.25]},
+      "fx": "steam", "fx_at": [0.8, 0.97, -0.25], "effect": "warmth",
+      "cries": [
+        {"text": "Piwo grzane! Grzaniec!", "gloss": "Mulled beer! Hot and spiced!"},
+        {"text": "Miód pitny, grzany!", "gloss": "Hot mead!"},
+        {"text": "Warmes Bier, mit Ingwer!", "gloss": "Warm beer, with ginger!"}
+      ],
+      "pitch": "Beer warmed with honey, cloves and a crumb of ginger. The innkeeper charges three for worse. One coin.",
+      "thanks": "Drink it slow. There, feel it in your toes?",
+      "gossip": ["The Austrians drink at the zajazd (inn) till the bell, then they walk it off round the square. Loud boots, slow eyes.",
+                 "A printer's lad was asking me where a man could leave a parcel near the Cloth Hall without it being found. I told him nowhere."]
+    },
+    {
+      "id": "ballady", "name": "ballad seller", "ware": "a ballad sheet", "item": "ballad sheet",
+      "model": ["town_bookseller", "dist_journeyman", "npc_m_06"], "kind": "stationary",
+      "pos": [6.6, 0, 5.6], "facing": 3.14159, "serve": 1.2, "closing": "23:30",
+      "prop": "vendor_ballads", "prop_bone": "hand_l", "prop_at": [0.0, 0.11, 0.0], "prop_rot": 0.0,
+      "flees_alarm": true, "flag": "ballad_sheet",
+      "cries": [
+        {"text": "Nowa pieśń! Grosz za kartkę!", "gloss": "A new song! A grosz a sheet!"},
+        {"text": "~ A kto z nas w kosy, ten nie w niewoli... ~", "gloss": "~ Who takes up the scythe is no man's slave... ~"},
+        {"text": "Neue Lieder, ein Kreuzer das Blatt!", "gloss": "New songs, a kreuzer a sheet!"},
+        {"text": "~ Hej, krakowiacy, pod Racławice... ~", "gloss": "~ Hey, Kraków lads, to Racławice... ~"}
+      ],
+      "pitch": "Songs, sir, only songs. Love, drink and the old days. Some of them you'd best not sing near a white coat. One coin.",
+      "thanks": "Fold it small. Read it at home.",
+      "gossip": ["They took old Maciej for singing the scythe song last week. He never printed a line in his life; the man who did still walks free.",
+                 "The fellow by the middle lantern asks everyone who sold them their sheets. Don't tell him it was me."]
+    },
+    {
+      "id": "swiece", "name": "candle and tinder seller", "ware": "tallow candles and a flint", "item": "candles",
+      "model": ["dist_peasant_f", "npc_f_03"], "kind": "stationary",
+      "pos": [25.4, 0, -16.1], "facing": 3.14159, "serve": 1.15, "closing": "23:00",
+      "prop": "vendor_tray_candles", "prop_bone": "spine_02", "prop_at": [0.0, 0.17, -0.27], "prop_rot": 0.0,
+      "lamp": {"at": [0.04, 1.2, -0.36], "energy": 0.55, "range": 2.8, "color": [1.0, 0.78, 0.48], "on_body": true},
+      "cries": [
+        {"text": "Świece łojowe! Hubka, krzesiwo!", "gloss": "Tallow candles! Tinder, fire-steel!"},
+        {"text": "Gromnice dla Matki Boskiej!", "gloss": "Church candles for Our Lady!"},
+        {"text": "Lichter! Zunder!", "gloss": "Candles! Tinder!"}
+      ],
+      "pitch": "Tallow for the house, beeswax for the altar, flint and tinder for the pipe. One coin.",
+      "thanks": "God keep you. Light one for me.",
+      "gossip": ["The priest locks St Mary's at eleven, but the sacristan's door on the north side sticks and never quite shuts.",
+                 "The bishop's people come out on the steps at a quarter past nine, with an Austrian gentleman who pretends to pray."]
+    },
+    {
+      "id": "ziola", "name": "herb woman", "ware": "a bunch of dried herbs", "item": "herbs",
+      "model": ["town_washerwoman_f", "npc_f_06", "dist_peasant_f"], "kind": "stationary",
+      "pos": [-14.2, 0, -5.7], "facing": 0.0, "serve": 1.2, "closing": "22:30",
+      "prop": "vendor_herbs", "prop_at": [-0.78, 0, 0.1], "prop_rot": 3.14159, "prop_col": [0.8, 1.4, 0.6],
+      "cries": [
+        {"text": "Zioła! Rumianek, szałwia, piołun!", "gloss": "Herbs! Camomile, sage, wormwood!"},
+        {"text": "Na kaszel, na gorączkę!", "gloss": "For the cough, for the fever!"},
+        {"text": "Kräuter für den Husten!", "gloss": "Herbs for the cough!"}
+      ],
+      "pitch": "Camomile for the belly, sage for the throat, wormwood for the worms and the sorrows. One coin a bunch.",
+      "thanks": "Steep it, don't boil it. And keep your feet dry.",
+      "gossip": ["The children who run about the Cloth Hall arcade will carry anything for a few groszy, and the watch never looks twice at them.",
+                 "Pani Zofia at the Town Hall door buys my lavender. Her guests stay late, and some of them leave by the cellar."]
+    },
+    {
+      "id": "szuwaks", "name": "shoe-black", "ware": "a boot-blacking", "item": "blacked boots",
+      "model": ["dist_journeyman", "npc_m_07"], "kind": "stationary",
+      "pos": [-15.6, 0, 26.5], "facing": 0.0, "serve": 1.05, "closing": "23:00",
+      "prop": "vendor_shoeblack_box", "prop_at": [0.0, 0, -0.55], "prop_rot": 3.14159, "prop_col": [0.5, 0.5, 0.4],
+      "work_clip": "crouch_idle",
+      "cries": [
+        {"text": "Buty czyścić! Szuwaks!", "gloss": "Boots cleaned! Blacking!"},
+        {"text": "Stiefel putzen, gnädiger Herr?", "gloss": "Boots polished, good sir?"}
+      ],
+      "pitch": "Slush to the ankle and salt to the knee. One coin and your boots will shine like a canon's.",
+      "thanks": "There. You could shave in them.",
+      "gossip": ["I clean the boots of everyone who goes into the kawiarnia (coffee house). An Austrian captain with a scar goes in at nine and doesn't come out till the curfew bell.",
+                 "Guards' boots are all the same, but the informer's are new. Good leather. Somebody pays him well."]
+    },
+    {
+      "id": "woda", "name": "water carrier", "ware": "a jug of water", "item": "water",
+      "model": ["dist_porter", "npc_m_01"], "kind": "roaming",
+      "loop": [[-2.5, 26.2, 0.0], [4.5, 26.2, 0.0], [10.4, 26.1, 0.0]], "stop_secs": [30, 55], "closing": "22:30",
+      "prop": "vendor_yoke_water", "prop_bone": "neck_01", "prop_at": [0.0, -0.02, 0.04], "prop_rot": 0.0,
+      "walk_clip": "walk_carry",
+      "cries": [
+        {"text": "Woda! Woda z Wisły!", "gloss": "Water! Water from the Vistula!"},
+        {"text": "Woda czysta, z Rudawy!", "gloss": "Clean water, from the Rudawa!"},
+        {"text": "Wasser! Frisches Wasser!", "gloss": "Water! Fresh water!"}
+      ],
+      "pitch": "Drawn above the town, not below it. One coin a jug.",
+      "thanks": "Mind, it's half ice.",
+      "gossip": ["I carry to every kitchen on the south side. The cellar at the corner past St Adalbert's takes more water than a family, and nobody there cooks."]
+    },
+    {
+      "id": "drewno", "name": "firewood seller", "ware": "a bundle of firewood", "item": "firewood",
+      "model": ["dist_carter", "dist_peasant", "npc_m_00"], "kind": "roaming",
+      "loop": [[-26.5, -15.5, -1.5708], [-26.5, -5.0, -1.5708], [-26.3, 3.5, -1.5708]], "stop_secs": [35, 60], "closing": "22:30",
+      "prop": "vendor_backframe_wood", "prop_bone": "spine_03", "prop_at": [0.0, 0.02, 0.21], "prop_rot": 0.0,
+      "walk_clip": "walk_carry",
+      "cries": [
+        {"text": "Drewno na opał!", "gloss": "Firewood!"},
+        {"text": "Brzezina sucha, pali się jak smoła!", "gloss": "Dry birch, burns like pitch!"},
+        {"text": "Brennholz! Trockenes Holz!", "gloss": "Firewood! Dry wood!"}
+      ],
+      "pitch": "Birch and beech, dry as a sermon. One coin a bundle, and I'll carry it to your door.",
+      "thanks": "That'll see you to morning, if you don't open the window.",
+      "gossip": ["I came in through the Floriańska gate at dusk. The Austrians search every sledge now, even for kindling."]
+    },
+    {
+      "id": "mleko", "name": "milk woman", "ware": "a jug of milk", "item": "milk",
+      "model": ["dist_market_woman_f", "town_market_woman_f", "npc_f_04"], "kind": "roaming",
+      "loop": [[-12.0, -26.6, 3.14159], [-3.5, -26.6, 3.14159], [4.0, -26.6, 3.14159]], "stop_secs": [30, 50], "closing": "22:00",
+      "prop": "vendor_yoke_milk", "prop_bone": "neck_01", "prop_at": [0.0, -0.02, 0.04], "prop_rot": 0.0,
+      "walk_clip": "walk_carry",
+      "cries": [
+        {"text": "Mleko! Słodkie mleko!", "gloss": "Milk! Sweet milk!"},
+        {"text": "Śmietana, maślanka!", "gloss": "Cream, buttermilk!"},
+        {"text": "Milch, frische Milch!", "gloss": "Milk, fresh milk!"}
+      ],
+      "pitch": "Milked at Zwierzyniec this afternoon, walked in before the gates shut. One coin a jug.",
+      "thanks": "Drink it before it freezes.",
+      "gossip": ["The goldsmith on the north row keeps his shutters open late. He's waiting for someone who never comes by the front."]
+    },
+    {
+      "id": "domokrazca", "name": "pedlar", "ware": "needles, thread and a ribbon", "item": "ribbon",
+      "model": ["town_shopkeeper_kazimierz", "figure_kazimierz", "npc_m_06"], "kind": "roaming",
+      "loop": [[11.0, -5.7, 0.0], [18.6, 0.0, -1.5708], [11.0, 5.7, 3.14159]], "stop_secs": [35, 60], "closing": "23:00",
+      "prop": "vendor_pack_cloth", "prop_bone": "spine_03", "prop_at": [0.0, 0.06, 0.2], "prop_rot": 0.0,
+      "walk_clip": "walk",
+      "cries": [
+        {"text": "Sukno, nici, guziki!", "gloss": "Cloth, thread, buttons!"},
+        {"text": "Shpilkes, knep, bendlekh!", "gloss": "Pins, buttons, ribbons!"},
+        {"text": "Bänder, Nadeln, Zwirn!", "gloss": "Ribbons, needles, thread!"}
+      ],
+      "pitch": "From Kazimierz, over the bridge before the watch shut it. Needles from Nuremberg, thread from Silesia, a ribbon for your sweetheart. One coin.",
+      "thanks": "Zay gezunt (be well). Come to my brother's shop on Szeroka.",
+      "gossip": ["The Austrian customs men stop every Jew on the bridge from Kazimierz and never a boatman. Ask yourself what the boatmen carry.",
+                 "They shut the Kazimierz bridge at ten. Anyone crossing after that paid someone."]
+    }
+  ]
+}

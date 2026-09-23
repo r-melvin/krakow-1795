@@ -30,6 +30,8 @@ func _ready() -> void:
 	_toggle_row(grid, "Fullscreen", "fullscreen")
 	_toggle_row(grid, "Vertical sync", "vsync")
 	_toggle_row(grid, "Bounced light and mist (GPU)", "gi")
+	_toggle_row(grid, "Multisample anti-aliasing (4x)", "msaa")
+	_toggle_row(grid, "Temporal anti-aliasing", "taa")
 
 	v.add_child(UiTheme.spacer(4))
 	v.add_child(HSeparator.new())
