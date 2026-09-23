@@ -99,13 +99,13 @@ def finish(o, bevel=0.06, seg=2, subsurf=0, wonk=0.0, smooth=40.0, keep_base=Tru
     return o
 
 
-def shear(o, kx, ky):
-    """Lean a whole object: x += z*kx, y += z*ky. Base stays on the ground."""
+def shear(o, kx, ky, z0=0.0):
+    """Lean a whole object: x += (z-z0)*kx, y += (z-z0)*ky. The base at z0 stays put."""
     bm = bmesh.new()
     bm.from_mesh(o.data)
     for v in bm.verts:
-        v.co.x += v.co.z * kx
-        v.co.y += v.co.z * ky
+        v.co.x += (v.co.z - z0) * kx
+        v.co.y += (v.co.z - z0) * ky
     bm.to_mesh(o.data)
     bm.free()
     return o
@@ -338,13 +338,14 @@ def door(parts, x, face, w=2.2, h=3.2):
 
 
 def chimney(parts, x, y, z, h=2.6):
-    lean = RNG.uniform(-0.08, 0.08)
+    lean_x, lean_y = RNG.uniform(-0.08, 0.08), RNG.uniform(-0.05, 0.05)
     c = taper_box("chimney", (0.9, 0.9, h), (x, y, z), M("brick"), top=0.85, bevel=0.06, wonk=0.03)
-    shear(c, lean, RNG.uniform(-0.05, 0.05))
+    shear(c, lean_x, lean_y, z0=z)
     parts.append(c)
-    parts.append(box("cap", (1.2, 1.2, 0.22), (x + h * lean, y, z + h), M("stone_dark"), bevel=0.05, wonk=0.02))
-    parts.append(cyl("pot", 0.22, 0.6, (x + h * lean, y, z + h + 0.2), M("brick_dark"), verts=12, r2=0.18, bevel=0.03))
-    parts.append(box("snow", (1.0, 1.0, 0.1), (x + h * lean, y, z + h + 0.22), M("snow"), bevel=0.04))
+    tx, ty = x + h * lean_x, y + h * lean_y
+    parts.append(box("cap", (1.1, 1.1, 0.22), (tx, ty, z + h - 0.02), M("stone_dark"), bevel=0.05, wonk=0.02))
+    parts.append(cyl("pot", 0.22, 0.6, (tx, ty, z + h + 0.18), M("brick_dark"), verts=12, r2=0.18, bevel=0.03))
+    parts.append(box("snow", (0.9, 0.9, 0.1), (tx, ty, z + h + 0.20), M("snow"), bevel=0.04))
 
 
 # ------------------------------------------------------------------ TENEMENT (kamienica)
@@ -734,84 +735,213 @@ def lantern_post():
     export("lantern_post", join(parts, "lantern_post"), cyl("c", 0.14, 3.6, (0, 0, 0), None, verts=6))
 
 
-# ------------------------------------------------------------------ FIGURES (front = +Y). Fable proportions: broad chest, big hands and boots.
+# ------------------------------------------------------------------ FIGURES (front = +Y)
+# Bodies are lofted: a list of elliptical rings (cx, cy, cz, rx, ry) becomes a smooth tube, subdivided.
+# Clothing is a second loft over the same rings with a little extra radius. Height about 1.9 m, Fable
+# proportions: broad shoulders, big forearms and hands, big boots, slightly large head.
+
+def loft(name, rings, mat, verts=16, subsurf=1, cap_start=True, cap_end=True, smooth=60):
+    bm = bmesh.new()
+    loops = []
+    for (cx, cy, cz, rx, ry) in rings:
+        loop = []
+        for i in range(verts):
+            t = math.tau * i / verts
+            loop.append(bm.verts.new((cx + rx * math.cos(t), cy + ry * math.sin(t), cz)))
+        loops.append(loop)
+    for a, b in zip(loops, loops[1:]):
+        for i in range(verts):
+            bm.faces.new((a[i], a[(i + 1) % verts], b[(i + 1) % verts], b[i]))
+    def fan(loop, ring, flip):
+        cx, cy, cz = ring[0], ring[1], ring[2]
+        c = bm.verts.new((cx, cy, cz))
+        for i in range(verts):
+            a, b = loop[i], loop[(i + 1) % verts]
+            bm.faces.new((c, b, a) if flip else (c, a, b))
+    if cap_start:
+        fan(loops[0], rings[0], True)
+    if cap_end:
+        fan(loops[-1], rings[-1], False)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(mat)
+    return finish(o, bevel=0, subsurf=subsurf, smooth=smooth)
+
+
+def grow(rings, d, dy=0.0):
+    """Same rings with radius padded by d (for clothing shells)."""
+    return [(cx, cy + dy, cz, rx + d, ry + d) for (cx, cy, cz, rx, ry) in rings]
+
+
+def ellipsoid(name, size, center, mat, seg=16, rings=10):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=rings, radius=1.0, location=center)
+    o = bpy.context.object
+    o.scale = size
+    o = _finish_prim(o, name, mat)
+    return finish(o, bevel=0, smooth=60)
+
+
+def body_rings(sx=1.0):
+    """Ring sets for one body. sx scales width (build, 1.0 = average man)."""
+    leg = lambda side: [
+        (side * 0.13, 0.00, 0.06, 0.060 * sx, 0.070),
+        (side * 0.13, 0.00, 0.20, 0.068 * sx, 0.078),
+        (side * 0.125, -0.01, 0.38, 0.085 * sx, 0.098),   # calf
+        (side * 0.12, 0.00, 0.52, 0.074 * sx, 0.084),     # knee
+        (side * 0.115, 0.01, 0.66, 0.095 * sx, 0.105),
+        (side * 0.11, 0.01, 0.80, 0.112 * sx, 0.122),
+        (side * 0.10, 0.00, 0.92, 0.112 * sx, 0.125),
+    ]
+    torso = [
+        (0, 0.00, 0.88, 0.175 * sx, 0.125),
+        (0, 0.00, 0.98, 0.190 * sx, 0.135),   # hips
+        (0, 0.00, 1.10, 0.160 * sx, 0.115),   # waist
+        (0, 0.00, 1.22, 0.185 * sx, 0.128),
+        (0, 0.01, 1.34, 0.215 * sx, 0.145),   # chest
+        (0, 0.00, 1.45, 0.240 * sx, 0.135),   # shoulders
+        (0, 0.00, 1.52, 0.150 * sx, 0.105),
+        (0, 0.00, 1.55, 0.070, 0.070),
+    ]
+    arm = lambda side: [
+        (side * 0.255, 0.00, 1.46, 0.078, 0.078),
+        (side * 0.285, 0.00, 1.31, 0.070, 0.072),
+        (side * 0.300, 0.02, 1.18, 0.060, 0.062),   # elbow
+        (side * 0.315, 0.05, 1.04, 0.068, 0.070),   # forearm (big)
+        (side * 0.325, 0.08, 0.92, 0.050, 0.052),   # wrist
+    ]
+    neck = [(0, 0.005, 1.50, 0.075, 0.078), (0, 0.005, 1.63, 0.068, 0.072)]
+    head = [
+        (0, 0.020, 1.615, 0.060, 0.062),   # chin
+        (0, 0.015, 1.650, 0.090, 0.095),   # jaw
+        (0, 0.010, 1.700, 0.100, 0.108),   # mouth
+        (0, 0.005, 1.750, 0.105, 0.114),   # cheeks
+        (0, 0.000, 1.795, 0.106, 0.114),   # eyes
+        (0, 0.000, 1.835, 0.104, 0.108),   # brow
+        (0, -0.005, 1.880, 0.096, 0.098),
+        (0, -0.010, 1.925, 0.066, 0.068),
+        (0, -0.010, 1.950, 0.030, 0.030),
+    ]
+    return leg, torso, arm, neck, head
+
+
 def humanoid(name, coat, hat, breeches="black", coat_len="short", cuffs=None, sash=None, boots="black",
-             hair=True, beard=False, musket=False, collar=None, skirt=False):
+             hair="short", beard=False, musket=False, collar=None, build=1.0, skin="skin"):
     reset()
     parts = []
+    leg, torso, arm, neck, head = body_rings(build)
     C = M(coat)
-    for sx in (-1, 1):
-        parts.append(blob("boot", (0.26, 0.40, 0.30), (sx * 0.14, 0.05, 0), M(boots), subsurf=2))
-        parts.append(cyl("leg", 0.13, 0.62, (sx * 0.14, 0, 0.26), M(breeches), verts=12, r2=0.11, bevel=0.02))
-    if coat_len == "long" or skirt:
-        parts.append(cyl("skirt", 0.44, 0.60, (0, 0, 0.30), C, verts=14, r2=0.31, bevel=0.03, subsurf=1))
-    elif coat_len == "mid":
-        parts.append(cyl("skirt", 0.36, 0.34, (0, 0, 0.56), C, verts=14, r2=0.31, bevel=0.03, subsurf=1))
-    torso = box("torso", (0.62, 0.38, 0.64), (0, 0, 0.84), C)
-    def vshape(co):
-        if co.z > 1.3:
-            co.x *= 1.18
-        else:
-            co.x *= 0.82
-            co.y *= 0.9
-    edit_verts(torso, vshape)
-    parts.append(finish(torso, bevel=0, subsurf=2))
-    if collar:
-        parts.append(cyl("collar", 0.17, 0.10, (0, 0.0, 1.44), M(collar), verts=12, bevel=0.02))
-    if sash:
-        parts.append(cyl("sash", 0.31, 0.16, (0, 0, 0.78), M(sash), verts=14, bevel=0.03))
-    for sx in (-1, 1):
-        parts.append(sphere("shoulder", 0.15, (sx * 0.33, 0, 1.38), C, seg=14, rings=10))
-        parts.append(cyl("arm", 0.11, 0.56, (sx * 0.37, 0.02, 0.84), C, verts=12, r2=0.085, bevel=0.02, rot=(0, sx * 0.12, 0)))
-        if cuffs:
-            parts.append(cyl("cuff", 0.12, 0.14, (sx * 0.39, 0.02, 0.84), M(cuffs), verts=12, bevel=0.02))
-        parts.append(sphere("hand", 0.12, (sx * 0.40, 0.04, 0.76), M("skin"), seg=14, rings=10))
-    parts.append(cyl("neck", 0.09, 0.14, (0, 0, 1.46), M("skin"), verts=10, bevel=0.02))
-    parts.append(blob("head", (0.30, 0.32, 0.34), (0, 0, 1.56), M("skin"), subsurf=2))
-    parts.append(sphere("nose", 0.04, (0, 0.165, 1.71), M("skin"), seg=8, rings=6))
-    for sx in (-1, 1):
-        parts.append(sphere("eye", 0.028, (sx * 0.06, 0.15, 1.76), M("eye", 0.3), seg=8, rings=6))
-    if hair:
-        parts.append(blob("hair", (0.34, 0.32, 0.20), (0, -0.03, 1.74), M("hair"), subsurf=2))
+    SK = M(skin)
+
+    # --- body core
+    parts.append(loft("torso", torso, SK))
+    parts.append(loft("neck", neck, SK))
+    parts.append(loft("head", head, SK, verts=20, subsurf=2))
+    for side in (-1, 1):
+        parts.append(loft("leg", leg(side), SK))
+        parts.append(loft("arm", arm(side), SK))
+        # hands: mitten palm + thumb
+        wx, wy, wz = arm(side)[-1][0], arm(side)[-1][1], arm(side)[-1][2]
+        parts.append(ellipsoid("hand", (0.055, 0.075, 0.115), (wx + side * 0.01, wy + 0.01, wz - 0.10), SK))
+        parts.append(ellipsoid("thumb", (0.022, 0.035, 0.045), (wx - side * 0.035, wy + 0.055, wz - 0.06), SK, seg=10, rings=6))
+        # shoulder caps
+        parts.append(ellipsoid("delt", (0.085, 0.085, 0.075), (side * 0.235, 0.0, 1.455), C))
+
+    # --- face
+    parts.append(ellipsoid("nose", (0.021, 0.026, 0.036), (0, 0.104, 1.766), SK, seg=10, rings=6))
+    parts.append(ellipsoid("mouth", (0.030, 0.010, 0.007), (0, 0.109, 1.712), M("facing_red", 0.7), seg=8, rings=4))
+    parts.append(ellipsoid("chin", (0.035, 0.030, 0.030), (0, 0.055, 1.632), SK, seg=10, rings=6))
+    for side in (-1, 1):
+        parts.append(ellipsoid("eye", (0.020, 0.012, 0.016), (side * 0.038, 0.098, 1.795), M("plaster_white", 0.3), seg=10, rings=6))
+        parts.append(ellipsoid("pupil", (0.010, 0.006, 0.011), (side * 0.038, 0.109, 1.795), M("eye", 0.2), seg=8, rings=5))
+        parts.append(ellipsoid("brow", (0.034, 0.010, 0.007), (side * 0.040, 0.100, 1.826), M("hair"), seg=8, rings=4))
+        parts.append(ellipsoid("ear", (0.012, 0.024, 0.034), (side * 0.104, -0.005, 1.785), SK, seg=10, rings=6))
     if beard:
-        parts.append(blob("beard", (0.24, 0.12, 0.16), (0, 0.13, 1.54), M("hair"), subsurf=2))
+        parts.append(loft("beard", [(0, 0.03, 1.56, 0.06, 0.05), (0, 0.03, 1.63, 0.085, 0.075), (0, 0.02, 1.71, 0.098, 0.100)], M("hair"), subsurf=2))
+    if hair == "short":
+        parts.append(loft("hair", [(0, -0.035, 1.72, 0.095, 0.085), (0, -0.025, 1.81, 0.112, 0.112), (0, -0.015, 1.87, 0.106, 0.108),
+                                   (0, -0.012, 1.93, 0.076, 0.078), (0, -0.012, 1.968, 0.030, 0.030)], M("hair"), verts=20, subsurf=2))
+    elif hair == "long":
+        parts.append(loft("hair", [(0, -0.05, 1.45, 0.11, 0.05), (0, -0.04, 1.60, 0.115, 0.075), (0, -0.03, 1.72, 0.112, 0.100),
+                                   (0, -0.025, 1.82, 0.114, 0.114), (0, -0.015, 1.90, 0.100, 0.100), (0, -0.012, 1.968, 0.030, 0.030)], M("hair"), verts=20, subsurf=2))
+    elif hair == "queue":   # 18th-c. tied-back hair with a short tail
+        parts.append(loft("hair", [(0, -0.035, 1.74, 0.098, 0.090), (0, -0.025, 1.82, 0.112, 0.112), (0, -0.015, 1.90, 0.100, 0.100), (0, -0.012, 1.968, 0.030, 0.030)], M("hair"), verts=20, subsurf=2))
+        parts.append(loft("tail", [(0, -0.10, 1.55, 0.02, 0.02), (0, -0.11, 1.68, 0.03, 0.03), (0, -0.09, 1.76, 0.035, 0.03)], M("hair"), subsurf=2))
+
+    # --- clothing shells
+    if coat_len == "long":
+        skirt = [(0, 0.0, 0.34, 0.31 * build, 0.25), (0, 0.0, 0.60, 0.25 * build, 0.19), (0, 0.0, 0.85, 0.20 * build, 0.145)]
+        coat_rings = skirt + grow(torso[1:], 0.022)
+    elif coat_len == "mid":
+        skirt = [(0, 0.0, 0.62, 0.25 * build, 0.19), (0, 0.0, 0.85, 0.21 * build, 0.15)]
+        coat_rings = skirt + grow(torso[1:], 0.022)
+    else:
+        coat_rings = grow(torso, 0.022)
+    parts.append(loft("coat", coat_rings, C, verts=20))
+    if collar:
+        parts.append(loft("collar", [(0, 0.0, 1.49, 0.13, 0.11), (0, 0.0, 1.545, 0.145, 0.125), (0, 0.0, 1.575, 0.085, 0.085)], M(collar)))
+    if sash:
+        parts.append(loft("sash", [(0, 0, 1.03, 0.215 * build, 0.165), (0, 0, 1.15, 0.205 * build, 0.155)], M(sash)))
+    for side in (-1, 1):
+        a = arm(side)
+        parts.append(loft("sleeve", grow(a[:-1], 0.018) + [(a[-1][0], a[-1][1], a[-1][2] + 0.02, a[-1][3] + 0.02, a[-1][4] + 0.02)], C))
+        if cuffs:
+            w = a[-1]
+            parts.append(loft("cuff", [(w[0], w[1], w[2] - 0.01, w[3] + 0.035, w[4] + 0.035), (w[0] - side * 0.01, w[1] - 0.02, w[2] + 0.12, w[3] + 0.040, w[4] + 0.040)], M(cuffs)))
+        l = leg(side)
+        parts.append(loft("breeches", grow(l[3:], 0.016), M(breeches)))          # knee to hip
+        parts.append(loft("stocking", grow(l[1:4], 0.008), M(breeches if coat_len == "long" else "plaster_white")))
+        parts.append(loft("boot", grow(l[:3], 0.022), M(boots)))                 # ankle to calf
+        parts.append(ellipsoid("foot", (0.085, 0.16, 0.055), (l[0][0], 0.07, 0.05), M(boots)))
+        parts.append(ellipsoid("heel", (0.07, 0.07, 0.05), (l[0][0], -0.03, 0.045), M(boots), seg=10, rings=6))
+
+    # --- hats
+    top = 1.93
     if hat == "tricorne":
-        parts.append(cyl("brim", 0.42, 0.06, (0, 0.02, 1.86), M("black"), verts=3, rot=(0, 0, math.pi / 2), bevel=0.03, subsurf=1))
-        parts.append(cyl("crown", 0.17, 0.15, (0, 0, 1.88), M("black"), verts=12, r2=0.15, bevel=0.03, subsurf=1))
+        parts.append(cyl("brim", 0.29, 0.03, (0, 0.02, top - 0.03), M("black"), verts=3, rot=(0, 0, math.pi / 2), bevel=0.015, subsurf=2))
+        parts.append(loft("crown", [(0, -0.005, top - 0.04, 0.110, 0.110), (0, -0.005, top + 0.06, 0.104, 0.104), (0, -0.005, top + 0.09, 0.04, 0.04)], M("black")))
     elif hat == "konfederatka":
-        parts.append(cyl("fur", 0.21, 0.09, (0, 0, 1.84), M("hair"), verts=14, bevel=0.03, subsurf=1))
-        parts.append(box("cap", (0.34, 0.34, 0.18), (0, 0, 1.92), M("crimson"), bevel=0.05, subsurf=1))
+        parts.append(loft("fur", [(0, -0.005, top - 0.07, 0.115, 0.115), (0, -0.005, top - 0.01, 0.125, 0.125)], M("hair")))
+        parts.append(box("cap", (0.23, 0.23, 0.09), (0, -0.005, top - 0.02), M("crimson"), bevel=0.03, subsurf=1))
     elif hat == "krakuska":
-        parts.append(cyl("band", 0.20, 0.07, (0, 0, 1.85), M("black"), verts=14, bevel=0.02))
-        parts.append(box("cap", (0.30, 0.30, 0.15), (0, 0, 1.92), M("red_cap"), bevel=0.04, subsurf=1))
-        parts.append(box("feather", (0.035, 0.035, 0.48), (0.14, -0.06, 1.92), M("feather"), rot=(0.1, -0.4, 0), bevel=0.01))
+        parts.append(loft("band", [(0, -0.005, top - 0.05, 0.112, 0.112), (0, -0.005, top + 0.0, 0.115, 0.115)], M("black")))
+        parts.append(box("cap", (0.21, 0.21, 0.10), (0, -0.005, top - 0.005), M("red_cap"), bevel=0.025, subsurf=1))
+        parts.append(cyl("feather", 0.012, 0.26, (0.08, -0.05, top + 0.02), M("feather"), verts=8, r2=0.003, rot=(0.2, -0.7, 0), bevel=0))
     elif hat == "biretta":
-        parts.append(box("cap", (0.28, 0.28, 0.13), (0, 0, 1.86), M("black"), bevel=0.03))
-        parts.append(box("ridge", (0.05, 0.28, 0.07), (0, 0, 1.99), M("black"), bevel=0.01))
+        parts.append(box("cap", (0.20, 0.20, 0.09), (0, -0.005, top - 0.02), M("black"), bevel=0.02, subsurf=1))
+        parts.append(box("ridge", (0.03, 0.20, 0.05), (0, -0.005, top + 0.07), M("black"), bevel=0.01))
+        parts.append(box("ridge", (0.20, 0.03, 0.05), (0, -0.005, top + 0.07), M("black"), bevel=0.01))
     elif hat == "round":
-        parts.append(cyl("brim", 0.28, 0.04, (0, 0, 1.86), M("black"), verts=16, bevel=0.015))
-        parts.append(cyl("crown", 0.16, 0.17, (0, 0, 1.88), M("black"), verts=14, r2=0.15, bevel=0.03, subsurf=1))
+        parts.append(cyl("brim", 0.17, 0.02, (0, -0.005, top - 0.03), M("black"), verts=20, bevel=0.008))
+        parts.append(loft("crown", [(0, -0.005, top - 0.03, 0.105, 0.105), (0, -0.005, top + 0.09, 0.098, 0.098), (0, -0.005, top + 0.12, 0.04, 0.04)], M("black")))
     elif hat == "fur":
-        parts.append(cyl("furhat", 0.21, 0.19, (0, 0, 1.85), M("hair"), verts=14, bevel=0.04, subsurf=1))
+        parts.append(loft("furhat", [(0, -0.005, top - 0.08, 0.118, 0.118), (0, -0.005, top + 0.06, 0.128, 0.128), (0, -0.005, top + 0.10, 0.06, 0.06)], M("hair")))
+    elif hat == "bonnet":
+        parts.append(loft("bonnet", [(0, -0.03, top - 0.10, 0.118, 0.118), (0, -0.03, top + 0.02, 0.122, 0.122), (0, -0.03, top + 0.06, 0.05, 0.05)], M("plaster_white")))
+
+    # --- kit
     if musket:
-        parts.append(taper_box("stock", (0.07, 0.09, 0.95), (0.47, 0.02, 0.62), M("wood_dark"), top=0.7, bevel=0.02))
-        parts.append(cyl("barrel", 0.02, 1.05, (0.47, 0.03, 1.45), M("lead", 0.4), verts=8, bevel=0))
-        parts.append(box("cartridge", (0.24, 0.12, 0.17), (-0.22, -0.2, 0.72), M("black"), bevel=0.02))
-        parts.append(cbox("belt", (0.09, 0.03, 0.8), (-0.05, 0.2, 1.1), M("plaster_white"), rot=(0, -0.55, 0), bevel=0.01))
+        parts.append(cyl("barrel", 0.012, 1.15, (0.31, -0.03, 1.15), M("lead", 0.4), verts=10, bevel=0))
+        parts.append(loft("stock", [(0.31, -0.03, 0.70, 0.030, 0.045), (0.31, -0.03, 1.00, 0.028, 0.040), (0.31, -0.03, 1.30, 0.016, 0.022)], M("wood_dark")))
+        parts.append(cbox("belt", (0.075, 0.015, 0.62), (-0.02, 0.165, 1.25), M("plaster_white"), rot=(0.05, -0.62, 0), bevel=0.004))
+        parts.append(box("cartridge", (0.20, 0.10, 0.14), (-0.22, -0.16, 0.95), M("black"), bevel=0.015))
     export(name, join(parts, name))
 
 
 def figures():
     humanoid("watchman", "white_coat", "tricorne", breeches="plaster_white", coat_len="mid", cuffs="facing_red",
-             collar="facing_red", boots="black", hair=False, musket=True)
-    humanoid("figure_noble", "crimson", "konfederatka", breeches="zupan_gold", coat_len="long", sash="zupan_gold", boots="brown_coat", collar="zupan_gold")
-    humanoid("figure_artist", "green_coat", "round", breeches="brown_coat", coat_len="mid", cuffs="brown_coat", collar="plaster_white")
-    humanoid("figure_veteran", "sukmana", "krakuska", breeches="brown_coat", coat_len="long", sash="facing_red", boots="black", cuffs="facing_red")
-    humanoid("figure_merchant", "brown_coat", "tricorne", breeches="black", coat_len="mid", cuffs="zupan_gold", collar="plaster_white")
-    humanoid("figure_priest", "black", "biretta", breeches="black", coat_len="long", collar="plaster_white")
-    humanoid("figure_kazimierz", "navy", "fur", breeches="black", coat_len="long", beard=True)
-    humanoid("figure_townsman", "brown_coat", "round", breeches="brown_coat", coat_len="mid")
-    humanoid("figure_townswoman", "plaster_sage", None, breeches="plaster_sage", coat_len="long", collar="plaster_white", skirt=True)
+             collar="facing_red", boots="black", hair="queue", musket=True, build=1.05)
+    humanoid("figure_noble", "crimson", "konfederatka", breeches="zupan_gold", coat_len="long", sash="zupan_gold", boots="brown_coat", collar="zupan_gold", hair="short")
+    humanoid("figure_artist", "green_coat", "round", breeches="brown_coat", coat_len="mid", cuffs="brown_coat", collar="plaster_white", hair="long", build=0.92)
+    humanoid("figure_veteran", "sukmana", "krakuska", breeches="brown_coat", coat_len="long", sash="facing_red", boots="black", cuffs="facing_red", hair="short", build=1.1)
+    humanoid("figure_merchant", "brown_coat", "tricorne", breeches="black", coat_len="mid", cuffs="zupan_gold", collar="plaster_white", hair="queue", build=1.08)
+    humanoid("figure_priest", "black", "biretta", breeches="black", coat_len="long", collar="plaster_white", hair="short", build=0.95)
+    humanoid("figure_kazimierz", "navy", "fur", breeches="black", coat_len="long", beard=True, hair="short")
+    humanoid("figure_townsman", "brown_coat", "round", breeches="brown_coat", coat_len="mid", hair="short")
+    humanoid("figure_townswoman", "plaster_sage", "bonnet", breeches="plaster_sage", coat_len="long", collar="plaster_white", hair="long", build=0.85)
 
 
 if __name__ == "__main__":
