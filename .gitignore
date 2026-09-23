@@ -25,6 +25,8 @@ assets/models/cast_*.glb.import
 assets/models/npc_*.glb
 assets/models/npc_*.glb.import
 assets/models/town_*.glb
+assets/models/dist_*.glb
+assets/models/dist_*.glb.import
 assets/models/town_*.glb.import
 assets/models/watchman.glb
 assets/models/watchman.glb.import
