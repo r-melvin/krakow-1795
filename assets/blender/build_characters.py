@@ -1253,8 +1253,8 @@ def drape(obj, name, rig, ctx):
             # centre line, so a narrower arc misses them), fading out by 75 deg
             dback = abs(math.atan2(rx, ry))
             rear = 1.0 - _smooth01((dback - math.radians(50)) / math.radians(25))
-            base = 0.045                                              # +4.5 cm all round (3 cm let the front knee through)
-            fl = (base + 0.045 * rear - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
+            base = 0.06                                               # +4.5 cm all round (3 cm let the front knee through)
+            fl = (base + 0.06 * rear - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
             # + 3 cm wearing ease all the way down, so the skirt clears the eased coat and breeches beneath it
             disp = 0.03 + A_fold * f * t ** 1.1 + 0.005 * g * max(0.0, 1 - t / 0.3) + fl
             moves[v] = Vector((rx / rl * disp, ry / rl * disp, 0.0))
@@ -1439,7 +1439,7 @@ def skirt_weights(obj, rig, ctx):
         sfac = (abs(rx) / rl) ** 2
         cap = cf + (cs - cf) * sfac
         # left/right blend: 18 cm wide at the front, 14 cm at the back (narrower tears the centre back, wider lets the calf through)
-        bw = 0.09 - 0.02 * max(0.0, ry / rl)
+        bw = 0.22                         # left/right blend over 44 cm: the cloth between the legs stretches evenly
         wl = _smooth01((rx + bw) / (2 * bw))
         th = cap * (1 - calf)
         cl = cap * calf

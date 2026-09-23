@@ -83,7 +83,105 @@ def load(name, x=0.0, rz=0.0):
             pb.scale = (1, 1, 1)
     return root, objs
 
+# ------------------------------------------------------------------ in-game retarget preview
+# Godot (scripts/core/assets.gd, _retarget) plays anim_library.glb clips on every character by keeping each bone's
+# world-space rotation delta from rest: q_target = A * q_lib * B. The same thing done here in armature space
+# (frame-independent): D = R_lib_pose * R_lib_rest^-1 per bone, target basis = Rrest^-1 * D_parent^-1 * D * Rrest,
+# and the pelvis offset scaled by pelvis height. So the clip sheets show what the game shows.
+_LIB = {}
+
+
+def lib_rig():
+    try:
+        if "rig" in _LIB and _LIB["rig"].name in bpy.data.objects:
+            return _LIB["rig"], _LIB["acts"]
+    except ReferenceError:          # scene() reset the file
+        _LIB.clear()
+    path = os.path.join(MODELS, "anim_library.glb")
+    before_a, before_o = set(bpy.data.actions), set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    new_o = [o for o in bpy.data.objects if o not in before_o]
+    rig = next(o for o in new_o if o.type == "ARMATURE")
+    for o in new_o:
+        if o is not rig and o.type == "MESH":
+            bpy.data.objects.remove(o)
+    rig.hide_render = True
+    acts = {}
+    for a in bpy.data.actions:
+        if a not in before_a:
+            a.use_fake_user = True
+            acts[a.name.split(".")[0]] = a
+    ad = rig.animation_data_create()
+    for tr in list(ad.nla_tracks):
+        ad.nla_tracks.remove(tr)
+    _LIB.update(rig=rig, acts=acts)
+    return rig, acts
+
+
+def retarget_pose(sc, target, clip, phase):
+    lib, acts = lib_rig()
+    act = acts.get(clip)
+    if act is None or target.type != "ARMATURE":
+        return False
+    lib.animation_data.action = act
+    f0, f1 = act.frame_range
+    sc.frame_set(int(round(f0 + (f1 - f0) * phase)))
+    bpy.context.view_layer.update()
+    D = {}
+    for pb in lib.pose.bones:
+        D[pb.name] = pb.matrix.to_quaternion() @ pb.bone.matrix_local.to_quaternion().inverted()
+    off = lib.pose.bones["pelvis"].head - lib.data.bones["pelvis"].head_local if "pelvis" in lib.pose.bones else None
+    scale = target.data.bones["pelvis"].head_local.z / max(0.1, lib.data.bones["pelvis"].head_local.z) if "pelvis" in target.data.bones else 1.0
+    from mathutils import Quaternion
+    def dq(b):
+        while b is not None:
+            if b.name in D:
+                return D[b.name]
+            b = b.parent
+        return Quaternion()
+    for pb in target.pose.bones:
+        b = pb.bone
+        rr = b.matrix_local.to_quaternion()
+        d = dq(b)
+        dp = dq(b.parent)
+        pb.rotation_mode = "QUATERNION"
+        pb.rotation_quaternion = rr.inverted() @ dp.inverted() @ d @ rr
+        pb.location = (0, 0, 0)
+        if b.name == "pelvis" and off is not None:
+            pb.location = rr.inverted() @ (off * scale)
+    lib.animation_data.action = None
+    bpy.context.view_layer.update()
+    return True
+
+
+def clip_sheet(name, clip, out):
+    """Four phases of a library clip, side view (top row) and from behind at 150 deg (bottom row), as the game plays it."""
+    sc = scene()
+    sc.render.resolution_x, sc.render.resolution_y = 1800, 975
+    lib_rig()
+    i = 0
+    for row, rz in enumerate((math.radians(90), math.radians(150))):
+        for q in range(4):
+            root, objs = load(name, q * 0.8, rz)
+            root.location.z = -row * 2.0
+            if not retarget_pose(sc, root, clip, q / 4):
+                return None
+    cam(sc, (1.2, -11.0, -0.1), (1.2, 0, -0.1), lens=50)
+    sc.render.filepath = os.path.join(out, "%s_clip_%s.png" % (name, clip))
+    bpy.ops.render.render(write_still=True)
+    print("[render]", sc.render.filepath)
+    return sc.render.filepath
+
+
+CLIPS = [c for c in os.environ.get("CLIPS", "").split(",") if c]
+
+
 for name in names:
+    if os.environ.get("ONLY_CLIPS"):
+        # CLIPS=walk_fast,run ONLY_CLIPS=1 blender -b --python render_characters.py -- <outdir> <name>
+        for clip in CLIPS:
+            clip_sheet(name, clip, OUT)
+        continue
     sc = scene()
     sc.render.resolution_x, sc.render.resolution_y = 2400, 1300
     # character faces Godot +Z = Blender -Y after import; camera sits at -Y to see the front
@@ -154,4 +252,6 @@ for name in names:
     cam(sc, (2.62, -8.2, 1.0), (2.62, 0, 0.85), lens=50)
     sc.render.filepath = os.path.join(OUT, name + "_walk.png"); bpy.ops.render.render(write_still=True)
     print("[render]", sc.render.filepath)
+    for clip in CLIPS:
+        clip_sheet(name, clip, OUT)
 
