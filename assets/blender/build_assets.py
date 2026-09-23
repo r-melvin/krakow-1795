@@ -1360,7 +1360,7 @@ def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters
     if sill:
         parts.append(fbox("sill", face, plane, a, (0.12 - REV) / 2, zb - 0.12, w + 0.3, 0.12 + REV, 0.12, M("stone"), bevel=0.02, seg=1))
         if snow:
-            parts.append(fbox("sill_snow", face, plane, a, (0.1 - REV) / 2 + 0.01, zb, w + 0.2, 0.08 + REV, 0.05, M("snow"), bevel=0.02, seg=1))
+            parts.append(fbox("sill_snow", face, plane, a, (0.1 - REV) / 2 + 0.01, zb, w + 0.2, 0.08 + REV, 0.03, M("snow"), bevel=0.01, seg=1))
     if surround:
         sm = M(surround)
         bw = 0.13
@@ -1371,7 +1371,7 @@ def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters
             parts.append(fbox("lintel", face, plane, a, 0.04, zs, w + 0.42, 0.08, 0.24, M("stone"), bevel=0.02, seg=1))
             parts.append(fbox("hood", face, plane, a, 0.08, zs + 0.24, w + 0.56, 0.16, 0.08, M("stone"), bevel=0.02, seg=1))
             if snow:
-                parts.append(fbox("hood_snow", face, plane, a, 0.08, zs + 0.32, w + 0.5, 0.14, 0.04, M("snow"), bevel=0.015, seg=1))
+                parts.append(fbox("hood_snow", face, plane, a, 0.08, zs + 0.32, w + 0.5, 0.14, 0.025, M("snow"), bevel=0.01, seg=1))
     else:
         voussoirs(parts, face, plane, a, zs, w, 0.16, M("stone"), shape=shape, n=7 if shape == "round" else 8)
     if shutters:
@@ -1531,7 +1531,7 @@ def plinth(parts, x0, x1, y_face, h=0.5, proud=0.08, mat=None, skip=()):
             parts.append(box("plinth", (xb - xa, proud + 0.05, h), ((xa + xb) / 2, y_face - proud / 2 + 0.025, 0), mat or M("stone_dark"), bevel=0.02, seg=1))
 
 
-def dormer(parts, x, y_front, zb, w, h, wall, roofmat, depth=1.6, warm=False, snow=True):
+def dormer(parts, x, y_front, zb, w, h, wall, roofmat, depth=1.6, warm=False, snow=False):
     """Dormer with a real window: plaster cheeks and front, a recessed casement, a small tiled gable roof."""
     parts.append(box("dormer", (w, depth - REV, h), (x, y_front + REV + (depth - REV) / 2, zb), wall, bevel=0.03, seg=1))
     ww, wh = w * 0.52, h * 0.58
@@ -1634,7 +1634,7 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
             voussoirs(parts, "-Y", af, x, top + 1.6 - bay_w * 0.25, bay_w * 0.5, 0.12, M("plaster_white"), n=7, proud=0.05, key=0.08)
         parts.append(box("attic_base", (width + 0.5, 0.3, 0.2), (0, af - 0.1, top - 0.45), spale, bevel=0.03, seg=1))
         parts.append(box("coping", (width + 0.6, dtop + 0.5, 0.18), (0, yc, top + 1.9), stone, bevel=0.03, seg=1, wonk=0.02))
-        parts.append(box("coping_snow", (width + 0.5, dtop + 0.4, 0.06), (0, yc, top + 2.08), M("snow"), bevel=0.02, seg=1))
+        parts.append(box("coping_snow", (width + 0.5, dtop + 0.4, 0.03), (0, yc, top + 2.08), M("snow"), bevel=0.01, seg=1))
         n = max(2, int(width / 2.2))
         py_ = af + 0.2
         for i in range(n + 1):
@@ -1658,7 +1658,7 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
         chimney(parts, -width * 0.3, 1.0, top + 2.6, h=2.4)
         roof_top = top + 4.9
 
-    parts.append(box("snow_c", (wtop + 0.9, dtop + 0.9, 0.1), (0, yc, body_h + 0.45), M("snow"), bevel=0.04, seg=1, wonk=0.03))
+    parts.append(box("snow_c", (wtop + 0.7, dtop + 0.7, 0.035), (0, yc, body_h + 0.45), M("snow"), bevel=0.015, seg=1, wonk=0.01))
 
     visual = join(parts, name)
     lean_x, lean_y = RNG.uniform(-0.0125, 0.0125), RNG.uniform(-0.01, 0.0025)
@@ -2121,7 +2121,7 @@ def hip_snow(name, L, W, H, loc, hip=None, frac=0.62):
     return hip_roof(name, Lf, Wf, H * frac + 0.08, (x, y, z + H * (1 - frac) + 0.02), M("snow"), hip=max(0.1, hip - (W - Wf) / 2), thick=0.06)
 
 
-def pitched(parts, name, L, W, H, loc, mat, along_x=True, snow=True, courses=0, sag=0.06, flare=0.06):
+def pitched(parts, name, L, W, H, loc, mat, along_x=True, snow=False, courses=0, sag=0.06, flare=0.06):
     parts.append(roof(name, L, W, H, loc, mat, sag=sag, flare=flare, along_x=along_x, courses=courses, ridge=courses > 0))
     if snow:
         x, y, z = loc
