@@ -165,7 +165,6 @@ static func speech(node: Node3D, text: String, secs: float, height: float = 2.15
 	l.no_depth_test = true
 	l.render_priority = 5
 	node.add_child(l)
-	var t := node.get_tree().create_timer(secs)
-	t.timeout.connect(func() -> void:
-		if is_instance_valid(l):
-			l.queue_free())
+	var tw := l.create_tween()     # dies with the label, so a freed world leaves no dangling timer
+	tw.tween_interval(secs)
+	tw.tween_callback(l.queue_free)

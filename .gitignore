@@ -33,3 +33,5 @@ assets/models/*.jpg.import
 # Third-party animal sources, fetched by tools/fetch_animals.sh (only the LICENSE.txt files are committed)
 assets/third_party/*/*
 !assets/third_party/*/LICENSE.txt
+assets/models/*.webp
+assets/models/*.webp.import
