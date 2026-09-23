@@ -10,16 +10,8 @@ COUNTER=/tmp/krakow-1795-cpu.slot
 S=$(( ( $(cat "$COUNTER" 2>/dev/null || echo 0) + 1 ) % SLOTS ))
 echo "$S" > "$COUNTER"
 FIRST=$(( S * N )); LAST=$(( FIRST + N - 1 )); [[ $LAST -ge $TOTAL ]] && LAST=$(( TOTAL - 1 ))
-# Godot loads the whole character roster (several GB): allow at most two Godot processes machine-wide,
-# whatever the agents do. Slots are flocks; the wait is up to 30 minutes.
+# Godot builds a 5-12 GB world: exactly ONE Godot process machine-wide, sharing the lock with tools/with_gpu.sh.
 if printf '%s ' "$@" | grep -q 'godot'; then
-  for slot in 0 1; do
-    exec 9>"/tmp/krakow-1795-godot-$slot.lock"
-    if flock -n 9; then
-      exec nice -n 10 taskset -c "${FIRST}-${LAST}" "$@"
-    fi
-    exec 9>&-
-  done
-  exec flock -w 1800 "/tmp/krakow-1795-godot-0.lock" nice -n 10 taskset -c "${FIRST}-${LAST}" "$@"
+  exec flock -w 3600 /tmp/krakow-1795-gpu.lock nice -n 10 taskset -c "${FIRST}-${LAST}" "$@"
 fi
 exec nice -n 10 taskset -c "${FIRST}-${LAST}" "$@"
