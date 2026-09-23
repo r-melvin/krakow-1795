@@ -3454,9 +3454,63 @@ PAL.update({
     "coach_green": (0.08, 0.17, 0.12), "coach_red": (0.40, 0.10, 0.07), "leather": (0.20, 0.12, 0.07), "berry": (0.55, 0.08, 0.06),
     "dried_flower": (0.62, 0.36, 0.20), "coffee": (0.10, 0.06, 0.04), "mud": (0.16, 0.13, 0.10),
 })
+
+
+def _tx_slush(g):
+    """Trodden street snow: grey-blue packed slush, boot prints pressed into it in loose staggered rows, dirt
+    streaks dragged along by cart wheels and soles, grit freckles. Matte (roughness ~0.85)."""
+    lumps = g.noise(5, 5, 4, 0.55, seed=61)
+    fine = g.noise(120, 120, 2, seed=62)
+    # boot prints: one oval pit pair (toe, heel) per staggered cell, turned and shifted per cell, some cells empty
+    cu, cv, iu, iv, par = g.cells(7, 5, stagger=0.5)
+    jit = g.white(iu, iv, 3.0)
+    jit2 = g.white(iu, iv, 7.0)
+    keep = g.smooth(jit, 0.35, 0.42)
+    ang = g.mul(g.sub(jit2, 0.5), 2.2)
+    ca, sa = g.m("COSINE", ang), g.m("SINE", ang)
+    ox = g.sub(cu, g.add(0.5, g.mul(g.sub(jit2, 0.5), 0.35)))
+    oy = g.sub(cv, g.add(0.5, g.mul(g.sub(jit, 0.5), 0.25)))
+    rx = g.sub(g.mul(ox, ca), g.mul(oy, sa))
+    ry = g.add(g.mul(ox, sa), g.mul(oy, ca))
+    dx = g.mul(rx, 3.4)
+    dy = g.mul(ry, 1.5)
+    d_toe = g.add(g.mul(dx, dx), g.mul(g.sub(dy, -0.12), g.sub(dy, -0.12)))
+    d_heel = g.add(g.mul(dx, dx), g.mul(g.mul(g.sub(dy, 0.3), 1.6), g.mul(g.sub(dy, 0.3), 1.6)))
+    pit = g.mul(g.mx(g.one_minus(g.smooth(d_toe, 0.04, 0.12)), g.one_minus(g.smooth(d_heel, 0.02, 0.07))), keep)
+    streak = g.smooth(g.noise(1.5, 14, 3, 0.5, seed=63), 0.52, 0.72)
+    grit = g.smooth(fine, 0.7, 0.76)
+    col = g.mix(lumps, (0.37, 0.40, 0.45), (0.46, 0.49, 0.54))
+    col = g.mix(g.mul(pit, 0.5), col, (0.33, 0.34, 0.36))
+    col = g.mix(g.mul(streak, 0.6), col, (0.30, 0.27, 0.23))
+    col = g.mix(g.mul(grit, 0.5), col, (0.16, 0.15, 0.14))
+    h = g.sub(g.add(g.mul(lumps, 0.45), g.mul(fine, 0.08)), g.add(g.mul(pit, 0.4), g.mul(streak, 0.12)))
+    rough = g.add(0.8, g.mul(fine, 0.1))
+    return col, rough, h, 0.035
+
+
+def _tx_hedge(g):
+    """Clipped yew/box in winter: small leaf clusters (bright tips, dark gaps between them), bronzed winter
+    patches, deep near-black hollows where the shell thins."""
+    cell = g.voronoi(70, 70, seed=71)
+    cell2 = g.voronoi(150, 150, seed=72)
+    leaf = g.one_minus(g.smooth(cell, 0.3, 0.75))
+    leaf2 = g.one_minus(g.smooth(cell2, 0.3, 0.7))
+    bronze = g.smooth(g.noise(4, 4, 4, 0.55, seed=73), 0.55, 0.72)
+    hollow = g.smooth(g.noise(9, 9, 3, 0.5, seed=74), 0.64, 0.74)
+    col = g.mix(g.add(g.mul(leaf, 0.7), g.mul(leaf2, 0.3)), (0.012, 0.025, 0.012), (0.07, 0.13, 0.05))
+    col = g.mix(g.mul(bronze, 0.4), col, (0.11, 0.09, 0.04))
+    col = g.mix(g.mul(hollow, 0.8), col, (0.015, 0.02, 0.012))
+    h = g.sub(g.add(g.mul(leaf, 0.6), g.mul(leaf2, 0.25)), g.mul(hollow, 0.5))
+    rough = g.add(0.72, g.mul(g.one_minus(leaf), 0.18))
+    return col, rough, h, 0.02
+
+
+RECIPES.update({"slush": _tx_slush, "hedge": _tx_hedge})
+TEXSPEC.update({"slush": (1024, 2.0), "hedge": (1024, 2.0)})
+PAL.update({"snow_dirty": (0.55, 0.58, 0.62), "hedge_leaf": (1.0, 1.0, 1.0), "hedge_core": (0.012, 0.018, 0.01)})
 TEX_OF.update({"bolt_red": "cloth", "bolt_blue": "cloth", "bolt_green": "cloth", "linen": "cloth",
-               "sacking": "cloth", "snow_dirty": "snow", "coach_green": "oak", "coach_red": "oak"})
-TINT.update({"bark": (0.52, 0.47, 0.42), "snow_dirty": (0.68, 0.66, 0.64), "sacking": (0.80, 0.70, 0.52),
+               "sacking": "cloth", "snow_dirty": "slush", "hedge_leaf": "hedge", "coach_green": "oak", "coach_red": "oak"})
+TINT.update({"bark": (0.52, 0.47, 0.42), "snow_dirty": (1.0, 1.0, 1.0), "hedge_leaf": (1.0, 1.0, 1.0), "sacking": (0.80, 0.70, 0.52),
              "coach_green": (0.26, 0.42, 0.32), "coach_red": (0.78, 0.36, 0.28)})
 _SERIF = [p for p in ("/usr/share/fonts/liberation/LiberationSerif-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSerif-Bold.ttf",
                       "/usr/share/fonts/noto/NotoSerif-Bold.ttf") if os.path.exists(p)]
@@ -3539,6 +3593,64 @@ def _text(name, body, size, loc, mat, depth=0.006, width=None, res=2):
     return _finish_prim(o, name, mat)
 
 
+def _slush_patch(name, outline, centre, lift=0.018, seed=0):
+    """Packed slush lying on the setts: a low mound over `outline` (closed list of (x, y)) with a thin lip at 6 mm.
+    dressing.gd fades alpha from 1 at 55 % of the radius to 0 at that lip, so no disc edge shows on the cobbles."""
+    rng = random.Random(seed)
+    bm = bmesh.new()
+    cx, cy = centre
+    c = bm.verts.new((cx, cy, lift))
+    mid, rim = [], []
+    for (x, y) in outline:
+        mid.append(bm.verts.new((cx + (x - cx) * 0.55, cy + (y - cy) * 0.55, lift * rng.uniform(0.7, 0.95))))
+        rim.append(bm.verts.new((x, y, 0.006)))
+    n = len(outline)
+    for k in range(n):
+        j = (k + 1) % n
+        bm.faces.new((c, mid[k], mid[j]))
+        bm.faces.new((mid[k], rim[k], rim[j], mid[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces:
+        if f.normal.z < 0:
+            f.normal_flip()
+        f.smooth = True
+    rim_set = set(rim)
+    col = bm.loops.layers.color.new("Col")
+    for f in bm.faces:
+        for lp in f.loops:
+            lp[col] = (1.0, 1.0, 1.0, 0.0 if lp.vert in rim_set else 1.0)
+    return _bm_obj(name, bm, _slush_mat())
+
+
+def _slush_mat():
+    """The slush material, exported with glTF alphaMode BLEND. The exporter does not write the "Col" rim alpha to
+    COLOR_0, so scripts/city/dressing.gd rebuilds the fade from vertex height (rim verts sit at 6 mm)."""
+    m = M("snow_dirty")
+    if not m.get("feather"):
+        nt = m.node_tree
+        bsdf = nt.nodes["Principled BSDF"]
+        vc = nt.nodes.new("ShaderNodeVertexColor")
+        vc.layer_name = "Col"
+        nt.links.new(vc.outputs["Alpha"], bsdf.inputs["Alpha"])
+        try:
+            m.surface_render_method = "BLENDED"
+        except AttributeError:
+            m.blend_method = "BLEND"
+        m["feather"] = 1
+    return m
+
+
+def _blob_outline(r, n, seed, sx=1.0, sy=1.0):
+    rng = random.Random(seed)
+    ph = [rng.uniform(0, math.tau) for _ in range(3)]
+    out = []
+    for k in range(n):
+        a = math.tau * k / n
+        rr = r * (1 + 0.14 * math.sin(3 * a + ph[0]) + 0.08 * math.sin(5 * a + ph[1]) + rng.uniform(-0.06, 0.06))
+        out.append((math.cos(a) * rr * sx, math.sin(a) * rr * sy))
+    return out
+
+
 # ------------------------------------------------------------------ trees
 def _tree(name, seed, trunk_h, trunk_r, L0, depth, kids, spread, up, snow_levels=(1, 2, 3)):
     """Bare winter tree: a leaning trunk that forks into `kids`+leader branches per level, snow along the upper
@@ -3592,7 +3704,7 @@ def _tree(name, seed, trunk_h, trunk_r, L0, depth, kids, spread, up, snow_levels
     grow(top, lean, L0, trunk_r * 0.85, 0)
     bark = _bm_obj(name + "_bark", bm, M("bark"))
     snow = _bm_obj(name + "_snow", sb, M("snow"))
-    ring = cyl("snow_ring", trunk_r * 3.2, 0.04, (0, 0, -0.02), M("snow_dirty"), verts=12, bevel=0)
+    ring = _slush_patch("snow_ring", _blob_outline(trunk_r * 3.4, 20, seed + 5), (0, 0), lift=0.03, seed=seed)
     visual = join([bark, snow, ring], name)
     export(name, visual, box("c", (trunk_r * 2.2, trunk_r * 2.2, trunk_h + 1.0), (0, 0, 0)))
 
@@ -4541,36 +4653,22 @@ def doormat_scraper():
 
 
 def trampled_snow():
-    """Old snow shovelled to the wall foot and packed by boots: an irregular slush apron with footprints, lying
-    just proud of the setts. Origin = on the wall at the pavement; 3 m along the wall, up to 1.5 m out."""
+    """Old snow shovelled to the wall foot and packed by boots: an irregular slush apron (boot prints and dirt
+    streaks baked into its grey-blue slush texture) whose rim sinks among the setts. Origin = on the wall at the
+    pavement; 3 m along the wall, up to 1.4 m out."""
     reset()
     rng = random.Random(191)
-    bm = bmesh.new()
-    n = 24
     ring = []
+    n = 26
     for k in range(n):
         t = k / (n - 1)
         x = -1.5 + 3.0 * t
-        y = -(0.5 + 0.9 * math.sin(math.pi * t) * rng.uniform(0.7, 1.1))
+        y = -(0.35 + 1.0 * math.sin(math.pi * t) ** 0.8 * rng.uniform(0.75, 1.1))
         ring.append((x, y))
-    outline_pts = [(-1.5, 0.0)] + ring + [(1.5, 0.0)]
-    c = bm.verts.new((0, -0.3, 0.012))
-    vs = [bm.verts.new((x, y, 0.006 if y < -0.05 else 0.03)) for x, y in outline_pts]
-    for a, b in zip(vs, vs[1:]):
-        bm.faces.new((c, a, b))
-    bm.faces.new((c, vs[-1], vs[0]))
-    parts = [_bm_obj("slush", bm, M("snow_dirty"))]
-    parts.append(_lumpy("drift", 0.5, (0.0, -0.12, 0.0), M("snow"), zscale=0.3, amp=0.2, seed=192, seg=14, rings=6, zmin=-0.01))
-    edit_verts(parts[-1], lambda co: setattr(co, "x", co.x * 2.4))
-    fp = bmesh.new()
-    for k in range(14):
-        x = rng.uniform(-1.3, 1.3)
-        y = -rng.uniform(0.25, 1.1)
-        a = rng.uniform(0, math.tau)
-        ux, uy = math.cos(a), math.sin(a)
-        pts = [(-0.05, -0.12), (0.05, -0.12), (0.055, 0.1), (-0.055, 0.1)]
-        _quad(fp, [(x + px * ux - py * uy, y + px * uy + py * ux, 0.016) for px, py in pts])
-    parts.append(_bm_obj("prints", fp, M("mud")))
+    outline_pts = ring + [(1.5, 0.02), (0.5, 0.02), (-0.5, 0.02), (-1.5, 0.02)]
+    parts = [_slush_patch("slush", outline_pts, (0.0, -0.35), lift=0.02, seed=193)]
+    parts.append(_lumpy("drift", 0.5, (0.0, -0.1, 0.0), M("snow"), zscale=0.28, amp=0.2, seed=192, seg=14, rings=6, zmin=-0.01))
+    edit_verts(parts[-1], lambda co: (setattr(co, "x", co.x * 2.4), setattr(co, "y", min(co.y, 0.0))))
     export("trampled_snow", join(parts, "trampled_snow"))
 
 
@@ -4638,13 +4736,79 @@ def park_railing():
 
 
 def hedge():
-    """3 m of clipped box hedge, knee to waist high, with snow lying on its flat top."""
+    """3 m of clipped yew/box hedge in winter, 0.85 m high: a round-shouldered shell displaced 2-4 cm by layered
+    noise and clad in a baked leaf-cluster texture, torn open in places onto a near-black core, broken caps of
+    snow on the top and a few twigs the shears missed."""
+    from mathutils import noise as mnoise
     reset()
-    h = _lumpy("hedge", 0.5, (0, 0, 0.42), M("yew"), amp=0.06, seed=211, seg=16, rings=8, zmin=0.0)
-    edit_verts(h, lambda co: (setattr(co, "x", co.x * 3.0), setattr(co, "y", co.y * 0.75), setattr(co, "z", min(co.z * 1.0, 0.85))))
-    snow = _lumpy("snow", 0.5, (0, 0, 0.84), M("snow"), zscale=0.12, amp=0.1, seed=212, seg=16, rings=6)
-    edit_verts(snow, lambda co: (setattr(co, "x", co.x * 2.95), setattr(co, "y", co.y * 0.7)))
-    export("hedge", join([h, snow], "hedge"), box("c", (3.0, 0.75, 0.9), (0, 0, 0)))
+    rng = random.Random(211)
+    hx, hy, H, R = 1.5, 0.36, 0.85, 0.13
+    step = 0.085
+    bm = bmesh.new()
+
+    def grid(axis_u, axis_v, fixed, nu, nv, u0, u1, v0, v1):
+        vs = []
+        for i in range(nu + 1):
+            row = []
+            for j in range(nv + 1):
+                p = [0.0, 0.0, 0.0]
+                p[axis_u] = u0 + (u1 - u0) * i / nu
+                p[axis_v] = v0 + (v1 - v0) * j / nv
+                p[fixed[0]] = fixed[1]
+                row.append(bm.verts.new(p))
+            vs.append(row)
+        for i in range(nu):
+            for j in range(nv):
+                bm.faces.new((vs[i][j], vs[i + 1][j], vs[i + 1][j + 1], vs[i][j + 1]))
+    nx, ny, nz = int(2 * hx / step), max(4, int(2 * hy / step)), int(H / step)
+    grid(0, 2, (1, -hy), nx, nz, -hx, hx, 0.0, H)
+    grid(0, 2, (1, hy), nx, nz, -hx, hx, 0.0, H)
+    grid(1, 2, (0, -hx), ny, nz, -hy, hy, 0.0, H)
+    grid(1, 2, (0, hx), ny, nz, -hy, hy, 0.0, H)
+    grid(0, 1, (2, H), nx, ny, -hx, hx, -hy, hy)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    ix, iy, iz = hx - R, hy - R, H - R
+    for v in bm.verts:
+        p = v.co.copy()
+        c = Vector((max(-ix, min(ix, p.x)), max(-iy, min(iy, p.y)), min(iz, p.z)))
+        d = p - c
+        nrm = d.normalized() if d.length > 1e-6 else Vector((0, 0, 1))
+        base = c + nrm * R
+        q = base * 3.0
+        dn = (mnoise.noise(q) * 0.6 + mnoise.noise(q * 2.7 + Vector((5, 1, 3))) * 0.3 + mnoise.noise(q * 7.1) * 0.15)
+        amt = 0.03 + 0.012 * dn
+        if base.z < 0.1:
+            amt *= base.z / 0.1                       # the foot stays tucked on the ground
+        v.co = base + nrm * (amt - 0.03) + Vector((0, 0, 0))
+        v.co.z = max(0.0, v.co.z)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    holes = [f for f in bm.faces if 0.18 < f.calc_center_median().z < H - 0.12 and abs(f.normal.z) < 0.5 and rng.random() < 0.025]
+    bmesh.ops.delete(bm, geom=holes, context="FACES_ONLY")
+    for f in bm.faces:
+        f.smooth = True
+    shell = _bm_obj("shell", bm, M("hedge_leaf"))
+    core = box("core", (2 * hx - 0.14, 2 * hy - 0.14, H - 0.1), (0, 0, 0), M("hedge_core", 0.95))
+    parts = [shell, core]
+    for k in range(7):                                  # broken snow caps
+        x = -1.25 + k * 0.42 + rng.uniform(-0.1, 0.1)
+        cap = _lumpy("snowcap", 0.32, (x, rng.uniform(-0.04, 0.04), H - 0.035), M("snow"), zscale=0.2, amp=0.25,
+                     seed=220 + k, seg=10, rings=5, zmin=H - 0.06)
+        edit_verts(cap, lambda co, x=x: setattr(co, "x", x + (co.x - x) * rng.uniform(0.9, 1.5)))
+        parts.append(cap)
+    tw = bmesh.new()
+    for k in range(18):
+        side = rng.choice((-1, 1))
+        if k % 3 == 0:
+            p0 = Vector((rng.uniform(-1.3, 1.3), rng.uniform(-0.2, 0.2), H))
+            d = Vector((rng.uniform(-0.3, 0.3), rng.uniform(-0.3, 0.3), 1.0)).normalized()
+        else:
+            p0 = Vector((rng.uniform(-1.35, 1.35), side * (hy - 0.02), rng.uniform(0.3, H - 0.1)))
+            d = Vector((rng.uniform(-0.4, 0.4), side * 1.0, rng.uniform(0.1, 0.7))).normalized()
+        L = rng.uniform(0.1, 0.22)
+        _tube(tw, p0 - d * 0.04, p0 + d * L, 0.005, 0.0, 3)
+        _tube(tw, p0 + d * L * 0.5, p0 + d * L * 0.5 + (d + Vector((0.3, 0.2, 0.2))).normalized() * L * 0.4, 0.003, 0.0, 3)
+    parts.append(_bm_obj("twigs", tw, M("dead_stalk")))
+    export("hedge", join(parts, "hedge"), box("c", (2 * hx, 2 * hy, H), (0, 0, 0)))
 
 
 def lawn_snow():

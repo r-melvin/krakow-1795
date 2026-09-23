@@ -50,6 +50,7 @@ func _ready() -> void:
 	_plants()
 	_clutter()
 	_weeds()
+	_feather_slush(self)
 	var dir := _shot_dir()
 	if dir != "" and not _shot_done:
 		_shot_done = true
@@ -299,6 +300,49 @@ func _clutter() -> void:
 	Assets.place(self, "sledge", Vector3(-7.5, 0, 13.6), -0.5)
 
 
+# ------------------------------------------------------------------ feathered slush edges
+static var _feathered := {}          ## source mesh -> rebuilt mesh with rim alpha (shared by every instance)
+
+## The packed-slush patches (trampled snow at doors, rings under trees) are exported with alpha blending but the
+## glTF exporter drops their rim alpha, so rebuild it here: vertices at the 6 mm lip get alpha 0, those 8 mm higher
+## (the inner ring and the crown) alpha 1, and the material takes alpha from vertex colour.
+func _feather_slush(root: Node) -> void:
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := c as MeshInstance3D
+		if mi.mesh == null or not (mi.mesh is ArrayMesh):
+			continue
+		var src := mi.mesh as ArrayMesh
+		if not _feathered.has(src):
+			_feathered[src] = _feathered_copy(src)
+		if _feathered[src] != null:
+			mi.mesh = _feathered[src]
+
+
+func _feathered_copy(src: ArrayMesh) -> ArrayMesh:
+	var hit := false
+	var out := ArrayMesh.new()
+	for i in src.get_surface_count():
+		var mat := src.surface_get_material(i)
+		var arrays := src.surface_get_arrays(i)
+		if mat != null and mat.resource_name == "snow_dirty" and mat is BaseMaterial3D \
+				and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			hit = true
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var cols := PackedColorArray()
+			cols.resize(verts.size())
+			for k in verts.size():
+				cols[k] = Color(1, 1, 1, clampf((verts[k].y - 0.0065) / 0.0075, 0.0, 1.0))
+			arrays[Mesh.ARRAY_COLOR] = cols
+			var m := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+			m.vertex_color_use_as_albedo = true
+			m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.85
+			mat = m
+		out.add_surface_from_arrays(src.surface_get_primitive_type(i), arrays)
+		out.surface_set_material(out.get_surface_count() - 1, mat)
+	return out if hit else null
+
+
 # ------------------------------------------------------------------ dead grass between the setts (MultiMesh)
 func _weeds() -> void:
 	var mesh := _mesh_of("weed_tuft")
@@ -414,6 +458,10 @@ func _shots(dir: String) -> void:
 		["churchyard", Vector3(34.0, 4.5, -6.5), Vector3(41.0, 0.5, -13.0)],
 		["laundry", Vector3(-21.0, 2.2, -23.5), Vector3(-28.0, 2.8, -31.0)],
 		["adalbert", Vector3(12.5, 2.0, 21.0), Vector3(17.5, 1.5, 19.0)],
+		["hedge_close", Vector3(39.4, 1.5, -12.2), Vector3(41.2, 0.45, -15.6)],
+		["slush_cafe_door", Vector3(-16.6, 1.6, 25.2), Vector3(-18.0, 0.0, 27.8)],
+		["slush_goldsmith_door", Vector3(18.2, 1.6, -24.6), Vector3(18.0, 0.0, -27.6)],
+		["tree_ring", Vector3(25.0, 1.7, -10.6), Vector3(27.2, 0.0, -12.8)],
 		["overhead_ne", Vector3(20.0, 38.0, 10.0), Vector3(22.0, 0.0, -10.0)],
 		["overhead_sw", Vector3(-20.0, 38.0, 0.0), Vector3(-18.0, 0.0, 20.0)],
 	]
