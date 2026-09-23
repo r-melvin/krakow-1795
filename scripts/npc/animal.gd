@@ -253,11 +253,11 @@ func _build_vehicle() -> void:
 	for w in _find(veh, "wheel_", []):
 		var wb := _merged_aabb(w, Transform3D.IDENTITY)
 		_wheels.append([w, maxf(wb.size.y * 0.5, 0.2)])
-	for l in _find(veh, "lamp_L", []):
+	for l in _find(veh, "lamp_", []):          # both carriage lamps: small, unshadowed pools
 		var light := OmniLight3D.new()
 		light.light_color = Color(1.0, 0.72, 0.4)
-		light.light_energy = 1.4
-		light.omni_range = 7.0
+		light.light_energy = 0.9
+		light.omni_range = 5.0
 		light.shadow_enabled = false
 		(l as Node3D).add_child(light)
 	var seats := _find(veh, "driver_seat", [])

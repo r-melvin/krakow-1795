@@ -10,6 +10,9 @@ const FlickerLight := preload("res://scripts/city/flicker.gd")
 const GuardScript := preload("res://scripts/stealth/guard.gd")
 const SafeHouseScript := preload("res://scripts/stealth/safe_house.gd")
 const PopulationScript := preload("res://scripts/city/population.gd")
+const WatchScript := preload("res://scripts/stealth/watch.gd")
+const HidingSpotScript := preload("res://scripts/stealth/hiding_spot.gd")
+const Distraction := preload("res://scripts/stealth/distraction.gd")
 
 const NAV_GROUP := "nav_source"
 
@@ -20,6 +23,8 @@ var nav_region: NavigationRegion3D
 var _baked := false
 var _bake_iteration := 0
 var portals: Array = []          ## [asset, centre, rot_y] per tenement module, for door triggers
+var watch: Node3D                ## stealth coordinator (scripts/stealth/watch.gd)
+var _lanterns: Array = []        ## [FlickerLight, post position] for the douse interactables
 
 
 func _ready() -> void:
@@ -34,6 +39,7 @@ func _ready() -> void:
 	_dressing()
 	_guards()
 	_population()
+	_stealth()
 	_safe_house()
 	_navigation()
 	_interiors()
@@ -112,6 +118,7 @@ func _environment() -> void:
 	moon.light_angular_distance = 0.5
 	moon.light_volumetric_fog_energy = 0.4
 	add_child(moon)
+	moon.add_to_group("moon_light")
 	# One probe over the square so glossy surfaces reflect the lit façades, not just the black sky.
 	var probe := ReflectionProbe.new()
 	probe.position = Vector3(0, 6, 0)
@@ -142,7 +149,9 @@ func _environment() -> void:
 		l.light_specular = 0.7
 		l.light_volumetric_fog_energy = 1.6
 		add_child(l)
+		l.add_to_group("flame_lights")
 		Assets.place(self, "lantern_post", p, 0.0)
+		_lanterns.append([l, p])
 
 	# The dragon's cave, south-west beyond the Town Hall: a sulphurous glow (easter egg).
 	var cave := OmniLight3D.new()
@@ -152,6 +161,7 @@ func _environment() -> void:
 	cave.omni_range = 16
 	cave.shadow_enabled = true
 	add_child(cave)
+	cave.add_to_group("flame_lights")
 
 	# Lit windows spill a little warm light onto the square's edges.
 	# Candle-lit windows: one or two flickering candle pools per house, just outside the façade, at the ground-floor
@@ -171,6 +181,7 @@ func _environment() -> void:
 		b.shadow_enabled = true
 		b.light_volumetric_fog_energy = 1.2
 		add_child(b)
+		b.add_to_group("flame_lights")
 		Assets.place(self, "brazier", p - Vector3(0, 1.2, 0), 0.0)
 
 
@@ -200,6 +211,7 @@ func _candles() -> void:
 			w.light_specular = 0.5
 			w.light_volumetric_fog_energy = 0.8
 			add_child(w)
+			w.add_to_group("flame_lights")
 		i += 1
 	# lit windows in the landmark blocks: Cloth Hall arcade, Town Hall, St Mary's porch
 	for p in [Vector3(-9, 3, -6), Vector3(9, 3, 6), Vector3(-22, 4, 14), Vector3(26, 3, -14)]:
@@ -212,12 +224,14 @@ func _candles() -> void:
 		w.omni_attenuation = 1.3
 		w.light_volumetric_fog_energy = 0.8
 		add_child(w)
+		w.add_to_group("flame_lights")
 
 
 func _ground() -> void:
 	# Plain static body (not CSG) so the navmesh baker reads its box shape directly.
 	var g := StaticBody3D.new()
 	g.name = "Ground"
+	g.set_meta("surface", "cobbles")       # stealth footstep noise (data/stealth.json "surfaces")
 	g.position.y = -0.5
 	var gs := CollisionShape3D.new()
 	var gb := BoxShape3D.new()
@@ -369,6 +383,118 @@ func _population() -> void:
 	pop.set_script(PopulationScript)
 	pop.name = "Population"
 	add_child(pop)
+
+
+# ------------------------------------------------------------------ stealth (docs/STEALTH.md)
+
+## The watch coordinator, hiding spots, distractions, and the light / surface registration for stealth perception.
+func _stealth() -> void:
+	watch = Node3D.new()
+	watch.set_script(WatchScript)
+	add_child(watch)
+	_hiding()
+	_distractions()
+	_register_surfaces.call_deferred()
+	# every other light (dressing lamps, interiors, carriage lamps) joins the flame lights once built
+	get_tree().create_timer(0.3, false).timeout.connect(_register_lights)
+
+
+## Hiding spots reuse the dressing's props where they stand (dressing.gd / _furniture) and add a few of their own.
+## [kind, position, rot_y, place asset or "", local inner, local exit, local peek]
+func _hiding() -> void:
+	var spots := [
+		# the handcart between the east stalls, heaped with straw
+		["hay", Vector3(17.9, 0, -7.9), 0.3, "straw_scatter", Vector3(0, 0, 0), Vector3(0, 0, 1.4), Vector3(0, 0.9, 0.7)],
+		# a hay cart against the Town Hall's east end
+		["hay", Vector3(-16.0, 0, 20.0), -0.6, "", Vector3(0, 0, 0), Vector3(0, 0, 1.6), Vector3(0, 1.0, 0.8)],
+		# the barrel pairs by the Town Hall and by St Adalbert's
+		["barrel", Vector3(-10.6, 0, 15.35), 0.0, "", Vector3(0, 0, -0.6), Vector3(0, 0, 1.0), Vector3(0, 1.1, 0.3)],
+		["barrel", Vector3(19.45, 0, 10.25), PI, "", Vector3(0, 0, -0.6), Vector3(0, 0, 1.0), Vector3(0, 1.1, 0.3)],
+		# under the coach in the inn yard, the woodpile lean-to beside it
+		["coach", Vector3(32.6, 0, -7.5), 0.0, "", Vector3(0, 0, 0), Vector3(-1.4, 0, 0), Vector3(-0.9, 0.35, 0)],
+		["leanto", Vector3(34.6, 0, -4.4), PI, "", Vector3(0, 0, 0.1), Vector3(0, 0, 1.3), Vector3(0, 1.0, 0.6)],
+		# a coal cellar hatch in the north-west alley, and a dark doorway niche on the north row
+		["hatch", Vector3(-26.2, 0, -23.0), PI * 0.5, "cellar_hatch", Vector3(0, -0.2, 0), Vector3(1.2, 0, 0), Vector3(0.3, 0.45, 0)],
+		["niche", Vector3(7.8, 0, -27.55), 0.0, "", Vector3(0, 0, -0.2), Vector3(0, 0, 1.1), Vector3(0, 0.9, 0.5)],
+	]
+	for s in spots:
+		var prop: Node3D = Assets.place(self, s[3], s[1], s[2]) if s[3] != "" else null
+		add_spot(s[0], s[1], s[2], s[4], s[5], s[6], prop)
+	# benches (dressing.gd _benches / _churchyard): sit down, ideally beside a townsman
+	for b in [[Vector3(-12.0, 0, 11.4), PI], [Vector3(11.6, 0, -9.0), PI * 0.5], [Vector3(26.9, 0, -16.55), 0.0],
+			[Vector3(17.2, 0, 17.6), -PI * 0.5], [Vector3(39.9, 0, -13.75), 0.0], [Vector3(42.6, 0, -10.75), PI]]:
+		add_spot("bench", b[0], b[1], Vector3(0, 0, 0.05), Vector3(0, 0, 1.0), Vector3(0, 1.2, 0))
+
+
+func add_spot(kind: String, pos: Vector3, rot_y: float, inner: Vector3, exit: Vector3, peek: Vector3, prop: Node3D = null) -> Node3D:
+	var hs := HidingSpotScript.new()
+	hs.kind = kind
+	hs.highlight_root = prop
+	hs.name = "Hide_%s_%d" % [kind, get_tree().get_nodes_in_group("hiding_spot").size()]
+	hs.position = pos
+	hs.rotation.y = rot_y
+	hs.inner_point = inner
+	hs.exit_point = exit
+	hs.peek_point = peek
+	add_child(hs)
+	return hs
+
+
+func _distractions() -> void:
+	# douse any street lantern
+	for e in _lanterns:
+		var lp := Distraction.LampPost.new()
+		lp.light = e[0]
+		lp.position = e[1]
+		add_child(lp)
+	# loose barrels to kick
+	for b in [[Vector3(-18.6, 0, -9.6), 0.0], [Vector3(8.5, 0, 18.4), 1.0], [Vector3(21.5, 0, -2.5), 0.5]]:
+		var rb := Distraction.RollingBarrel.new()
+		rb.position = b[0]
+		rb.rotation.y = b[1]
+		add_child(rb)
+	# doors to knock on: the bay of a tenement away from its entrance (interiors.gd owns the entrance)
+	if portals.size() >= 16:
+		var k := 0
+		for i in [1, 6, 11, 15]:
+			var por: Array = portals[i]
+			var lx := 3.3 if not (por[0] in ["tenement_b", "tenement_e"]) else 2.0
+			var d := Distraction.KnockDoor.new()
+			d.position = (por[1] as Vector3) + Basis(Vector3.UP, por[2]) * Vector3(lx, 0, 4.15)
+			d.rotation.y = por[2]
+			d.model = ["npc_m_03", "npc_f_02", "npc_m_05", "npc_f_05"][k % 4]
+			add_child(d)
+			k += 1
+	# the saddle horse tethered by St Adalbert's
+	var pop := get_node_or_null("Population")
+	var horse: Node3D = pop.actor("inn_horse") if pop else null
+	if horse:
+		var ht := Distraction.HorseTether.new()
+		ht.horse = horse
+		ht.position = horse.position
+		add_child(ht)
+
+
+## Surface metadata for footstep noise: the dressing's straw, gravel and snow patches become "surface_patch"es.
+func _register_surfaces() -> void:
+	var kinds := {"straw_scatter": ["straw", 1.3], "gravel_path": ["gravel", 2.2], "lawn_snow": ["snow", 2.6],
+			"trampled_snow": ["snow", 1.6], "muck_heap": ["mud", 1.3]}
+	for n in find_children("*", "Node3D", true, false):
+		var base := n.scene_file_path.get_file().get_basename()
+		if kinds.has(base) and not n.is_in_group("surface_patch"):
+			var k: Array = kinds[base]
+			n.set_meta("surface", k[0])
+			n.set_meta("surface_radius", float(k[1]) * n.scale.x)
+			n.add_to_group("surface_patch")
+
+
+func _register_lights() -> void:
+	if not is_inside_tree():
+		return
+	for n in find_children("*", "OmniLight3D", true, false):
+		if n.is_in_group("flame_lights") or n.get_parent().get_script() == SafeHouseScript:
+			continue
+		n.add_to_group("flame_lights")
 
 
 func _safe_house() -> void:

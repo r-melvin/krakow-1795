@@ -30,7 +30,7 @@ const SIGHT := 22.0            ## m: a storyline that begins this close to the p
 const STATUS_COL := {"available": UiTheme.BRASS, "in progress": UiTheme.BRASS_BRIGHT, "resolved": UiTheme.GOOD,
 		"set aside": UiTheme.TEXT_DIM}
 const CONTROLS := [["W A S D", "Walk"], ["Mouse", "Look about"], ["Shift", "Run (the watch hears it)"],
-		["Ctrl  /  C", "Crouch and creep"], ["Z", "Go prone and crawl"], ["E", "Talk, take, use"], ["F  /  Left mouse", "Strike; from behind, a silent takedown"],
+		["Ctrl  /  C", "Crouch and creep"], ["Z", "Go prone and crawl"], ["Q  /  R", "Lean out from cover"], ["H  or  E", "Hide in a cart, barrels or a niche; sit on a bench"], ["E (hold)", "Drag a downed man"], ["G  /  Right mouse", "Hold to aim, release to throw a stone"], ["E", "Talk, take, use; douse a lantern, knock, kick a barrel, untie a horse"], ["F  /  Left mouse", "Strike; from behind, a silent takedown"],
 		["1 - 4", "Choose a reply"], ["J  /  Tab", "Journal"], ["Esc  /  P", "Pause"]]
 const TIPS := ["Lanterns show you to the watch; the curfew bell makes them look twice as far.",
 		"Walk when carrying the bundle or wearing a borrowed cloak. A hurry is noticed before a face.",

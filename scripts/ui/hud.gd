@@ -3,6 +3,10 @@ extends CanvasLayer
 ## suspicion) with the watch state in one word, and an alarm count once the watch has been roused. The controls
 ## line shows for the first 8 s of the first night only (after that they live in the pause menu's Journal,
 ## "Controls" tab). The mission block (objectives_panel.gd) and the journal (journal.gd) are added here.
+## Stealth cues (StealthCues below, no text): a thin arc under the screen centre whose length is the player's
+## visibility and whose colour is their noise (white quiet -> amber loud), and a chevron at the screen edge
+## pointing at the most alarmed guard when he is off-screen. Sound rings, the last-known ghost and the guard cones
+## are drawn in the world (watch.gd, guard.gd).
 
 const HELP_SECONDS := 8.0
 const STATE_WORDS := ["calm", "curious", "searching", "alarm"]
@@ -46,7 +50,7 @@ func _ready() -> void:
 	if not _help_shown and GameState.day == 1:
 		_help_shown = true
 		_help = _lbl(15, Color(UiTheme.TEXT, 0.75))
-		_help.text = "WASD move    Shift sprint    Ctrl crouch    Z prone    E use    F strike    J journal    Esc pause"
+		_help.text = "WASD move    Shift sprint    Ctrl crouch    Z prone    Q/R lean    G throw    E use    F strike    J journal    Esc pause"
 		_help.anchor_left = 0.0
 		_help.anchor_top = 1.0
 		_help.anchor_bottom = 1.0
@@ -59,6 +63,7 @@ func _ready() -> void:
 		tw.tween_property(_help, "modulate:a", 0.0, 1.0)
 		tw.tween_callback(_help.queue_free)
 
+	add_child(StealthCues.new())
 	# Mission block: current objective top right, purse, interact prompt, one-line messages, curfew banner.
 	add_child(preload("res://scripts/mission/objectives_panel.gd").new())
 	# The journal (J / Tab, or from the pause menu): its own layer above the HUD, works while paused.
@@ -80,6 +85,8 @@ func _process(_d: float) -> void:
 	var max_s := 0.0
 	var worst := Guard.State.CALM
 	for g in get_tree().get_nodes_in_group("guards"):
+		if g.is_downed():
+			continue
 		max_s = maxf(max_s, g.suspicion)
 		if g.state > worst:
 			worst = g.state
@@ -125,3 +132,95 @@ class WatchEye extends Control:
 		draw_polyline(pts, col, 1.5, true)
 		draw_circle(c, h * (0.5 + 0.25 * t), col)
 		draw_circle(c, h * 0.2, Color(0, 0, 0, 0.8))
+
+
+
+## Stealth cues, drawn without text. `player` / `watch` may be set explicitly (the stealth smoke's sandbox);
+## otherwise the "player" group and that player's watch are used.
+class StealthCues extends Control:
+	const Perception := preload("res://scripts/stealth/perception.gd")
+	const ARC_RADIUS := 30.0
+	const ARC_SPAN := deg_to_rad(130.0)
+	var player: Node3D
+	var watch: Node
+	var _vis := 0.0
+	var _noise := 0.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	func _process(delta: float) -> void:
+		if player == null or not is_instance_valid(player):
+			player = get_tree().get_first_node_in_group("player") as Node3D
+			watch = null
+		if player and (watch == null or not is_instance_valid(watch)):
+			watch = Perception.watch_of(player)
+		if player:
+			_vis = lerpf(_vis, float(player.get("visibility")), clampf(delta * 8.0, 0.0, 1.0))
+			_noise = lerpf(_noise, clampf(float(player.get("noise")), 0.0, 1.0), clampf(delta * 6.0, 0.0, 1.0))
+		queue_redraw()
+
+	func _draw() -> void:
+		if player == null or not is_instance_valid(player) or not player.is_inside_tree():
+			return
+		var vp := get_viewport_rect().size
+		# The third-person camera centres on the player's shoulders, so the arc sits lower, under the figure's feet.
+		var c := Vector2(vp.x * 0.5, vp.y * 0.775 - ARC_RADIUS)
+		var mid := PI * 0.5                     # bottom of the circle: the arc opens upward like a cradle
+		var a0 := mid - ARC_SPAN * 0.5
+		var a1 := mid + ARC_SPAN * 0.5
+		draw_arc(c, ARC_RADIUS, a0, a1, 48, Color(0, 0, 0, 0.38), 6.0, true)
+		draw_arc(c, ARC_RADIUS, a0, a1, 48, Color(1, 1, 1, 0.13), 1.5, true)
+		var len := ARC_SPAN * clampf(_vis, 0.0, 1.0)
+		if len > 0.01:
+			var quiet := Color(0.93, 0.91, 0.86, 0.9)
+			var loud := Color(1.0, 0.6, 0.16, 1.0)
+			var col := quiet.lerp(loud, clampf(_noise, 0.0, 1.0))
+			draw_arc(c, ARC_RADIUS, mid - len * 0.5, mid + len * 0.5, 40, col, 3.0, true)
+		if player.get("hidden_spot") != null and player.hidden_spot.get("hides_player"):
+			draw_circle(c + Vector2(0, ARC_RADIUS), 3.0, Color(0.6, 0.75, 0.95, 0.8))
+		_draw_chevron(vp)
+
+	func _draw_chevron(vp: Vector2) -> void:
+		var cam := get_viewport().get_camera_3d()
+		if cam == null or watch == null or not is_instance_valid(watch):
+			return
+		var best: Node3D = null
+		var best_s := 19.0
+		for g in watch.guards():
+			if g.is_downed():
+				continue
+			var s: float = g.suspicion + (100.0 if g.is_runner else 0.0)
+			if (g.state > 0 or g.is_runner) and s > best_s:
+				best_s = s
+				best = g
+		if best == null:
+			return
+		var wp: Vector3 = best.global_position + Vector3(0, 1.6, 0)
+		var behind := cam.is_position_behind(wp)
+		var sp := cam.unproject_position(wp)
+		var margin := 40.0
+		var rect := Rect2(Vector2(margin, margin), vp - Vector2(margin, margin) * 2.0)
+		if not behind and rect.has_point(sp):
+			return
+		var centre := vp * 0.5
+		var dir := (sp - centre)
+		if behind:
+			dir = -dir
+		if dir.length() < 1.0:
+			dir = Vector2(0, 1)
+		dir = dir.normalized()
+		var sx := (rect.size.x * 0.5) / maxf(absf(dir.x), 0.001)
+		var sy := (rect.size.y * 0.5) / maxf(absf(dir.y), 0.001)
+		var p := centre + dir * minf(sx, sy)
+		var col := Color(1.0, 0.78, 0.3, 0.85)
+		if best.state >= 2:
+			col = Color(1.0, 0.5, 0.2, 0.9)
+		if best.state >= 3 or best.is_runner:
+			col = Color(1.0, 0.25, 0.18, 0.95)
+		var perp := Vector2(-dir.y, dir.x)
+		var tip := p + dir * 13.0
+		var pts := PackedVector2Array([tip, p - dir * 7.0 + perp * 13.0, p - dir * 1.0, p - dir * 7.0 - perp * 13.0])
+		draw_colored_polygon(pts, col)
+		draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[3], pts[0]]), Color(0, 0, 0, 0.5), 1.0, true)

@@ -3,7 +3,8 @@
 Run:  bash tools/fetch_animals.sh                      (downloads the sources into assets/third_party/)
       blender -b --python assets/blender/build_animals.py [-- --only horse,cat]
 Writes assets/models/<name>.glb for: horse, horse_harnessed, dog_hound, dog_spitz, cat, pigeon, crow, hawk,
-carriage, horse_cart, hitch_rail. Sources and licences: docs/ANIMALS.md.
+carriage, horse_cart, coach (replaces build_assets.py's inn-yard coach), hitch_rail. Sources and licences:
+docs/ANIMALS.md.
 
 Conventions (same as build_assets.py)
 - Metres, Blender Z up, glTF export_yup: Blender (x, y, z) -> Godot (x, z, -y).
@@ -1350,175 +1351,439 @@ def hawk():
     rig_export("hawk", rig, [body])
 
 
-# ------------------------------------------------------------------ vehicles (procedural)
-def M(name, color, rough=0.6, **kw):
-    return principled("veh_" + name, color, rough, **kw)
+# ------------------------------------------------------------------ vehicles (procedural, textured like the buildings)
+# Materials come from build_assets.py (imported, not edited): its baked oak / iron / glass / cloth / snow textures,
+# tinted per key, with auto_uv() projecting UVs at the same texel density as the buildings.
+_BA = None
+VEH_KEYS = {   # extra palette keys: (texture kind, tint)
+    "veh_lacquer": ("oak", (0.10, 0.10, 0.11)),      # black-lacquered panels, grain just visible
+    "veh_coach_green": ("oak", (0.20, 0.36, 0.27)),
+    "veh_wheel_red": ("oak", (0.62, 0.20, 0.14)),
+    "veh_wheel_yellow": ("oak", (0.80, 0.58, 0.22)),
+    "veh_hood": ("cloth", (0.13, 0.11, 0.10)),        # oiled leather hood
+    "veh_leather": ("cloth", (0.36, 0.22, 0.13)),
+    "veh_cushion": ("cloth", (0.52, 0.12, 0.12)),
+    "veh_blind": ("cloth", (0.78, 0.64, 0.42)),
+    "veh_hammercloth": ("cloth", (0.55, 0.10, 0.10)),
+    "veh_sacking": ("cloth", (0.80, 0.70, 0.52)),
+    "veh_hay": ("thatch", (1.0, 0.92, 0.72)),
+}
+
+
+def ba():
+    """build_assets.py as a module (materials, texture bakes, auto_uv). Its caches point at datablocks that
+    reset() deletes, so they are cleared on every call."""
+    global _BA
+    if _BA is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("krakow_build_assets", os.path.join(ROOT, "assets", "blender", "build_assets.py"))
+        _BA = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_BA)
+        for k, (kind, tint) in VEH_KEYS.items():
+            _BA.PAL[k] = tint
+            _BA.TEX_OF[k] = kind
+            _BA.TINT[k] = tint
+    return _BA
+
+
+def VM(key, rough=0.85, emit=None, emit_strength=0.0):
+    return ba().M(key, rough, emit, emit_strength)
+
+
+def veh_reset():
+    reset()
+    ba()._mats.clear()
+
+
+def bm_tube(bm, pts, r, seg=6):
+    for a, b in zip(pts[:-1], pts[1:]):
+        bm_cyl(bm, a, b, r, seg=seg, caps=False)
+
+
+def part(name, mat, build, parent=None, loc=None):
+    bm = bmesh.new()
+    build(bm)
+    o = new_obj(name, bm, mat)
+    if loc is not None:
+        for v in o.data.vertices:
+            v.co -= Vector(loc)
+        o.location = loc
+    if parent:
+        o.parent = parent
+    return o
+
+
+def wheel(name, radius, width, spokes, paint, loc, parent, hub_r=0.075):
+    """Artillery-style wheel about the X axis, origin on the hub: painted felloe and spokes, iron tyre with
+    nail heads, turned hub with iron bands and axle cap."""
+    def felloe(bm):
+        vs = bm_ring(bm, (0, 0, 0), (1, 0, 0), radius - 0.045, radius - 0.045, 0.035, seg=28, tseg=4)
+        for v in vs:
+            v.co.x *= width / 0.05
+        bm_cyl(bm, (-width * 0.8, 0, 0), (width * 0.8, 0, 0), hub_r, hub_r * 0.85, seg=10)          # hub
+        for k in range(spokes):
+            a = math.tau * (k + 0.5) / spokes
+            d = Vector((0, math.cos(a), math.sin(a)))
+            bm_cyl(bm, d * hub_r * 0.9 + Vector((0.008 * (-1) ** k, 0, 0)), d * (radius - 0.07), 0.017, 0.013, seg=5, caps=False)
+
+    def iron(bm):
+        vs = bm_ring(bm, (0, 0, 0), (1, 0, 0), radius - 0.008, radius - 0.008, 0.012, seg=28, tseg=4)
+        for v in vs:
+            v.co.x *= (width * 1.1) / 0.024
+        for x in (-width * 0.8, width * 0.8):
+            bm_ring(bm, (x, 0, 0), (1, 0, 0), hub_r * 0.95, hub_r * 0.95, 0.01, seg=10, tseg=4)
+        bm_cyl(bm, (width * 0.8, 0, 0), (width * 1.6, 0, 0), hub_r * 0.55, hub_r * 0.4, seg=8)      # axle cap
+        bm_cyl(bm, (-width * 0.8, 0, 0), (-width * 1.3, 0, 0), hub_r * 0.5, seg=8)
+    w = part(name, VM(paint), felloe)
+    t = part(name + "_iron", VM("iron"), iron)
+    select([w, t], w)
+    bpy.ops.object.join()
+    w.location = loc
+    w.parent = parent
+    return w
+
+
+def leaf_spring(bm, centre, half_len, rise=0.08, leaves=3, along="Y"):
+    """Stacked elliptic leaf spring: each leaf a flattened arc, longest on top."""
+    cx, cy, cz = centre
+    for k in range(leaves):
+        L = half_len * (1.0 - 0.22 * k)
+        pts = []
+        for i in range(9):
+            t = -1 + 2 * i / 8
+            u = t * L
+            z = cz + rise * (1 - t * t) * (1 if k == 0 else 0.9) - k * 0.014
+            pts.append(Vector((cx, cy + u, z)) if along == "Y" else Vector((cx + u, cy, z)))
+        for a, b in zip(pts[:-1], pts[1:]):
+            bm_box(bm, ((0.05, (b - a).length, 0.01) if along == "Y" else ((b - a).length, 0.05, 0.01)), (a + b) / 2,
+                   Vector((0, 1, 0) if along == "Y" else (1, 0, 0)).rotation_difference((b - a).normalized()).to_matrix())
+        # the lower half of the ellipse
+        pts2 = [Vector((p.x, p.y, 2 * cz - p.z - 0.02)) for p in pts] if k == 0 else []
+        for a, b in zip(pts2[:-1], pts2[1:]):
+            bm_box(bm, ((0.05, (b - a).length, 0.01) if along == "Y" else ((b - a).length, 0.05, 0.01)), (a + b) / 2,
+                   Vector((0, 1, 0) if along == "Y" else (1, 0, 0)).rotation_difference((b - a).normalized()).to_matrix())
+
+
+def c_spring(bm, base, up=0.55, depth=0.28, back=1, seg=7):
+    """C-spring standing on the perch end: rises from `base`, curls over towards the body (direction `back`)."""
+    pts = []
+    for i in range(seg + 1):
+        a = math.pi * 1.25 * i / seg - math.pi * 0.5
+        pts.append(Vector(base) + Vector((0, back * (depth * (1 - math.cos(a + math.pi * 0.5)) * 0.5) * -1, up * 0.5 * (1 + math.sin(a)))))
+    for a, b in zip(pts[:-1], pts[1:]):
+        bm_box(bm, (0.06, 0.035, (b - a).length + 0.01), (a + b) / 2, Vector((0, 0, 1)).rotation_difference((b - a).normalized()).to_matrix())
+    return pts[-1]
+
+
+def lamp(bm_frame, bm_glass, c, s=1.0):
+    """Carriage lamp: iron box frame with a chimney cap, glass faces (separate emissive mesh)."""
+    x, y, z = c
+    bm_box(bm_frame, (0.12 * s, 0.12 * s, 0.02), (x, y, z - 0.09 * s))
+    bm_box(bm_frame, (0.13 * s, 0.13 * s, 0.025), (x, y, z + 0.09 * s))
+    bm_cyl(bm_frame, (x, y, z + 0.1 * s), (x, y, z + 0.17 * s), 0.035 * s, 0.012 * s, seg=6)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            bm_box(bm_frame, (0.012, 0.012, 0.18 * s), (x + sx * 0.055 * s, y + sy * 0.055 * s, z))
+    bm_box(bm_glass, (0.1 * s, 0.1 * s, 0.16 * s), (x, y, z))
+
+
+def finish_uvs(objs):
+    for o in objs:
+        if o.type == "MESH" and not o.name.endswith("-colonly"):
+            ba().auto_uv(o)
 
 
 def carriage(trace_back=1.95):
-    """Dorozka / fiacre: a two-horse hire cab. Sprung open body with a folding leather hood over the rear seat,
-    raised driver's box, small front and tall rear wheels on elliptic springs, a centre pole and splinter bar.
-    Front at -Y. The horses stand in slots ahead of the splinter bar."""
-    reset()
-    body_c = M("lacquer", (0.03, 0.035, 0.04), 0.35)
-    trim = M("trim", (0.45, 0.07, 0.06), 0.5)
-    wheel_c = M("wheel", (0.30, 0.05, 0.04), 0.55)
-    iron = M("iron", (0.08, 0.08, 0.09), 0.45)
-    hood_c = M("hood", (0.05, 0.045, 0.04), 0.55)
-    seat_c = M("cushion", (0.18, 0.05, 0.06), 0.9)
-    wood = M("wood", (0.22, 0.13, 0.07), 0.8)
-    lamp_glass = M("lamp_glass", (0.9, 0.75, 0.4), 0.2, emit=(1.0, 0.72, 0.35, 3.0))
-    objs = []
-    RW, FW, TRACK = 0.66, 0.46, 0.78          # rear / front wheel radius, half track
-    YR, YF = 0.95, -1.05                      # axle positions
-    # chassis: perch pole and axles
-    bm = bmesh.new()
-    bm_cyl(bm, (0, YF, 0.50), (0, YR, 0.58), 0.035, seg=8)
-    bm_cyl(bm, (-TRACK, YR, RW), (TRACK, YR, RW), 0.035, seg=8)
-    bm_cyl(bm, (-TRACK, YF, FW), (TRACK, YF, FW), 0.035, seg=8)
-    for y, z0, half in ((YR, RW, 0.62), (YF, FW, 0.5)):      # elliptic leaf springs (a flattened ring each side)
+    """Dorozka: Krakow's hired open cab. Black-lacquered body with a red coach line, crimson cushions, a folding
+    leather hood on iron hoops and landau irons, raised driver's box with cushion and footboard, elliptic leaf
+    springs on both axles, iron-tyred red wheels, pole, splinter bar and swingletrees for the pair, steps, two
+    lamps, whip. Front at -Y; horses in the horse_slot empties."""
+    veh_reset()
+    lac, red, iron, wood = VM("veh_lacquer"), VM("veh_wheel_red"), VM("iron"), VM("wood_dark")
+    hood, cush, leather = VM("veh_hood"), VM("veh_cushion"), VM("veh_leather")
+    glass = VM("veh_lampglass", 0.2, emit=(1.0, 0.72, 0.36), emit_strength=4.0) if "veh_lampglass" in ba().PAL else None
+    if glass is None:
+        ba().PAL["veh_lampglass"] = (1.0, 0.85, 0.6)
+        glass = VM("veh_lampglass", 0.2, emit=(1.0, 0.72, 0.36), emit_strength=4.0)
+    RW, FW, TRACK = 0.66, 0.46, 0.78
+    YR, YF = 0.95, -1.05
+    root = part("carriage", iron, lambda bm: (
+        bm_cyl(bm, (-TRACK, YR, RW), (TRACK, YR, RW), 0.032, seg=8),
+        bm_cyl(bm, (-TRACK, YF, FW), (TRACK, YF, FW), 0.032, seg=8),
+        [leaf_spring(bm, (sx * 0.5, YR, RW + 0.12), 0.34) for sx in (-1, 1)],
+        [leaf_spring(bm, (sx * 0.45, YF, FW + 0.12), 0.28) for sx in (-1, 1)],
+        [bm_box(bm, (0.2, 0.08, 0.02), (sx * 0.62, 0.0, 0.52)) for sx in (-1, 1)],          # step treads
+        [bm_cyl(bm, (sx * 0.56, 0.0, 0.92), (sx * 0.62, 0.0, 0.53), 0.012, seg=5) for sx in (-1, 1)],
+        [bm_cyl(bm, (sx * 0.62, -0.62, 1.52), (sx * 0.62, -0.95, 1.2), 0.012, seg=5) for sx in (-1, 1)],   # box irons
+        [bm_cyl(bm, (sx * 0.66, 0.55, 1.35), (sx * 0.66, 1.0, 1.62), 0.012, seg=5) for sx in (-1, 1)],    # landau irons
+        bm_cyl(bm, (0.62, -0.62, 1.55), (0.95, -0.2, 2.9), 0.007, 0.003, seg=4),                        # whip
+        bm_cyl(bm, (0.6, -0.64, 1.45), (0.64, -0.6, 1.65), 0.015, seg=6),                                # whip socket
+    ))
+    parts = [root]
+    parts.append(part("perch", wood, lambda bm: (
+        bm_box(bm, (0.1, abs(YR - YF) + 0.2, 0.08), (0, (YR + YF) / 2, 0.55)),
+        bm_cyl(bm, (0, YF, 0.56), (0, -4.35, 0.96), 0.04, 0.03, seg=8),                         # pole to the horses' chests
+        bm_box(bm, (1.7, 0.07, 0.07), (0, -1.5, 0.80)),                                          # splinter bar
+        [bm_box(bm, (0.78, 0.05, 0.05), (sx * 0.62, -1.56, 0.92)) for sx in (-1, 1)],            # swingletrees
+        [bm_cyl(bm, (sx * 0.62, -1.5, 0.8), (sx * 0.62, -1.56, 0.92), 0.015, seg=5) for sx in (-1, 1)],
+        bm_cyl(bm, (0, -1.5, 0.8), (0, YF, FW + 0.05), 0.03, seg=6),
+    ), root))
+    def body(bm):
+        bm_box(bm, (1.26, 1.5, 0.05), (0, 0.35, 0.95))                                          # floor
         for sx in (-1, 1):
-            vs = bm_ring(bm, (sx * 0.52, y, z0 + 0.10), (1, 0, 0), half * 0.5, 0.07, 0.018, seg=16, tseg=4)
-    bm_cyl(bm, (0, YF, 0.52), (0, -3.55, 0.78), 0.04, 0.03, seg=8)          # pole
-    bm_cyl(bm, (-0.85, -1.5, 0.80), (0.85, -1.5, 0.80), 0.035, seg=8)       # splinter bar
-    bm_cyl(bm, (0, -1.5, 0.80), (0, YF, FW), 0.03, seg=6)
-    objs.append(new_obj("chassis", bm, iron))
-    # body: floor, sides with a swept lower edge, seat and back
-    bm = bmesh.new()
-    bm_box(bm, (1.26, 1.5, 0.05), (0, 0.35, 0.95))                           # floor
-    for sx in (-1, 1):
-        bm_box(bm, (0.04, 1.3, 0.42), (sx * 0.63, 0.45, 1.18))              # side panels
-        bm_box(bm, (0.04, 0.5, 0.22), (sx * 0.63, -0.45, 1.06))             # footwell sides, lower
-    bm_box(bm, (1.3, 0.05, 0.62), (0, 1.12, 1.28))                          # back panel
-    bm_box(bm, (1.26, 0.04, 0.3), (0, -0.7, 1.08))                          # dash front of the footwell
-    objs.append(new_obj("body", bm, body_c))
-    bm = bmesh.new()
-    for sx in (-1, 1):
-        bm_box(bm, (0.05, 1.32, 0.04), (sx * 0.645, 0.45, 1.40))            # red coachline on the rail
-    bm_box(bm, (1.32, 0.06, 0.04), (0, 1.13, 1.60))
-    objs.append(new_obj("trim", bm, trim))
-    bm = bmesh.new()
-    bm_box(bm, (1.18, 0.55, 0.14), (0, 0.78, 1.12))                         # rear seat cushion
-    bm_box(bm, (1.18, 0.12, 0.45), (0, 1.05, 1.40))                         # squab
-    objs.append(new_obj("seat", bm, seat_c))
-    # folding hood: a leather shell over hoops, lowered halfway (quarter circle behind the seat)
-    bm = bmesh.new()
-    hc, hr = Vector((0, 0.95, 1.30)), 0.68
-    seg, cols = 14, []
-    for i in range(seg + 1):
-        a = math.radians(-8 + 110 * i / seg)        # from just forward of vertical to down behind
-        d = Vector((0, math.sin(a), math.cos(a)))
-        cols.append([bm.verts.new(hc + Vector((x, 0, 0)) + d * hr) for x in (-0.66, 0.66)])
-    for i in range(seg):
-        bm.faces.new((cols[i][0], cols[i][1], cols[i + 1][1], cols[i + 1][0]))
-    for x in (-0.66, 0.66):                         # side quarters (fan-shaped)
-        ctr = bm.verts.new(hc + Vector((x, 0, 0)))
-        ring = [c[0 if x < 0 else 1] for c in cols]
+            # side panel: lower edge swept up at the front, the classic cab line
+            vs = bm_box(bm, (0.04, 1.3, 0.44), (sx * 0.63, 0.45, 1.18))
+            for v in vs:
+                if v.co.z < 1.1 and v.co.y < 0.0:
+                    v.co.z += 0.12
+            bm_box(bm, (0.04, 0.5, 0.24), (sx * 0.63, -0.45, 1.08))                              # footwell sides
+            # mudguard over the front wheel
+            pts = [Vector((sx * 0.7, YF + FW * math.cos(a), FW + 0.08 + FW * math.sin(a))) for a in [math.radians(d) for d in range(20, 181, 32)]]
+            for a, b in zip(pts[:-1], pts[1:]):
+                bm_box(bm, (0.16, (b - a).length + 0.01, 0.012), (a + b) / 2, Vector((0, 1, 0)).rotation_difference((b - a).normalized()).to_matrix())
+        bm_box(bm, (1.3, 0.05, 0.62), (0, 1.12, 1.28))                                          # back
+        bm_box(bm, (1.26, 0.04, 0.34), (0, -0.7, 1.1))                                          # dash
+        bm_box(bm, (0.9, 0.42, 0.32), (0, -0.55, 1.38))                                         # driver's box
+        vs = bm_box(bm, (0.9, 0.5, 0.035), (0, -1.02, 1.03), Matrix.Rotation(math.radians(-18), 3, "X"))   # footboard
+    parts.append(part("body", lac, body, root))
+    parts.append(part("coachline", red, lambda bm: [
+        (bm_box(bm, (0.046, 1.28, 0.02), (sx * 0.632, 0.46, 1.33)),
+         bm_box(bm, (0.046, 1.1, 0.012), (sx * 0.632, 0.52, 1.06)),
+         bm_box(bm, (0.046, 0.02, 0.26), (sx * 0.632, 1.08, 1.2))) for sx in (-1, 1)] + [bm_box(bm, (0.92, 0.02, 0.02), (0, -0.765, 1.5))], root))
+    parts.append(part("cushions", cush, lambda bm: (
+        bm_box(bm, (1.18, 0.55, 0.14), (0, 0.78, 1.12)), bm_box(bm, (1.18, 0.12, 0.45), (0, 1.05, 1.40)),
+        bm_box(bm, (0.94, 0.46, 0.1), (0, -0.55, 1.58)), bm_box(bm, (0.94, 0.06, 0.22), (0, -0.32, 1.72))), root))
+    def hood_shell(bm):
+        hc, hr, seg = Vector((0, 0.95, 1.30)), 0.68, 12
+        cols = []
+        for i in range(seg + 1):
+            a = math.radians(-8 + 104 * i / seg)
+            d = Vector((0, math.sin(a), math.cos(a)))
+            # leather sags a little between the hoops
+            sag = 0.025 * abs(math.sin(i / seg * math.pi * 3))
+            cols.append([bm.verts.new(hc + Vector((x, 0, 0)) + d * (hr - sag)) for x in (-0.66, 0, 0.66)])
         for i in range(seg):
-            bm.faces.new((ctr, ring[i], ring[i + 1]) if x > 0 else (ctr, ring[i + 1], ring[i]))
-    bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.02)
-    for k in range(4):                              # hood hoops
-        a = math.radians(-8 + 110 * k / 3)
-        d = Vector((0, math.sin(a), math.cos(a)))
-        bm_cyl(bm, hc + Vector((-0.69, 0, 0)) + d * hr, hc + Vector((0.69, 0, 0)) + d * hr, 0.014, seg=6)
-    objs.append(new_obj("hood", bm, hood_c))
-    # driver's box: raised seat on an iron frame, footboard sloping forward
-    bm = bmesh.new()
-    bm_box(bm, (0.9, 0.42, 0.3), (0, -0.55, 1.38))                          # box
-    bm_box(bm, (0.9, 0.5, 0.04), (0, -1.05, 1.02), Matrix.Rotation(math.radians(-18), 3, "X"))   # footboard
-    objs.append(new_obj("driver_box", bm, body_c))
-    bm = bmesh.new()
-    bm_box(bm, (0.94, 0.46, 0.1), (0, -0.55, 1.58))
-    objs.append(new_obj("driver_cushion", bm, seat_c))
-    bm = bmesh.new()
+            for j in range(2):
+                bm.faces.new((cols[i][j], cols[i][j + 1], cols[i + 1][j + 1], cols[i + 1][j]))
+        for side, xi in ((-0.66, 0), (0.66, 2)):
+            ctr = bm.verts.new(hc + Vector((side, 0, 0)))
+            ring = [c[xi] for c in cols]
+            for i in range(seg):
+                bm.faces.new((ctr, ring[i], ring[i + 1]) if side > 0 else (ctr, ring[i + 1], ring[i]))
+        bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=0.018)
+    parts.append(part("hood", hood, hood_shell, root))
+    def hoops(bm):
+        hc, hr = Vector((0, 0.95, 1.30)), 0.69
+        for k in range(4):
+            a = math.radians(-8 + 104 * k / 3)
+            pts = [hc + Vector((x, 0, 0)) + Vector((0, math.sin(a), math.cos(a))) * hr for x in (-0.68, 0.68)]
+            bm_tube(bm, [pts[0], pts[1]], 0.012)
+            for p in pts:
+                bm_tube(bm, [hc + Vector((p.x, 0, 0)), p], 0.01, seg=4)                    # bows down to the joint
+        for sx in (-1, 1):
+            bm.verts.ensure_lookup_table()
+            r = bmesh.ops.create_uvsphere(bm, u_segments=6, v_segments=4, radius=0.03)
+            bmesh.ops.translate(bm, verts=r["verts"], vec=hc + Vector((sx * 0.69, 0, 0)))
+    parts.append(part("hood_irons", iron, hoops, root))
+    fr, gl = bmesh.new(), bmesh.new()
     for sx in (-1, 1):
-        bm_cyl(bm, (sx * 0.4, -0.35, 1.0), (sx * 0.4, -0.35, 1.34), 0.02, seg=6)
-        bm_cyl(bm, (sx * 0.4, -0.75, 1.0), (sx * 0.4, -0.75, 1.34), 0.02, seg=6)
-        bm_cyl(bm, (sx * 0.5, -0.78, 1.45), (sx * 0.5, -0.78, 1.72), 0.012, seg=6)     # lamp brackets
-        bm_box(bm, (0.1, 0.1, 0.03), (sx * 0.5, -0.78, 1.70))
-        bm_box(bm, (0.1, 0.1, 0.03), (sx * 0.5, -0.78, 1.88))
-        bm_cyl(bm, (sx * 0.5, -0.78, 1.89), (sx * 0.5, -0.78, 1.96), 0.03, 0.005, seg=6)
-    bm_cyl(bm, (0.62, -0.62, 1.55), (0.95, -0.2, 2.9), 0.008, 0.004, seg=5)            # whip in its socket
-    objs.append(new_obj("fittings", bm, iron))
-    bm = bmesh.new()
-    for sx in (-1, 1):
-        bm_box(bm, (0.085, 0.085, 0.15), (sx * 0.5, -0.78, 1.79))
-    objs.append(new_obj("lamps", bm, lamp_glass))
-    bm = bmesh.new()
-    bm_box(bm, (0.4, 0.08, 0.3), (0.0, 1.2, 0.95))                          # luggage boot at the back
-    objs.append(new_obj("boot", bm, wood))
-    root = objs[0]
-    for o in objs[1:]:
-        o.parent = root
-    # wheels, origin on the hub
+        lamp(fr, gl, (sx * 0.5, -0.78, 1.79))
+        bm_cyl(fr, (sx * 0.5, -0.78, 1.45), (sx * 0.5, -0.78, 1.7), 0.012, seg=5)
+    lf = new_obj("lamp_frames", fr, iron)
+    lf.parent = root
+    lg = new_obj("lamp_glass", gl, glass)
+    lg.parent = root
+    parts += [lf, lg]
     for tag, y, r in (("wheel_rl", YR, RW), ("wheel_rr", YR, RW), ("wheel_fl", YF, FW), ("wheel_fr", YF, FW)):
-        bm = bmesh.new()
-        bm_wheel(bm, r, 0.035, spokes=14 if r > 0.5 else 12)
-        x = -TRACK if tag.endswith("l") else TRACK
-        w = new_obj(tag, bm, wheel_c, Vector())
-        w.location = (x, y, r)
-        w.parent = root
-        objs.append(w)
-    # horse slots: horse_harnessed's traces end trace_back behind its centre, at the splinter bar (y=-1.5)
+        parts.append(wheel(tag, r, 0.034, 14 if r > 0.5 else 12, "veh_wheel_red", (-TRACK if tag.endswith("l") else TRACK, y, r), root))
+    finish_uvs(parts)
     extras = [empty("horse_slot_0", (-0.62, -1.5 - trace_back, 0), root), empty("horse_slot_1", (0.62, -1.5 - trace_back, 0), root),
               empty("driver_seat", (0, -0.55, 1.63), root), empty("lamp_L", (-0.5, -0.78, 1.8), root), empty("lamp_R", (0.5, -0.78, 1.8), root)]
     col = col_box("carriage", (-0.95, -1.6, 0), (0.95, 1.3, 2.1), root)
-    root.name = "carriage"
-    export("carriage", objs + extras + [col], anim=False)
+    export("carriage", parts + extras + [col], anim=False)
 
 
 def horse_cart(trace_back=1.95):
-    """Peasant ladder-sided cart (woz drabiniasty), two tall wheels, shafts for one horse, a load of sacks and hay.
-    Front at -Y."""
-    reset()
-    wood = M("cart_wood", (0.30, 0.20, 0.11), 0.85)
-    wood_d = M("cart_wood_dark", (0.17, 0.11, 0.06), 0.85)
-    iron = M("cart_iron", (0.08, 0.08, 0.09), 0.5)
-    sack = M("sack", (0.55, 0.47, 0.34), 0.95)
-    hay = M("hay", (0.62, 0.52, 0.28), 0.95)
-    objs = []
+    """Peasant ladder cart (woz drabiniasty): plank bed on two beams, raked ladder sides, iron-shod wheels,
+    shafts reaching the horse's shoulders, a driver's plank, a load of grain sacks and loose hay. Front at -Y."""
+    veh_reset()
+    wood, dark, iron = VM("wood"), VM("wood_dark"), VM("iron")
     R, TRACK, YA = 0.62, 0.72, 0.3
-    bm = bmesh.new()
-    bm_box(bm, (0.95, 2.3, 0.06), (0, 0.25, 0.78))                           # bed
-    for sx in (-1, 1):
-        bm_box(bm, (0.08, 2.5, 0.08), (sx * 0.5, 0.25, 0.72))                # side beams, continue as shafts
-        bm_cyl(bm, (sx * 0.5, -1.0, 0.72), (sx * 0.52, -3.55, 0.95), 0.035, 0.028, seg=6)  # shafts
-        bm_cyl(bm, (sx * 0.62, -0.95, 0.78), (sx * 0.62, 1.4, 1.35), 0.03, seg=6)   # ladder side top rail (sloped)
-        bm_cyl(bm, (sx * 0.56, -0.95, 0.80), (sx * 0.6, 1.4, 0.95), 0.03, seg=6)    # lower rail
-        for k in range(9):
-            y = -0.9 + k * 0.28
-            zt = 0.78 + (y + 0.95) / 2.35 * 0.57
-            bm_cyl(bm, (sx * 0.57, y, 0.78), (sx * 0.62, y, zt + 0.02), 0.014, seg=5)  # rungs
-    bm_box(bm, (1.0, 0.05, 0.3), (0, -0.9, 0.93))                           # front board
-    bm_box(bm, (1.0, 0.05, 0.25), (0, 1.38, 0.92))                          # tailboard
-    bm_box(bm, (0.8, 0.28, 0.06), (0, -0.7, 1.12))                          # driver's plank across the sides
-    objs.append(new_obj("cart_body", bm, wood))
-    bm = bmesh.new()
-    bm_cyl(bm, (-TRACK, YA, R), (TRACK, YA, R), 0.04, seg=8)
-    for sx in (-1, 1):
-        bm_box(bm, (0.06, 0.06, R - 0.72 + 0.1), (sx * 0.5, YA, (R + 0.72) / 2))    # axle block
-    objs.append(new_obj("cart_axle", bm, iron))
-    bm = bmesh.new()
-    for i, (x, y, z, rx_) in enumerate([(-0.22, 0.1, 0.98, 0.0), (0.2, 0.25, 0.98, 0.2), (0.0, 0.5, 1.02, -0.1), (-0.15, 0.95, 0.98, 0.3), (0.22, 1.0, 0.98, 0.0)]):
-        vs = bm_box(bm, (0.36, 0.55, 0.3), (x, y, z), Matrix.Rotation(rx_, 3, "Z"))
-    objs.append(new_obj("sacks", bm, sack))
-    bm = bmesh.new()
-    r = bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=8, radius=0.5)
-    bmesh.ops.transform(bm, matrix=Matrix.Translation((0, 0.9, 1.1)) @ Matrix.Diagonal((1.0, 1.1, 0.5, 1)), verts=r["verts"])
-    objs.append(new_obj("hay", bm, hay))
-    for o in objs[1:]:
-        o.parent = objs[0]
+    root = part("horse_cart", dark, lambda bm: [
+        (bm_box(bm, (0.09, 2.5, 0.09), (sx * 0.46, 0.25, 0.72)),                                 # bed beams
+         bm_cyl(bm, (sx * 0.46, -1.0, 0.72), (sx * 0.5, -3.95, 1.05), 0.035, 0.028, seg=6),      # shafts
+         bm_box(bm, (0.08, 0.1, R - 0.72 + 0.14), (sx * 0.46, YA, (R + 0.72) / 2 - 0.02))) for sx in (-1, 1)])
+    parts = [root]
+    def bed(bm):
+        for k in range(7):                                  # loose planks with gaps
+            x = -0.42 + k * 0.14
+            bm_box(bm, (0.125, 2.4, 0.035), (x, 0.25, 0.785))
+        for sx in (-1, 1):
+            bm_cyl(bm, (sx * 0.62, -0.95, 0.8), (sx * 0.66, 1.42, 1.32), 0.028, seg=6)           # ladder rails
+            bm_cyl(bm, (sx * 0.55, -0.95, 0.8), (sx * 0.58, 1.42, 0.92), 0.028, seg=6)
+            for k in range(10):
+                y = -0.88 + k * 0.25
+                zt = 0.8 + (y + 0.95) / 2.37 * 0.52
+                bm_cyl(bm, (sx * 0.55, y, 0.8), (sx * 0.63, y, zt + 0.02), 0.013, seg=5)         # rungs
+            bm_cyl(bm, (sx * 0.5, -0.6, 0.75), (sx * 0.62, -0.6, 1.02), 0.02, seg=5)             # stake (lushnia)
+        bm_box(bm, (1.05, 0.05, 0.32), (0, -0.92, 0.94))                                         # front board
+        bm_box(bm, (1.05, 0.05, 0.26), (0, 1.4, 0.92))                                           # tailboard
+        bm_box(bm, (0.95, 0.26, 0.05), (0, -0.7, 1.12))                                          # driver's plank
+    parts.append(part("bed", wood, bed, root))
+    parts.append(part("axle", iron, lambda bm: (bm_cyl(bm, (-TRACK, YA, R), (TRACK, YA, R), 0.04, seg=8),
+                                                [bm_box(bm, (0.1, 0.12, 0.02), (sx * 0.5, -3.5, 1.0)) for sx in (-1, 1)]), root))
+    sacking = VM("veh_sacking")
+    def sacks(bm):
+        for (x, y, z, rz_, sc) in [(-0.22, 0.05, 0.99, 0.0, 1.0), (0.21, 0.2, 0.99, 0.25, 1.0), (0.0, 0.5, 1.05, -0.1, 0.95),
+                                   (-0.18, 0.95, 0.98, 0.35, 1.0), (0.22, 1.05, 0.98, 0.0, 0.9), (0.02, 0.7, 1.28, 1.4, 0.85)]:
+            r = bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=0.5)
+            bmesh.ops.transform(bm, matrix=Matrix.Translation((x, y, z)) @ Matrix.Rotation(rz_, 4, "Z") @ Matrix.Diagonal((0.2 * sc, 0.3 * sc, 0.15 * sc, 1)), verts=r["verts"])
+            bm_cyl(bm, (x + 0.29 * sc * math.sin(-rz_) * 0, y - 0.3 * sc, z + 0.02), (x, y - 0.36 * sc, z + 0.05), 0.04, 0.015, seg=5)   # tied neck
+    parts.append(part("sacks", sacking, sacks, root))
+    def hay(bm):
+        r = bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=0.5)
+        rng = __import__("random").Random(7)
+        for v in r["verts"]:
+            v.co.x *= 1.05
+            v.co.y *= 1.35
+            v.co.z *= 0.55
+            v.co += v.co.normalized() * rng.uniform(-0.04, 0.05)
+        bmesh.ops.translate(bm, verts=r["verts"], vec=(0, 0.55, 1.15))
+    parts.append(part("hay", VM("veh_hay"), hay, root))
     for tag, x in (("wheel_l", -TRACK), ("wheel_r", TRACK)):
-        bm = bmesh.new()
-        bm_wheel(bm, R, 0.045, spokes=12, hub_r=0.09)
-        w = new_obj(tag, bm, wood_d, Vector())
-        w.location = (x, YA, R)
-        w.parent = objs[0]
-        objs.append(w)
-    extras = [empty("horse_slot_0", (0, -0.95 - trace_back, 0), objs[0]), empty("driver_seat", (0, -0.7, 1.17), objs[0])]
-    col = col_box("horse_cart", (-0.85, -1.0, 0), (0.85, 1.45, 1.5), objs[0])
-    objs[0].name = "horse_cart"
-    export("horse_cart", objs + extras + [col], anim=False)
+        parts.append(wheel(tag, R, 0.045, 12, "wood_dark", (x, YA, R), root, hub_r=0.09))
+    finish_uvs(parts)
+    extras = [empty("horse_slot_0", (0, -0.95 - trace_back, 0), root), empty("driver_seat", (0, -0.7, 1.17), root)]
+    col = col_box("horse_cart", (-0.85, -1.0, 0), (0.85, 1.45, 1.5), root)
+    export("horse_cart", parts + extras + [col], anim=False)
+
+
+def coach():
+    """Travelling coach (kareta) standing in the inn yard (placed by scripts/city/dressing.gd, replaces the
+    build_assets.py version of the same name). Closed green body with a swelled lower panel, glazed doors with
+    half-drawn blinds and a coat-of-arms roundel, quarter lights, black roof with a luggage rail, strapped trunks
+    under snow, four C-springs with leather braces over a perch, red iron-tyred wheels, coachman's box with a
+    hammercloth, lamps, steps, pole. Built front -Y, then turned so the pole points +X like the old one."""
+    veh_reset()
+    green, lac, red, iron, wood = VM("veh_coach_green"), VM("veh_lacquer"), VM("veh_wheel_red"), VM("iron"), VM("wood_dark")
+    leather, blind, hc = VM("veh_leather"), VM("veh_blind"), VM("veh_hammercloth")
+    gold = VM("gold", 0.35)
+    ba().PAL.setdefault("veh_lampglass", (1.0, 0.85, 0.6))
+    lampg = VM("veh_lampglass", 0.2, emit=(1.0, 0.72, 0.36), emit_strength=4.0)
+    glass = VM("glass")
+    RW, FW, TR = 0.72, 0.52, 0.86
+    YR, YF = 1.05, -1.15
+    Z0, Z1, BL, BW = 0.78, 2.02, 1.8, 1.36     # body bottom, top, length, width
+    root = part("coach", wood, lambda bm: (
+        bm_box(bm, (0.12, abs(YR - YF) + 0.5, 0.1), (0, (YR + YF) / 2, 0.52)),                    # perch
+        bm_box(bm, (1.3, 0.14, 0.12), (0, YF, FW + 0.12)),                                         # fore carriage bed
+        bm_box(bm, (1.3, 0.14, 0.12), (0, YR, RW + 0.02)),
+        bm_cyl(bm, (0, YF - 0.1, 0.56), (0, -3.2, 0.45), 0.045, 0.034, seg=8),                     # pole
+        bm_box(bm, (0.95, 0.06, 0.06), (0, -1.75, 0.58)),                                          # swingletree bar
+    ))
+    parts = [root]
+    parts.append(part("running_gear", iron, lambda bm: (
+        bm_cyl(bm, (-TR, YR, RW), (TR, YR, RW), 0.04, seg=8), bm_cyl(bm, (-TR, YF, FW), (TR, YF, FW), 0.04, seg=8),
+        [c_spring(bm, (sx * 0.55, y, 0.62 if y > 0 else FW + 0.18), up=0.5, depth=0.3, back=(1 if y > 0 else -1)) for sx in (-1, 1) for y in (YR + 0.2, YF - 0.15)],
+        [bm_box(bm, (0.26, 0.12, 0.02), (sx * 0.78, 0.0, 0.55)) for sx in (-1, 1)],                # steps
+        [bm_cyl(bm, (sx * 0.66, 0.0, Z0 + 0.02), (sx * 0.78, 0.0, 0.56), 0.012, seg=5) for sx in (-1, 1)],
+        [bm_cyl(bm, (sx * 0.5, YF - 0.35, 1.5), (sx * 0.5, YF - 0.62, 1.12), 0.014, seg=5) for sx in (-1, 1)],   # box irons
+    ), root))
+    parts.append(part("braces", leather, lambda bm: [
+        bm_cyl(bm, (sx * 0.55, y + (0.15 if y > 0 else -0.15) * -1 * (1 if y > 0 else -1) * 0, 1.08 if y > 0 else FW + 0.66), (sx * 0.5, y * 0.82, Z0 + 0.06), 0.022, seg=5)
+        for sx in (-1, 1) for y in (YR + 0.2, YF - 0.15)] + [bm_box(bm, (0.05, abs(YR - YF), 0.02), (sx * 0.5, 0, Z0 - 0.05)) for sx in (-1, 1)], root))
+    def shell(bm):
+        r = bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((0, 0, (Z0 + Z1) / 2)) @ Matrix.Diagonal((BW, BL, Z1 - Z0, 1)), verts=r["verts"])
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
+        for v in bm.verts:
+            t = max(0.0, min(1.0, (v.co.z - Z0) / (Z1 - Z0)))
+            # swelled lower panel (bombe): narrower and shorter at the sill, full at the waist
+            f = 0.78 + 0.22 * min(1.0, t / 0.45) ** 0.6
+            v.co.y *= f
+            v.co.x *= 0.94 + 0.06 * min(1.0, t / 0.45)
+    parts.append(part("body", green, shell, root))
+    def trim(bm):
+        for sx in (-1, 1):
+            x = sx * (BW / 2 + 0.006)
+            bm_box(bm, (0.014, 0.66, 0.025), (x, 0.0, Z1 - 0.02))                                  # door frame
+            bm_box(bm, (0.014, 0.025, Z1 - Z0 - 0.1), (x, -0.33, (Z0 + Z1) / 2))
+            bm_box(bm, (0.014, 0.025, Z1 - Z0 - 0.1), (x, 0.33, (Z0 + Z1) / 2))
+            bm_box(bm, (0.014, BL, 0.02), (x, 0, Z0 + (Z1 - Z0) * 0.47))                           # waist moulding
+            bm_ring(bm, (x * 1.004, 0.0, Z0 + 0.36), (1, 0, 0), 0.1, 0.1, 0.012, seg=16, tseg=4)   # roundel ring
+            bm_box(bm, (0.02, 0.08, 0.02), (x * 1.01, 0.22, Z0 + 0.62))                             # door handle
+    parts.append(part("gilt", gold, trim, root))
+    parts.append(part("arms", VM("veh_hammercloth"), lambda bm: [
+        bm_cyl(bm, (sx * (BW / 2 + 0.002), 0, Z0 + 0.36), (sx * (BW / 2 + 0.012), 0, Z0 + 0.36), 0.09, seg=14) for sx in (-1, 1)], root))
+    parts.append(part("arms_eagle", VM("snow"), lambda bm: [
+        bm_box(bm, (0.01, 0.07, 0.09), (sx * (BW / 2 + 0.015), 0, Z0 + 0.36), Matrix.Rotation(math.radians(45), 3, "X")) for sx in (-1, 1)], root))
+    def windows(bm):
+        for sx in (-1, 1):
+            x = sx * (BW / 2 + 0.004)
+            bm_box(bm, (0.01, 0.5, 0.46), (x, 0.0, Z1 - 0.32))                                     # door light
+            for y in (-0.62, 0.62):
+                bm_box(bm, (0.01, 0.34, 0.42), (x * 0.985, y * 0.95, Z1 - 0.32))                   # quarter lights
+        bm_box(bm, (1.0, 0.01, 0.4), (0, -BL / 2 - 0.004, Z1 - 0.32))                              # front light
+    parts.append(part("glass", glass, windows, root))
+    def blinds(bm):
+        for sx in (-1, 1):
+            x = sx * (BW / 2 + 0.008)
+            bm_box(bm, (0.008, 0.48, 0.2), (x, 0.0, Z1 - 0.2))                                     # half drawn
+            bm_cyl(bm, (x, -0.25, Z1 - 0.09), (x, 0.25, Z1 - 0.09), 0.018, seg=6)
+            for y in (-0.62, 0.62):
+                bm_box(bm, (0.008, 0.32, 0.12), (x * 0.99, y * 0.95, Z1 - 0.17))
+    parts.append(part("blinds", blind, blinds, root))
+    def roof(bm):
+        r = bmesh.ops.create_cube(bm, size=1.0)
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((0, 0, Z1 + 0.05)) @ Matrix.Diagonal((BW + 0.1, BL + 0.1, 0.1, 1)), verts=r["verts"])
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=2, use_grid_fill=True)
+        for v in bm.verts:
+            if v.co.z > Z1 + 0.06:
+                v.co.z += 0.06 * (1 - (2 * v.co.x / (BW + 0.1)) ** 2)                              # domed
+        bm_box(bm, (0.95, 0.46, 0.34), (0, YF - 0.38, 1.36))                                       # coachman's box
+    parts.append(part("roof", lac, roof, root))
+    parts.append(part("hammercloth", hc, lambda bm: (bm_box(bm, (1.0, 0.52, 0.34), (0, YF - 0.38, 1.2)),
+                                                    bm_box(bm, (1.02, 0.02, 0.06), (0, YF - 0.12, 1.02))), root))
+    parts.append(part("box_cushion", VM("veh_cushion"), lambda bm: (bm_box(bm, (0.96, 0.44, 0.1), (0, YF - 0.38, 1.58)),
+                                                                   bm_box(bm, (0.96, 0.07, 0.28), (0, YF - 0.14, 1.72))), root))
+    parts.append(part("footboard", wood, lambda bm: bm_box(bm, (0.9, 0.46, 0.035), (0, YF - 0.82, 1.2), Matrix.Rotation(math.radians(-20), 3, "X")), root))
+    def rail(bm):
+        zt = Z1 + 0.14
+        hx, hy = BW / 2, BL / 2 - 0.05
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                bm_cyl(bm, (sx * hx, sy * hy, zt - 0.04), (sx * hx, sy * hy, zt + 0.16), 0.012, seg=5)
+            bm_cyl(bm, (sx * hx, -hy, zt + 0.16), (sx * hx, hy, zt + 0.16), 0.01, seg=5)
+            bm_cyl(bm, (-hx, sx * hy, zt + 0.16), (hx, sx * hy, zt + 0.16), 0.01, seg=5)
+        for y in (-0.3, 0.45):                                                                      # trunk straps
+            bm_box(bm, (0.92, 0.04, 0.012), (0, y, zt + 0.42))
+    parts.append(part("roof_rail", iron, rail, root))
+    parts.append(part("trunks", leather, lambda bm: (bm_box(bm, (0.9, 0.62, 0.38), (0, -0.3, Z1 + 0.33)),
+                                                    bm_box(bm, (0.7, 0.5, 0.3), (0.05, 0.45, Z1 + 0.29))), root))
+    def snowcap(bm):
+        r = bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=6, radius=0.5)
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((0, -0.3, Z1 + 0.53)) @ Matrix.Diagonal((0.92, 0.64, 0.07, 1)), verts=r["verts"])
+        r = bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=6, radius=0.5)
+        bmesh.ops.transform(bm, matrix=Matrix.Translation((0, 0.8, Z1 + 0.16)) @ Matrix.Diagonal((1.3, 0.3, 0.05, 1)), verts=r["verts"])
+    parts.append(part("snow", VM("snow"), snowcap, root))
+    fr, gl = bmesh.new(), bmesh.new()
+    for sx in (-1, 1):
+        lamp(fr, gl, (sx * 0.56, YF - 0.12, 1.78), 1.1)
+        bm_cyl(fr, (sx * 0.52, YF - 0.12, 1.45), (sx * 0.56, YF - 0.12, 1.68), 0.012, seg=5)
+    lf = new_obj("lamp_frames", fr, iron)
+    lg = new_obj("lamp_glass", gl, lampg)
+    lf.parent = lg.parent = root
+    parts += [lf, lg]
+    for tag, y, r in (("wheel_rl", YR, RW), ("wheel_rr", YR, RW), ("wheel_fl", YF, FW), ("wheel_fr", YF, FW)):
+        parts.append(wheel(tag, r, 0.04, 14 if r > 0.6 else 12, "veh_wheel_red", (-TR if tag.endswith("l") else TR, y, r), root, hub_r=0.085))
+    finish_uvs(parts)
+    col = col_box("coach", (-0.95, -1.5, 0), (0.95, 1.55, 2.4), root)
+    root.rotation_euler.z = math.pi / 2          # front -Y -> +X, as build_assets placed it
+    export("coach", parts + [col], anim=False)
+
+
+def M(name, color, rough=0.6, **kw):
+    return principled("veh_" + name, color, rough, **kw)
 
 
 def hitch_rail():
@@ -1552,6 +1817,7 @@ BUILDS = [
     ("hawk", hawk),
     ("carriage", carriage),
     ("horse_cart", horse_cart),
+    ("coach", coach),
     ("hitch_rail", hitch_rail),
 ]
 

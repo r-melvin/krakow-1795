@@ -62,8 +62,9 @@ people.
 | `pigeon` | mujtaba-io pigeon | 0.30 m long | idle, walk (keyed here), fly | 1,010 |
 | `crow` | Teh_Bucket raven | 0.45 m long | idle, fly | 2,380 |
 | `hawk` | Sherkiz hawk | 0.55 m long | fly, idle (= fly) | 9,956 |
-| `carriage` | procedural dorożka | 1.5 m track, 0.66 m rear wheels | - | 3,436 |
-| `horse_cart` | procedural ladder cart | 0.62 m wheels | - | 1,800 |
+| `carriage` | procedural dorożka, textured | 1.5 m track, 0.66 m rear wheels | - | 6,136 |
+| `horse_cart` | procedural ladder cart, textured | 0.62 m wheels | - | 3,252 |
+| `coach` | procedural travelling coach (inn yard), textured; replaces build_assets.py's `coach` | 0.72 m rear wheels | - | 5,692 |
 | `hitch_rail` | procedural | 2.7 m rail | - | 196 |
 
 Conventions (the same as `build_assets.py`): front at Blender -Y (Godot +Z), origin on the ground under the body,
@@ -129,5 +130,13 @@ So the dogs and the cat are **refined procedurally from the Quaternius rigs** (k
   rotations are baked); its legs are pale because the tabby blends to cream below the flank.
 - The hawk has only a flight clip and is modelled wings-spread, so it can only fly (hawks are not night birds;
   it is there because the falconer lost it).
-- The carriage and cart are procedural and plain-shaded (no baked wood textures yet).
+- Vehicles use build_assets.py's baked oak / iron / glass / cloth / thatch / snow textures (imported through
+  importlib, tinted per key) with its auto_uv(). The dorożka has a lacquered body with a red coach line,
+  crimson cushions, a leather hood on iron hoops, leaf springs, iron-tyred wheels, mudguards, steps, lamps,
+  whip, pole, splinter bar and swingletrees; the cart a plank bed, ladder sides, sacks and hay, iron-shod wheels,
+  shafts to the horse's shoulders; the coach a swelled green body, glazed doors with half-drawn blinds, gilt
+  mouldings and a coat-of-arms roundel, C-springs with leather braces, roof rail, strapped trunks under snow,
+  hammercloth box, lamps, steps, pole.
+- `coach.glb` is written by both build scripts: build_assets.py's DRESSING `coach()` still exists (not edited),
+  so a full `build_assets.py` run overwrites the new one; run `build_animals.py` afterwards.
 - `build_assets.py -- --animals` overwrites `horse.glb`, `cat.glb` and `pigeon.glb`; rerun `build_animals.py`.

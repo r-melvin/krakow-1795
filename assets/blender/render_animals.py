@@ -155,9 +155,10 @@ def vehicles():
     x = 0.0
     man(x)
     x += 1.0
-    for veh, lead in (("carriage", 5.2), ("horse_cart", 4.6)):
+    for veh, lead in (("carriage", 5.2), ("horse_cart", 4.6), ("coach", 3.4)):
         # front (-Y) turned to -X; the horses stand up to `lead` metres ahead of the vehicle origin
-        r, objs = load(veh, (x + lead, 0, 0), yaw=-math.pi / 2)
+        # the coach is built pole-first towards +X (dressing.gd places it that way): turn it like the others
+        r, objs = load(veh, (x + lead, 0, 0), yaw=(math.pi if veh == "coach" else -math.pi / 2))
         if not r:
             continue
         bpy.context.view_layer.update()

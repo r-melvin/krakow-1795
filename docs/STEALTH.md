@@ -6,41 +6,85 @@ and a phased plan to apply it to Kraków, 1795. Written against the code in `scr
 
 ## 1. What exists today
 
-### Detection (`guard.gd`)
-- **Sight**: a 70° cone, 14 m, one ray from the guard's eye to the player's head. Score falls off with
-  distance (0.3 at the edge, 1.0 point blank) and is multiplied by `player.visibility`, which is 1.0
-  standing and 0.5 crouching. **Light is not part of it**: the player comment mentions a light probe but
-  nothing reads one, so a lantern pool and a black alley are identical to a guard.
-- **Hearing**: a radius of 8 m scaled by `player.noise` (0 still, 0.15 crouch-walk, 0.45 walk, 1.0 sprint).
-  Walls are ignored.
-- **Suspicion**: 0..100, +45/s at full visibility, −12/s when unseen. Thresholds: 20 Curious, 60 Searching
-  (6 s search of `last_known`), 100 Alarm (sticks until suspicion decays to 0, and each alarm adds crackdown).
-- **Disguise** (salon cloak): sight and hearing ×0.25 unless sprinting, crouching or lingering within 3 m for
-  more than 4 s. Guards seize the player after 2 s within 1.3 m while alarmed and the player is not fighting.
-- **Witnessing**: a guard downed in a fight is seen by any guard with line of sight; a quiet rear takedown is not.
-- **Curfew**: at 22:00 the view distance doubles for 3 game minutes.
+Phases A, B, C, D and G of section 4 are in (phases E and F are not: see "Hooks" below). Every number lives in
+`data/stealth.json`; the files are `scripts/stealth/` (perception.gd, guard.gd, player.gd, watch.gd, hiding_spot.gd,
+distraction.gd, stealth_smoke.gd), `scripts/ui/hud.gd` (cues), `scripts/city/greybox_district.gd` (registration and
+placement), `population.gd` (crowd query) and `flicker.gd` (dousing).
 
-### Player (`player.gd`)
-- Walk, sprint, crouch, rear takedown within 1.5 m, cudgel swing, carrying (0.7× speed, no sprint).
-- No lean, no peek, no cover, no hiding places, no body dragging, no throwables, no lockpicking.
+### Perception (A)
+- **Visibility** = posture (stand 1.0, crouch 0.6, prone 0.3, sit 0.7) x light x crowd, 0 inside a hiding spot.
+  **Light** is sampled 10x a second at the chest from every OmniLight in group `flame_lights` (lanterns, braziers,
+  candle windows, and, registered 0.3 s after build, the dressing lamps, interiors and carriage lamps) with Godot's omni
+  attenuation and an occlusion ray, plus the moon (group `moon_light`, 0.25 when a ray toward it is clear), x0.45,
+  clamped 0.15..1. Measured: lantern pool 1.00, covered passage 0.15, open moonlight 0.25.
+- **Noise** = gait (crouch 0.15, walk 0.45, sprint 1.0, prone 0.075) x surface: cobbles 1.0, snow 0.6, gravel 1.2,
+  planks 1.3 (interiors), straw 0.4, mud 1.1, from the `surface` meta on the collider underfoot or the nearest
+  `surface_patch` (the dressing's straw, gravel, snow and muck props, tagged by the district). Walls halve hearing.
+- **Two-zone cone**: near 0-5 m, 90 deg sees any posture; far 5-14 m, 60 deg sees standing, crouching only at light
+  >= 0.75, never prone; peripheral 110 deg (60 % range) catches sprinting. Cover is two rays (head, chest): head only
+  0.5, chest only 0.7. Guards sweep their head (+-50 deg; sentries +-35 deg, slower) while standing at a waypoint.
+- **Barks**: German/Polish lines in a speech bubble on each state change, lure, body, lamp, runner; only the first of
+  an alert episode also goes to the message line (and so the journal).
 
-### Feedback (`hud.gd`, guard cone)
-- Each guard draws a flat wedge on the cobbles tinted by its state (dim green, amber, orange, red) and a
-  `?` / `!?` / `!!` label above its head. The HUD shows one word for the worst guard's state and an eye icon.
-- Nothing tells the player how visible or how loud they are, or which guard is the one reacting.
+### Hiding (B)
+- 8 hiding spots (`E` hide / leave, or `H`): the east handcart heaped with straw, the Town Hall hay cart, two barrel
+  pairs, under the inn-yard coach, the woodpile lean-to, a cellar hatch in the NW alley, a doorway niche on the north
+  row. Visibility 0, the camera moves to a peek point. A guard who had the player in view within 1.5 s of going in
+  searches the spot and pulls them out; during Evasion guards prod nearby spots (20 %).
+- 6 benches (`E` sit): sitting, visibility x0.25 with a townsman within 1.8 m.
+- **Lean** (`Q` / `R`, standing or crouched, still): head and camera shift 0.45 m sideways; guards see only the head.
+- **Crowd**: 3+ townsfolk within 2.5 m (standing, or walking the player's way), not crouched, sprinting, fighting or
+  aiming: x0.35 (`Population.crowd_count`).
+- Stealth props never steal the interact target from mission people and props (meta `low_priority`).
 
-### Distractions and intel
-- One scripted distraction: the false pamphlet planted on the informer from behind, which sends the watch to
-  the Florian Gate (a mission flag, not a general system).
-- Intel is delivered by dialogue (the printer, the smuggler, the hostess) and the day briefing. No
-  overheard conversations, no posters, no documents to read, no maps.
-- Storylines (`data/storylines.json`) are timed NPC loops (delivery, procession, informer) that can be
-  watched, but nothing in them is stealth-relevant yet apart from the informer's route.
+### Alert phases, runner, bodies (C)
+- `watch.gd` (one per district, group `watch`): CALM -> ALARM (guards within 30 m converge; a runner is sent) ->
+  EVASION (3 s without a sighting; 60 s of guards visiting hiding spots and open points within 9 m of the ghost) ->
+  CAUTION (3 game-minutes: patrol speed and view x2) -> CALM.
+- **Crackdown rises only when a runner reaches the Corporal's post** (St Mary's, (24, 0, -10)): the watch then adds
+  crackdown +5 and calls `GameState.raise_alarm` (the night's alarm count). The runner is the nearest guard other than
+  the one fighting (a lone guard goes once he has lost the player); a rear takedown is allowed on him from behind.
+- Downed guards: hold `E` to drag (half speed); let go near a hiding spot and the body is stashed there. A patrol who
+  sees a body goes Searching, kneels over it (it wakes 4 s later), sets CAUTION and sends a runner. A guard waking
+  up goes Searching and sets CAUTION.
 
-### Crowds and enforcers
-- ~19 NPC walkers and 4 animals exist, but crowds do nothing for detection: a guard's ray ignores NPCs
-  (only physics bodies block it, and NPC bodies do not) and there is no "blend" state.
-- Enforcers do not exist: any guard is fooled equally by the cloak.
+### Distractions (D)
+- **Stone** (hold `G` / right mouse to aim with an arc preview, release): lands with a ring; the nearest guard in
+  earshot (8 m x loudness x 2, walls halve) walks over and looks about for 8 s; others glance.
+- **Doused lamp** (`E` at any of the 10 street lanterns): off for 30 s (the lamplighter relights it); a guard who
+  sees the dark lamp walks over and relights it (5 s) with his back to the square.
+- **Barrel** (3 loose ones, `E` kick): rolls away from the player, rumbling, bounces off walls; a guard runs to it.
+- **Door knock** (4 tenement doors away from the entrances): a townsman opens and keeps the guard who comes 10 s.
+- **Loose horse** (the saddle horse by St Adalbert's, `E` untie): wanders off; the nearest guard follows it 8 s.
+- **Church bell**: `watch.ring_bell()` for missions: sound masked 4 s, guards look at the tower.
+  `watch.mask_sound(secs)` alone masks. The decoy pamphlet flow is unchanged.
+
+### On-screen (G)
+- A thin arc low in the screen centre, under the figure: its length is visibility, its colour noise (white -> amber),
+  a dot when hidden. A chevron at the screen edge for the most alarmed guard when he is off-screen. No new text.
+- Ground rings for 2 s at stones, barrels, knocks, the horse, the bell and sprinting steps.
+- Cones: the near zone always; the far zone fades in with suspicion (hidden when calm).
+- The last-known ghost: a rim-lit outline where the watch thinks the player is (Evasion, or a lone searching guard).
+
+### Hooks for phases E and F
+- Watch signals: `phase_changed`, `sound_event`, `player_spotted`, `body_found`, `runner_sent`, `runner_arrived`,
+  `runner_stopped`, `hiding_changed`, `lamp_changed`, `barked`; `watch.flags` mirrored into `Mission.flags` as
+  `stealth_<name>` (e.g. `stealth_phase`, `stealth_runner_arrived`).
+- `guard.enforcer` (sees through the disguise, red-tinted cone) and `guard.sight_modifiers` (Callables
+  `(guard, player) -> float`) for zone permits; `guard.task` / `set_task()` for scripted errands.
+
+### Smoke
+`godot --headless --path . --quit-after 3000 -- --smoke` runs `stealth_smoke.gd` beside the mission smoke, each check
+in a private sandbox world (SubViewport with its own World3D; sandbox actors are outside the `guards` / `player`
+groups and have no GameState / Mission side effects), printing `[smoke] stealth ...` lines ending OK / FAIL.
+`--stealth-shot=/dir` (windowed) saves `stealth_arc_light`, `_arc_dark`, `_hiding`, `_cone_curious`, `_ring`,
+`_ghost`, `_chevron`.
+
+### Known limits
+- One game minute is one real second, so Caution lasts 3 s at the default; raise `phases.caution_minutes` if it
+  should be felt. Side-street barricades in Caution are not built.
+- Only guards count as bodies (not the informer or other takedown targets).
+- Guards use the navmesh for errands and the runner but still walk their patrol legs in straight lines.
 
 ## 2. What the classics teach
 

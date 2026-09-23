@@ -26,6 +26,7 @@ static var _shots_done := false
 
 
 func _ready() -> void:
+	add_to_group("population")
 	var f := FileAccess.open(ROSTER, FileAccess.READ)
 	if f == null:
 		push_warning("Population: cannot open %s" % ROSTER)
@@ -246,6 +247,27 @@ func _vehicle_shots(dir: String) -> void:
 
 func count() -> int:
 	return _spawned.size()
+
+
+## Stealth crowd query (player.gd crowd blending): townsfolk within `radius` m of `point` who are out in the street,
+## awake, and standing still or walking the same way as `dir` (dot > 0.5). `dir` ZERO counts every one near.
+func crowd_count(point: Vector3, dir: Vector3 = Vector3.ZERO, radius: float = 2.5) -> int:
+	var n := 0
+	var d2 := Vector2(dir.x, dir.z)
+	for b in _spawned:
+		if not is_instance_valid(b) or b.get_script() != NpcScript:
+			continue
+		var npc := b as CharacterBody3D
+		if npc.is_inside() or npc.is_downed() or not npc.visible:
+			continue
+		var off := Vector2(npc.global_position.x - point.x, npc.global_position.z - point.z)
+		if off.length() > radius or absf(npc.global_position.y - point.y) > 2.0:
+			continue
+		var v := Vector2(npc.velocity.x, npc.velocity.z)
+		if d2.length() > 0.1 and v.length() > 0.3 and v.normalized().dot(d2.normalized()) < 0.5:
+			continue
+		n += 1
+	return n
 
 
 ## Mission hook: spawn one roster entry (same format as data/npcs.json). An entry whose id already exists
