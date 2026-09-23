@@ -77,3 +77,54 @@ Old Town (Rynek), Wawel (garrison), Kazimierz, Stradom, Kleparz, Kanonicza/Churc
 - Engine: Godot 4.7 (GDScript). Forward+ renderer.
 - Assets: Blender → glTF 2.0 (.glb) into `assets/models/`. Greybox uses CSG until then.
 - Data: factions/origins/districts as JSON in `data/`, loaded at boot.
+
+## Economy lever: propination (beer and spirits)
+Propination (propinacja) was the magnates' and towns' legal monopoly on brewing, distilling and selling drink;
+tenants were obliged to buy from the lord's tavern. In 1795 it was one of the largest incomes of the great families
+and a fresh target for Austrian excise. In play:
+- Every district has taverns tied to a propination holder (a magnate, the town, a monastery). Taverns are safe-house
+  candidates, rumour mills and recruiting grounds; the holder's steward (ekonom), brewer, maltster, distiller and
+  cellarman are named NPCs.
+- Levers: boycott (the Street), smuggling untaxed spirits from Kazimierz and the docks (Underworld), cutting a
+  magnate in on excise fraud (Magnates), preaching temperance (Church), an Austrian excise raid (Austria) as a threat
+  the player can trigger or forestall.
+- Consequences ripple: a boycotted magnate loses income and either bends toward the movement or hires mercenaries.
+
+## Trade and foreigners
+Kraków sat on the Vistula salt and grain route and the overland route from Lwów. Armenian and Greek merchants
+carried Ottoman and Persian goods (spices, dyes, silks, carpets, coffee); Hungarian wine came over the Carpathians;
+Scots pedlars, German and Italian craftsmen, Flemish printers and French émigrés fleeing the Revolution all lived in
+the city. These appear as named traders and tradesmen in the districts and as contacts with foreign courts.
+
+## World simulation (the living city)
+Reference points: Hitman's schedules and opportunities, the recent 007's crowd and NPC routines.
+- **Clock.** The night mission runs on a world clock (default 1 real second = 1 game minute, from 21:00). Curfew
+  bells, the watch's rounds, tavern closing and church hours are clock events.
+- **Posts and schedules.** Every named NPC has a loop of posts (stall, tavern bar, church door, tenement door,
+  well) with an activity at each (pack up, drink, pray, gossip, sleep). Crowd NPCs draw from a small set of shared
+  loops. Movement uses a baked navmesh with avoidance, so crowds flow around obstacles and each other.
+- **Storylines.** Scripted sequences attached to NPCs with time or proximity triggers: the smuggler's delivery run,
+  the bishop's procession, the informer who shadows the player and reports to the watch, the drunk who is thrown
+  out of a propination tavern, the printer smuggling a pamphlet bundle to the salon. They can be watched, used as
+  cover, interrupted or exploited (steal the pamphlets, replace the delivery, feed the informer a lie).
+- **Interiors.** Reusable sets (tavern, shop, workshop, church nave, salon, flat) placed behind doors; each district
+  re-dresses the same kits with its own trades, colours and props until bespoke interiors exist.
+- **Districts.** Each district has its own trades, its own propination holder, its own notables, and its own
+  watch presence, so the same systems produce different textures of life: jewellers and traders in Kazimierz,
+  tanners and brewers in Garbary, porters and salt on the docks, grain and horses in Kleparz, canons in Kanonicza.
+- **Reactions.** Crowds react to the watch (step aside), to alarms (scatter, gawk), to the player's disguise and
+  reputation (greet, ignore, report). Reputation with each faction changes who will talk and who will inform.
+
+## The countryside (farmland as a faction avenue)
+Kraków fed on the villages around it: manor farms (folwarki) of the Church, the university, the town and the
+magnates, worked by serfs; free peasant villages under royal (now Austrian) law; mills on the Rudawa and Prądnik.
+Kościuszko's Połaniec Proclamation (May 1794) had promised the peasants personal freedom and lower labour dues;
+the partition cancelled it. That makes the countryside a live avenue:
+- **Faction: the Villages.** Wójts (village headmen), millers, folwark stewards, parish priests as intermediaries.
+  Influence gives food during a blockade, hiding places outside the walls, a route for smuggled arms and letters,
+  and recruits with scythes.
+- **Levers.** Promise the Połaniec terms again (costs magnate trust), pay grain debts, protect a village from
+  Austrian requisition, or lean on a steward. Betray them and the Street remembers.
+- **Sets.** A farm district outside the map's edge: fields, fences, a cottage, a barn, haystacks, a mill,
+  a roadside shrine, a folwark manor house. Missions: a night ride to a mill to move a cache; hiding a fugitive in
+  a barn; a requisition raid to stop.

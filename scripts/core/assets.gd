@@ -38,12 +38,38 @@ static func character(name: String) -> Node3D:
 		return null
 	fig.rotation.y = PI
 	pivot.add_child(fig)
+	_tune_materials(fig)
 	var ap := _find_anim_player(fig)
 	if ap:
 		for anim_name in ap.get_animation_list():
 			ap.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
 		pivot.set_meta("anim", ap)
 	return pivot
+
+
+## Skin gets subsurface scattering and a softer specular; cloth goes fully rough; strands stay alpha-scissor.
+static func _tune_materials(n: Node) -> void:
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		for i in mi.get_surface_override_material_count():
+			var mat := mi.get_active_material(i)
+			if mat is BaseMaterial3D:
+				var bm := mat as BaseMaterial3D
+				var nm := bm.resource_name.to_lower()
+				if "body" in nm:
+					bm.subsurf_scatter_enabled = true
+					bm.subsurf_scatter_strength = 0.6
+					bm.subsurf_scatter_skin_mode = true
+					bm.roughness = 0.62
+					bm.metallic_specular = 0.45
+				elif nm.begins_with("cloth_"):
+					bm.roughness = 0.95
+					bm.metallic_specular = 0.2
+				elif "eye_shadow" in nm:
+					bm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+					bm.cull_mode = BaseMaterial3D.CULL_BACK
+	for c in n.get_children():
+		_tune_materials(c)
 
 
 static func _find_anim_player(n: Node) -> AnimationPlayer:

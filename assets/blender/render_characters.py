@@ -14,10 +14,22 @@ def scene():
     sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
     sc.world.node_tree.nodes["Background"].inputs[0].default_value = (0.42, 0.47, 0.56, 1)
     sc.world.node_tree.nodes["Background"].inputs[1].default_value = 0.6
-    sun = bpy.data.lights.new("sun", "SUN"); sun.energy = 3.0; sun.angle = 0.5
-    so = bpy.data.objects.new("sun", sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(55), 0, math.radians(35))
-    fill = bpy.data.lights.new("fill", "SUN"); fill.energy = 1.0
-    fo = bpy.data.objects.new("fill", fill); sc.collection.objects.link(fo); fo.rotation_euler = (math.radians(60), 0, math.radians(-120))
+    def sun(name, energy, colour, rx, rz, angle=0.6):
+        l = bpy.data.lights.new(name, "SUN"); l.energy = energy; l.color = colour; l.angle = angle
+        o = bpy.data.objects.new(name, l); sc.collection.objects.link(o); o.rotation_euler = (math.radians(rx), 0, math.radians(rz))
+    sun("key", 2.6, (1.0, 0.93, 0.82), 50, 35)          # warm key, front-left, high
+    sun("fill", 0.9, (0.80, 0.88, 1.0), 65, -110)       # cool soft fill from the other side
+    sun("rim", 2.0, (1.0, 0.97, 0.9), 35, 160, 0.3)     # rim from behind
+    try:
+        sc.eevee.use_gtao = True
+        sc.eevee.gtao_distance = 0.25
+    except AttributeError:
+        pass
+    try:
+        sc.eevee.use_shadows = True
+        sc.eevee.use_raytracing = True
+    except AttributeError:
+        pass
     return sc
 
 def cam(sc, loc, target, lens=50):
@@ -56,6 +68,6 @@ for name in names:
     sc = scene()
     sc.render.resolution_x, sc.render.resolution_y = 1200, 1200
     load(name, 0, math.radians(25))
-    cam(sc, (0.32, -0.75, 1.62), (0.0, 0, 1.58), lens=90)
+    cam(sc, (0.30, -0.78, 1.60), (0.0, 0, 1.55), lens=85)
     sc.render.filepath = os.path.join(OUT, name + "_face.png"); bpy.ops.render.render(write_still=True)
     print("[render]", sc.render.filepath)

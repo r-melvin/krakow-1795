@@ -1,10 +1,11 @@
 extends Control
 ## Choose who you are. Shows starting influence per faction so the trade-offs are visible.
 
-signal chosen(origin_id: String)
+signal chosen(origin_id: String, sex: String)
 
 var _detail: RichTextLabel
 var _selected := ""
+var _sex := "m"
 var _start: Button
 
 
@@ -48,10 +49,23 @@ func _ready() -> void:
 	_detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	h.add_child(_detail)
 
+	var row := HBoxContainer.new()
+	v.add_child(row)
+	var sex_label := Label.new()
+	sex_label.text = "Play as:  "
+	row.add_child(sex_label)
+	var group := ButtonGroup.new()
+	for opt in [["m", "Man"], ["f", "Woman"]]:
+		var b := CheckBox.new()
+		b.text = opt[1]
+		b.button_group = group
+		b.button_pressed = opt[0] == "m"
+		b.toggled.connect(func(on: bool): if on: _sex = opt[0])
+		row.add_child(b)
 	_start = Button.new()
 	_start.text = "Begin"
 	_start.disabled = true
-	_start.pressed.connect(func(): chosen.emit(_selected))
+	_start.pressed.connect(func(): chosen.emit(_selected, _sex))
 	v.add_child(_start)
 
 

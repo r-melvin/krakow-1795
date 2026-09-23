@@ -2,3 +2,18 @@
 *.uid
 .blend1
 assets/blender/*.blend1
+
+# Generated characters (MakeHuman/MPFB pipeline, ~10 MB each). Rebuild with:
+#   blender -b --python assets/blender/build_characters.py
+assets/models/figure_*.glb
+assets/models/figure_*.glb.import
+assets/models/cast_*.glb
+assets/models/cast_*.glb.import
+assets/models/npc_*.glb
+assets/models/npc_*.glb.import
+assets/models/town_*.glb
+assets/models/town_*.glb.import
+assets/models/watchman.glb
+assets/models/watchman.glb.import
+__pycache__/
+*.pyc

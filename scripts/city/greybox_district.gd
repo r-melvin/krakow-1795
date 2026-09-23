@@ -7,8 +7,17 @@ extends Node3D
 
 const GuardScript := preload("res://scripts/stealth/guard.gd")
 const SafeHouseScript := preload("res://scripts/stealth/safe_house.gd")
+const PopulationScript := preload("res://scripts/city/population.gd")
+
+const NAV_GROUP := "nav_source"
+
+signal navmesh_ready(polygons: int)
 
 var _ground_mat: StandardMaterial3D
+var nav_region: NavigationRegion3D
+var _baked := false
+var _bake_iteration := 0
+var portals: Array = []          ## [asset, centre, rot_y] per tenement module, for door triggers
 
 
 func _ready() -> void:
@@ -21,7 +30,10 @@ func _ready() -> void:
 	_tenements()
 	_furniture()
 	_guards()
+	_population()
 	_safe_house()
+	_navigation()
+	_interiors()
 
 
 func _environment() -> void:
@@ -39,7 +51,7 @@ func _environment() -> void:
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.16, 0.19, 0.32)
-	e.ambient_light_energy = 0.38
+	e.ambient_light_energy = 0.5
 	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	e.tonemap_exposure = 1.15
 	e.ssao_enabled = true
@@ -66,10 +78,15 @@ func _environment() -> void:
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 120
 	add_child(moon)
+	var fill := DirectionalLight3D.new()
+	fill.light_color = Color(0.45, 0.5, 0.7)
+	fill.light_energy = 0.12
+	fill.rotation_degrees = Vector3(-30, -140, 0)
+	add_child(fill)
 
 	# Oil lanterns. Kraków had public street lighting from the 1770s, sparse: warm pools between dark stretches.
 	for p in [Vector3(-22, 0, -22), Vector3(22, 0, -22), Vector3(-22, 0, 22), Vector3(16, 0, 24),
-			Vector3(0, 0, -24), Vector3(-6, 0, 24), Vector3(-24, 0, 0), Vector3(24, 0, 4), Vector3(0, 0, 8), Vector3(0, 0, -8)]:
+			Vector3(0, 0, -24), Vector3(-6, 0, 24), Vector3(-24, 0, 0), Vector3(24, 0, 4), Vector3(5, 0, 9), Vector3(-5, 0, -9)]:
 		var l := OmniLight3D.new()
 		l.position = p + Vector3(0.9, 2.9, 0)
 		l.light_color = Color(1.0, 0.68, 0.36)
@@ -80,6 +97,15 @@ func _environment() -> void:
 		l.light_specular = 0.3
 		add_child(l)
 		Assets.place(self, "lantern_post", p, 0.0)
+
+	# The dragon's cave, south-west beyond the Town Hall: a sulphurous glow (easter egg).
+	var cave := OmniLight3D.new()
+	cave.position = Vector3(-36, 2.5, 33)
+	cave.light_color = Color(0.55, 0.95, 0.45)
+	cave.light_energy = 5
+	cave.omni_range = 16
+	cave.shadow_enabled = true
+	add_child(cave)
 
 	# Lit windows spill a little warm light onto the square's edges.
 	for p in [Vector3(-14, 6, -27), Vector3(8, 6, -27), Vector3(-27, 6, 6), Vector3(6, 6, 27), Vector3(-12, 6, 27)]:
@@ -92,11 +118,21 @@ func _environment() -> void:
 
 
 func _ground() -> void:
-	var g := CSGBox3D.new()
-	g.size = Vector3(90, 1, 90)
+	# Plain static body (not CSG) so the navmesh baker reads its box shape directly.
+	var g := StaticBody3D.new()
+	g.name = "Ground"
 	g.position.y = -0.5
-	g.use_collision = true
-	g.material = _ground_mat
+	var gs := CollisionShape3D.new()
+	var gb := BoxShape3D.new()
+	gb.size = Vector3(90, 1, 90)
+	gs.shape = gb
+	g.add_child(gs)
+	var gm := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = gb.size
+	bm.material = _ground_mat
+	gm.mesh = bm
+	g.add_child(gm)
 	add_child(g)
 	# Snow patches and a few paving strips to break the plane.
 	var snow := StandardMaterial3D.new()
@@ -137,6 +173,7 @@ func _row(mods: Array, start: Vector3, dir: Vector3, rot_y: float) -> void:
 	for m in mods:
 		var w: float = m[1]
 		var centre := cursor + dir * (w * 0.5)
+		portals.append([m[0], centre, rot_y])
 		if Assets.place(self, m[0], centre, rot_y) == null:
 			var b := CSGBox3D.new()
 			b.size = Vector3(w, 12, 8) if dir.x != 0 else Vector3(8, 12, w)
@@ -158,8 +195,8 @@ func _furniture() -> void:
 		Assets.place(self, "cart", c[0], c[1])
 	for c in [[Vector3(-8, 0, 12), 0.2], [Vector3(8, 0, -13), -0.5]]:
 		Assets.place(self, "crate_stack", c[0], c[1])
-	Assets.place(self, "well", Vector3(-12, 0, 2), 0.0)
-	Assets.place(self, "well", Vector3(14, 0, 0), PI * 0.5)
+	Assets.place(self, "well", Vector3(-12, 0, 9), 0.0)
+	Assets.place(self, "well", Vector3(14, 0, -9), PI * 0.5)
 
 
 func _guards() -> void:
@@ -179,6 +216,15 @@ func _guards() -> void:
 		g.waypoints = wps
 		g.position = wps[0]
 		add_child(g)
+		g.add_child(avoidance_obstacle(0.45))
+
+
+func _population() -> void:
+	# Night townsfolk and animals from data/npcs.json.
+	var pop := Node.new()
+	pop.set_script(PopulationScript)
+	pop.name = "Population"
+	add_child(pop)
 
 
 func _safe_house() -> void:
@@ -188,6 +234,70 @@ func _safe_house() -> void:
 	sh.name = "SafeHouse"
 	sh.position = Vector3(26, 0, 25)
 	add_child(sh)
+
+
+## Walkable surface for townsfolk, baked at runtime from the static collision (ground CSG and the -col
+## shapes in the building and prop glTFs). Characters are CharacterBody3D, so they are not baked in.
+func _navigation() -> void:
+	add_to_group(NAV_GROUP)
+	var nm := NavigationMesh.new()
+	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nm.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
+	nm.geometry_source_group_name = NAV_GROUP
+	nm.agent_radius = 0.4
+	nm.agent_height = 1.75
+	nm.agent_max_climb = 0.25
+	nm.agent_max_slope = 30.0
+	nm.cell_size = 0.2            # 0.4 m radius = 2 cells exactly
+	nm.cell_height = 0.25
+	# Only the street level matters: clip geometry above 4 m so roofs and towers are not voxelised.
+	nm.filter_baking_aabb = AABB(Vector3(-45, -1, -45), Vector3(90, 5, 90))
+	nav_region = NavigationRegion3D.new()
+	nav_region.name = "NavRegion"
+	nav_region.navigation_mesh = nm
+	NavigationServer3D.map_set_cell_size(get_world_3d().navigation_map, nm.cell_size)
+	NavigationServer3D.map_set_cell_height(get_world_3d().navigation_map, nm.cell_height)
+	add_child(nav_region)
+	nav_region.bake_finished.connect(_on_bake_finished)
+	# The glTF instances and CSG collision register with physics during this frame: bake on the next one.
+	await get_tree().physics_frame
+	if is_inside_tree():
+		nav_region.bake_navigation_mesh(true)
+
+
+func _on_bake_finished() -> void:
+	_bake_iteration = NavigationServer3D.map_get_iteration_id(get_world_3d().navigation_map)
+	_baked = navmesh_polygons() > 0
+	navmesh_ready.emit(navmesh_polygons())
+
+
+## True once the baked navmesh has been synced into the world's navigation map (map sync is async,
+## so the map iteration must move past the one current when the bake finished).
+func nav_ready() -> bool:
+	return _baked and NavigationServer3D.map_get_iteration_id(get_world_3d().navigation_map) > _bake_iteration
+
+
+func navmesh_polygons() -> int:
+	if nav_region == null or nav_region.navigation_mesh == null:
+		return 0
+	return nav_region.navigation_mesh.get_polygon_count()
+
+
+## Guards and the player are not NavigationAgents; this lets townsfolk steer around them.
+static func avoidance_obstacle(r: float) -> NavigationObstacle3D:
+	var o := NavigationObstacle3D.new()
+	o.name = "AvoidanceObstacle"
+	o.radius = r
+	o.avoidance_enabled = true
+	return o
+
+
+## Interior sets below the map and door triggers at the portals (scripts/city/interiors.gd).
+func _interiors() -> void:
+	var n := Node3D.new()
+	n.set_script(load("res://scripts/city/interiors.gd"))
+	n.set("portals", portals)
+	add_child(n)
 
 
 func player_spawn() -> Vector3:

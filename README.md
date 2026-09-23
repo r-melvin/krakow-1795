@@ -25,7 +25,7 @@ WASD move, Shift sprint, Ctrl or C crouch, mouse look, Esc release mouse.
 ```
 blender -b --python assets/blender/build_assets.py
 ```
-Contact sheets in `docs/screenshots/sheet_*.png`. Era references baked into the generator:
+Contact sheets in `docs/screenshots/*.jpg`. Era references baked into the generator:
 Sukiennice in its Renaissance state (attyka parapet, end loggias, no side arcades), St Mary's with its unequal
 towers, the Town Hall still standing (demolished 1820), St Adalbert's dome, kamienice with attyka / gable /
 mansard roofs, Austrian infantry in white with tricornes, origins in kontusz, sukmana, cassock, frock coat.
@@ -43,7 +43,11 @@ One-time setup (already done on this machine):
 blender -b --command extension install-file -r user_default -e mpfb.zip     # from extensions.blender.org
 # then extract makehuman_system_assets_cc0.zip into ~/.config/blender/5.2/extensions/.user/user_default/mpfb/data
 ```
-Rebuild all or some: `blender -b --python assets/blender/build_characters.py [-- watchman figure_noble]`.
+Rebuild all or some: `blender -b --python assets/blender/build_characters.py [-- watchman figure_noble | base | cast | townsfolk | npc]`.
+Rosters in that file: `CHARACTERS` (player origins, man and woman each, and the watchman), `CAST` (faction leaders,
+villains, spies, beggars, urchins, children), `TOWNSFOLK` (shopkeepers, innkeeper, tradesmen), `crowd_specs()`
+(seeded background townsfolk with varied skin, age, hair and cloth). Generated character files are not committed
+(see .gitignore); run the build once after cloning. Animals and the Wawel dragon: `blender -b --python assets/blender/build_assets.py -- --animals`.
 Check renders: `render_characters.py -- <outdir> <names>` (turnaround + face) and `render_lineup.py -- <outdir>`.
 
 ## Blender pipeline
