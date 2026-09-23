@@ -128,3 +128,30 @@ the partition cancelled it. That makes the countryside a live avenue:
 - **Sets.** A farm district outside the map's edge: fields, fences, a cottage, a barn, haystacks, a mill,
   a roadside shrine, a folwark manor house. Missions: a night ride to a mill to move a cache; hiding a fugitive in
   a barn; a requisition raid to stop.
+
+
+## Tone, period constraints and language
+
+**Tone.** The game does not soften the years it is set in. Occupation, public punishment on the Rynek, poverty,
+drink, prostitution, disease and killing cold are shown plainly; sexual content stays implied. Characters voice
+the bigotries of their age (against Jews, peasants, foreigners, women outside their station, and anyone whose
+desires were then a crime). The game presents these as the world the player moves through, not as views it
+shares. A content notice says so before the main menu (`scripts/ui/content_notice.gd`).
+
+**Gender and inclination as gates.** Character creation sets sex and "drawn to" (women / men / both / unspoken,
+`GameState.inclination`). Content gates on them through dialogue conditions (`gender:f`, `inclination:men|both`,
+`origin:...`, `influence:faction>=n`) and `GameState.option_allowed(req)` for doors and roles. Closed choices stay
+visible but greyed with a period reason ("Not for a woman here.", "Not your inclination."). Rules of thumb:
+- A woman cannot join the watch, sit in the guild hall, be a priest (she is a nun), or walk the streets alone at
+  night without drawing a different kind of attention; she can enter kitchens, sickrooms, convents and the
+  women's side of the synagogue, and is searched less at gates.
+- A man cannot pass as a nun or enter the women's quarters; a nobleman is admitted to the salon a burgher is not.
+- Same-sex desire is a crime under the Austrian code: it is a blackmail lever against the player and against
+  NPCs (an officer, a canon, a magnate's son), and also a key to certain circles (the theatre, a bathhouse, a
+  private salon) that a straight character cannot use. "Unspoken" satisfies no explicit requirement.
+- Jews are confined to Kazimierz after curfew and barred from guild trades; a Kazimierz merchant origin has
+  doors closed on the Rynek and open in Kazimierz.
+
+**Language.** Polish, German and Yiddish lines are kept as the people would have said them, always with an
+English gloss beneath (speech bubbles show "text\n(gloss)"; JSON lines carry a `gloss` field). Period words
+used in the UI carry their meaning in `data/glossary.json`, shown in the journal's Glossary tab.

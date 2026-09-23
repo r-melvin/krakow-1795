@@ -20,6 +20,9 @@ var day: int = 1
 var crackdown: int = 10          ## 0..100. Austrian pressure on the city.
 var origin_id: String = ""
 var gender: String = "m"      ## "m" or "f": picks figure_<origin> or figure_<origin>_f
+## Whom the character is drawn to: "women", "men", "both" or "unspoken". In 1795 this is a private fact with
+## public consequences (a crime under Austrian law, a blackmail lever, a door into some circles and out of others).
+var inclination: String = "unspoken"
 var origin: Dictionary = {}
 
 var factions: Dictionary = {}    ## id -> {name, strength, fear, agenda, external, influence, loyalty}
@@ -120,9 +123,10 @@ func to_menu() -> void:
 	set_phase(Phase.MENU)
 
 
-func choose_origin(id: String, sex: String = "m") -> void:
+func choose_origin(id: String, sex: String = "m", incl: String = "unspoken") -> void:
 	origin_id = id
 	gender = sex
+	inclination = incl
 	origin = origins[id]
 	for fid in origin["influence"]:
 		set_influence(fid, int(origin["influence"][fid]))
@@ -264,7 +268,7 @@ func save_game() -> void:
 	var infl := {}
 	for fid in factions:
 		infl[fid] = get_influence(fid)
-	var data := {"day": day, "origin": origin_id, "gender": gender, "influence": infl, "crackdown": crackdown, "coins": coins}
+	var data := {"day": day, "origin": origin_id, "gender": gender, "influence": infl, "crackdown": crackdown, "coins": coins, "inclination": inclination}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data, "  "))
@@ -282,6 +286,7 @@ func continue_game() -> bool:
 	coins = int(d.get("coins", 12))
 	origin_id = str(d["origin"])
 	gender = str(d.get("gender", "m"))
+	inclination = str(d.get("inclination", "unspoken"))
 	origin = origins[origin_id]
 	for fid in factions:
 		factions[fid]["influence"] = 0
@@ -291,3 +296,60 @@ func continue_game() -> bool:
 		set_influence(fid, int(infl[fid]))
 	set_phase(Phase.DAY)
 	return true
+
+
+## Period gating. `req` may hold: gender ("m"/"f"), not_gender, inclination (a String or Array of allowed values;
+## "unspoken" never satisfies an explicit requirement), origin / not_origin (ids or Arrays), min_influence
+## ({faction: value}), min_coins. Returns true when every present key is satisfied. Content authors use it on
+## dialogue choices, doors and roles: a woman is not let into the guild hall, a man is not taken for a nun, a
+## man who wants men can be blackmailed and can also enter certain rooms a straight man cannot.
+func option_allowed(req: Dictionary) -> bool:
+	if req.is_empty():
+		return true
+	if req.has("gender") and gender != str(req["gender"]):
+		return false
+	if req.has("not_gender") and gender == str(req["not_gender"]):
+		return false
+	if req.has("inclination"):
+		var want = req["inclination"]
+		var ok := false
+		if want is Array:
+			ok = inclination in want or ("both" in want and inclination == "both")
+		else:
+			ok = inclination == str(want)
+		if inclination == "both" and (want is Array and ("women" in want or "men" in want) or str(want) in ["women", "men"]):
+			ok = true
+		if not ok:
+			return false
+	if req.has("origin"):
+		var o = req["origin"]
+		if (o is Array and origin_id not in o) or (not (o is Array) and origin_id != str(o)):
+			return false
+	if req.has("not_origin"):
+		var no = req["not_origin"]
+		if (no is Array and origin_id in no) or (not (no is Array) and origin_id == str(no)):
+			return false
+	if req.has("min_influence"):
+		for fid in req["min_influence"]:
+			if get_influence(str(fid)) < int(req["min_influence"][fid]):
+				return false
+	if req.has("min_coins") and coins < int(req["min_coins"]):
+		return false
+	return true
+
+
+## Why an option is closed, for a greyed choice: short period phrasing.
+func option_reason(req: Dictionary) -> String:
+	if req.has("gender") and gender != str(req["gender"]):
+		return "Not for a woman here." if gender == "f" else "Not for a man here."
+	if req.has("not_gender") and gender == str(req["not_gender"]):
+		return "Not for a woman here." if gender == "f" else "Not for a man here."
+	if req.has("inclination"):
+		return "Not your inclination."
+	if req.has("origin") or req.has("not_origin"):
+		return "Not for someone of your station."
+	if req.has("min_influence"):
+		return "You are not known enough here."
+	if req.has("min_coins"):
+		return "Not enough coin."
+	return ""

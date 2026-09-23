@@ -255,6 +255,10 @@ func _cond_raw(c: String, id: String) -> bool:
 			return p != null and npc != null and _behind(npc, p)
 		"origin":
 			return GameState.origin_id in arg.split("|")
+		"gender":                        # gender:f  gender:m
+			return GameState.gender in arg.split("|")
+		"inclination":                   # inclination:men|both  ("unspoken" never satisfies)
+			return GameState.inclination != "unspoken" and GameState.inclination in arg.split("|")
 		"influence":
 			var parts := arg.split(">=")
 			return GameState.get_influence(parts[0]) >= int(parts[1])
@@ -342,9 +346,33 @@ func play(id: String, node_name: String) -> void:
 			continue
 		var ok := _cond_all(c.get("need", []), id)
 		_choices.append(c)
-		shown.append({"text": _fmt(str(c.get("text", "..."))), "enabled": ok, "why": str(c.get("why", "not possible"))})
+		var why := str(c.get("why", ""))
+		if not ok and why == "":
+			why = _period_why(c.get("need", []), id)
+		shown.append({"text": _fmt(str(c.get("text", "..."))), "enabled": ok, "why": why if why != "" else "not possible"})
 	dialogue.set_meta("node", node_name)
 	dialogue.show_node(lines, shown)
+
+
+## Period phrasing for a greyed choice whose `need` failed on who the player is.
+func _period_why(needs: Array, id: String) -> String:
+	for n in needs:
+		var c := str(n)
+		if _cond(c, id):
+			continue
+		var key := c.trim_prefix("!").get_slice(":", 0)
+		match key:
+			"gender":
+				return "Not for a woman here." if GameState.gender == "f" else "Not for a man here."
+			"inclination":
+				return "Not your inclination."
+			"origin":
+				return "Not for someone of your station."
+			"influence":
+				return "You are not known enough here."
+			"coins>=cost":
+				return "Not enough coin."
+	return ""
 
 
 func _on_choice(i: int) -> void:

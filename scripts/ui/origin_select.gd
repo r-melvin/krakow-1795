@@ -2,13 +2,15 @@ extends Control
 ## Choose who you are. Left: origins and Man / Woman. Centre: the figure on a turntable. Right: blurb, goal,
 ## weakness, starting influence per faction and skills, so the trade-offs are visible. Emits `chosen`.
 
-signal chosen(origin_id: String, sex: String)
+signal chosen(origin_id: String, sex: String, inclination: String)
 
 const Preview := preload("res://scripts/ui/character_preview.gd")
 const SKILL_MAX := 3
 
 var _selected := ""
 var _sex := "m"
+var _incl := "unspoken"
+var _incl_buttons: Dictionary = {}
 var _start: Button
 var _preview: SubViewportContainer
 var _origin_buttons: Dictionary = {}
@@ -100,6 +102,23 @@ func _ready() -> void:
 		sexrow.add_child(b)
 		_sex_buttons[opt[0]] = b
 	lv.add_child(sexrow)
+	lv.add_child(UiTheme.spacer(6))
+	lv.add_child(UiTheme.kicker("Drawn to"))
+	var inclrow := HBoxContainer.new()
+	inclrow.add_theme_constant_override("separation", 6)
+	for opt in [["unspoken", "Unspoken"], ["women", "Women"], ["men", "Men"], ["both", "Both"]]:
+		var ib := Button.new()
+		ib.text = opt[1]
+		ib.toggle_mode = true
+		ib.button_pressed = opt[0] == _incl
+		ib.custom_minimum_size = Vector2(0, 34)
+		ib.pressed.connect(_set_incl.bind(opt[0]))
+		inclrow.add_child(ib)
+		_incl_buttons[opt[0]] = ib
+	lv.add_child(inclrow)
+	var incl_note := UiTheme.label("A private matter with public consequences in 1795. It opens some doors and closes others; the watch and the blackmailers care.", 13, UiTheme.TEXT_DIM, "italic")
+	incl_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lv.add_child(incl_note)
 	lv.add_child(UiTheme.spacer(18))
 	lv.add_child(UiTheme.body("Where you were born decides who will listen to you, and who would see you hang.", 16, UiTheme.TEXT_DIM))
 	var lspace := Control.new()
@@ -196,7 +215,7 @@ func _select(id: String) -> void:
 	if not _origin_buttons[id].button_pressed:
 		_origin_buttons[id].set_pressed_no_signal(true)
 	var o: Dictionary = GameState.origins[id]
-	_name.text = o["name"]
+	_name.text = o["name"] + ("  ·  " + str(o["gloss"]) if o.has("gloss") else "")
 	_blurb.text = o["blurb"]
 	_goal.text = o["goal"]
 	_weak.text = o["weakness"]
@@ -217,6 +236,12 @@ func _select(id: String) -> void:
 		h.add_child(UiTheme.label("◆".repeat(n) + "◇".repeat(maxi(SKILL_MAX - n, 0)), 17, UiTheme.BRASS_BRIGHT if n > 0 else UiTheme.TEXT_DIM))
 		_skills.add_child(h)
 	_refresh_preview()
+
+
+func _set_incl(i: String) -> void:
+	_incl = i
+	for k in _incl_buttons:
+		_incl_buttons[k].set_pressed_no_signal(k == i)
 
 
 func _set_sex(s: String) -> void:
@@ -242,7 +267,7 @@ func _begin() -> void:
 		return
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.3)
-	tw.tween_callback(func() -> void: chosen.emit(_selected, _sex))
+	tw.tween_callback(func() -> void: chosen.emit(_selected, _sex, _incl))
 
 
 func _unhandled_input(event: InputEvent) -> void:

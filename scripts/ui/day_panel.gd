@@ -12,6 +12,7 @@ const DEFAULT_BRIEFING := "A message must reach the boatmen's safe house across 
 var _summary := ""
 var _summary_label: Label
 var _go: Button
+var _more: Label
 
 
 func _ready() -> void:
@@ -62,14 +63,14 @@ func _ready() -> void:
 	# Left: tonight's mission
 	var lp := UiTheme.panel()
 	lp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lp.size_flags_stretch_ratio = 1.15
+	lp.size_flags_stretch_ratio = 1.55
 	cols.add_child(lp)
 	var lv := VBoxContainer.new()
 	lv.add_theme_constant_override("separation", 14)
 	lp.add_child(lv)
 	lv.add_child(UiTheme.kicker("Tonight"))
 	var title: String = m_title if m_title != "" else DEFAULT_TITLE
-	lv.add_child(UiTheme.heading(title, 34))
+	lv.add_child(UiTheme.heading(title, 30))
 	lv.add_child(HSeparator.new())
 	# The briefing scrolls inside the panel; the footer with the buttons stays pinned at the bottom so the
 	# screen fits any window height (long briefings used to push "Go out tonight" off a 1080p screen).
@@ -83,7 +84,7 @@ func _ready() -> void:
 	sv.add_theme_constant_override("separation", 12)
 	scroll.add_child(sv)
 	var brief: String = m_brief if m_brief != "" else DEFAULT_BRIEFING
-	sv.add_child(UiTheme.body(brief, 18))
+	sv.add_child(UiTheme.body(brief, 17))
 	if not m_objs.is_empty():
 		sv.add_child(UiTheme.spacer(4))
 		sv.add_child(UiTheme.kicker("Objectives"))
@@ -97,6 +98,15 @@ func _ready() -> void:
 	_summary_label = UiTheme.body("", 16, UiTheme.TEXT_DIM)
 	_summary_label.visible = false
 	sv.add_child(_summary_label)
+	_more = UiTheme.label("▾  more below: scroll", 13, UiTheme.BRASS, "italic")
+	_more.visible = false
+	lv.add_child(_more)
+	scroll.get_v_scroll_bar().changed.connect(func() -> void:
+		var vb := scroll.get_v_scroll_bar()
+		_more.visible = vb.max_value > vb.page + 1.0 and vb.value + vb.page < vb.max_value - 1.0)
+	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var vb := scroll.get_v_scroll_bar()
+		_more.visible = vb.value + vb.page < vb.max_value - 1.0)
 	lv.add_child(UiTheme.label("Night falls at 21:00. The watch changes at midnight.", 15, UiTheme.TEXT_DIM, "italic"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)

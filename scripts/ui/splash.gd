@@ -1,7 +1,10 @@
 extends Control
+
 ## Title card: painted night skyline, the title in a display serif, then any key or click goes to the main menu.
 
 const Backdrop := preload("res://scripts/ui/backdrop.gd")
+const ContentNotice := preload("res://scripts/ui/content_notice.gd")
+static var notice_shown := false   # once per launch
 
 var _content: VBoxContainer
 var _prompt: Label
@@ -94,5 +97,16 @@ func leave() -> void:
 	var tw := create_tween()
 	tw.tween_property(self, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_SINE)
 	tw.tween_callback(func() -> void:
-		if GameState.phase == GameState.Phase.SPLASH:
-			GameState.to_menu())
+		if GameState.phase != GameState.Phase.SPLASH:
+			return
+		if notice_shown or "--smoke" in OS.get_cmdline_user_args() and "--shot-ui" not in " ".join(OS.get_cmdline_user_args()):
+			GameState.to_menu()
+			return
+		notice_shown = true
+		var n := Control.new()
+		n.set_script(ContentNotice)
+		get_parent().add_child(n)
+		n.accepted.connect(func() -> void:
+			n.queue_free()
+			if GameState.phase == GameState.Phase.SPLASH:
+				GameState.to_menu()))

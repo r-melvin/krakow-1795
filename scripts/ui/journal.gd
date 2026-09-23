@@ -4,7 +4,7 @@ extends CanvasLayer
 ## Opening pauses the game and shows the mouse; closing restores both. Added by scripts/ui/hud.gd each night;
 ## the entries themselves live in Mission.journal (scripts/core/mission.gd), so they survive nights.
 ##
-## Tabs (1-5, or the arrow keys, or click):
+## Tabs (1-6, or the arrow keys, or click):
 ##   Missions    the current mission: title, briefing, approach, objectives (done / optional), rewards hint;
 ##               finished missions below.
 ##   Storylines  every mission approach (missions.json `approaches` + `journal.storylines`), mission storyline
@@ -24,7 +24,7 @@ extends CanvasLayer
 ## journal_<tab>.png on the third night of the smoke run (after the first mission pass) and
 ## journal_first_<tab>.png ten seconds into the first night.
 
-const TABS := ["Missions", "Storylines", "People", "Log", "Controls"]
+const TABS := ["Missions", "Storylines", "People", "Log", "Glossary", "Controls"]
 const EARSHOT := 14.0          ## m: an NPC's storyline line is overheard within this distance
 const SIGHT := 22.0            ## m: a storyline that begins this close to the player is seen
 const STATUS_COL := {"available": UiTheme.BRASS, "in progress": UiTheme.BRASS_BRIGHT, "resolved": UiTheme.GOOD,
@@ -378,7 +378,7 @@ func _input(event: InputEvent) -> void:
 		close()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k: int = (event as InputEventKey).physical_keycode
-		if k >= KEY_1 and k <= KEY_5:
+		if k >= KEY_1 and k <= KEY_6:
 			_set_tab(k - KEY_1)
 		elif k == KEY_RIGHT or k == KEY_D:
 			_set_tab((_tab + 1) % TABS.size())
@@ -502,7 +502,7 @@ func _build() -> void:
 	spread.add_child(_right_scroll)
 	_right = _right_scroll.get_child(0).get_child(0)
 
-	var foot := UiTheme.label("J  /  Tab  close        1 - 5  or  ← →  turn the page        Esc  back to the night", 14,
+	var foot := UiTheme.label("J  /  Tab  close        1 - 6  or  ← →  turn the page        Esc  back to the night", 14,
 			Color(UiTheme.TEXT_DIM, 0.8), "italic")
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(foot)
@@ -545,7 +545,8 @@ func _refresh() -> void:
 		1: _fill_storylines()
 		2: _fill_people()
 		3: _fill_log()
-		4: _fill_controls()
+		4: _fill_glossary()
+		5: _fill_controls()
 
 
 # --- text helpers
@@ -753,6 +754,28 @@ func _fill_log() -> void:
 
 
 # --- Controls
+
+## Polish and German words the game uses, with their meaning; from data/glossary.json (other systems append to it).
+func _fill_glossary() -> void:
+	var f := FileAccess.open("res://data/glossary.json", FileAccess.READ)
+	var terms: Array = []
+	if f:
+		var d = JSON.parse_string(f.get_as_text())
+		if d is Array:
+			terms = d
+	terms.sort_custom(func(a, b) -> bool: return str(a.get("term", "")).naturalnocasecmp_to(str(b.get("term", ""))) < 0)
+	_section(_left, "Words of the city")
+	_left.add_child(_t("Polish unless marked. The game keeps the words people would have used; this is the key.", 15, UiTheme.TEXT_DIM, "italic"))
+	var half := int(ceil(terms.size() / 2.0))
+	for i in terms.size():
+		var col := _left if i < half else _right
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 1)
+		row.add_child(_t(str(terms[i].get("term", "")), 18, UiTheme.BRASS_BRIGHT, "bold"))
+		row.add_child(_t(str(terms[i].get("gloss", "")), 16, UiTheme.TEXT))
+		col.add_child(row)
+		col.add_child(UiTheme.spacer(4))
+
 
 func _fill_controls() -> void:
 	for c in CONTROLS:

@@ -112,6 +112,10 @@ func _smoke() -> void:
 	await get_tree().process_frame
 	print("[smoke] origins=%d factions=%d districts=%d" % [GameState.origins.size(), GameState.factions.size(), GameState.districts.size()])
 	await _ui_shot("splash", 3.0)
+	if _ui_shot_dir() != "":
+		var notice := _add_screen(preload("res://scripts/ui/content_notice.gd"))
+		await _ui_shot("notice", 1.0)
+		notice.queue_free()
 	GameState.to_menu()
 	await get_tree().process_frame
 	await _ui_shots_menu()
