@@ -3505,12 +3505,28 @@ def _tx_hedge(g):
     return col, rough, h, 0.02
 
 
-RECIPES.update({"slush": _tx_slush, "hedge": _tx_hedge})
-TEXSPEC.update({"slush": (1024, 2.0), "hedge": (1024, 2.0)})
-PAL.update({"snow_dirty": (0.55, 0.58, 0.62), "hedge_leaf": (1.0, 1.0, 1.0), "hedge_core": (0.012, 0.018, 0.01)})
+def _tx_juniper(g):
+    """Juniper / rosemary foliage: finer needle clusters than the hedge, blue-green with grey bloom, dark gaps."""
+    cell = g.voronoi(130, 130, seed=81)
+    cell2 = g.voronoi(260, 260, seed=82)
+    leaf = g.one_minus(g.smooth(cell, 0.3, 0.75))
+    leaf2 = g.one_minus(g.smooth(cell2, 0.3, 0.7))
+    bloom = g.smooth(g.noise(5, 5, 4, 0.55, seed=83), 0.5, 0.7)
+    hollow = g.smooth(g.noise(10, 10, 3, 0.5, seed=84), 0.64, 0.74)
+    col = g.mix(g.add(g.mul(leaf, 0.65), g.mul(leaf2, 0.35)), (0.012, 0.025, 0.022), (0.07, 0.13, 0.11))
+    col = g.mix(g.mul(bloom, 0.45), col, (0.13, 0.17, 0.16))
+    col = g.mix(g.mul(hollow, 0.8), col, (0.012, 0.018, 0.016))
+    h = g.sub(g.add(g.mul(leaf, 0.55), g.mul(leaf2, 0.3)), g.mul(hollow, 0.5))
+    rough = g.add(0.7, g.mul(g.one_minus(leaf), 0.2))
+    return col, rough, h, 0.015
+
+
+RECIPES.update({"slush": _tx_slush, "hedge": _tx_hedge, "juniper": _tx_juniper})
+TEXSPEC.update({"slush": (1024, 2.0), "hedge": (1024, 2.0), "juniper": (1024, 2.0)})
+PAL.update({"snow_dirty": (0.55, 0.58, 0.62), "hedge_leaf": (1.0, 1.0, 1.0), "juniper_leaf": (1.0, 1.0, 1.0), "rosemary_leaf": (1.0, 1.0, 1.0), "bay_leafy": (1.0, 1.0, 1.0), "hedge_core": (0.012, 0.018, 0.01)})
 TEX_OF.update({"bolt_red": "cloth", "bolt_blue": "cloth", "bolt_green": "cloth", "linen": "cloth",
-               "sacking": "cloth", "snow_dirty": "slush", "hedge_leaf": "hedge", "coach_green": "oak", "coach_red": "oak"})
-TINT.update({"bark": (0.52, 0.47, 0.42), "snow_dirty": (1.0, 1.0, 1.0), "hedge_leaf": (1.0, 1.0, 1.0), "sacking": (0.80, 0.70, 0.52),
+               "sacking": "cloth", "snow_dirty": "slush", "hedge_leaf": "hedge", "juniper_leaf": "juniper", "rosemary_leaf": "juniper", "bay_leafy": "hedge", "coach_green": "oak", "coach_red": "oak"})
+TINT.update({"bark": (0.52, 0.47, 0.42), "snow_dirty": (1.0, 1.0, 1.0), "hedge_leaf": (1.0, 1.0, 1.0), "juniper_leaf": (0.9, 1.0, 1.08), "rosemary_leaf": (1.25, 1.3, 1.2), "bay_leafy": (1.1, 1.2, 1.0), "sacking": (0.80, 0.70, 0.52),
              "coach_green": (0.26, 0.42, 0.32), "coach_red": (0.78, 0.36, 0.28)})
 _SERIF = [p for p in ("/usr/share/fonts/liberation/LiberationSerif-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSerif-Bold.ttf",
                       "/usr/share/fonts/noto/NotoSerif-Bold.ttf") if os.path.exists(p)]
@@ -3734,16 +3750,69 @@ def _tub(parts, w, h, loc=(0, 0, 0)):
     parts.append(box("soil", (w * 1.05, w * 1.05, 0.02), (x, y, z + h + 0.02), M("soil")))
 
 
+def _leafy(parts, name, r, center, mat, zscale=1.0, seed=0, seg=14, rings=10, holes=0.03, twigs=8, snow=0.6,
+           amp=0.12, flat_top=None):
+    """Leafy clipped mass (tub yew, juniper, bay ball, rosemary): a sphere shell displaced by layered noise and
+    clad in a foliage bake, a few faces cut out onto a near-black core, twig tips poking out and a sunk snow cap
+    (`snow` = cap radius as a fraction of r, 0 for none). Appends to parts."""
+    from mathutils import noise as mnoise
+    rng = random.Random(seed)
+    cx, cy, cz = center
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=rings, radius=r, location=center)
+    o = bpy.context.object
+    o.scale.z = zscale
+    o = _finish_prim(o, name, mat, mode=1.0, c=(cx, cy))
+    off = Vector((seed * 1.7, seed * 0.9, seed * 2.3))
+
+    def f(co):
+        d = Vector((co.x - cx, co.y - cy, (co.z - cz) / zscale))
+        n = d.normalized() if d.length > 1e-6 else Vector((0, 0, 1))
+        q = n * 2.2 + off
+        dn = mnoise.noise(q) * 0.6 + mnoise.noise(q * 2.6) * 0.3 + mnoise.noise(q * 6.3) * 0.15
+        k = 1.0 + amp * dn
+        co.x = cx + (co.x - cx) * k
+        co.y = cy + (co.y - cy) * k
+        co.z = cz + (co.z - cz) * k
+        if flat_top is not None and co.z > flat_top:
+            co.z = flat_top + (co.z - flat_top) * 0.25
+    edit_verts(o, f)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bm.faces.ensure_lookup_table()
+    cut = [fc for fc in bm.faces if abs(fc.normal.z) < 0.6 and rng.random() < holes]
+    bmesh.ops.delete(bm, geom=cut, context="FACES_ONLY")
+    for fc in bm.faces:
+        fc.smooth = True
+    bm.to_mesh(o.data)
+    bm.free()
+    parts.append(o)
+    parts.append(sphere(name + "_core", r * 0.8, center, M("hedge_core", 0.95), seg=8, rings=6, zscale=zscale))
+    tw = bmesh.new()
+    for k in range(twigs):
+        a = rng.uniform(0, math.tau)
+        el = rng.uniform(-0.3, 1.0)
+        n = Vector((math.cos(a) * math.cos(el), math.sin(a) * math.cos(el), math.sin(el)))
+        p0 = Vector((cx + n.x * r * 0.95, cy + n.y * r * 0.95, cz + n.z * r * zscale * 0.95))
+        d = (n + Vector((rng.uniform(-0.3, 0.3), rng.uniform(-0.3, 0.3), 0.3))).normalized()
+        L = r * rng.uniform(0.25, 0.5)
+        _tube(tw, p0 - d * 0.03, p0 + d * L, 0.004, 0.0, 3)
+    if twigs:
+        parts.append(_bm_obj(name + "_twigs", tw, M("dead_stalk")))
+    if snow:
+        top = cz + r * zscale * (1.0 + amp * 0.3) if flat_top is None else flat_top + 0.01
+        cap = _lumpy(name + "_snow", r * snow, (cx + rng.uniform(-0.02, 0.02), cy, top - r * 0.12), M("snow"),
+                     zscale=0.3, amp=0.25, seed=seed + 1, seg=10, rings=5, zmin=top - r * 0.25)
+        parts.append(cap)
+
+
 def shrub_tub():
     """Clipped yew in an oak tub, snow on its shoulders: flanks a door."""
     reset()
     parts = []
     _tub(parts, 0.55, 0.5)
     parts.append(cyl("stem", 0.04, 0.3, (0, 0, 0.55), M("bark"), verts=6))
-    parts.append(_lumpy("yew", 0.34, (0, 0, 1.05), M("yew"), zscale=1.7, amp=0.12, seed=3, seg=14, rings=10))
-    parts.append(_lumpy("yew_top", 0.16, (0.02, 0.0, 1.62), M("yew"), zscale=1.3, amp=0.15, seed=4, seg=10, rings=6))
-    parts.append(_lumpy("snow", 0.22, (0.02, 0.0, 1.66), M("snow"), zscale=0.55, amp=0.14, seed=5, seg=10, rings=6))
-    parts.append(_lumpy("snow2", 0.25, (-0.05, 0.03, 1.36), M("snow"), zscale=0.28, amp=0.18, seed=6, seg=10, rings=6))
+    _leafy(parts, "yew", 0.34, (0, 0, 1.05), M("hedge_leaf"), zscale=1.6, seed=3, seg=16, rings=12, twigs=10, snow=0.55)
+    _leafy(parts, "yew_top", 0.15, (0.02, 0.0, 1.66), M("hedge_leaf"), zscale=1.3, seed=4, seg=10, rings=7, holes=0.0, twigs=4, snow=0.9)
     export("shrub_tub", join(parts, "shrub_tub"), box("c", (0.65, 0.65, 1.2), (0, 0, 0)))
 
 
@@ -3754,8 +3823,7 @@ def shrub_juniper():
     for zz in (0.08, 0.37):
         parts.append(cyl("hoop", 0.3 + zz * 0.1, 0.04, (0, 0, zz), M("iron", 0.5), verts=14, bevel=0))
     parts.append(cyl("soil", 0.31, 0.02, (0, 0, 0.43), M("soil"), verts=14, bevel=0))
-    parts.append(_lumpy("jun", 0.24, (0, 0, 1.1), M("juniper"), zscale=2.8, amp=0.14, seed=8, seg=12, rings=12))
-    parts.append(_lumpy("snow", 0.14, (0.03, -0.02, 1.62), M("snow"), zscale=0.7, amp=0.2, seed=9, seg=8, rings=6))
+    _leafy(parts, "jun", 0.24, (0, 0, 1.1), M("juniper_leaf"), zscale=2.8, seed=8, seg=14, rings=16, twigs=10, snow=0.6, amp=0.1)
     export("shrub_juniper", join(parts, "shrub_juniper"), cyl("c", 0.32, 1.2, (0, 0, 0), None, verts=8))
 
 
@@ -3778,13 +3846,12 @@ def pot_herbs():
         p0 = Vector((-0.28 + math.cos(a) * rr, math.sin(a) * rr, 0.27))
         d = Vector((math.cos(a) * 0.3, math.sin(a) * 0.3, 1.0)).normalized()
         _tube(bm, p0, p0 + d * rng.uniform(0.28, 0.45), 0.012, 0.0, 3)
-    parts.append(_bm_obj("rosemary", bm, M("rosemary")))
-    parts.append(_lumpy("rosemary_body", 0.13, (-0.28, 0, 0.42), M("rosemary"), zscale=0.9, amp=0.25, seed=32, seg=10, rings=6))
-    parts.append(_lumpy("rsnow", 0.1, (-0.28, 0, 0.52), M("snow"), zscale=0.4, amp=0.25, seed=33, seg=8, rings=5))
+    parts.append(_bm_obj("rosemary", bm, M("rosemary_leaf")))
+    _leafy(parts, "rosemary_body", 0.14, (-0.28, 0, 0.43), M("rosemary_leaf"), zscale=0.85, seed=32, seg=12, rings=8,
+           holes=0.04, twigs=6, snow=0.6, amp=0.2)
     _pot(parts, 0.17, 0.4, (0.22, 0.02, 0))
     parts.append(cyl("bay_stem", 0.018, 0.75, (0.22, 0.02, 0.38), M("bark"), verts=6))
-    parts.append(_lumpy("bay", 0.22, (0.22, 0.02, 1.22), M("bay_leaf"), amp=0.12, seed=34, seg=12, rings=8))
-    parts.append(_lumpy("bsnow", 0.15, (0.22, 0.02, 1.38), M("snow"), zscale=0.45, amp=0.2, seed=35, seg=8, rings=5))
+    _leafy(parts, "bay", 0.22, (0.22, 0.02, 1.22), M("bay_leafy"), seed=34, seg=14, rings=10, twigs=7, snow=0.6)
     export("pot_herbs", join(parts, "pot_herbs"))
 
 
