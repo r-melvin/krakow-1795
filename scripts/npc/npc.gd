@@ -5,7 +5,7 @@ extends "res://scripts/npc/walker.gd"
 ##  - with no schedule, stands (idle, occasional slow turn) or wanders within a radius of its post.
 ## A storyline (storyline.gd) can take control with claim() / release() and drive it with the script_* calls.
 
-enum Mode { AMBIENT, GOING, DOING, SCRIPTED }
+enum Mode { AMBIENT, GOING, DOING, SCRIPTED, DOWNED }
 
 var npc_id := "npc"
 var candidates: PackedStringArray = []
@@ -46,6 +46,11 @@ var _script_clip := "idle"
 var _script_face: Variant = null     ## Vector3 point or Node3D
 var script_arrived := true
 var _return_home := false
+
+# Knocked down (player takedown): lies still for `_down_left` seconds, then gets up and resumes.
+var _down_left := 0.0
+var _mode_before_down: Mode = Mode.AMBIENT
+var _rising := false              ## the get_up clip is playing (still DOWNED until it ends)
 
 
 func _ready() -> void:
@@ -105,7 +110,22 @@ func _build() -> void:
 
 
 func _play_rest() -> void:
-	Assets.play(_figure, clip if clip != "" else "idle")
+	Assets.play(_figure, clip if clip != "" and clip != "idle" else _idle_clip())
+
+
+## Standing-about clip from the data: sitting (behaviour/activity "sit"), gossips talk, stallholders and traders
+## haggle, lookouts stand alert; everyone else idles.
+func _idle_clip(activity: String = "") -> String:
+	if activity == "sit" or behaviour == "sit":
+		return "sit_idle"
+	var r := role.to_lower()
+	if "rumour" in r or "gossip" in r or "neighbour" in r:
+		return "talk_gesture_a" if hash(npc_id) % 2 == 0 else "talk_gesture_b"
+	if "merchant" in r or "stall" in r or "loaves" in r:
+		return "haggle"
+	if "lookout" in r or "watching" in r or "informer" in r or "loitering" in r:
+		return "idle_alert"
+	return "idle"
 
 
 func _physics_process(delta: float) -> void:
@@ -113,6 +133,16 @@ func _physics_process(delta: float) -> void:
 	var game_dt := maxf(clock - _last_clock, 0.0)
 	_last_clock = clock
 	match mode:
+		Mode.DOWNED:
+			halt(delta)
+			_down_left -= delta
+			if _down_left <= 0.0:
+				if not _rising and Assets.has_clip(_figure, "get_up"):
+					_rising = true
+					Assets.clear_action(_figure)
+					_down_left = Assets.play_action(_figure, "get_up")
+				else:
+					_get_up()
 		Mode.SCRIPTED:
 			_scripted(delta)
 		Mode.GOING, Mode.DOING:
@@ -201,7 +231,7 @@ func _doing(delta: float, game_dt: float) -> void:
 			if _pause > 0.0:
 				_pause -= delta
 				halt(delta)
-				Assets.play(_figure, "idle")
+				Assets.play(_figure, _idle_clip())
 				if _pause <= 0.0:
 					_pick_target_around(e["pos"], 2.5)
 			elif walk_to(_target, speed * 0.8, delta):
@@ -221,7 +251,7 @@ func _doing(delta: float, game_dt: float) -> void:
 				_turn_timer = _rng.randf_range(5.0, 12.0)
 				_want_yaw = float(e["facing"]) + _rng.randf_range(-0.8, 0.8)
 			turn_toward_yaw(_want_yaw, delta, 1.5)
-			Assets.play(_figure, "idle")
+			Assets.play(_figure, _idle_clip(act))
 	_doing_left -= game_dt
 	var flee: float = e["flee_watch"]
 	if flee > 0.0 and _watch_near(flee):
@@ -285,14 +315,22 @@ func _pick_target_around(centre: Vector3, r: float) -> void:
 
 func _walk_anim(sp: float) -> void:
 	if is_moving():
-		Assets.play(_figure, "walk", clampf(sp / 1.3, 0.6, 2.2))
+		var c := "walk"
+		if sp > 2.0:
+			c = "jog"
+		elif "carrier" in role.to_lower():
+			c = "carry_basket"
+		Assets.play_move(_figure, c, sp)
 	else:
-		Assets.play(_figure, "idle")
+		Assets.play(_figure, _idle_clip())
 
 
 # --- Storyline control ------------------------------------------------------------------------
 
 func claim() -> void:
+	if mode == Mode.DOWNED:
+		_mode_before_down = Mode.SCRIPTED
+		return
 	mode = Mode.SCRIPTED
 	_set_hidden(false)
 	_script_target = null
@@ -303,6 +341,9 @@ func claim() -> void:
 
 ## Hand back to the schedule (walk back to the current post) or, unscheduled, walk back home.
 func release() -> void:
+	if mode == Mode.DOWNED:
+		_mode_before_down = Mode.AMBIENT
+		return
 	_script_target = null
 	_script_face = null
 	if schedule.is_empty():
@@ -331,6 +372,62 @@ func script_play(clip_name: String) -> void:
 
 func say(text: String, secs: float) -> void:
 	speech(self, text, secs)
+
+
+# --- Mission hooks ----------------------------------------------------------------------------
+
+## Knocked senseless (non-lethal): lie on the cobbles for `secs`, then get up and carry on.
+func knock_down(secs: float) -> void:
+	if mode == Mode.DOWNED:
+		_down_left = maxf(_down_left, secs)
+		return
+	_mode_before_down = mode
+	mode = Mode.DOWNED
+	_down_left = secs
+	_script_target = null
+	_rising = false
+	_shape.disabled = true
+	if Assets.has_clip(_figure, "takedown_victim"):
+		Assets.play_action(_figure, "takedown_victim", 1.0, true)
+	else:
+		_figure.rotation.x = -PI * 0.5
+		_figure.position.y = 0.18
+		Assets.play(_figure, "idle", 0.0)
+
+
+func is_downed() -> bool:
+	return mode == Mode.DOWNED
+
+
+func _get_up() -> void:
+	_rising = false
+	_figure.rotation.x = 0.0
+	_figure.position.y = 0.0
+	Assets.clear_action(_figure)
+	_shape.disabled = _hidden
+	if _mode_before_down == Mode.SCRIPTED:
+		mode = Mode.SCRIPTED
+		script_arrived = true
+	else:
+		mode = Mode.AMBIENT
+		release()
+
+
+## Move instantly (e.g. into an interior set) and stay there as an unscheduled stander facing `yaw`.
+func relocate(pos: Vector3, yaw: float) -> void:
+	schedule = []
+	mode = Mode.AMBIENT
+	behaviour = "stand"
+	_return_home = false
+	_script_target = null
+	global_position = pos
+	_home = pos
+	facing = yaw
+	_want_yaw = yaw
+	rotation.y = yaw
+	velocity = Vector3.ZERO
+	_set_hidden(false)
+	reset_physics_interpolation()
 
 
 func _scripted(delta: float) -> void:

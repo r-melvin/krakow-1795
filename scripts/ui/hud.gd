@@ -46,7 +46,7 @@ func _ready() -> void:
 	if not _help_shown and GameState.day == 1:
 		_help_shown = true
 		_help = _lbl(15, Color(UiTheme.TEXT, 0.75))
-		_help.text = "WASD move    Shift sprint    Ctrl crouch    E use    F strike    J journal    Esc pause"
+		_help.text = "WASD move    Shift sprint    Ctrl crouch    Z prone    E use    F strike    J journal    Esc pause"
 		_help.anchor_left = 0.0
 		_help.anchor_top = 1.0
 		_help.anchor_bottom = 1.0

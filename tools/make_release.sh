@@ -11,7 +11,12 @@ mkdir -p export
 ZIP="export/krakow-1795-models-${TAG}.zip"
 rm -f "$ZIP"
 echo "== zipping $(ls assets/models/*.glb | wc -l) models"
-zip -q -r "$ZIP" assets/models/*.glb assets/ground/*.png
+python3 - "$ZIP" <<'PY'
+import sys, glob, zipfile
+with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
+    for f in sorted(glob.glob("assets/models/*.glb") + glob.glob("assets/ground/*.png")):
+        z.write(f)
+PY
 ls -l "$ZIP" | awk '{printf "== %s %.0f MB\n", $9, $5/1048576}'
 if gh release view "$TAG" >/dev/null 2>&1; then
   gh release upload "$TAG" "$ZIP" --clobber

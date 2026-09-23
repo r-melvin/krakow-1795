@@ -515,11 +515,14 @@ def _tx_cobbles(g):
     # then bumps, worn facets, pits and chipped rims
     ew, eh = g.mul(g.add(halfw, rad), 1.12), g.mul(g.add(halfh, rad), 1.12)
     ex, ez = g.m("DIVIDE", px, ew), g.m("DIVIDE", pz, eh)
-    dome = g.mul(stone, g.m("SQRT", g.mx(g.sub(1.0, g.add(g.mul(ex, ex), g.mul(ez, ez))), 0.0)))
-    lump = g.mul(g.sub(g.noise(44, 44, 4, seed=52), 0.5), 1.4)
-    facet = g.mul(g.sub(g.voronoi(40, 40, feature="F1", seed=53), 0.35), 0.8)
+    cap = g.mul(stone, g.m("SQRT", g.mx(g.sub(1.0, g.add(g.mul(ex, ex), g.mul(ez, ez))), 0.0)))
+    # worn flat on top (feet and wheels), steep and battered at the sides
+    dome = g.mn(g.mul(cap, 1.6), 1.0)
+    flat = g.smooth(cap, 0.5, 0.8)
+    lump = g.mul(g.mul(g.sub(g.noise(44, 44, 4, seed=52), 0.5), 1.4), g.one_minus(g.mul(flat, 0.75)))
+    facet = g.mul(g.mul(g.sub(g.voronoi(40, 40, feature="F1", seed=53), 0.35), 0.8), g.one_minus(g.mul(flat, 0.6)))
     pit = g.smooth(g.voronoi(120, 120, seed=54), 0.0, 0.09)
-    chip = g.mul(g.smooth(g.voronoi(58, 58, seed=55), 0.0, 0.16), g.one_minus(g.mul(dome, 0.7)))
+    chip = g.mul(g.smooth(g.voronoi(58, 58, seed=55), 0.0, 0.18), g.one_minus(flat))
     sunken = g.smooth(r2, 0.93, 0.96)
     # colour families and per-stone brightness
     grey = g.ramp(r, [(0.0, (0.20, 0.19, 0.19)), (0.5, (0.36, 0.35, 0.34)), (1.0, (0.50, 0.48, 0.45))])
@@ -559,14 +562,14 @@ def _tx_cobbles(g):
     dust = g.mul(g.smooth(g.noise(11, 11, 5, seed=44), 0.68, 0.82), g.one_minus(dome))
     col = g.mix(g.mul(dust, 0.22), col, (0.82, 0.84, 0.90))
     col = g.mix(stone, joint, col)
-    hdome = g.add(0.35, g.mul(r6, 0.65))
+    hdome = g.add(0.22, g.mul(r6, 0.30))
     jointh = g.add(g.add(0.04, g.mul(grain, 0.08)), g.add(g.mul(g.one_minus(gravel), 0.06), g.mul(snowj, 0.22)))
     top = g.add(g.add(g.mul(dome, hdome), g.mul(g.add(lump, facet), dome)), g.mul(g.add(g.mul(pit, -0.25), g.mul(chip, -0.30)), dome))
     stoneh = g.mul(g.add(g.add(0.40, tilt), top), g.sub(1.0, g.mul(sunken, 0.5)))
     h = g.add(g.mul(stone, stoneh), g.mul(g.one_minus(stone), jointh))
     rough = g.lerp(stone, g.add(0.9, g.mul(gravel, 0.1)),
                    g.add(g.add(0.5, g.mul(chip, 0.15)), g.add(g.mul(wear, 0.3), g.mul(wet, -0.25))))
-    return col, rough, h, 0.10
+    return col, rough, h, 0.08
 
 
 def _tx_thatch(g):

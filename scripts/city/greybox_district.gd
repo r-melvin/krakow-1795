@@ -243,7 +243,7 @@ func _ground() -> void:
 			var pm := (base as BaseMaterial3D).duplicate() as BaseMaterial3D
 			pm.heightmap_enabled = true
 			pm.heightmap_texture = load("res://assets/ground/cobbles_height.png")
-			pm.heightmap_scale = 3.0
+			pm.heightmap_scale = 2.0
 			pm.heightmap_deep_parallax = true
 			pm.heightmap_min_layers = 8
 			pm.heightmap_max_layers = 24
