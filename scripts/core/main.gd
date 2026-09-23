@@ -118,47 +118,6 @@ func _smoke_schedules(player: Player) -> void:
 	var bad: PackedStringArray = pop.unreachable_posts() if pop else PackedStringArray()
 	print("[smoke] clock=%s navmesh_polys=%d scheduled=%d storylines=%d unreachable_posts=%s" % [GameState.time_string(),
 			_world.navmesh_polygons(), pop.scheduled_count() if pop else 0, pop.storylines.size() if pop else 0, bad])
-	if OS.has_environment("COLDBG"):
-		var space := _world.get_world_3d().direct_space_state
-		for pt in [Vector3(-11.2, 0.9, 6.4), Vector3(24.4, 0.9, 22.8), Vector3(22.3, 0.9, 23.4), Vector3(-12.8, 0.9, 6.2)]:
-			var q := PhysicsShapeQueryParameters3D.new()
-			var cap := CapsuleShape3D.new()
-			cap.radius = 0.3
-			cap.height = 1.75
-			q.shape = cap
-			q.transform = Transform3D(Basis(), pt)
-			for h in space.intersect_shape(q, 16):
-				var c: Node = h["collider"]
-				print("COL ", pt, " ", c.get_path(), " ", c.get_class())
-				for cs in c.get_children():
-					if cs is CollisionShape3D:
-						var sh: Shape3D = cs.shape
-						if sh is ConcavePolygonShape3D:
-							var f: PackedVector3Array = sh.get_faces()
-							print("COL   faces=", f.size() / 3)
-							for k in range(0, f.size(), 3):
-								var a: Vector3 = cs.global_transform * f[k]
-								var b: Vector3 = cs.global_transform * f[k + 1]
-								var cc: Vector3 = cs.global_transform * f[k + 2]
-								var ctr := (a + b + cc) / 3.0
-								if ctr.x > 23.0 and ctr.z > 21.0 and ctr.y < 2.0:
-									print("COL   tri ", a.snapped(Vector3(0.01,0.01,0.01)), b.snapped(Vector3(0.01,0.01,0.01)), cc.snapped(Vector3(0.01,0.01,0.01)))
-						print("COL   shape ", sh.get_class(), " ", (sh.get_debug_mesh().get_aabb() if sh else null), " xf=", cs.global_transform.origin)
-		var map := _world.get_world_3d().navigation_map
-		print("PATH ", NavigationServer3D.map_get_path(map, Vector3(22.3, 0, 23.4), Vector3(21.4, 0, -21.4), true))
-		print("PATH2 ", NavigationServer3D.map_get_path(map, Vector3(22.3, 0.5, 23.4), Vector3(21.4, 0.5, -21.4), true))
-		print("CP ", NavigationServer3D.map_get_closest_point(map, Vector3(22.3, 0, 23.4)), NavigationServer3D.map_get_closest_point(map, Vector3(21, 0, 19)), NavigationServer3D.map_get_closest_point(map, Vector3(21, 0, 22.4)))
-	if OS.has_environment("SCHEDDBG"):
-		player.global_position = Vector3(-40, 0.5, -40)
-		GameState.clock_scale = float(OS.get_environment("SCHEDDBG"))
-		for k in 12:
-			for i in 600:
-				await get_tree().physics_frame
-			print("DBG ---- ", GameState.time_string())
-			for n in get_tree().get_nodes_in_group("npcs"):
-				print("DBG %-22s mode=%s step=%d post=%-18s pos=%s inside=%s moving=%s" % [n.npc_id, n.Mode.keys()[n.mode], n.step, n.post_name, n.global_position.snapped(Vector3(0.1,0.1,0.1)), n.is_inside(), n.is_moving()])
-			for n in get_tree().get_nodes_in_group("animals"):
-				print("DBG %-22s pos=%s" % [n.npc_id, n.global_position.snapped(Vector3(0.1,0.1,0.1))])
 	var before := {}
 	for n in get_tree().get_nodes_in_group("scheduled"):
 		before[n] = n.post_changes
@@ -216,7 +175,7 @@ func _shots(player: Player) -> void:
 	# close-ups of the populated square
 	for shot in [["stmarys_door", Vector3(30, 2.2, -8), Vector3(31, 1.4, -15)], ["stalls", Vector3(-6, 2.0, -8), Vector3(-11, 1.2, -13)],
 			["townhall_corner", Vector3(-8, 2.0, 22), Vector3(-14, 1.2, 17)], ["cloth_hall_passage", Vector3(0, 1.8, 12), Vector3(0, 1.2, 6)],
-			["dragon", Vector3(-30, 2.5, 30), Vector3(-38, 1.5, 36)],
+			["dragon", Vector3(-30, 2.5, 30), Vector3(-38, 1.5, 36)], ["delivery_alley", Vector3(19, 2.4, 9), Vector3(25, 1.3, 16)],
 			["player_closeup", player.global_position + Vector3(0.6, 1.7, -2.2), player.global_position + Vector3(0, 1.45, 0)]]:
 		cam.position = shot[1]
 		cam.look_at_from_position(shot[1], shot[2])

@@ -26,7 +26,7 @@ func setup_navigation(avoid_radius: float, height: float, max_speed: float) -> v
 	nav_agent.radius = avoid_radius
 	nav_agent.height = height
 	nav_agent.max_speed = max_speed
-	nav_agent.path_desired_distance = 0.6
+	nav_agent.path_desired_distance = 0.35
 	nav_agent.target_desired_distance = ARRIVE_DIST
 	# The baked surface sits ~0.5 m above the ground plane (voxel rounding); report path points at foot level.
 	nav_agent.path_height_offset = 0.5
@@ -82,7 +82,8 @@ func walk_to(target: Vector3, speed: float, delta: float) -> bool:
 	var v := _desired
 	if use_nav:
 		nav_agent.velocity = _desired
-		v = _safe_velocity
+		if _detour_left <= 0.0:   # sidesteps ignore avoidance, which is what deadlocked us
+			v = _safe_velocity
 	velocity.x = v.x
 	velocity.z = v.z
 	var face := v if Vector2(v.x, v.z).length() > 0.1 else _desired
@@ -99,7 +100,6 @@ func walk_to(target: Vector3, speed: float, delta: float) -> bool:
 	if _stuck > 1.5:
 		_stuck = 0.0
 		_detours += 1
-		if OS.has_environment("SCHEDDBG"): print("DBGW ", name, " detour ", _detours, " at ", global_position.snapped(Vector3(0.1,0.1,0.1)), " -> ", target.snapped(Vector3(0.1,0.1,0.1)))
 		if _detours > 3:
 			_detours = 0
 			return true

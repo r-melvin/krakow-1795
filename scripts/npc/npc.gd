@@ -75,7 +75,8 @@ static func first_existing(names: PackedStringArray) -> String:
 func _build() -> void:
 	_shape = CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.3
+	# Narrower than the 0.4 m navmesh erosion, which voxel rounding can shave to ~0.3 m at corners.
+	cap.radius = 0.22
 	cap.height = 1.75
 	_shape.shape = cap
 	_shape.position.y = 0.875

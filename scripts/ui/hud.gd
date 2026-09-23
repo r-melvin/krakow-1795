@@ -5,6 +5,7 @@ var _bar: ProgressBar
 var _state: Label
 var _obj: Label
 var _alarms: Label
+var _clock: Label
 
 
 func _ready() -> void:
@@ -15,6 +16,10 @@ func _ready() -> void:
 	add_child(root)
 	var v := VBoxContainer.new()
 	root.add_child(v)
+
+	_clock = Label.new()
+	_clock.text = GameState.time_string()
+	v.add_child(_clock)
 
 	_obj = Label.new()
 	_obj.text = "Night %d. Reach the safe house (lit marker, SE corner). Unseen if you can." % GameState.day
@@ -48,4 +53,5 @@ func _process(_d: float) -> void:
 			worst = g.state
 	_bar.value = max_s
 	_state.text = "Watch: " + ["calm", "curious", "searching", "ALARM"][worst]
+	_clock.text = "Kraków, %s" % GameState.time_string()
 	_alarms.text = "Alarms raised: %d    Crackdown: %d" % [GameState.night_alarm_count, GameState.crackdown]
