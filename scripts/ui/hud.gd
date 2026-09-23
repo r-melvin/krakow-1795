@@ -6,7 +6,8 @@ extends CanvasLayer
 ## Stealth cues (StealthCues below, no text): a thin arc under the screen centre whose length is the player's
 ## visibility and whose colour is their noise (white quiet -> amber loud), and a chevron at the screen edge
 ## pointing at the most alarmed guard when he is off-screen. Sound rings, the last-known ghost and the guard cones
-## are drawn in the world (watch.gd, guard.gd).
+## are drawn in the world (watch.gd, guard.gd). A minimap (minimap.gd, bottom right, M toggles) shares the journal
+## map's drawing (city_map.gd).
 
 const HELP_SECONDS := 8.0
 const STATE_WORDS := ["calm", "curious", "searching", "alarm"]
@@ -64,6 +65,10 @@ func _ready() -> void:
 		tw.tween_callback(_help.queue_free)
 
 	add_child(StealthCues.new())
+	# Kit indicator bottom left: the current item's icon and count (scripts/stealth/kit.gd Indicator).
+	add_child(preload("res://scripts/stealth/kit.gd").Indicator.new())
+	# Minimap bottom right (scripts/ui/minimap.gd, M toggles it); the full map is the journal's Map tab.
+	add_child(preload("res://scripts/ui/minimap.gd").new())
 	# Mission block: current objective top right, purse, interact prompt, one-line messages, curfew banner.
 	add_child(preload("res://scripts/mission/objectives_panel.gd").new())
 	# The journal (J / Tab, or from the pause menu): its own layer above the HUD, works while paused.

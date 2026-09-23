@@ -10,9 +10,15 @@ extends Node3D
 ## `guard.sight_modifiers` (Callables (guard, player) -> float), `flags` (free-form facts, also mirrored into
 ## Mission.flags as "stealth_<name>" outside the sandbox).
 ## `sandbox`: a test world (scripts/stealth/stealth_smoke.gd): no GameState/Mission side effects.
+## Phases E/F: the watch owns `zones` (scripts/stealth/zones.gd: disguise zones, trespass) and `intel`
+## (scripts/stealth/intel.gd: overhearing, bills, patrol recording, notoriety, enforcers, watch routines), both
+## created in _ready outside the sandbox (a sandbox test adds its own with add_phase_f). `report(pos, by)`: an
+## enforcer townsman who recognised the player calls the nearest guard. `guard_downed` feeds notoriety.
 
 const Perception := preload("res://scripts/stealth/perception.gd")
 const Walker := preload("res://scripts/npc/walker.gd")
+const ZonesScript := preload("res://scripts/stealth/zones.gd")
+const IntelScript := preload("res://scripts/stealth/intel.gd")
 
 enum Phase { CALM, ALARM, EVASION, CAUTION }
 const PHASE_NAMES := ["CALM", "ALARM", "EVASION", "CAUTION"]
@@ -27,6 +33,8 @@ signal runner_stopped(runner: Node)
 signal hiding_changed(spot: Node, occupied: bool)
 signal lamp_changed(lamp: Node, lit: bool)
 signal barked(guard: Node, kind: String, text: String)
+signal guard_downed(guard: Node, in_fight: bool, witness: Node)
+signal reported(pos: Vector3, by: Node, guard: Node)
 
 var sandbox := false
 var overrides: Dictionary = {}       ## "section.key" -> value (sandbox tests speed the timers up)
@@ -41,6 +49,8 @@ var bodies_found := 0
 var flags: Dictionary = {}
 var clock := 0.0                     ## seconds since this watch started (guards time their memories with it)
 var phase_log: Array = []            ## [[phase name, clock]] for the smoke
+var zones: Node                      ## scripts/stealth/zones.gd (phase F)
+var intel: Node                      ## scripts/stealth/intel.gd (phases E, F)
 
 var _mask_left := 0.0
 var _last_sighting := -100.0
@@ -56,6 +66,7 @@ var _rings: Array = []               ## [MeshInstance3D, age, dur]
 var _ring_shader: Shader
 static var _smoke_reported := false
 static var _smoke_started := false
+static var _intel_smoke_started := false
 
 const RING_SHADER := """
 shader_type spatial;
@@ -87,6 +98,7 @@ void fragment() {
 
 func _ready() -> void:
 	add_to_group("watch")
+	Sfx.watch_hooks(self)    # voices sound_event (stones, bottles, barrels, knocks, fights, the bell) and lamp_changed
 	name = "Watch" if not sandbox else name
 	_build_ghost()
 	_ring_shader = Shader.new()
@@ -97,6 +109,30 @@ func _ready() -> void:
 		var s: Node = load("res://scripts/stealth/stealth_smoke.gd").new()
 		s.name = "StealthSmoke"
 		get_tree().root.add_child.call_deferred(s)
+	if not sandbox:
+		add_phase_f()
+	if not sandbox and "--smoke" in OS.get_cmdline_user_args() and not _intel_smoke_started:
+		_intel_smoke_started = true
+		var s2: Node = load("res://scripts/stealth/intel_smoke.gd").new()
+		s2.name = "IntelSmoke"
+		get_tree().root.add_child.call_deferred(s2)
+
+
+## Creates the zones and intel children. `origin`: a sandbox root (zone polygons are relative to it).
+func add_phase_f(origin := Vector3.ZERO) -> void:
+	if zones == null:
+		zones = ZonesScript.new()
+		zones.name = "Zones"
+		zones.sandbox = sandbox
+		zones.origin = origin
+		zones.watch = self
+		add_child(zones)
+	if intel == null:
+		intel = IntelScript.new()
+		intel.name = "Intel"
+		intel.sandbox = sandbox
+		intel.watch = self
+		add_child(intel)
 
 
 func tv(path: String, fallback: Variant = 0.0) -> Variant:
@@ -362,6 +398,31 @@ func on_runner_stopped(g: Node) -> void:
 		runner = null
 	runners_stopped += 1
 	runner_stopped.emit(g)
+
+
+## A guard went down (guard.knock_down): `witness` is a comrade who saw it, or null. Intel counts notoriety.
+func on_guard_downed(g: Node, in_fight: bool, witness: Node) -> void:
+	guard_downed.emit(g, in_fight, witness)
+
+
+## An enforcer townsman (npc.gd) recognised the player at `pos`: the nearest free guard comes looking, Searching.
+## Returns that guard, or null.
+func report(pos: Vector3, by: Node = null) -> Node:
+	var best: Node = null
+	var best_d := INF
+	for g in awake_guards():
+		if g.is_runner or g.state == g.State.ALARM:
+			continue
+		var d: float = g.global_position.distance_to(pos)
+		if d < best_d:
+			best_d = d
+			best = g
+	if best:
+		best.converge(pos)
+		best.set_task({"kind": "search", "pos": pos}, true)
+		bark(best, "searching")
+	reported.emit(pos, by, best)
+	return best
 
 
 func on_body_found(body: Node, finder: Node) -> void:

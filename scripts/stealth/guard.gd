@@ -17,6 +17,14 @@ const Interactable := preload("res://scripts/mission/interactable.gd")
 ## guard can be dragged by the player (its child interactable) and hidden in a hiding spot.
 ## A disguised player (player.disguised) reads as a townsman: sight/hearing count a quarter, unless they
 ## sprint, crouch or linger within 3 m for more than 4 s. `enforcer` guards ignore the disguise (phase F hook).
+## Phase F (scripts/stealth/zones.gd): in a zone the player's outfit does not permit (trespass), the disguise factor
+## is void, zones.gd's sight modifier makes him x1.6 sharper, and on sight he goes Curious, Searching after 6 s.
+## Enforcers (the Corporal) draw a red edge round their cone. `notoriety_view_mult` (intel.gd: +10 % at notoriety
+## >= 30) scales the view like the curfew bell. Errand task "errand" (intel.gd's watch routines: the Corporal's
+## glass at the Winiarnia, the midnight relief): walk to `pos`, stand `secs`, no suspicion, then back to the round.
+## Kit hooks (scripts/stealth/kit.gd): `stagger(secs, clip)` / `is_staggered()` (a knife parry: block_stagger; flash
+## powder: stagger) stand him reeling with no perception and no swing; `dead` (a lethal knife thrust, a pistol ball)
+## keeps a downed guard from ever waking. Smoke clouds blind him through kit.gd's entry in `sight_modifiers`.
 
 enum State { CALM, CURIOUS, SEARCHING, ALARM }
 
@@ -32,6 +40,7 @@ enum State { CALM, CURIOUS, SEARCHING, ALARM }
 var sandbox := false                      ## test world: no GameState / Mission side effects
 var target_player: Node3D = null          ## explicit player (sandbox); otherwise group "player"
 var enforcer := false                     ## phase F hook: sees through the disguise
+var notoriety_view_mult := 1.0            ## intel.gd: base view x1.1 once the player is wanted
 var sight_modifiers: Array[Callable] = [] ## phase F hook: (guard, player) -> float, multiplies a sighting
 
 var state: State = State.CALM
@@ -83,6 +92,14 @@ var _path_age := 0.0
 var _stuck := 0.0
 var _task_prio := 0
 var _bark_cd := 0.0
+var _trespass_now := false        ## the player stands in a zone his outfit does not permit (zones.gd)
+var _trespass_t := 0.0            ## seconds this guard has watched the player trespass
+var _trespass_gap := 0.0          ## seconds since he last saw the trespasser
+var _trespass_stage := 0          ## 0 none, 1 curious barked, 2 searching barked
+var _cone_edge: MeshInstance3D    ## enforcers: red rim round the near wedge
+var _cone_edge_far: MeshInstance3D
+var dead := false                  ## kit.gd: killed (knife thrust with `lethal`, pistol ball): never wakes
+var stagger_left := 0.0            ## kit.gd: parried or blinded by flash powder: reels on the spot, perceives nothing
 
 const CATCH_DISTANCE := 1.3
 const CATCH_TIME := 2.0           ## seconds held within CATCH_DISTANCE (while the player is not fighting back)
@@ -93,7 +110,7 @@ const SWING_WINDUP := 0.6
 const DISGUISE_FACTOR := 0.25
 const LINGER_DIST := 3.0
 const LINGER_TIME := 4.0
-const TASK_PRIO := {"look": 1, "follow": 2, "investigate": 2, "door": 2, "relight": 2, "search": 3, "search_spot": 4, "body": 4}
+const TASK_PRIO := {"errand": 1, "look": 1, "follow": 2, "investigate": 2, "door": 2, "relight": 2, "search": 3, "search_spot": 4, "body": 4}
 
 
 func _ready() -> void:
@@ -198,6 +215,43 @@ func _rebuild_cone() -> void:
 	_wedge(_cone_near.mesh as ImmediateMesh, 0.0, near_d, float(T("cone.near_angle", 90.0)))
 	_wedge(_cone_far.mesh as ImmediateMesh, near_d, view_distance, float(T("cone.far_angle", 60.0)))
 	_cone_built_for = Vector2(view_distance, near_d)
+	if _cone_edge:
+		_edge(_cone_edge.mesh as ImmediateMesh, 0.0, near_d, float(T("cone.near_angle", 90.0)), true)
+		_edge(_cone_edge_far.mesh as ImmediateMesh, near_d, view_distance, float(T("cone.far_angle", 60.0)), false)
+
+
+## A thin rim along a wedge (outer arc, plus the two sides when `sides`): the enforcer's red edge.
+static func _edge(im: ImmediateMesh, r0: float, r1: float, angle_deg: float, sides: bool, w: float = 0.14) -> void:
+	im.clear_surfaces()
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half := deg_to_rad(angle_deg * 0.5)
+	var steps := 20
+	for i in steps:
+		var a0 := -half + (2 * half) * float(i) / steps
+		var a1 := -half + (2 * half) * float(i + 1) / steps
+		var d0 := Vector3(sin(a0), 0, -cos(a0))
+		var d1 := Vector3(sin(a1), 0, -cos(a1))
+		for v in [d0 * (r1 - w), d0 * r1, d1 * r1, d0 * (r1 - w), d1 * r1, d1 * (r1 - w)]:
+			im.surface_add_vertex(v)
+	if sides:
+		for sgn in [-1.0, 1.0]:
+			var d := Vector3(sin(half * sgn), 0, -cos(half * sgn))
+			var n := Vector3(-d.z, 0, d.x) * w * (1.0 if sgn < 0 else -1.0)
+			for v in [d * maxf(r0, 0.4), d * r1, d * r1 + n, d * maxf(r0, 0.4), d * r1 + n, d * maxf(r0, 0.4) + n]:
+				im.surface_add_vertex(v)
+	im.surface_end()
+
+
+func _build_edges() -> void:
+	_cone_edge = _wedge_instance()
+	_cone_edge_far = _wedge_instance()
+	for e in [_cone_edge, _cone_edge_far]:
+		var m := (e as MeshInstance3D).material_override as StandardMaterial3D
+		m.albedo_color = Color(0.55, 0.04, 0.03, 1.0)
+		(e as MeshInstance3D).position.y = 0.005
+		_cone.add_child(e)
+	_cone_built_for = Vector2.ZERO
+	_rebuild_cone()
 
 
 static func _wedge(im: ImmediateMesh, r0: float, r1: float, angle_deg: float) -> void:
@@ -240,6 +294,14 @@ func _physics_process(delta: float) -> void:
 	if _rising > 0.0:
 		_rising -= delta
 		velocity = Vector3.ZERO
+		return
+	if stagger_left > 0.0:
+		stagger_left -= delta
+		sees_player = false
+		last_score = 0.0
+		velocity = Vector3.ZERO
+		_swing_cd = SWING_WINDUP
+		_near_time = 0.0
 		return
 	_bark_cd = maxf(0.0, _bark_cd - delta)
 	if is_runner:
@@ -345,6 +407,8 @@ func _perceive() -> float:
 	var score := 0.0
 	var space := get_world_3d().direct_space_state
 	var hidden: bool = _player.get("hidden_spot") != null and _player.hidden_spot.get("hides_player")
+	var zones: Node = _watch.get("zones") if _watch and is_instance_valid(_watch) else null
+	_trespass_now = zones != null and zones.trespassing(_player)
 
 	# Hearing: radius from the player's noise (surface-dependent), halved through walls, masked by the bell.
 	var noise: float = float(_player.get("noise")) if _player.get("noise") != null else 0.0
@@ -384,7 +448,8 @@ func _perceive() -> float:
 				if s > 0.0:
 					sees_player = true
 					score = maxf(score, s)
-	if score > 0 and _player.get("disguised") and not enforcer and not (_player.is_sprinting or _player.is_crouching or _linger > LINGER_TIME):
+	if score > 0 and _player.get("disguised") and not enforcer and not _trespass_now \
+			and not (_player.is_sprinting or _player.is_crouching or _linger > LINGER_TIME):
 		score *= DISGUISE_FACTOR
 	if score > 0:
 		last_known = _player.global_position
@@ -423,12 +488,13 @@ func _update_suspicion(vis: float, delta: float) -> void:
 		suspicion += float(T("suspicion.gain", 45.0)) * vis * delta
 	else:
 		var floor_s := 0.0
-		if not task.is_empty() and task.get("kind", "") != "look":
+		if not task.is_empty() and task.get("kind", "") != "look" and task.get("kind", "") != "errand":
 			floor_s = cur + 5.0
 		if _watch and _watch.phase == _watch.Phase.EVASION and state >= State.SEARCHING:
 			floor_s = srch + 1.0
 		if suspicion > floor_s:
 			suspicion = maxf(floor_s, suspicion - float(T("suspicion.decay", 12.0)) * delta)
+	_trespass_react(delta, cur, srch)
 	suspicion = clampf(suspicion, 0, 100)
 
 	var new_state := state
@@ -466,6 +532,54 @@ func _update_suspicion(vis: float, delta: float) -> void:
 			State.CALM:
 				if old != State.ALARM and task.is_empty():
 					_bark("calm")
+
+
+## Trespass (zones.gd): Curious the moment he sees the player where the outfit is not allowed, Searching once he
+## has watched them stay trespass.searching_secs; a short gap (grace_secs) out of sight does not reset the count.
+func _trespass_react(delta: float, cur: float, srch: float) -> void:
+	var zones: Node = _watch.get("zones") if _watch and is_instance_valid(_watch) else null
+	if zones == null or state == State.ALARM:
+		return
+	if sees_player and _trespass_now:
+		_trespass_gap = 0.0
+		_trespass_t += delta
+		if suspicion < cur + 1.0:
+			suspicion = cur + 1.0
+			last_known = _player.global_position
+		if _trespass_stage == 0:
+			_trespass_stage = 1
+			_bark_line("trespass")
+		if _trespass_t >= zones.tset("searching_secs", 6.0):
+			if suspicion < srch + 1.0:
+				suspicion = srch + 1.0
+				last_known = _player.global_position
+			if _trespass_stage == 1:
+				_trespass_stage = 2
+				_bark_line("trespass_search", true)
+	else:
+		_trespass_gap += delta
+		if _trespass_gap > zones.tset("grace_secs", 1.5) and (not _trespass_now or not sees_player):
+			_trespass_t = 0.0
+			if _trespass_gap > 8.0:
+				_trespass_stage = 0
+
+
+## A glossed line from zones.json barks (trespass, trespass_search): "text\n(gloss)" over his head.
+func _bark_line(kind: String, force := false) -> void:
+	if _bark_cd > 0.0 and not force:
+		return
+	var Zones := preload("res://scripts/stealth/zones.gd")
+	var text := Zones.bark_text(kind)
+	if text == "":
+		return
+	_bark_cd = 2.5
+	Walker.speech(self, text, 2.6, 2.3)
+	if _watch:
+		_watch.barked.emit(self, kind, text)
+
+
+func is_trespass_seen() -> bool:
+	return _trespass_now and sees_player
 
 
 func _bark(kind: String) -> void:
@@ -605,7 +719,7 @@ func _do_task(delta: float) -> bool:
 	var done := false
 	var kind: String = task.get("kind", "")
 	var spd := patrol_speed * _speed_mult
-	if float(task["t"]) > 40.0:
+	if float(task["t"]) > float(task.get("max_t", 40.0)):
 		done = true
 	match kind:
 		"look":
@@ -704,6 +818,18 @@ func _do_task(delta: float) -> bool:
 					done = true
 					last_known = global_position
 					_search_timer = 6.0
+		"errand":
+			# a watch routine: walk there at a steady pace, stand a while (game minutes), then back to the round
+			if not task.get("arrived", false):
+				if _nav_go(task["pos"], spd, delta, 0.9):
+					task["arrived"] = true
+					task["at"] = float(task["t"])
+			else:
+				_halt(delta)
+				if task.has("face"):
+					_face(task["face"], delta)
+				var rate := GameState.clock_scale if not sandbox else 1.0
+				done = done or (float(task["t"]) - float(task["at"])) * rate >= float(task.get("minutes", 5.0))
 		"follow":
 			var n: Variant = task.get("target")
 			if n == null or not is_instance_valid(n):
@@ -840,7 +966,7 @@ func _update_head(delta: float, sweeping: bool) -> void:
 
 ## Watch view / speed multipliers (caution) times the mission's (curfew bell). Redraws the cone when it changes.
 func refresh_mults() -> void:
-	var vm := _ext_view_mult
+	var vm := _ext_view_mult * notoriety_view_mult
 	var sm := 1.0
 	if _watch and is_instance_valid(_watch):
 		vm *= _watch.view_mult()
@@ -1001,11 +1127,18 @@ func knock_down(secs: float, in_fight: bool) -> void:
 	_label.text = "zz"
 	if was_runner and _watch:
 		_watch.on_runner_stopped(self)
+	var seen_by: Node = null
+	var gs: Array = _watch.guards() if _watch else get_tree().get_nodes_in_group("guards")
+	for g in gs:
+		if g != self and g.has_method("can_see_point") and g.can_see_point(global_position + Vector3(0, 0.8, 0), -1.0, [get_rid()]):
+			seen_by = g
+			break
 	if in_fight:
-		var gs: Array = _watch.guards() if _watch else get_tree().get_nodes_in_group("guards")
 		for g in gs:
 			if g != self and g.has_method("witness"):
 				g.witness(global_position)
+	if _watch and _watch.has_method("on_guard_downed"):
+		_watch.on_guard_downed(self, in_fight, seen_by)
 	if Mission.is_active() and not sandbox:
 		Mission.on_takedown(self, in_fight)
 
@@ -1014,7 +1147,24 @@ func is_downed() -> bool:
 	return downed_left > 0.0
 
 
+## kit.gd: parried (block_stagger) or flash-blinded (stagger): stands reeling `secs`, no perception, no swing.
+func stagger(secs: float, clip: String = "stagger") -> void:
+	if downed_left > 0.0:
+		return
+	stagger_left = maxf(stagger_left, secs)
+	sees_player = false
+	if _figure:
+		Assets.play_action(_figure, clip if Assets.has_clip(_figure, clip) else "stagger")
+
+
+func is_staggered() -> bool:
+	return stagger_left > 0.0 and downed_left <= 0.0
+
+
 func _wake() -> void:
+	if dead:
+		downed_left = 1.0e9
+		return
 	downed_left = 0.0
 	health = MAX_HEALTH
 	if hidden_in and is_instance_valid(hidden_in):
@@ -1055,6 +1205,21 @@ func witness(pos: Vector3) -> void:
 	is_runner = false
 	suspicion = 100.0
 	_update_suspicion(0.0, 0.0)
+
+
+## True if this guard, awake and on his feet, would see the point `pos` now (in his wide cone, nothing in between).
+## Witnessed takedowns and torn bills (intel.gd) ask this; it has no side effects.
+func can_see_point(pos: Vector3, max_dist: float = -1.0, exclude: Array = []) -> bool:
+	if downed_left > 0.0 or is_runner or not is_inside_tree():
+		return false
+	var eye := _eye()
+	var to := pos - eye
+	if to.length() > (max_dist if max_dist > 0.0 else view_distance):
+		return false
+	var flat := Vector3(to.x, 0, to.z)
+	if flat.length() > 1.5 and rad_to_deg(_look_dir().angle_to(flat.normalized())) > float(T("cone.peripheral_angle", 110.0)) * 0.5:
+		return false
+	return Perception.clear_line(get_world_3d().direct_space_state, eye, pos, [get_rid()] + exclude, _player, true)
 
 
 ## Curfew bell and the like: scale the view distance (1.0 restores it) and redraw the cone.
@@ -1098,9 +1263,15 @@ func _update_visuals() -> void:
 		_label.text = "»"
 	if enforcer:
 		col = col.lerp(Color(0.3, 0.02, 0.02), 0.4)
+		if _cone_edge == null:
+			_build_edges()
+	if _cone_edge:
+		_cone_edge.visible = enforcer and not is_runner
 	near_mat.albedo_color = col
 	var far_k := clampf((suspicion - 3.0) / 45.0, 0.0, 1.0)
 	if state >= State.SEARCHING:
 		far_k = 1.0
 	_cone_far.visible = far_k > 0.01 and not is_runner
+	if _cone_edge_far:
+		_cone_edge_far.visible = enforcer and _cone_far.visible
 	far_mat.albedo_color = Color(col.r * far_k * 0.8, col.g * far_k * 0.8, col.b * far_k * 0.8, 1.0)

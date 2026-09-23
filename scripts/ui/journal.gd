@@ -4,14 +4,19 @@ extends CanvasLayer
 ## Opening pauses the game and shows the mouse; closing restores both. Added by scripts/ui/hud.gd each night;
 ## the entries themselves live in Mission.journal (scripts/core/mission.gd), so they survive nights.
 ##
-## Tabs (1-6, or the arrow keys, or click):
+## Tabs (1-7, or the arrow keys, or click):
 ##   Missions    the current mission: title, briefing, approach, objectives (done / optional), rewards hint;
 ##               finished missions below.
 ##   Storylines  every mission approach (missions.json `approaches` + `journal.storylines`), mission storyline
 ##               and city storyline (data/storylines.json) the player has discovered, with a blurb, status and
 ##               the people involved; undiscovered ones show as "???" rows.
 ##   People      NPCs spoken with or overheard: name, role, faction, where and when last seen.
-##   Log         timestamped Mission.message / announcement text and overheard storyline lines.
+##   Log         timestamped Mission.message / announcement text and overheard storyline lines, overheard hints
+##               ("heard at <place>, <time>") and bills read (intel.gd).
+##   Map         a drawn plan of the Rynek (MapView): buildings, disguise zones (data/zones.json) and the one you
+##               stand in, lanterns seen, hiding spots used, patrol routes watched (dotted loops), the Corporal's
+##               post, enforcers, vendors and the brothel once found, your position and facing. The right page
+##               has the zone, outfit, notoriety in words, the routes and bills. Data: Mission.journal["intel"].
 ##   Controls    the key list.
 ##
 ## Discovery: a dialogue node with `"discover": [ids]` (missions.json) marks those storylines; a mission
@@ -24,14 +29,16 @@ extends CanvasLayer
 ## journal_<tab>.png on the third night of the smoke run (after the first mission pass) and
 ## journal_first_<tab>.png ten seconds into the first night.
 
-const TABS := ["Missions", "Storylines", "People", "Log", "Glossary", "Controls"]
+const TABS := ["Missions", "Storylines", "People", "Log", "Map", "Glossary", "Controls"]
+const Intel := preload("res://scripts/stealth/intel.gd")
+const Zones := preload("res://scripts/stealth/zones.gd")
 const EARSHOT := 14.0          ## m: an NPC's storyline line is overheard within this distance
 const SIGHT := 22.0            ## m: a storyline that begins this close to the player is seen
 const STATUS_COL := {"available": UiTheme.BRASS, "in progress": UiTheme.BRASS_BRIGHT, "resolved": UiTheme.GOOD,
 		"set aside": UiTheme.TEXT_DIM}
 const CONTROLS := [["W A S D", "Walk"], ["Mouse", "Look about"], ["Shift", "Run (the watch hears it)"],
-		["Ctrl  /  C", "Crouch and creep"], ["Z", "Go prone and crawl"], ["Q  /  R", "Lean out from cover"], ["H  or  E", "Hide in a cart, barrels or a niche; sit on a bench"], ["E (hold)", "Drag a downed man"], ["G  /  Right mouse", "Hold to aim, release to throw a stone"], ["E", "Talk, take, use; douse a lantern, knock, kick a barrel, untie a horse"], ["F  /  Left mouse", "Strike; from behind, a silent takedown"],
-		["1 - 4", "Choose a reply"], ["J  /  Tab", "Journal"], ["Esc  /  P", "Pause"]]
+		["Ctrl  /  C", "Crouch and creep"], ["Z", "Go prone and crawl"], ["Q  /  R", "Lean out from cover"], ["H  or  E", "Hide in a cart, barrels or a niche; sit on a bench"], ["E (hold)", "Drag a downed man"], ["G  /  Right mouse", "Hold to aim, release to throw a stone"], ["E", "Talk, take, use; douse a lantern, knock, kick a barrel, untie a horse; read or tear down a bill"], ["Crouch still", "Watch a patrol 10 s (on a bench, 5 s) to mark its round on the map"], ["F  /  Left mouse", "Strike; from behind, a silent takedown"],
+		["1 - 4", "Choose a reply"], ["J  /  Tab", "Journal"], ["M", "Minimap on / off"], ["Esc  /  P", "Pause"]]
 const TIPS := ["Lanterns show you to the watch; the curfew bell makes them look twice as far.",
 		"Walk when carrying the bundle or wearing a borrowed cloak. A hurry is noticed before a face.",
 		"Come at a man from behind and he never sees you.",
@@ -378,7 +385,7 @@ func _input(event: InputEvent) -> void:
 		close()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var k: int = (event as InputEventKey).physical_keycode
-		if k >= KEY_1 and k <= KEY_6:
+		if k >= KEY_1 and k <= KEY_7:
 			_set_tab(k - KEY_1)
 		elif k == KEY_RIGHT or k == KEY_D:
 			_set_tab((_tab + 1) % TABS.size())
@@ -502,7 +509,7 @@ func _build() -> void:
 	spread.add_child(_right_scroll)
 	_right = _right_scroll.get_child(0).get_child(0)
 
-	var foot := UiTheme.label("J  /  Tab  close        1 - 6  or  ← →  turn the page        Esc  back to the night", 14,
+	var foot := UiTheme.label("J  /  Tab  close        1 - 7  or  ← →  turn the page        Esc  back to the night", 14,
 			Color(UiTheme.TEXT_DIM, 0.8), "italic")
 	foot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(foot)
@@ -545,8 +552,9 @@ func _refresh() -> void:
 		1: _fill_storylines()
 		2: _fill_people()
 		3: _fill_log()
-		4: _fill_glossary()
-		5: _fill_controls()
+		4: _fill_map()
+		5: _fill_glossary()
+		6: _fill_controls()
 
 
 # --- text helpers
@@ -660,6 +668,11 @@ func _fill_storylines() -> void:
 		else:
 			_unknown_row(parent, e)
 		_hair(parent)
+	var heard := _hints_where(func(h: Dictionary) -> bool: return h.get("tab", "") == "storylines" or h.get("story", "") != "")
+	if not heard.is_empty():
+		_section(_right, "Overheard")
+		for h in heard:
+			_hint_row(_right, h)
 
 
 func _story_row(parent: Control, e: Dictionary, status: String) -> void:
@@ -701,6 +714,7 @@ func _fill_people() -> void:
 		_left.add_child(_t("You have spoken to no one yet. Faces and names you learn in the night are kept here.",
 				17, UiTheme.TEXT_DIM, "italic"))
 		_right.add_child(_t(" ", 16))
+		_watch_people(_right)
 		return
 	var ids := people.keys()
 	var half := int(ceil(ids.size() / 2.0))
@@ -718,10 +732,15 @@ func _fill_people() -> void:
 		box.add_child(top)
 		if str(p.get("role", "")) != "":
 			box.add_child(_t(str(p["role"]), 16, UiTheme.TEXT))
+		if _intel()["enforcers"].has(ids[i]):
+			box.add_child(_t("●  Knows your face: no cloak will fool this one.", 15, UiTheme.BAD, "bold"))
 		box.add_child(_t("Last seen at %s, %s, night %d." % [p.get("where", "?"), p.get("t", "?"), int(p.get("night", 1))],
 				14, UiTheme.TEXT_DIM, "italic"))
+		for h in _hints_where(func(hh: Dictionary) -> bool: return hh.get("about", "") == str(ids[i])):
+			_hint_row(box, h, true)
 		parent.add_child(box)
 		_hair(parent)
+	_watch_people(_right)
 
 
 # --- Log
@@ -749,8 +768,146 @@ func _fill_log() -> void:
 		row.add_child(t)
 		var kind := str(e.get("kind", ""))
 		var col := UiTheme.BRASS_BRIGHT if kind == "announcement" else UiTheme.TEXT
-		row.add_child(_t(str(e.get("text", "")).replace("\n", " "), 16, col, "italic" if kind == "story" else "regular"))
+		if kind == "intel":
+			col = Color(0.78, 0.86, 0.72)
+		elif kind == "bill":
+			col = Color(0.9, 0.84, 0.7)
+		row.add_child(_t(str(e.get("text", "")).replace("\n", " "), 16, col, "italic" if kind == "story" or kind == "intel" else "regular"))
 		parent.add_child(row)
+
+
+# --- Intel (scripts/stealth/intel.gd keeps it in Mission.journal["intel"])
+
+func _intel() -> Dictionary:
+	return Intel.journal_store()
+
+
+## Overheard hints matching `pred`, in the order they were heard.
+func _hints_where(pred: Callable) -> Array:
+	var out: Array = []
+	var hs: Dictionary = _intel()["hints"]
+	for id in hs:
+		if pred.call(hs[id]):
+			out.append(hs[id])
+	return out
+
+
+func _hint_row(parent: Control, h: Dictionary, compact := false) -> void:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 0)
+	v.add_child(_t("“%s”" % h.get("note", ""), 15 if compact else 16, Color(0.8, 0.87, 0.74), "italic"))
+	if str(h.get("text", "")) != "" and not compact:
+		v.add_child(_t("%s\n(%s)" % [h.get("text", ""), h.get("gloss", "")], 14, UiTheme.TEXT_DIM, "italic"))
+	v.add_child(_t("heard at %s, %s, night %d" % [h.get("where", "?"), h.get("t", "?"), int(h.get("night", 1))], 13,
+			Color(UiTheme.BRASS, 0.8), "regular"))
+	parent.add_child(v)
+
+
+## The watch as the player knows it: guards whose rounds were watched, enforcers, what was overheard about them.
+func _watch_people(parent: Control) -> void:
+	var st := _intel()
+	var names: Array = []
+	for n in st["patrols"]:
+		names.append("guard:" + str(n))
+	for id in st["enforcers"]:
+		if str(id).begins_with("guard:") and not names.has(id):
+			names.append(id)
+	for h in _hints_where(func(hh: Dictionary) -> bool: return str(hh.get("about", "")).begins_with("guard:")):
+		if not names.has(h["about"]):
+			names.append(h["about"])
+	var npc_enf: Array = []
+	for id in st["enforcers"]:
+		if not str(id).begins_with("guard:") and not Mission.journal["people"].has(id):
+			npc_enf.append(id)
+	if names.is_empty() and npc_enf.is_empty():
+		return
+	_section(parent, "The watch")
+	for id in names:
+		var gname := str(id).trim_prefix("guard:")
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 1)
+		var title := gname + ("  ·  the Corporal" if gname == "St Mary's post" else "")
+		box.add_child(UiTheme.label(title, 20, UiTheme.BRASS_BRIGHT, "display"))
+		if st["enforcers"].has(id):
+			box.add_child(_t("●  Knows your face: his cone is edged in red. A cloak will not fool him.", 15, UiTheme.BAD, "bold"))
+		if st["patrols"].has(gname):
+			var pr: Dictionary = st["patrols"][gname]
+			box.add_child(_t("%s watched at %s, night %d: on the map." % ["Post" if pr.get("sentry", false) else "Round", pr.get("t", "?"),
+					int(pr.get("night", 1))], 14, UiTheme.TEXT_DIM, "italic"))
+		for h in _hints_where(func(hh: Dictionary) -> bool: return hh.get("about", "") == id):
+			_hint_row(box, h, true)
+		parent.add_child(box)
+		_hair(parent)
+	for id in npc_enf:
+		var e: Dictionary = st["enforcers"][id]
+		var box := VBoxContainer.new()
+		box.add_child(UiTheme.label(str(e.get("name", id)), 20, UiTheme.BRASS_BRIGHT, "display"))
+		box.add_child(_t("●  Knows your face. Seen at %s." % e.get("where", "?"), 15, UiTheme.BAD, "bold"))
+		parent.add_child(box)
+		_hair(parent)
+
+
+# --- Map
+
+func _fill_map() -> void:
+	var st := _intel()
+	var mv := MapView.new()
+	mv.intel = st
+	mv.world = _district()
+	mv.custom_minimum_size = Vector2(0, 620)
+	mv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_left.add_child(mv)
+	var zones := Zones.db()
+	var zid := str(st.get("zone", "street"))
+	var zname := str(zones.get("zones", {}).get(zid, {}).get("name", zid))
+	var oid := str(st.get("outfit", "none"))
+	var odata: Dictionary = zones.get("outfits", {}).get(oid, {})
+	var mo: Dictionary = Mission.data.get("stealth", {}).get("outfits", {}).get(oid, {})
+	if not mo.is_empty():
+		odata = mo
+	var ok := (odata.get("permit", ["street"]) as Array).has(zid)
+	var R := _right
+	R.add_child(UiTheme.kicker("Where you stand"))
+	R.add_child(UiTheme.label(zname, 26, UiTheme.BRASS_BRIGHT, "display"))
+	R.add_child(_t("Dressed in %s: %s" % [odata.get("name", oid), "you may be seen here." if ok else "you have no business here. The watch will stop you."],
+			16, UiTheme.TEXT if ok else UiTheme.BAD, "italic"))
+	var permits: PackedStringArray = []
+	for z in odata.get("permit", ["street"]):
+		permits.append(str(zones.get("zones", {}).get(z, {}).get("name", z)).to_lower())
+	R.add_child(_t("Your clothes pass in " + ", ".join(permits) + ".", 14, UiTheme.TEXT_DIM, "regular"))
+	var n := float(st.get("notoriety", 0.0))
+	var word := "The watch does not know your face."
+	if n >= 60.0:
+		word = "Hunted. Your description is on every wall, and the patrols walk in pairs."
+	elif n >= 30.0:
+		word = "Wanted. Bills with your description are posted on the walls; the soldiers look harder."
+	elif n >= 10.0:
+		word = "Talked of in the guardroom. Not yet on paper."
+	_section(R, "Your name in the city")
+	R.add_child(_t(word, 16, UiTheme.BAD if n >= 30.0 else UiTheme.TEXT, "italic"))
+	_section(R, "Rounds watched")
+	if (st["patrols"] as Dictionary).is_empty():
+		R.add_child(_t("Crouch still where a patrol can be seen, or sit on a bench, and learn its round.", 15, UiTheme.TEXT_DIM, "italic"))
+	for g in st["patrols"]:
+		var pr: Dictionary = st["patrols"][g]
+		R.add_child(_t("%s  ·  %s, %s" % [g, "a post" if pr.get("sentry", false) else "a round of %d turns" % (pr["wps"] as Array).size(),
+				pr.get("t", "?")], 15, UiTheme.BAD if pr.get("enforcer", false) else UiTheme.TEXT))
+	if not (st["bills"] as Dictionary).is_empty():
+		_section(R, "Bills read")
+		for b in st["bills"]:
+			var bd: Dictionary = st["bills"][b]
+			R.add_child(_t("%s  ·  %s" % [bd.get("title", b), bd.get("note", "") if str(bd.get("note", "")) != "" else "at " + str(bd.get("where", "?"))],
+					15, UiTheme.BAD if bd.get("wanted", false) else UiTheme.TEXT))
+	_section(R, "Key")
+	R.add_child(_t("Dotted loop: a round you watched   ·   triangle: a sentry's post   ·   flag: the Corporal   ·   gold dot: a lantern seen   ·   cross: a hiding place you used   ·   red: knows your face   ·   tinted ground: where your own clothes will not pass", 14, UiTheme.TEXT_DIM, "italic"))
+
+
+func _district() -> Node3D:
+	for w in get_tree().get_nodes_in_group("watch"):
+		var ww := w as Node3D
+		if ww and not bool(ww.get("sandbox")) and ww.get_parent() is Node3D:
+			return ww.get_parent()
+	return null
 
 
 # --- Controls
@@ -879,3 +1036,53 @@ class Spine extends Control:
 		while y < size.y - 10:
 			draw_line(Vector2(cx - 3, y), Vector2(cx + 3, y + 4), Color(UiTheme.BRASS, 0.25), 1.0)
 			y += 18.0
+
+
+## The Map tab's drawn plan of the Rynek on a pasted sheet of paper; the drawing itself is scripts/ui/city_map.gd
+## (shared with the HUD minimap): footprints, disguise zones, and what intel.gd has gathered.
+class MapView extends Control:
+	const CityMap := preload("res://scripts/ui/city_map.gd")
+	const VIEW := Rect2(-50, -53, 100, 100)        ## x, z range drawn
+
+	var intel: Dictionary = {}
+	var world: Node3D
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var margin := 14.0
+		var avail := size - Vector2(margin, margin) * 2.0
+		var sc := minf(avail.x / VIEW.size.x, avail.y / VIEW.size.y)
+		var mapsz := VIEW.size * sc
+		var off := Vector2(margin, margin) + (avail - mapsz) * 0.5
+		var sheet := Rect2(off - Vector2(10, 10), mapsz + Vector2(20, 20))
+		draw_rect(Rect2(sheet.position + Vector2(5, 6), sheet.size), Color(0, 0, 0, 0.35))
+		draw_rect(sheet, CityMap.PAPER)
+		for i in 10:                                           # darkened, foxed edges
+			var inset := float(i) * 2.2
+			draw_rect(Rect2(sheet.position + Vector2(inset, inset), sheet.size - Vector2(inset, inset) * 2.0), Color(0.35, 0.22, 0.1, 0.035), false, 2.2)
+		draw_rect(Rect2(off, mapsz), CityMap.INK_SOFT, false, 1.0)
+		var p: Node3D = null
+		for n in get_tree().get_nodes_in_group("player"):
+			if world == null or (n as Node3D).get_world_3d() == world.get_world_3d():
+				p = n
+		var zid := str(intel.get("zone", "street"))
+		var permit: Array = Zones.db().get("outfits", {}).get(str(intel.get("outfit", "none")), {}).get("permit", ["street"])
+		var mo: Dictionary = Mission.data.get("stealth", {}).get("outfits", {}).get(str(intel.get("outfit", "none")), {})
+		if not mo.is_empty():
+			permit = mo.get("permit", permit)
+		CityMap.draw_map(self, Rect2(off, mapsz), VIEW.get_center(), sc, {"intel": intel, "world": world, "labels": true,
+				"zones": "all", "zone": zid, "trespass": not permit.has(zid), "player": p, "corporal": true, "icon": 1.0, "clip": true})
+		var fb := UiTheme.font("display")
+		var fi := UiTheme.font("italic")
+		var tp := off + Vector2(mapsz.x - 200, mapsz.y - 34)    # the cartouche, bottom right below the south row
+		draw_string(fb, tp, "Rynek Główny", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CityMap.INK)
+		draw_string(fi, tp + Vector2(0, 18), "(the Main Market Square)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(CityMap.INK, 0.8))
+		var c := off + Vector2(mapsz.x - 30, 36)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -20), c + Vector2(6, 0), c + Vector2(-6, 0)]), CityMap.INK)
+		draw_polyline(PackedVector2Array([c + Vector2(0, 20), c + Vector2(6, 0), c + Vector2(-6, 0), c + Vector2(0, 20)]), CityMap.INK, 1.0)
+		draw_string(fb, c + Vector2(-5, -24), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CityMap.INK)

@@ -1,0 +1,43 @@
+{
+  "_doc": "Disguise zones (docs/STEALTH.md 3.7, phase F), read by scripts/stealth/zones.gd. Polygons are [x, z] on the Rynek (Godot metres, +X east, +Z south). Zones are tested in `order`; a point outside every polygon is the street. `interiors`: interior sets (scripts/city/interiors.gd) that belong to the zone. An outfit is worn while its Mission flag is set (the salon cloak also whenever player.disguised is true and no other outfit applies); `permit` lists the zones it may stand in. Trespass: in a zone the outfit does not permit, a guard's sight counts x trespass.sight, he goes Curious on sight and Searching after trespass.searching_secs.",
+  "order": ["church", "salon", "barracks", "kazimierz_gate", "street"],
+  "zones": {
+    "salon": {"name": "The salon: Town Hall door and hall", "polygons": [[[-22, 14.5], [-8, 14.5], [-8, 23], [-22, 23]]], "interiors": ["int_salon"], "color": [0.78, 0.55, 0.85]},
+    "barracks": {"name": "The watch post at St Mary's", "polygons": [[[19, -31], [31, -31], [31, -5], [19, -5]]], "color": [0.85, 0.35, 0.3]},
+    "church": {"name": "Church porches", "polygons": [[[29, -22.5], [37, -22.5], [37, -16.5], [29, -16.5]], [[18.5, 21.5], [26, 21.5], [26, 25.5], [18.5, 25.5]]], "interiors": ["int_church"], "color": [0.9, 0.85, 0.55]},
+    "kazimierz_gate": {"name": "The road to Kazimierz", "polygons": [[[-47, 33], [-26, 33], [-26, 47], [-47, 47]]], "color": [0.6, 0.7, 0.9]},
+    "street": {"name": "The open square", "polygons": [[[-30, -30], [30, -30], [30, 30], [-30, 30]]], "color": [0.7, 0.68, 0.6]}
+  },
+  "outfits": {
+    "austrian_coat": {"name": "an Austrian coat", "flag": "disguise_austrian", "disguised": true, "permit": ["barracks", "street"]},
+    "clergy": {"name": "a cassock", "flag": "disguise_clergy", "disguised": true, "permit": ["church", "street"]},
+    "salon_cloak": {"name": "the salon cloak", "flag": "invited", "disguised": true, "permit": ["salon", "street"]},
+    "none": {"name": "your own clothes", "permit": ["street"]}
+  },
+  "trespass": {"sight": 1.6, "searching_secs": 6.0, "grace_secs": 1.5},
+  "barks": {
+    "trespass": [
+      ["Hier ist kein Durchgang!", "No way through here!"],
+      ["Was suchen Sie hier?", "What are you after here?"],
+      ["Tu nie wolno!", "You can't be here!"]
+    ],
+    "trespass_search": [
+      ["Sie da! Stehen bleiben!", "You there! Stand still!"],
+      ["Papiere, bitte!", "Papers, please!"]
+    ],
+    "recognise": [
+      ["To on! Straż!", "That's him! Watch!"],
+      ["Znam tę twarz! Straż!", "I know that face! Watch!"],
+      ["Herr Korporal! Der da!", "Corporal, sir! That one!"]
+    ],
+    "recognise_f": [
+      ["To ona! Straż!", "That's her! Watch!"],
+      ["Znam tę twarz! Straż!", "I know that face! Watch!"]
+    ]
+  },
+  "enforcer": {"recognise_dist": 6.0, "recognise_secs": 2.0, "cone_deg": 130.0, "cooldown_secs": 30.0},
+  "watch_routines": [
+    {"id": "corporal_tavern", "guard": "St Mary's post", "at": "22:30", "pos": [-21.6, 0, -26.2], "minutes": 30, "label": "a glass at the Winiarnia"},
+    {"id": "watch_change", "guard": "Cloth Hall sentry", "at": "00:00", "pos": [23.0, 0, -10.5], "minutes": 8, "label": "the change of the watch at St Mary's"}
+  ]
+}

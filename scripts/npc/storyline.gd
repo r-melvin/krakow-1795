@@ -13,7 +13,7 @@ extends Node
 ##         secs?: with target+keep, tail the target that long (real seconds); lose?: m, on_lose?: label
 ##   wait  secs: s | until: "HH:MM" | arrive: [ids] | flag: name (a Mission flag)
 ##   face  pos | target
-##   say   text, secs (default 3), wait? (default true), alert?: {guard: name, suspicion: 0..100, pos?: [x,y,z]}
+##   say   text, secs (default 3), wait? (default true), hint?: id (intel.gd overhearing), alert?: {guard: name, suspicion: 0..100, pos?: [x,y,z]}
 ##         (alert sends the guard to pos, or by default to where the player stands)
 ##   event name: calls Mission.story_event(story id, name, actor) for mission logic
 ##   play  clip, secs? (blocks that long if given)
@@ -26,6 +26,9 @@ enum Status { WAITING, RUNNING, DONE }
 signal storyline_started(id: String)
 signal storyline_step(id: String, text: String)
 signal storyline_ended(id: String)
+## For intel.gd (phase E): a `say` step carrying `"hint": id` (a hint in data/storylines.json `hints`) was spoken by
+## `actor`; intel writes the hint to the journal if the player stood within earshot.
+signal storyline_hint(id: String, hint_id: String, actor: Node3D)
 
 var population: Node              ## population.gd, for actor and post lookup
 var data: Dictionary = {}
@@ -177,6 +180,8 @@ func _enter(i: int) -> void:
 				var Walker := preload("res://scripts/npc/walker.gd")
 				Walker.speech(a, str(s.get("text", "...")), float(s.get("secs", 3.0)))
 				storyline_step.emit(story_id, str(s.get("text", "...")))
+				if s.has("hint"):
+					storyline_hint.emit(story_id, str(s["hint"]), a)
 			if s.has("alert"):
 				_alert(s["alert"])
 		"event":

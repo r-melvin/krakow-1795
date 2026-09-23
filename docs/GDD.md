@@ -58,6 +58,26 @@ Old Town (Rynek), Wawel (garrison), Kazimierz, Stradom, Kleparz, Kanonicza/Churc
 - Puzzles: routes through the city (rooftops, cellars, church crypts), locks, ciphers on letters, timing patrols, moving crowds as cover.
 - Non-lethal default. Lethal has consequences (crackdown, faction fear).
 
+### Intel, disguise zones and notoriety (docs/STEALTH.md phases E and F)
+- **Listening is a verb.** Townsfolk in pairs, guards muttering at their posts and storyline scenes carry hints
+  (data/storylines.json and data/npcs.json `hints`, Polish or German with an English gloss). Stand within 4 m for
+  5 s and the line is said aloud and kept in the journal ("heard at <place>, <time>"). The hints are true: the
+  Corporal really leaves St Mary's post for the Winiarnia at 22:30, the Cloth Hall sentry really walks off for the
+  midnight relief (data/zones.json `watch_routines`).
+- **Paper on the walls.** Austrian proclamations (curfew, the watch rota, a new levy), the magistrate's lamp order and
+  a theatre bill on the notice board and facades (data/bills.json). E reads one into the journal.
+- **Watching the watch.** Crouch still, or sit on a bench, with a patrol in view: its round is drawn on the journal's
+  Map tab, beside the lanterns seen, the hiding places used, the vendors and the red lantern once found.
+- **Clothes are permits.** The Rynek is cut into zones: the salon (Town Hall door and hall), the watch post at St
+  Mary's, the church porches, the road to Kazimierz, the open street. The salon cloak passes in the salon and the
+  street; an Austrian coat in the post and the street; a cassock at the churches. In the wrong place the watch looks
+  harder, goes Curious at once and Searching if you stay. The zone you stand in is shown only on the journal map.
+- **Faces are not clothes.** The informer, the Corporal, the innkeeper of the Zajazd and a spy by the stalls know
+  your face: a cloak does not fool them, and a townsman who recognises you calls the nearest soldier.
+- **Notoriety** (0-100, kept across nights): alarms that reach the Corporal, soldiers beaten in the open, takedowns
+  seen. At 30 wanted bills describe you from your origin, sex and coat, and the watch looks further; at 60 the
+  patrols walk in pairs. Tearing bills down and changing coats bring it down; it fades by 10 a night.
+
 ### Intrigue loop
 - Rival agents run their own plots against you. Detected via intel (underworld, salon gossip, church confessions).
 - Deals: every faction wants something. Concessions are tracked and come due.
@@ -116,13 +136,62 @@ Reference points: Hitman's schedules and opportunities, the recent 007's crowd a
   the bishop's procession, the informer who shadows the player and reports to the watch, the drunk who is thrown
   out of a propination tavern, the printer smuggling a pamphlet bundle to the salon. They can be watched, used as
   cover, interrupted or exploited (steal the pamphlets, replace the delivery, feed the informer a lie).
-- **Interiors.** Reusable sets (tavern, shop, workshop, church nave, salon, flat) placed behind doors; each district
-  re-dresses the same kits with its own trades, colours and props until bespoke interiors exist.
+- **Interiors.** Every door opens on a room that is unmistakably its trade. Rooms share one shell system (walls,
+  beamed, smoke-blackened, flat or vaulted ceilings; plank, parquet, flag, brick, tile or earth floors) and are
+  dressed per trade: the baker's glowing oven and dough trough, the shoemaker's lasts and boots on pegs, the
+  goldsmith's barred vault and strongbox, the apothecary's labelled jars, still and crocodile, the locksmith's key
+  boards and forge corner, the tailor's board and dress forms, the cloth merchant's pigeonholes and ell, the cooper's
+  cask being raised over a cresset, the chandler's vat and dipping wheel, the beer hall's casks and hatch, the wine
+  cellar down its steps, the kawiarnia's urn and newspapers on sticks, the zajazd's ledger and coach doors, the house
+  with the red lantern (implied, never explicit), the salon with the Constitution open on its desk, St Mary's with
+  pulpit and confessional, three kinds of lodging (garret, burgher's parlour, scholar's room), the smithy, the
+  guardroom with the Corporal's Ledger and a barred cell, the synagogue's bimah and ark, the Uniate iconostasis, and
+  the finale's kingpin house (secret stair to a river tunnel and boat), bathhouse and warehouse.
+  `data/interiors.json` maps each door (tenement portals, square landmarks, outer-city buildings) to a set and
+  variant; rooms carry lights (flickering flames), night views through their windows, footstep surfaces on their
+  floors, tagged props (`ledger`, `poisonable` decanters, `flammable` bales, the `weapons_rack`) and `Post_<n>`
+  markers where the population and campaign put people.
 - **Districts.** Each district has its own trades, its own propination holder, its own notables, and its own
   watch presence, so the same systems produce different textures of life: jewellers and traders in Kazimierz,
   tanners and brewers in Garbary, porters and salt on the docks, grain and horses in Kleparz, canons in Kanonicza.
 - **Reactions.** Crowds react to the watch (step aside), to alarms (scatter, gawk), to the player's disguise and
   reputation (greet, ignore, report). Reputation with each faction changes who will talk and who will inform.
+
+## Night life and crime
+
+`scripts/city/street_life.gd`, tuned entirely from `data/street_life.json` (lines, timings, probabilities by clock
+hour and crackdown). Tone: the period's brutality is shown plainly (violence, death, punishment, poverty, the
+occupation) without gratuitous detail; sexual matters stay behind the door (no nudity, no depicted acts).
+- **The red lantern** (west row, the door beside the beer hall): two women call out to passers-by and to soldiers,
+  one of them coughing; a doorman on a bench, a pimp who collects, customers (Austrian soldiers openly) who go in
+  and come out later. The madam sells a room (2 złoty: the lodging-house interior, visibility 0 and guard suspicion
+  cleared for 20 s, `Mission.flags.brothel_room`) and gossip (1 złoty each: which officer is upstairs, the watch
+  rota, whom the informer reports to). At crackdown 40+ a patrol makes its Visitation once a night.
+- **Drunks** (3-5 after 22:00): stagger, sing, relieve themselves against a wall, fall asleep on benches, accost
+  the player (a swing only shoves them) and are moved on by the watch.
+- **Fights, crime** (never more than two at once): brawls near the taverns with a crowd that hides the player and
+  draws the watch; cutpurses in crowds (they can rob the player; one blow and they drop the purse); muggings in
+  the dark alleys behind the rows (after 23:00 the player alone in the dark is the mark: pay, fight or run; an
+  underworld friend walks free); a burglar at a shutter (`saw_burglar`); a fence at the cellar hatch after midnight.
+  High crackdown moves drink and violence off the square into the alleys.
+- **Punishment**: prisoners in the pillory and stocks by the Town Hall, jeered at or fed; a flogging at the
+  whipping post once a night, drummed and counted in German, with a crowd; a hanged Jacobin on the gallows outside
+  the rows.
+- **Poverty and occupation**: veteran beggars of Maciejowice, a woman who freezes in a doorway and is carted off
+  before dawn, children scavenging behind the stalls, a soup line at St Adalbert's; arrests, a press gang, soldiers
+  shaking down a Jewish pedlar or a Uniate priest, firewood requisitioned, the printed Constitution torn down and
+  burned, and after the curfew bell a drunk beaten for not going home.
+- **Voices**: the madam (wry), doorman (fearful), pimp (vengeful), thug leader (vengeful, stern or cynical), the
+  drunk (drunk-philosopher), the man in the pillory (gallows-humour) and the bard (wry) carry a `personality`; the
+  player's choices carry a `tone` (joke, blunt, humble, threat, flatter, bribe, appeal) and the answer comes from
+  personality x tone: a joke buys a drink from the drunk and a slap from a vengeful thug; a threat cows the doorman
+  (a free room) and brings out the pimp's knife. Humour is dry and never at the expense of the flogged or the dead,
+  except from the gallows-humour man himself; the sergeant reads sentences flat.
+- **The bard** at the kawiarnia trades a verse for a rumour, and was taught by a wandering master called Jaskier.
+- **Riot and fire** (finale hooks): `StreetLife.riot(centre, intensity, cause)` turns the townsfolk near it into a
+  mob with a ringleader the player can talk down or up; stalls are smashed and, at the height, set alight; the watch
+  fires a volley after a minute. `Fire.ignite(pos)` (`scripts/city/fire.gd`) burns and spreads between flammable
+  props, draws a bucket line from the wells and leaves them charred; snow and rain slow it.
 
 ## The countryside (farmland as a faction avenue)
 Kraków fed on the villages around it: manor farms (folwarki) of the Church, the university, the town and the
@@ -216,3 +285,155 @@ exported for the street-life scenes.
 **Runtime markers.** Buildings export empties as children of the asset root: `Chimney_<n>` at each flue top,
 `Window_<n>` on the sill of each openable ground- and first-floor street window (its Blender -Y, which is
 Godot +Z, points out into the street), `Furnace_<n>` at forge, foundry, brewery and cooper fires.
+
+## Campaign (seven nights, one winter)
+
+Code: `scripts/mission/campaign.gd` (Mission.campaign), `rumours.gd`, `events.gd`, `mission_runner.gd`,
+`scripts/ui/day_panel.gd`, `dawn_panel.gd`. Data: `data/campaign.json`, `rumours.json`, `events.json`,
+`missions.json`. State lives in `GameState.campaign` and `Mission.journal` and is saved every dawn with the rest
+(save/continue works mid-campaign).
+
+### The arc
+Each night takes one institution back from the occupier; a lost night still moves the story on (its `failure`
+consequences apply and the next night comes).
+
+| Night | Mission | At stake | Roads (the first counts in the pacing estimate) |
+|---|---|---|---|
+| 1 | The Printer's Bundle | the press | smuggler, urchins, salon |
+| 2 | The Corporal's Ledger | the watch's book | Novak's price, laundress (women), drunkard (men); copy or steal |
+| 3 | The Salt Barge | the muskets | the guild's false manifest, the raftsmen's sledge; Rózia's key as a shortcut |
+| 4 | The Bishop's Letter | the Church | canon's cassock (men), Bernardine habit (women), staged miracle; the confessional's second door (the Uniate priest's key) |
+| 5 | The Magnate's Ball | the Town Hall | servant's livery, invitation, on the banker's arm; then blackmail, poison or win Count Wodzicki |
+| 6 | The Pillory | the street | a riot, a quiet key or pick, an omen told by the fortune-teller |
+| 7 | The Kingpin | the river (the docks district) | a sandbox: see below |
+
+Each mission's `campaign` block turns its outcome into consequences (loyalty, fear, strength, crackdown, camp flags,
+levers, rumours seeded, districts). `variants` react to earlier nights (e.g. the informer sells you to Wilk if you
+did not win night 1); conditions like `camp:`, `lever:`, `found:`, `night:` gate choices in every mission.
+
+### The whisper network (the distinctive loop)
+Rumours are objects (`data/rumours.json`): subject, truth (true, false, or true only if a condition holds, such
+as holding the banker's notes), a spread rate, effects when it takes hold, effects when it is disproved.
+- **Carried by people.** A rumour lives in named townsfolk (`carriers`, from `data/npcs.json`) linked in a
+  `network` of social groups (the west well, the passage, the church steps, the taverns, the watch, the market).
+  At night every unheard rumour in play is placed on its carriers as an overheard line (intel.gd: stand within
+  4 m for 5 s); the madam's gossip, the ballad sheet and a flogging seen also count as hearing one.
+- **Spread at dawn.** Each carrier passes it to each neighbour with probability spread x channel boost x
+  (1 - crackdown/200); reach is the share of the roster that carries it. At 35% it takes hold, once.
+- **Planted by you.** From the day panel, through a channel: the ballad seller (cheap, slow, hard to trace),
+  Mother Weronika (reaches soldiers first), the printer's press (fast; needs the press), Wit the crier (everyone
+  at once; everyone saw who paid), a forged bill (needs a seal). Planted rumours move guards (the raid on
+  Kazimierz takes a patrol off the Rynek, the warehouse raid pulls one of Wilk's bodyguards away), set traps for
+  enforcers (the informer arrested as a Russian spy), draw people out (the amnesty brings the deserter into the
+  square), and shift loyalty and fear.
+- **Costs.** A planted rumour can be traced to you (notoriety +12, crackdown +3); a false one that takes hold can
+  be disproved, and the channel's faction loses influence.
+- **Superstition and religion** are a class of their own (`kind`: omen, miracle, curse, relic, prophecy). They
+  spread fastest among the pious and the street, slowest in the salon, and cost Salon influence to plant. A staged
+  miracle (the bribed sacristan) that is traced is blasphemy. The black-dog omen of Kazimierz, already running on
+  day 1, turns people on the Jews unless you counter it (a day action with the rabbi and the Uniate priest). The
+  hejnał breaking off, a relic of St Stanislaus or Kościuszko's sabre, a Marian prophecy, a curse on the
+  Commissioner's house: each with its own effects.
+- **Leads.** A rumour about a person is a lead: follow it (one a day) and that person is in tonight's world with
+  a map mark. The day panel shows rumours with reach, truth as far as you know (`?` until proven or disproved) and
+  whether you planted them. The journal keeps them in `Mission.journal.rumours` and the Log ("rumour: ...").
+
+### People to find (levers)
+Jan Wróbel the deserter (Garbary tanneries: an Austrian coat), Marianna the laundress (the Corporal's secret, a
+basket into the post), Monsieur Orlov the Russian (gold, and strings), Wit the crier (cheap crying), Tadeusz the
+printer's apprentice (seals and the press), Herr Lindner the Prussian banker (the Commissioner's debts), Rózia
+the fence (keys, a vial), Father Hryhorij the Uniate priest (the confessional's second door), Sergeant Kmita at
+Kleparz (the veterans), and Jan Śniadecki the astronomer (moon tables: darker nights). Each is found through a
+rumour, gives a lever on talking, and has a day meeting afterwards.
+
+### Days
+Two hours a day (three after a won night), spent on: lying low, the Zajazd, alms, the guilds, the salon, a
+speech, bribes, a smuggler's parcel, a staged miracle, a curse, holy pictures, meeting a person found, appeasing a
+faction, making amends, naming an heir, countering a dangerous omen, or planting a rumour. The passage urchins
+(Staś and Kasia) sell news for a coin without costing an hour: the watch's sweep, the talk of the passage,
+where a person hides, an unlatched window (one more slip-away), shadowing someone, carrying a message. They lie
+now and then (honest 60% plus half your Street influence). At night they sell news to anyone on the nights the
+mission does not need them.
+
+### Factions against each other
+`relations` in campaign.json: Church and Salon, Guilds and Underworld, Magnates and Street, Church and Underworld,
+Guilds and Street, Russia and Prussia as spoilers. Influence gained with one side costs the other side loyalty.
+If one side's influence runs more than 30 ahead of its rival, the rival keeps you at arm's length: its influence
+gates fail ("They keep you at arm's length") until you make amends. Neglect (no gain for two nights) or a broken
+promise raises a faction's grievance; at 60 it sabotages the next night unless appeased: a tipped-off patrol, a
+mob you did not call, tolls, a loose tongue with the Polizei, no sanctuary. The day panel lists the pairs that
+hurt now.
+
+### Random events
+`data/events.json`, at most three a night, each at most once, staged 12-40 m from you: a runaway cart, an arrest,
+a stall fire (buckets, or slip past the watch it draws), a candle procession (walk with it, disguised), a tavern
+brawl (pick a side), a lost child, snowballing urchins (hire them to pelt a guard), the lamplighter (pay him to
+leave a corner dark), a pamphlet drop, a duel in the snow, a drunk soldier's coat, the flogging crowd (with
+street_life.gd's flogging scene). Each outcome moves influence, loyalty, crackdown or rumours and appears in the
+dawn report.
+
+### The finale: The Kingpin
+Wilk the river king owns the Vistula quays. He makes a round of five stations (the warehouse, cards behind the
+fishermen's tavern at 21:45, the bathhouse at 22:40, his barges under the cargo hook at 23:30, the riverside
+shrine), guarded by two enforcer bodyguards who keep a ring round him (one ahead, one behind looking back), see
+through disguises and gain suspicion three times as fast within 8 m. Anyone reaching arm's length without a permit
+is frisked: the approach fails, the guards go to Alarm and Wilk holes up in his warehouse. The honest roads are
+indirect, built from general verbs, and each leaves a different river behind it:
+
+| Method | How | Consequence |
+|---|---|---|
+| Poison | Salomea's drop, or Rózia's vial, in his card-table jug or bathhouse kvass | Church uneasy |
+| Accident | work the pin out of the cargo hook before 23:30 | guilds relieved; nobody to blame |
+| Fire | kick the watchmen's brazier into the warehouse straw while he is inside (or as a distraction) | guilds lose grain; crackdown |
+| Riot | turn the raftsmen (Street or Underworld loyalty, the relic, the riot of night 6), the mob drags him out | Street cheers; heavy crackdown; the Underworld splits |
+| Guillotine | Citizen Lebrun builds the machine (Street strong, 4 zł); the mob's tribunal uses it, or it scares a bodyguard off | Street ecstatic; Church and Salon appalled; curfew sweep |
+| Knife | take a bodyguard's coat at the privy (22:15) and walk up as one of them, or isolate him (raid rumour, the machine) | the river respects it |
+| Pistol | Jędrek's pistol, the loud last resort | notoriety +30 |
+
+Then decide who rules the river (Jędrek, his lieutenant, or no king at all) and get out through the Grodzka gate.
+The docks district's controller becomes `movement`: one district of eight. The ending (Martial Law, A Candle in
+the Window, The Tsar's Friends, The Razor on the River, The Commonwealth Stirs, No More Kings on the River, King
+Jędrek) follows loyalties and choices.
+
+### Failure, capture and succession
+- **Checkpoints**: the start of the night, every objective done, 20 s in a hiding spot.
+- **Caught or beaten** by the watch: a choice, not a fail screen. Slip away to the last checkpoint (once a night,
+  more with the copied rota or the urchins' window; notoriety +5, ten minutes pass; the Church's sabotage denies
+  it), go quietly to the cells, or restart the night (the pause menu's Restart night also stays).
+- **The cells** (a cell under the watch post, far below the map): pay the turnkey (6 zł, 3 with Underworld or
+  Guilds standing), be ransomed by a faction (its influence -10, its rivals' grievance +15), or wait until he dozes
+  at 03:00 and work the window while he looks away (back into the night, notoriety +10, the watch sees further).
+  Bribe and ransom end the night as a failure.
+- **Two captures in a row**: a trial next morning: flogging (notoriety cleared, one health tonight) or banishment
+  (tonight is lost). A third capture at crackdown 60+ is a hanging.
+- **Succession** is a standing choice. Name an heir among the people found (a day action; the nominee's faction
+  gains, its rivals notice; a nominee with a scandal is a blackmail target; changing heirs costs trust). If the
+  figurehead dies or is taken, the nominee takes the banner; with no nominee, or if the movement loses faith (its
+  strongest faction at grievance 80, notoriety 90, two nights lost in a row), the strongest faction imposes its
+  protégé (a canon, Pani Zofia, a smuggler, a carter-veteran, a guild master, a magnate's client). While you live,
+  loss of faith is a coup: concede, stand firm on eloquence, or step aside. The new figurehead inherits journal,
+  people, rumours and levers, 70% influence (100% with the backer), no notoriety, a new origin, sex and
+  inclination (content re-gates), and the old one becomes a martyr, prisoner or exile rumour. A succession card
+  precedes the next briefing. With no one to take up the banner, the movement ends in an epitaph.
+
+### Voices (personality and tone)
+Every named person has a `personality` (wry, gallows-humour, stern, pious, vengeful, cynical-merchant, fearful,
+ambitious, tender, drunk-philosopher) and a `temper` (0..1). Player choices carry a `tone` (joke, blunt, humble,
+threat, flatter, appeal-to-faith, appeal-to-country, bribe). `campaign.json tones.table` decides: good (the
+choice's `on_good` node; the person is charmed and remembers: a free rumour, `charmed:<id>` later), bad (`on_bad`,
+or with temper 0.6+ you are thrown out; `grudge:<id>` is remembered), neutral. Nodes may carry `lines_by`
+personality. The humour is dry, local and period-plausible (the pillory as the city's coldest seat, the Austrians
+as "our guests", the tax on crying), never winking at the player, and never undercutting a death or a flogging
+except from a gallows-humour character. The stern and the vengeful have their own eloquence.
+
+### Pacing (measured)
+`[smoke] campaign nights=7 est_minutes=<n>` sums, per night by its shortest (smoke) route: travel from the entry
+through each required objective's map mark (x1.6 detour, 2.2 m/s), 1.4 min of watching and hiding per required
+objective and 1.2 per optional, dialogue at 150 wpm, the briefing at 170 wpm, waits for the clock, two events a
+night, a lead person from night 2, and the day panel with its choices. The first mission's three roads count once.
+
+### Historical people
+Real people appear as named characters or off-stage presences, with sources and the liberties taken in
+`docs/HISTORY.md`: Bishop Feliks Paweł Turski, Jan Śniadecki, Canon Sebastian Sierakowski, Count Stanisław
+Wodzicki, Filip Nereusz Lichocki, Hugo Kołłątaj, Tadeusz Kościuszko, Wojciech Bogusławski, Johann Wenzel von
+Margelik. Journal entries carry `historical: true`.

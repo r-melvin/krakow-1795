@@ -1,85 +1,483 @@
 {
   "journal": {
     "people": {
-      "smuggler": {"name": "The Smuggler", "faction": "underworld"},
-      "boatman": {"name": "The Boatman", "faction": "underworld"},
-      "bishop": {"name": "The Bishop", "faction": "church"},
-      "bishop_chaplain": {"name": "The Chaplain", "faction": "church"},
-      "bishop_noble": {"name": "The Austrian Official", "faction": "austria"},
-      "priest": {"name": "The Vicar of St Mary's", "faction": "church"},
-      "informer": {"name": "The Informer", "faction": "austria"},
-      "urchin_a": {"name": "Staś", "faction": "street"},
-      "urchin_b": {"name": "Kasia", "faction": "street"}
+      "smuggler": {
+        "name": "The Smuggler",
+        "faction": "underworld"
+      },
+      "boatman": {
+        "name": "The Boatman",
+        "faction": "underworld"
+      },
+      "bishop": {
+        "name": "The Bishop",
+        "faction": "church"
+      },
+      "bishop_chaplain": {
+        "name": "The Chaplain",
+        "faction": "church"
+      },
+      "bishop_noble": {
+        "name": "The Austrian Official",
+        "faction": "austria"
+      },
+      "priest": {
+        "name": "The Vicar of St Mary's",
+        "faction": "church"
+      },
+      "informer": {
+        "name": "The Informer",
+        "faction": "austria"
+      },
+      "urchin_a": {
+        "name": "Staś",
+        "faction": "street"
+      },
+      "urchin_b": {
+        "name": "Kasia",
+        "faction": "street"
+      },
+      "tavern_keeper": {
+        "name": "The Innkeeper of the Zajazd",
+        "faction": "austria"
+      },
+      "spy": {
+        "name": "The Man in the Brown Coat",
+        "faction": "austria"
+      }
     }
   },
+  "hints": [
+    {
+      "id": "corporal_tavern",
+      "speakers": [
+        "well_gossip_a",
+        "well_gossip_b"
+      ],
+      "about": "guard:St Mary's post",
+      "tab": "people",
+      "text": "Kapral o wpół do jedenastej idzie do Winiarni. Pół godziny, jak w zegarku.",
+      "gloss": "At half past ten the Corporal goes to the Winiarnia. Half an hour, like clockwork.",
+      "note": "The Corporal leaves St Mary's post for the Winiarnia (north-west corner) at 22:30 and stays about half an hour. His post is empty meanwhile."
+    },
+    {
+      "id": "passage_unguarded",
+      "speakers": [
+        "urchin_a",
+        "urchin_b"
+      ],
+      "about": "urchin_a",
+      "tab": "storylines",
+      "text": "Jak bije północ, żołnierz spod Sukiennic idzie do kaprala. Przejście stoi puste.",
+      "gloss": "When midnight strikes, the soldier from the Cloth Hall goes to the Corporal. The passage stands empty.",
+      "note": "At midnight the Cloth Hall sentry walks to St Mary's for the change of the watch: the Cloth Hall passage is unguarded for a few minutes."
+    },
+    {
+      "id": "brothel_room",
+      "speakers": [
+        "urchin_b",
+        "urchin_a"
+      ],
+      "about": "urchin_b",
+      "tab": "log",
+      "text": "U Matki Weroniki na zachodniej pierzei za grosz schowają każdego. Nawet przed Austriakiem.",
+      "gloss": "At Mother Weronika's on the west row they'll hide anyone for a coin. Even from an Austrian.",
+      "note": "The house with the red lantern on the west row will hide a hunted man in a paid room."
+    },
+    {
+      "id": "informer_reports",
+      "speakers": [
+        "bishop_noble",
+        "bishop_chaplain"
+      ],
+      "about": "informer",
+      "tab": "people",
+      "text": "Unser Mann im grauen Rock meldet alles dem Korporal bei St. Marien.",
+      "gloss": "Our man in the grey coat reports everything to the Corporal at St Mary's.",
+      "note": "The grey-coated informer reports to the Corporal at St Mary's post. Stop him before he gets there."
+    },
+    {
+      "id": "watch_change",
+      "speakers": [
+        "guard:Cloth Hall sentry"
+      ],
+      "solo": true,
+      "about": "guard:Cloth Hall sentry",
+      "tab": "people",
+      "text": "Um Mitternacht Ablösung bei St. Marien. Endlich.",
+      "gloss": "Relief at St Mary's at midnight. At last.",
+      "note": "The Cloth Hall sentry is relieved at St Mary's at midnight and leaves his post to get there."
+    },
+    {
+      "id": "corporal_himself",
+      "speakers": [
+        "guard:St Mary's post"
+      ],
+      "solo": true,
+      "about": "guard:St Mary's post",
+      "tab": "people",
+      "text": "Halb elf. Ein Glas in der Weinstube, dann zurück auf Posten.",
+      "gloss": "Half past ten. A glass in the wine-house, then back to my post.",
+      "note": "The Corporal himself: at half past ten he takes a glass at the Winiarnia, then returns to St Mary's."
+    },
+    {
+      "id": "patrol_b_turn",
+      "speakers": [
+        "guard:Rynek patrol B"
+      ],
+      "solo": true,
+      "about": "guard:Rynek patrol B",
+      "tab": "people",
+      "text": "Bis zum Rathaus und kehrt. Bis zum Rathaus und kehrt. Jede Nacht.",
+      "gloss": "Up to the Town Hall and about turn. Up to the Town Hall and about turn. Every night.",
+      "note": "Rynek patrol B turns at the Town Hall end; while he walks back east, the Town Hall side is out of his sight."
+    },
+    {
+      "id": "cellar_tonight",
+      "story": "delivery",
+      "about": "smuggler",
+      "tab": "storylines",
+      "note": "The smuggler takes the muskets into the safe-house cellar by St Adalbert's tonight: he uses the cellar door in the south-east corner, never the front."
+    },
+    {
+      "id": "informer_at_post",
+      "story": "informer",
+      "about": "informer",
+      "tab": "people",
+      "note": "The informer runs to the Corporal at St Mary's post with whatever he has seen."
+    },
+    {
+      "id": "rumour_salt_tax",
+      "speakers": [
+        "stallholder_west",
+        "stallholder_east"
+      ],
+      "about": "",
+      "tab": "log",
+      "text": "Od Nowego Roku akcyza na sól podwójna. Z czego żyć?",
+      "gloss": "From the New Year the salt excise doubles. What are we to live on?",
+      "note": "Rumour: the Austrian excise will double the salt tax at the New Year."
+    },
+    {
+      "id": "rumour_hejnal_sign",
+      "speakers": [
+        "beggar",
+        "priest"
+      ],
+      "about": "",
+      "tab": "log",
+      "text": "Hejnał urwał się w pół nuty, jak za Tatarów. To znak.",
+      "gloss": "The hejnał broke off mid-note, like in the Tatar days. It's a sign.",
+      "note": "Rumour: the trumpeter broke off the hejnał and did not finish it: a sign."
+    }
+  ],
   "storylines": [
     {
       "id": "delivery",
-      "journal": {"blurb": "The smuggler meets a Vistula boatman in the docks-side alley. Something heavier than salt is coming up the river."},
+      "journal": {
+        "blurb": "The smuggler meets a Vistula boatman in the docks-side alley. Something heavier than salt is coming up the river."
+      },
       "title": "The delivery",
       "note": "The smuggler leaves the safe-house door to meet a Vistula boatman at the cart in the docks-side alley. Get within 3.5 m while they talk and they break off.",
-      "trigger": {"at": "21:40"},
-      "spooked": {"radius": 3.5, "actors": ["smuggler", "boatman"], "goto": "spooked", "until": "done"},
+      "trigger": {
+        "at": "21:40"
+      },
+      "spooked": {
+        "radius": 3.5,
+        "actors": [
+          "smuggler",
+          "boatman"
+        ],
+        "goto": "spooked",
+        "until": "done"
+      },
       "steps": [
-        {"do": "say", "actor": "smuggler", "text": "Keep the cellar shut. I'll not be long.", "secs": 3, "wait": false},
-        {"do": "goto", "actor": "smuggler", "pos": [23.6, 0, 13.4], "wait": false},
-        {"do": "goto", "actor": "boatman", "pos": [25.0, 0, 14.4]},
-        {"do": "wait", "arrive": ["smuggler", "boatman"]},
-        {"do": "face", "actor": "smuggler", "target": "boatman"},
-        {"do": "face", "actor": "boatman", "target": "smuggler"},
-        {"do": "say", "actor": "boatman", "text": "Salt from Wieliczka, the manifest says. Under the salt, forty muskets.", "secs": 4},
-        {"do": "say", "actor": "smuggler", "text": "And the customs man at the Vistula gate?", "secs": 3},
-        {"do": "say", "actor": "boatman", "text": "Paid till Candlemas. The barge leaves at the fourth bell.", "secs": 4},
-        {"do": "play", "actor": "smuggler", "clip": "sentry", "secs": 1},
-        {"do": "say", "actor": "smuggler", "text": "Then the cellar takes them tonight. Go, before the watch comes round.", "secs": 4},
-        {"do": "goto", "actor": "boatman", "post": "boatman_wait", "wait": false, "label": "done"},
-        {"do": "goto", "actor": "smuggler", "post": "safe_house_door"},
-        {"do": "face", "actor": "smuggler", "pos": [26, 0, 25], "next": "end"},
-
-        {"do": "say", "actor": "smuggler", "text": "Not here. Walk on, friend.", "secs": 3, "label": "spooked"},
-        {"do": "say", "actor": "boatman", "text": "Another night, then.", "secs": 2, "wait": false},
-        {"do": "goto", "actor": "boatman", "post": "boatman_wait", "run": true, "wait": false},
-        {"do": "goto", "actor": "smuggler", "post": "safe_house_door"}
+        {
+          "do": "say",
+          "actor": "smuggler",
+          "text": "Keep the cellar shut. I'll not be long.",
+          "secs": 3,
+          "wait": false
+        },
+        {
+          "do": "goto",
+          "actor": "smuggler",
+          "pos": [
+            23.6,
+            0,
+            13.4
+          ],
+          "wait": false
+        },
+        {
+          "do": "goto",
+          "actor": "boatman",
+          "pos": [
+            25.0,
+            0,
+            14.4
+          ]
+        },
+        {
+          "do": "wait",
+          "arrive": [
+            "smuggler",
+            "boatman"
+          ]
+        },
+        {
+          "do": "face",
+          "actor": "smuggler",
+          "target": "boatman"
+        },
+        {
+          "do": "face",
+          "actor": "boatman",
+          "target": "smuggler"
+        },
+        {
+          "do": "say",
+          "actor": "boatman",
+          "text": "Salt from Wieliczka, the manifest says. Under the salt, forty muskets.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "smuggler",
+          "text": "And the customs man at the Vistula gate?",
+          "secs": 3
+        },
+        {
+          "do": "say",
+          "actor": "boatman",
+          "text": "Paid till Candlemas. The barge leaves at the fourth bell.",
+          "secs": 4
+        },
+        {
+          "do": "play",
+          "actor": "smuggler",
+          "clip": "sentry",
+          "secs": 1
+        },
+        {
+          "do": "say",
+          "actor": "smuggler",
+          "text": "Then the cellar takes them tonight. Go, before the watch comes round.",
+          "secs": 4,
+          "hint": "cellar_tonight"
+        },
+        {
+          "do": "goto",
+          "actor": "boatman",
+          "post": "boatman_wait",
+          "wait": false,
+          "label": "done"
+        },
+        {
+          "do": "goto",
+          "actor": "smuggler",
+          "post": "safe_house_door"
+        },
+        {
+          "do": "face",
+          "actor": "smuggler",
+          "pos": [
+            26,
+            0,
+            25
+          ],
+          "next": "end"
+        },
+        {
+          "do": "say",
+          "actor": "smuggler",
+          "text": "Not here. Walk on, friend.",
+          "secs": 3,
+          "label": "spooked"
+        },
+        {
+          "do": "say",
+          "actor": "boatman",
+          "text": "Another night, then.",
+          "secs": 2,
+          "wait": false
+        },
+        {
+          "do": "goto",
+          "actor": "boatman",
+          "post": "boatman_wait",
+          "run": true,
+          "wait": false
+        },
+        {
+          "do": "goto",
+          "actor": "smuggler",
+          "post": "safe_house_door"
+        }
       ]
     },
     {
       "id": "procession",
-      "journal": {"blurb": "The bishop's party walks to St Mary's for Compline, with an Austrian official at his elbow."},
+      "journal": {
+        "blurb": "The bishop's party walks to St Mary's for Compline, with an Austrian official at his elbow."
+      },
       "title": "The procession",
       "note": "The bishop's party walks to St Mary's for Compline at 21:30 and comes out at 22:15. Their movement is their schedule; this adds the talk.",
-      "trigger": {"at": "21:12"},
+      "trigger": {
+        "at": "21:12"
+      },
       "steps": [
-        {"do": "say", "actor": "bishop", "text": "Compline, gentlemen. Let us not keep the vicar waiting.", "secs": 4},
-        {"do": "say", "actor": "bishop_noble", "text": "His Excellency the Governor sends his regards, Your Grace.", "secs": 4},
-        {"do": "say", "actor": "bishop", "text": "And his soldiers to count my congregation, I expect.", "secs": 4},
-        {"do": "say", "actor": "bishop_chaplain", "text": "Mind the ice on the steps, Your Grace.", "secs": 3},
-        {"do": "wait", "until": "21:28"},
-        {"do": "say", "actor": "priest", "text": "Your Grace. The doors are open.", "secs": 3},
-        {"do": "wait", "until": "22:16"},
-        {"do": "say", "actor": "bishop", "text": "Pray for Kraków. She will need it before spring.", "secs": 4},
-        {"do": "say", "actor": "bishop_noble", "text": "Vienna prays for order, Your Grace. Order first.", "secs": 4},
-        {"do": "say", "actor": "bishop_chaplain", "text": "The lantern, Your Grace. This way.", "secs": 3}
+        {
+          "do": "say",
+          "actor": "bishop",
+          "text": "Compline, gentlemen. Let us not keep the vicar waiting.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "bishop_noble",
+          "text": "His Excellency the Governor sends his regards, Your Grace.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "bishop",
+          "text": "And his soldiers to count my congregation, I expect.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "bishop_chaplain",
+          "text": "Mind the ice on the steps, Your Grace.",
+          "secs": 3
+        },
+        {
+          "do": "wait",
+          "until": "21:28"
+        },
+        {
+          "do": "say",
+          "actor": "priest",
+          "text": "Your Grace. The doors are open.",
+          "secs": 3
+        },
+        {
+          "do": "wait",
+          "until": "22:16"
+        },
+        {
+          "do": "say",
+          "actor": "bishop",
+          "text": "Pray for Kraków. She will need it before spring.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "bishop_noble",
+          "text": "Vienna prays for order, Your Grace. Order first.",
+          "secs": 4
+        },
+        {
+          "do": "say",
+          "actor": "bishop_chaplain",
+          "text": "The lantern, Your Grace. This way.",
+          "secs": 3
+        }
       ]
     },
     {
       "id": "informer",
-      "journal": {"blurb": "A man in a grey coat shadows strangers between the Cloth Hall lanterns, and runs to the watch."},
+      "journal": {
+        "blurb": "A man in a grey coat shadows strangers between the Cloth Hall lanterns, and runs to the watch."
+      },
       "title": "The informer",
       "note": "Pass within 8 m of the police informer, in his sight, and he shadows you at 6 m for two minutes, then reports you to the St Mary's post, who comes looking. Put 22 m between you and he loses you. If a false pamphlet was planted on him (Mission flag decoy_planted) he sends the corporal to the Florian Gate instead.",
-      "trigger": {"radius": 8, "actor": "informer", "cone": 140},
+      "trigger": {
+        "radius": 8,
+        "actor": "informer",
+        "cone": 140
+      },
       "steps": [
-        {"do": "say", "actor": "informer", "text": "Now who walks the Rynek after curfew?", "secs": 3, "wait": false},
-        {"do": "goto", "actor": "informer", "target": "player", "keep": 6, "secs": 120, "lose": 22, "on_lose": "lost"},
-        {"do": "goto", "actor": "informer", "target": "guard:St Mary's post", "keep": 1.6, "run": true, "label": "report"},
-        {"do": "face", "actor": "informer", "target": "guard:St Mary's post"},
-        {"do": "say", "actor": "informer", "text": "Corporal! A stranger, skulking about the Cloth Hall. I followed him myself.", "secs": 4,
-         "alert": {"guard": "St Mary's post", "suspicion": 65}, "unless": "decoy_planted"},
-        {"do": "say", "actor": "informer", "text": "Corporal! Read this: Jacobins meeting at the Florian Gate, tonight. They're there now!", "secs": 4,
-         "alert": {"guard": "St Mary's post", "suspicion": 65, "pos": [-20.0, 0, -26.0]}, "when": "decoy_planted"},
-        {"do": "say", "actor": "guard:St Mary's post", "text": "Show me.", "secs": 2, "next": "end", "unless": "decoy_planted"},
-        {"do": "say", "actor": "guard:St Mary's post", "text": "The Florian Gate? Come on, then.", "secs": 2, "next": "end", "when": "decoy_planted"},
-
-        {"do": "say", "actor": "informer", "text": "Gone. Devil take him.", "secs": 3, "label": "lost"}
+        {
+          "do": "say",
+          "actor": "informer",
+          "text": "Now who walks the Rynek after curfew?",
+          "secs": 3,
+          "wait": false
+        },
+        {
+          "do": "goto",
+          "actor": "informer",
+          "target": "player",
+          "keep": 6,
+          "secs": 120,
+          "lose": 22,
+          "on_lose": "lost"
+        },
+        {
+          "do": "goto",
+          "actor": "informer",
+          "target": "guard:St Mary's post",
+          "keep": 1.6,
+          "run": true,
+          "label": "report"
+        },
+        {
+          "do": "face",
+          "actor": "informer",
+          "target": "guard:St Mary's post"
+        },
+        {
+          "do": "say",
+          "actor": "informer",
+          "text": "Corporal! A stranger, skulking about the Cloth Hall. I followed him myself.",
+          "secs": 4,
+          "hint": "informer_at_post",
+          "alert": {
+            "guard": "St Mary's post",
+            "suspicion": 65
+          },
+          "unless": "decoy_planted"
+        },
+        {
+          "do": "say",
+          "actor": "informer",
+          "text": "Corporal! Read this: Jacobins meeting at the Florian Gate, tonight. They're there now!",
+          "secs": 4,
+          "alert": {
+            "guard": "St Mary's post",
+            "suspicion": 65,
+            "pos": [
+              -20.0,
+              0,
+              -26.0
+            ]
+          },
+          "when": "decoy_planted"
+        },
+        {
+          "do": "say",
+          "actor": "guard:St Mary's post",
+          "text": "Show me.",
+          "secs": 2,
+          "next": "end",
+          "unless": "decoy_planted"
+        },
+        {
+          "do": "say",
+          "actor": "guard:St Mary's post",
+          "text": "The Florian Gate? Come on, then.",
+          "secs": 2,
+          "next": "end",
+          "when": "decoy_planted"
+        },
+        {
+          "do": "say",
+          "actor": "informer",
+          "text": "Gone. Devil take him.",
+          "secs": 3,
+          "label": "lost"
+        }
       ]
     }
   ]

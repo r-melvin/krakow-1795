@@ -4,6 +4,10 @@ extends "res://scripts/npc/walker.gd"
 ##    playing an activity at each, or
 ##  - with no schedule, stands (idle, occasional slow turn) or wanders within a radius of its post.
 ## A storyline (storyline.gd) can take control with claim() / release() and drive it with the script_* calls.
+## Phase F (docs/STEALTH.md 3.7): `enforcer` (data/npcs.json `enforcer: true`, or the mission's `stealth.enforcers`)
+## knows the player's face: if he sees the disguised player within recognise_dist for recognise_secs
+## (data/zones.json `enforcer`), he barks and calls the nearest guard (watch.report). `zone_permit` (data) lists the
+## zones this townsperson belongs in (the journal map notes it). Enforcers join group "enforcer_npc".
 
 enum Mode { AMBIENT, GOING, DOING, SCRIPTED, DOWNED }
 
@@ -24,6 +28,15 @@ var step := -1                    ## current schedule index
 var post_name := ""               ## post currently heading to / occupying
 var post_changes := 0             ## how many times the schedule moved this NPC to a different post
 var mode: Mode = Mode.AMBIENT
+var enforcer := false             ## knows the player's face through any disguise (phase F)
+var zone_permit: Array = []       ## zones (data/zones.json) this townsperson belongs in
+var recognise_target: Node3D      ## test sandbox: the player to recognise (else group "player")
+var recognised := 0               ## times this enforcer called the watch
+
+static var _roster: Dictionary = {}   ## npc id -> data/npcs.json entry (enforcer / zone_permit lookup)
+var _recognise_t := 0.0
+var _recognise_cd := 0.0
+var _recognise_poll := 0.0
 
 var _figure: Node3D
 var _shape: CollisionShape3D
@@ -64,6 +77,7 @@ func _ready() -> void:
 	_target = _home
 	_last_clock = GameState.clock_minutes
 	_build()
+	_read_phase_f()
 	setup_navigation(0.4, 1.75, 3.2)
 	if not schedule.is_empty():
 		add_to_group("scheduled")
@@ -129,6 +143,8 @@ func _idle_clip(activity: String = "") -> String:
 
 
 func _physics_process(delta: float) -> void:
+	if enforcer:
+		_recognise(delta)
 	var clock := GameState.clock_minutes
 	var game_dt := maxf(clock - _last_clock, 0.0)
 	_last_clock = clock
@@ -161,6 +177,73 @@ func _physics_process(delta: float) -> void:
 			else:
 				_stand(delta)
 				halt(delta)
+
+
+# --- Phase F: enforcers --------------------------------------------------------------------------
+
+func _read_phase_f() -> void:
+	if _roster.is_empty():
+		var f := FileAccess.open("res://data/npcs.json", FileAccess.READ)
+		var d: Variant = JSON.parse_string(f.get_as_text()) if f else null
+		if d is Dictionary:
+			for e in d.get("npcs", []):
+				_roster[str(e.get("id", ""))] = e
+	var e: Dictionary = _roster.get(npc_id, {})
+	enforcer = bool(e.get("enforcer", false))
+	zone_permit = e.get("zone_permit", [])
+	if Mission.is_active() and (Mission.data.get("stealth", {}).get("enforcers", []) as Array).has(npc_id):
+		enforcer = true
+	if enforcer:
+		add_to_group("enforcer_npc")
+
+
+## An enforcer who sees the disguised player close by for long enough calls the watch (a bark, watch.report).
+func _recognise(delta: float) -> void:
+	_recognise_cd = maxf(0.0, _recognise_cd - delta)
+	_recognise_poll -= delta
+	if _recognise_poll > 0.0:
+		return
+	var step := 0.2
+	_recognise_poll = step
+	var p := recognise_target if recognise_target else get_tree().get_first_node_in_group("player") as Node3D
+	if p == null or _recognise_cd > 0.0 or mode == Mode.DOWNED or _hidden or not visible or not p.get("disguised"):
+		_recognise_t = 0.0
+		return
+	var cfg: Dictionary = preload("res://scripts/stealth/zones.gd").db().get("enforcer", {})
+	var to := p.global_position - global_position
+	to.y = 0.0
+	var fwd := -global_transform.basis.z
+	fwd.y = 0.0
+	var sees := to.length() < float(cfg.get("recognise_dist", 6.0)) and absf(p.global_position.y - global_position.y) < 2.0 \
+			and rad_to_deg(fwd.angle_to(to)) < float(cfg.get("cone_deg", 130.0)) * 0.5 \
+			and p.get("hidden_spot") == null
+	if sees:
+		var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.6, 0), p.global_position + Vector3(0, 1.4, 0))
+		q.exclude = [get_rid(), (p as CollisionObject3D).get_rid()]
+		sees = get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+	_recognise_t = _recognise_t + step if sees else maxf(0.0, _recognise_t - step)
+	if _recognise_t < float(cfg.get("recognise_secs", 2.0)):
+		return
+	_recognise_t = 0.0
+	recognised += 1
+	_recognise_cd = float(cfg.get("cooldown_secs", 30.0))
+	var Zones := preload("res://scripts/stealth/zones.gd")
+	var line := Zones.bark_text("recognise_f" if GameState.gender == "f" else "recognise")
+	speech(self, line, 3.0)
+	var w := preload("res://scripts/stealth/perception.gd").watch_of(self)
+	if w and w.has_method("report"):
+		w.report(p.global_position, self)
+	else:
+		var best: Node = null
+		var best_d := INF
+		for g in get_tree().get_nodes_in_group("guards"):
+			var d := (g as Node3D).global_position.distance_to(global_position)
+			if d < best_d and g.has_method("witness"):
+				best_d = d
+				best = g
+		if best:
+			best.witness(p.global_position)
+	print("[npc] %s recognised the player at %s" % [npc_id, GameState.time_string()])
 
 
 # --- Schedule ---------------------------------------------------------------------------------

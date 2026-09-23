@@ -1,89 +1,1550 @@
 {
   "posts": {
-    "stall_west": {"pos": [-12.2, 0, -12.4], "facing": 2.4},
-    "stall_west_b": {"pos": [-8.6, 0, -12.4], "facing": 3.0},
-    "door_north_w": {"pos": [-14.0, 0, -26.9], "facing": 0.0},
-    "door_north_c": {"pos": [2.0, 0, -26.9], "facing": 0.0},
-    "door_north_e": {"pos": [18.0, 0, -26.9], "facing": 0.0},
-    "stall_east": {"pos": [12.0, 0, 11.4], "facing": -0.4},
-    "door_south_e": {"pos": [8.0, 0, 26.9], "facing": 3.14},
-    "door_south_w": {"pos": [-10.0, 0, 26.9], "facing": 3.14},
-    "door_south_far": {"pos": [-20.0, 0, 26.9], "facing": 3.14},
-    "door_west": {"pos": [-26.9, 0, -10.0], "facing": 1.57},
-    "door_east": {"pos": [27.2, 0, 8.0], "facing": -1.57},
-    "well_west": {"pos": [-12.8, 0, 6.2], "facing": 1.2},
-    "well_west_b": {"pos": [-10.9, 0, 6.5], "facing": -1.4},
-    "well_east": {"pos": [15.2, 0, -6.6], "facing": 0.3},
-    "adalbert_steps": {"pos": [22.3, 0, 23.4], "facing": 3.14},
-    "lantern_ne": {"pos": [21.4, 0, -21.4], "facing": 0.8},
-    "passage_south": {"pos": [1.2, 0, 6.2], "facing": 3.0},
-    "passage_south_b": {"pos": [-1.4, 0, 6.8], "facing": 2.6},
-    "stalls_east_front": {"pos": [9.0, 0, 11.0], "facing": -0.2},
-    "stalls_west_front": {"pos": [-9.5, 0, -11.6], "facing": 2.8},
-    "stmarys_door": {"pos": [33.0, 0, -18.6], "facing": 0.0},
-    "stmarys_steps_a": {"pos": [32.2, 0, -19.2], "facing": 0.2},
-    "stmarys_steps_b": {"pos": [31.4, 0, -18.2], "facing": 0.2},
-    "stmarys_steps_c": {"pos": [33.4, 0, -17.8], "facing": 0.2},
-    "bishop_out": {"pos": [30.0, 0, -14.6], "facing": 2.6},
-    "chaplain_out": {"pos": [28.8, 0, -13.8], "facing": 2.2},
-    "official_out": {"pos": [31.4, 0, -13.7], "facing": 3.6},
-    "bishop_gather": {"pos": [14.0, 0, -23.2], "facing": -1.2},
-    "chaplain_gather": {"pos": [12.8, 0, -22.6], "facing": -1.4},
-    "official_gather": {"pos": [15.0, 0, -22.4], "facing": 2.0},
-    "townhall_corner": {"pos": [-13.8, 0, 17.4], "facing": -0.5},
-    "west_side_s": {"pos": [-24.0, 0, 6.0], "facing": 1.2},
-    "west_lantern": {"pos": [-22.8, 0, -1.0], "facing": 0.8},
-    "west_stalls": {"pos": [-17.0, 0, -8.0], "facing": -0.8},
-    "townhall_front": {"pos": [-8.0, 0, 16.0], "facing": 2.0},
-    "north_crossing": {"pos": [-2.0, 0, -20.0], "facing": 1.6},
-    "south_crossing": {"pos": [2.0, 0, 21.0], "facing": -1.6},
-    "lantern_nw_mid": {"pos": [-5.8, 0, -10.2], "facing": 0.6},
-    "lantern_se_mid": {"pos": [5.8, 0, 10.2], "facing": -2.4},
-    "alley_meeting": {"pos": [24.0, 0, 12.0], "facing": 0.0},
-    "safe_house_door": {"pos": [28.2, 0, 27.4], "facing": 2.4},
-    "boatman_wait": {"pos": [29.6, 0, 16.0], "facing": 1.2},
-    "road_n_e": {"pos": [17.0, 0, -22.5], "facing": 1.57},
-    "road_n_w": {"pos": [-10.0, 0, -22.5], "facing": 1.57},
-    "road_nw": {"pos": [-26.0, 0, -25.0], "facing": 1.57},
-    "road_out_nw": {"pos": [-42.5, 0, -25.0], "facing": 3.14},
-    "road_out_sw": {"pos": [-42.5, 0, 40.5], "facing": -1.57},
-    "road_out_se": {"pos": [40.0, 0, 40.5], "facing": 0.0},
-    "road_out_e": {"pos": [40.0, 0, -10.0], "facing": 1.57},
-    "road_e_gap": {"pos": [25.0, 0, -10.5], "facing": 0.6},
-    "road_ne": {"pos": [22.5, 0, -14.0], "facing": 0.6}
+    "stall_west": {
+      "pos": [
+        -12.2,
+        0,
+        -12.4
+      ],
+      "facing": 2.4
+    },
+    "stall_west_b": {
+      "pos": [
+        -8.6,
+        0,
+        -12.4
+      ],
+      "facing": 3.0
+    },
+    "door_north_w": {
+      "pos": [
+        -14.0,
+        0,
+        -26.9
+      ],
+      "facing": 0.0
+    },
+    "door_north_c": {
+      "pos": [
+        2.0,
+        0,
+        -26.9
+      ],
+      "facing": 0.0
+    },
+    "door_north_e": {
+      "pos": [
+        18.0,
+        0,
+        -26.9
+      ],
+      "facing": 0.0
+    },
+    "stall_east": {
+      "pos": [
+        12.0,
+        0,
+        11.4
+      ],
+      "facing": -0.4
+    },
+    "door_south_e": {
+      "pos": [
+        8.0,
+        0,
+        26.9
+      ],
+      "facing": 3.14
+    },
+    "door_south_w": {
+      "pos": [
+        -10.0,
+        0,
+        26.9
+      ],
+      "facing": 3.14
+    },
+    "door_south_far": {
+      "pos": [
+        -20.0,
+        0,
+        26.9
+      ],
+      "facing": 3.14
+    },
+    "door_west": {
+      "pos": [
+        -26.9,
+        0,
+        -10.0
+      ],
+      "facing": 1.57
+    },
+    "door_east": {
+      "pos": [
+        27.2,
+        0,
+        8.0
+      ],
+      "facing": -1.57
+    },
+    "well_west": {
+      "pos": [
+        -12.8,
+        0,
+        6.2
+      ],
+      "facing": 1.2
+    },
+    "well_west_b": {
+      "pos": [
+        -10.9,
+        0,
+        6.5
+      ],
+      "facing": -1.4
+    },
+    "well_east": {
+      "pos": [
+        15.2,
+        0,
+        -6.6
+      ],
+      "facing": 0.3
+    },
+    "adalbert_steps": {
+      "pos": [
+        22.3,
+        0,
+        23.4
+      ],
+      "facing": 3.14
+    },
+    "lantern_ne": {
+      "pos": [
+        21.4,
+        0,
+        -21.4
+      ],
+      "facing": 0.8
+    },
+    "passage_south": {
+      "pos": [
+        1.2,
+        0,
+        6.2
+      ],
+      "facing": 3.0
+    },
+    "passage_south_b": {
+      "pos": [
+        -1.4,
+        0,
+        6.8
+      ],
+      "facing": 2.6
+    },
+    "stalls_east_front": {
+      "pos": [
+        9.0,
+        0,
+        11.0
+      ],
+      "facing": -0.2
+    },
+    "stalls_west_front": {
+      "pos": [
+        -9.5,
+        0,
+        -11.6
+      ],
+      "facing": 2.8
+    },
+    "stmarys_door": {
+      "pos": [
+        33.0,
+        0,
+        -18.6
+      ],
+      "facing": 0.0
+    },
+    "stmarys_steps_a": {
+      "pos": [
+        32.2,
+        0,
+        -19.2
+      ],
+      "facing": 0.2
+    },
+    "stmarys_steps_b": {
+      "pos": [
+        31.4,
+        0,
+        -18.2
+      ],
+      "facing": 0.2
+    },
+    "stmarys_steps_c": {
+      "pos": [
+        33.4,
+        0,
+        -17.8
+      ],
+      "facing": 0.2
+    },
+    "bishop_out": {
+      "pos": [
+        30.0,
+        0,
+        -14.6
+      ],
+      "facing": 2.6
+    },
+    "chaplain_out": {
+      "pos": [
+        28.8,
+        0,
+        -13.8
+      ],
+      "facing": 2.2
+    },
+    "official_out": {
+      "pos": [
+        31.4,
+        0,
+        -13.7
+      ],
+      "facing": 3.6
+    },
+    "bishop_gather": {
+      "pos": [
+        14.0,
+        0,
+        -23.2
+      ],
+      "facing": -1.2
+    },
+    "chaplain_gather": {
+      "pos": [
+        12.8,
+        0,
+        -22.6
+      ],
+      "facing": -1.4
+    },
+    "official_gather": {
+      "pos": [
+        15.0,
+        0,
+        -22.4
+      ],
+      "facing": 2.0
+    },
+    "townhall_corner": {
+      "pos": [
+        -13.8,
+        0,
+        17.4
+      ],
+      "facing": -0.5
+    },
+    "west_side_s": {
+      "pos": [
+        -24.0,
+        0,
+        6.0
+      ],
+      "facing": 1.2
+    },
+    "west_lantern": {
+      "pos": [
+        -22.8,
+        0,
+        -1.0
+      ],
+      "facing": 0.8
+    },
+    "west_stalls": {
+      "pos": [
+        -17.0,
+        0,
+        -8.0
+      ],
+      "facing": -0.8
+    },
+    "townhall_front": {
+      "pos": [
+        -8.0,
+        0,
+        16.0
+      ],
+      "facing": 2.0
+    },
+    "north_crossing": {
+      "pos": [
+        -2.0,
+        0,
+        -20.0
+      ],
+      "facing": 1.6
+    },
+    "south_crossing": {
+      "pos": [
+        2.0,
+        0,
+        21.0
+      ],
+      "facing": -1.6
+    },
+    "lantern_nw_mid": {
+      "pos": [
+        -5.8,
+        0,
+        -10.2
+      ],
+      "facing": 0.6
+    },
+    "lantern_se_mid": {
+      "pos": [
+        5.8,
+        0,
+        10.2
+      ],
+      "facing": -2.4
+    },
+    "alley_meeting": {
+      "pos": [
+        24.0,
+        0,
+        12.0
+      ],
+      "facing": 0.0
+    },
+    "safe_house_door": {
+      "pos": [
+        28.2,
+        0,
+        27.4
+      ],
+      "facing": 2.4
+    },
+    "boatman_wait": {
+      "pos": [
+        29.6,
+        0,
+        16.0
+      ],
+      "facing": 1.2
+    },
+    "road_n_e": {
+      "pos": [
+        17.0,
+        0,
+        -22.5
+      ],
+      "facing": 1.57
+    },
+    "road_n_w": {
+      "pos": [
+        -10.0,
+        0,
+        -22.5
+      ],
+      "facing": 1.57
+    },
+    "road_nw": {
+      "pos": [
+        -26.0,
+        0,
+        -25.0
+      ],
+      "facing": 1.57
+    },
+    "road_out_nw": {
+      "pos": [
+        -42.5,
+        0,
+        -25.0
+      ],
+      "facing": 3.14
+    },
+    "road_out_sw": {
+      "pos": [
+        -42.5,
+        0,
+        40.5
+      ],
+      "facing": -1.57
+    },
+    "road_out_se": {
+      "pos": [
+        40.0,
+        0,
+        40.5
+      ],
+      "facing": 0.0
+    },
+    "road_out_e": {
+      "pos": [
+        40.0,
+        0,
+        -10.0
+      ],
+      "facing": 1.57
+    },
+    "road_e_gap": {
+      "pos": [
+        25.0,
+        0,
+        -10.5
+      ],
+      "facing": 0.6
+    },
+    "road_ne": {
+      "pos": [
+        22.5,
+        0,
+        -14.0
+      ],
+      "facing": 0.6
+    }
   },
   "npcs": [
-    {"id": "stallholder_west", "model": ["cast_stallholder", "npc_m_00", "figure_merchant"], "pos": [-12.2, 0, -12.4], "facing": 2.4, "behaviour": "stand", "clip": "idle", "role": "Cloth merchant tying down his awning after the market", "schedule": [{"at": "21:00", "post": "stall_west", "activity": "idle", "for": 14}, {"post": "stall_west_b", "activity": "idle", "for": 5}, {"post": "door_north_w", "activity": "inside", "for": 12}, {"post": "stall_west", "activity": "idle", "for": 8}, {"post": "door_north_w", "activity": "inside", "for": 35}]},
-    {"id": "stallholder_east", "model": ["cast_stallholder_f", "npc_f_00", "figure_merchant_f"], "pos": [12.0, 0, 11.4], "facing": -0.4, "behaviour": "stand", "clip": "idle", "role": "Baker's widow stacking the last loaves into a crate", "schedule": [{"at": "21:00", "post": "stall_east", "activity": "idle", "for": 18}, {"post": "door_south_e", "activity": "inside", "for": 12}, {"post": "stall_east", "activity": "idle", "for": 8}, {"post": "door_south_e", "activity": "inside", "for": 40}]},
-    {"id": "well_gossip_a", "model": ["npc_f_01", "figure_townswoman"], "pos": [-12.8, 0, 6.2], "facing": 1.2, "behaviour": "stand", "clip": "idle", "role": "Townswoman drawing water late, trading rumours", "schedule": [{"at": "21:00", "post": "well_west", "activity": "idle", "for": 25}, {"post": "door_west", "activity": "inside", "for": 20}, {"post": "well_west", "activity": "idle", "for": 15}, {"post": "door_west", "activity": "inside", "for": 45}]},
-    {"id": "well_gossip_b", "model": ["npc_f_02", "figure_kazimierz_f", "figure_townswoman"], "pos": [-10.9, 0, 6.5], "facing": -1.4, "behaviour": "stand", "clip": "idle", "role": "Her neighbour from Kazimierz", "schedule": [{"at": "21:00", "post": "well_west_b", "activity": "idle", "for": 24}, {"post": "well_west_b", "activity": "walk", "for": 8}, {"post": "door_south_far", "activity": "inside", "for": 30}, {"post": "well_west_b", "activity": "idle", "for": 20}]},
-    {"id": "water_carrier", "model": ["npc_m_01", "figure_townsman"], "pos": [15.2, 0, -6.6], "facing": 0.3, "behaviour": "stand", "clip": "idle", "role": "Water carrier resting his yoke by the east well", "schedule": [{"at": "21:00", "post": "well_east", "activity": "idle", "for": 8}, {"post": "door_east", "activity": "idle", "for": 3}, {"post": "door_north_e", "activity": "idle", "for": 3}, {"post": "well_east", "activity": "idle", "for": 6}, {"post": "door_east", "activity": "inside", "for": 10}]},
-    {"id": "beggar", "model": ["cast_beggar", "npc_m_03", "figure_townsman"], "pos": [22.3, 0, 23.4], "facing": 3.14, "behaviour": "sit", "clip": "idle", "role": "Old soldier begging on St Adalbert's steps", "schedule": [{"at": "21:00", "post": "adalbert_steps", "activity": "sit", "for": 45, "flee_watch": 9.5}, {"post": "lantern_ne", "activity": "sit", "for": 18}]},
-    {"id": "urchin_a", "model": ["cast_urchin", "npc_m_07", "figure_artist"], "pos": [1.2, 0, 6.2], "facing": 3.0, "behaviour": "wander", "radius": 2.0, "clip": "idle", "role": "Street boy loitering at the Cloth Hall passage", "schedule": [{"at": "21:00", "post": "passage_south", "activity": "walk", "for": 6}, {"post": "stalls_east_front", "activity": "idle", "for": 3, "run": true}, {"post": "passage_south", "activity": "idle", "for": 4, "run": true}, {"post": "stalls_west_front", "activity": "idle", "for": 3, "run": true}, {"post": "passage_south", "activity": "walk", "for": 5, "run": true}]},
-    {"id": "urchin_b", "model": ["cast_urchin_f", "npc_f_07", "figure_artist_f"], "pos": [-1.4, 0, 6.8], "facing": 2.6, "behaviour": "stand", "clip": "idle", "role": "His sister, lookout for pickpockets", "schedule": [{"at": "21:00", "post": "passage_south_b", "activity": "idle", "for": 9}, {"post": "stalls_west_front", "activity": "idle", "for": 4, "run": true}, {"post": "passage_south_b", "activity": "idle", "for": 6, "run": true}, {"post": "stalls_east_front", "activity": "idle", "for": 4, "run": true}]},
-    {"id": "priest", "model": ["cast_priest", "npc_m_05", "figure_priest"], "pos": [33.0, 0, -18.6], "facing": 3.14, "behaviour": "stand", "clip": "idle", "role": "Vicar locking St Mary's after Compline", "schedule": [{"at": "21:00", "post": "stmarys_door", "activity": "idle", "for": 10}, {"post": "door_north_e", "activity": "inside", "for": 8}, {"at": "21:24", "post": "stmarys_door", "activity": "sentry", "for": 5}, {"post": "stmarys_door", "activity": "inside", "for": 50}, {"at": "22:20", "post": "stmarys_door", "activity": "idle", "for": 6}, {"post": "door_north_e", "activity": "inside", "for": 40}]},
-    {"id": "bishop", "model": ["cast_bishop", "figure_priest"], "pos": [30.0, 0, -14.6], "facing": 2.6, "behaviour": "stand", "clip": "idle", "role": "The bishop, bound for Compline at St Mary's with his party", "schedule": [{"at": "21:00", "post": "bishop_gather", "activity": "idle", "for": 14}, {"at": "21:14", "post": "stmarys_steps_a", "activity": "idle", "for": 1}, {"at": "21:30", "post": "stmarys_steps_a", "activity": "inside", "for": 600}, {"at": "22:15", "post": "bishop_out", "activity": "idle", "for": 12}, {"post": "door_north_c", "activity": "inside", "for": 600}]},
-    {"id": "bishop_chaplain", "model": ["cast_chaplain", "npc_m_06", "figure_priest"], "pos": [28.8, 0, -13.8], "facing": 2.2, "behaviour": "stand", "clip": "sentry", "role": "Chaplain holding the bishop's lantern", "schedule": [{"at": "21:00", "post": "chaplain_gather", "activity": "sentry", "for": 14}, {"at": "21:14", "post": "stmarys_steps_b", "activity": "idle", "for": 1}, {"at": "21:30", "post": "stmarys_steps_b", "activity": "inside", "for": 600}, {"at": "22:15", "post": "chaplain_out", "activity": "sentry", "for": 12}, {"post": "door_north_c", "activity": "inside", "for": 600}]},
-    {"id": "bishop_noble", "model": ["cast_governor", "figure_noble"], "pos": [31.4, 0, -13.7], "facing": 3.6, "behaviour": "stand", "clip": "idle", "role": "Austrian official escorting the bishop", "schedule": [{"at": "21:00", "post": "official_gather", "activity": "idle", "for": 14}, {"at": "21:14", "post": "stmarys_steps_c", "activity": "idle", "for": 1}, {"at": "21:30", "post": "stmarys_steps_c", "activity": "inside", "for": 600}, {"at": "22:15", "post": "official_out", "activity": "idle", "for": 12}, {"post": "door_north_c", "activity": "inside", "for": 600}]},
-    {"id": "smuggler", "model": ["cast_smuggler", "npc_m_04", "figure_veteran"], "pos": [28.2, 0, 27.4], "facing": 2.4, "behaviour": "stand", "clip": "sentry", "role": "Smuggler watching the safe-house cellar door; expects a boatman tonight"},
-    {"id": "falconer", "model": ["cast_falconer", "npc_m_02", "figure_noble"], "pos": [-13.8, 0, 17.4], "facing": -0.5, "behaviour": "stand", "clip": "idle", "role": "Falconer of the Town Hall, walking his dog at night", "schedule": [{"at": "21:00", "post": "townhall_corner", "activity": "idle", "for": 5}, {"post": "west_side_s", "activity": "idle", "for": 2}, {"post": "west_lantern", "activity": "idle", "for": 3}, {"post": "west_stalls", "activity": "idle", "for": 2}, {"post": "townhall_front", "activity": "idle", "for": 3}]},
-    {"id": "townsman_crossing_n", "model": ["npc_m_05", "npc_m_06", "figure_townsman"], "pos": [-2.0, 0, -20.0], "facing": 1.6, "behaviour": "wander", "radius": 7.0, "clip": "idle", "role": "Journeyman hurrying home before the watch closes the gates", "schedule": [{"at": "21:00", "post": "north_crossing", "activity": "walk", "for": 6}, {"post": "door_north_c", "activity": "inside", "for": 20}, {"post": "north_crossing", "activity": "idle", "for": 4}, {"post": "door_west", "activity": "idle", "for": 3}]},
-    {"id": "townswoman_crossing_s", "model": ["npc_f_03", "npc_f_04", "figure_townswoman"], "pos": [2.0, 0, 21.0], "facing": -1.6, "behaviour": "wander", "radius": 6.0, "clip": "idle", "role": "Servant girl carrying a message across the square", "schedule": [{"at": "21:00", "post": "south_crossing", "activity": "idle", "for": 4}, {"post": "door_south_w", "activity": "idle", "for": 3}, {"post": "south_crossing", "activity": "walk", "for": 5}, {"post": "door_south_e", "activity": "inside", "for": 15}]},
-    {"id": "townsman_crossing_w", "model": ["npc_m_04", "figure_kazimierz", "figure_townsman"], "pos": [-25.0, 0, 4.0], "facing": 0.0, "behaviour": "wander", "radius": 5.0, "clip": "idle", "role": "Kazimierz trader crossing towards Grodzka street"},
-    {"id": "boatman", "model": ["cast_boatman", "npc_m_03", "figure_townsman"], "pos": [29.6, 0, 16.0], "facing": 1.2, "behaviour": "stand", "clip": "idle", "role": "Vistula boatman up from the docks, waiting in the alley by the cart"},
-    {"id": "informer", "model": ["cast_informer", "npc_m_06", "figure_townsman"], "pos": [-5.8, 0, -10.2], "facing": 0.6, "behaviour": "stand", "clip": "idle", "role": "Austrian police informer loitering between the Cloth Hall lanterns", "schedule": [{"at": "21:00", "post": "lantern_nw_mid", "activity": "idle", "for": 7}, {"post": "lantern_se_mid", "activity": "idle", "for": 7}]},
-    {"id": "vizsla", "kind": "animal", "model": ["dog_hound", "dog_vizsla"], "pos": [-15.0, 0, 18.4], "facing": -0.3, "behaviour": "follow", "radius": 2.5, "speed": 1.4, "role": "The falconer's hound", "follow": "falconer"},
-    {"id": "pomeranian", "kind": "animal", "model": ["dog_spitz", "dog_pomeranian"], "pos": [-12.0, 0, 7.2], "facing": 0.5, "behaviour": "wander", "radius": 1.8, "speed": 0.6, "role": "A townswoman's spitz"},
-    {"id": "stall_cat", "kind": "animal", "model": "cat", "pos": [-10.0, 1.2, -14.0], "facing": 2.8, "behaviour": "stand", "role": "Cat asleep on a stall counter"},
-    {"id": "dorozka", "kind": "vehicle", "model": "carriage", "pos": [17.0, 0, -22.5], "behaviour": "drive", "speed": 2.0, "route": ["road_n_e", "road_n_w", "road_nw", "road_out_nw", "road_out_sw", "road_out_se", "road_out_e", "road_e_gap", "road_ne"], "route_start": 0, "role": "Hired dorozka (fiacre) on its round of the Rynek, two horses, coachman on the box"},
-    {"id": "peasant_cart", "kind": "vehicle", "model": "horse_cart", "pos": [-42.5, 0, 40.5], "behaviour": "drive", "speed": 1.4, "route": ["road_n_e", "road_n_w", "road_nw", "road_out_nw", "road_out_sw", "road_out_se", "road_out_e", "road_e_gap", "road_ne"], "route_start": 4, "role": "Peasant cart with sacks and hay, late back from market"},
-    {"id": "inn_horse", "kind": "animal", "model": ["horse"], "pos": [27.0, 0, 19.0], "facing": 1.5708, "behaviour": "stand", "tether": true, "role": "Saddle horse tethered by St Adalbert's, where the alley leads out"},
-    {"id": "pigeon_a", "kind": "animal", "model": "pigeon", "pos": [6.0, 0, -9.2], "facing": 0.4, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon picking at spilt grain by the Cloth Hall"},
-    {"id": "pigeon_b", "kind": "animal", "model": "pigeon", "pos": [6.8, 0, -9.8], "facing": 2.0, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon"},
-    {"id": "pigeon_c", "kind": "animal", "model": "pigeon", "pos": [5.4, 0, -10.1], "facing": 4.0, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon"},
-    {"id": "crow_a", "kind": "animal", "model": "crow", "pos": [13.4, 0, -16.9], "facing": 2.5, "behaviour": "wander", "radius": 1.0, "speed": 0.4, "role": "Hooded crow at the cart's spillings"},
-    {"id": "crow_b", "kind": "animal", "model": "crow", "pos": [-18.4, 0, -10.6], "facing": -0.8, "behaviour": "stand", "role": "Crow by the barrels"},
-    {"id": "hawk", "kind": "animal", "model": "hawk", "pos": [0.0, 24.0, 0.0], "behaviour": "circle", "radius": 16.0, "speed": 5.0, "role": "The falconer's hawk, loose over the square"},
-    {"id": "smok", "kind": "animal", "model": "dragon", "pos": [-38, 0, 36], "facing": 0.6, "behaviour": "stand", "role": "Smok Wawelski, strayed up from the south-west"}
+    {
+      "id": "stallholder_west",
+      "model": [
+        "cast_stallholder",
+        "npc_m_00",
+        "figure_merchant"
+      ],
+      "pos": [
+        -12.2,
+        0,
+        -12.4
+      ],
+      "facing": 2.4,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Cloth merchant tying down his awning after the market",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "stall_west",
+          "activity": "idle",
+          "for": 14
+        },
+        {
+          "post": "stall_west_b",
+          "activity": "idle",
+          "for": 5
+        },
+        {
+          "post": "door_north_w",
+          "activity": "inside",
+          "for": 12
+        },
+        {
+          "post": "stall_west",
+          "activity": "idle",
+          "for": 8
+        },
+        {
+          "post": "door_north_w",
+          "activity": "inside",
+          "for": 35
+        }
+      ],
+      "hints": [
+        {
+          "id": "informer_beat",
+          "solo": true,
+          "about": "informer",
+          "tab": "people",
+          "text": "Ten w szarym surducie chodzi tam i z powrotem między latarniami przy Sukiennicach.",
+          "gloss": "The one in the grey frock coat walks back and forth between the lanterns by the Cloth Hall.",
+          "note": "The informer paces between the two lanterns at the Cloth Hall's corners (north-west and south-east)."
+        }
+      ],
+      "personality": "cynical-merchant",
+      "temper": 0.5
+    },
+    {
+      "id": "stallholder_east",
+      "model": [
+        "cast_stallholder_f",
+        "npc_f_00",
+        "figure_merchant_f"
+      ],
+      "pos": [
+        12.0,
+        0,
+        11.4
+      ],
+      "facing": -0.4,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Baker's widow stacking the last loaves into a crate",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "stall_east",
+          "activity": "idle",
+          "for": 18
+        },
+        {
+          "post": "door_south_e",
+          "activity": "inside",
+          "for": 12
+        },
+        {
+          "post": "stall_east",
+          "activity": "idle",
+          "for": 8
+        },
+        {
+          "post": "door_south_e",
+          "activity": "inside",
+          "for": 40
+        }
+      ],
+      "hints": [
+        {
+          "id": "curfew_hour",
+          "solo": true,
+          "about": "stallholder_east",
+          "tab": "log",
+          "text": "O dziesiątej dzwon od Mariackiego, a Austriacy patrzą wtedy dwa razy dalej.",
+          "gloss": "At ten the bell from St Mary's, and then the Austrians look twice as far.",
+          "note": "Curfew at 22:00: for a few minutes after St Mary's bell the watch sees twice as far. Keep out of the lantern light."
+        }
+      ],
+      "personality": "tender",
+      "temper": 0.3
+    },
+    {
+      "id": "well_gossip_a",
+      "model": [
+        "npc_f_01",
+        "figure_townswoman"
+      ],
+      "pos": [
+        -12.8,
+        0,
+        6.2
+      ],
+      "facing": 1.2,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Townswoman drawing water late, trading rumours",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "well_west",
+          "activity": "idle",
+          "for": 25
+        },
+        {
+          "post": "door_west",
+          "activity": "inside",
+          "for": 20
+        },
+        {
+          "post": "well_west",
+          "activity": "idle",
+          "for": 15
+        },
+        {
+          "post": "door_west",
+          "activity": "inside",
+          "for": 45
+        }
+      ],
+      "personality": "wry",
+      "temper": 0.3
+    },
+    {
+      "id": "well_gossip_b",
+      "model": [
+        "npc_f_02",
+        "figure_kazimierz_f",
+        "figure_townswoman"
+      ],
+      "pos": [
+        -10.9,
+        0,
+        6.5
+      ],
+      "facing": -1.4,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Her neighbour from Kazimierz",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "well_west_b",
+          "activity": "idle",
+          "for": 24
+        },
+        {
+          "post": "well_west_b",
+          "activity": "walk",
+          "for": 8
+        },
+        {
+          "post": "door_south_far",
+          "activity": "inside",
+          "for": 30
+        },
+        {
+          "post": "well_west_b",
+          "activity": "idle",
+          "for": 20
+        }
+      ],
+      "personality": "wry",
+      "temper": 0.3
+    },
+    {
+      "id": "water_carrier",
+      "model": [
+        "npc_m_01",
+        "figure_townsman"
+      ],
+      "pos": [
+        15.2,
+        0,
+        -6.6
+      ],
+      "facing": 0.3,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Water carrier resting his yoke by the east well",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "well_east",
+          "activity": "idle",
+          "for": 8
+        },
+        {
+          "post": "door_east",
+          "activity": "idle",
+          "for": 3
+        },
+        {
+          "post": "door_north_e",
+          "activity": "idle",
+          "for": 3
+        },
+        {
+          "post": "well_east",
+          "activity": "idle",
+          "for": 6
+        },
+        {
+          "post": "door_east",
+          "activity": "inside",
+          "for": 10
+        }
+      ],
+      "hints": [
+        {
+          "id": "lamplighter_round",
+          "solo": true,
+          "about": "water_carrier",
+          "tab": "log",
+          "text": "Latarnik obchodzi Rynek w kółko. Zgaszona latarnia stoi ciemna ledwie pół pacierza.",
+          "gloss": "The lamplighter goes round and round the square. A doused lantern stays dark barely half a prayer.",
+          "note": "The lamplighter's round never stops: a doused lantern stays dark only about half a minute, less if a guard sees it."
+        }
+      ],
+      "personality": "fearful",
+      "temper": 0.2
+    },
+    {
+      "id": "beggar",
+      "model": [
+        "cast_beggar",
+        "npc_m_03",
+        "figure_townsman"
+      ],
+      "pos": [
+        22.3,
+        0,
+        23.4
+      ],
+      "facing": 3.14,
+      "behaviour": "sit",
+      "clip": "idle",
+      "role": "Old soldier begging on St Adalbert's steps",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "adalbert_steps",
+          "activity": "sit",
+          "for": 45,
+          "flee_watch": 9.5
+        },
+        {
+          "post": "lantern_ne",
+          "activity": "sit",
+          "for": 18
+        }
+      ],
+      "hints": [
+        {
+          "id": "smuggler_door",
+          "solo": true,
+          "about": "smuggler",
+          "tab": "people",
+          "text": "Przemytnik? Wchodzi piwnicą przy świętym Wojciechu, nigdy frontem.",
+          "gloss": "The smuggler? He goes in by the cellar at St Adalbert's, never by the front.",
+          "note": "The smuggler uses the cellar door in the south-east corner by St Adalbert's (the safe house), never the front door."
+        }
+      ],
+      "personality": "gallows-humour",
+      "temper": 0.3
+    },
+    {
+      "id": "urchin_a",
+      "model": [
+        "cast_urchin",
+        "npc_m_07",
+        "figure_artist"
+      ],
+      "pos": [
+        1.2,
+        0,
+        6.2
+      ],
+      "facing": 3.0,
+      "behaviour": "wander",
+      "radius": 2.0,
+      "clip": "idle",
+      "role": "Street boy loitering at the Cloth Hall passage",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "passage_south",
+          "activity": "walk",
+          "for": 6
+        },
+        {
+          "post": "stalls_east_front",
+          "activity": "idle",
+          "for": 3,
+          "run": true
+        },
+        {
+          "post": "passage_south",
+          "activity": "idle",
+          "for": 4,
+          "run": true
+        },
+        {
+          "post": "stalls_west_front",
+          "activity": "idle",
+          "for": 3,
+          "run": true
+        },
+        {
+          "post": "passage_south",
+          "activity": "walk",
+          "for": 5,
+          "run": true
+        }
+      ],
+      "personality": "wry",
+      "temper": 0.2
+    },
+    {
+      "id": "urchin_b",
+      "model": [
+        "cast_urchin_f",
+        "npc_f_07",
+        "figure_artist_f"
+      ],
+      "pos": [
+        -1.4,
+        0,
+        6.8
+      ],
+      "facing": 2.6,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "His sister, lookout for pickpockets",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "passage_south_b",
+          "activity": "idle",
+          "for": 9
+        },
+        {
+          "post": "stalls_west_front",
+          "activity": "idle",
+          "for": 4,
+          "run": true
+        },
+        {
+          "post": "passage_south_b",
+          "activity": "idle",
+          "for": 6,
+          "run": true
+        },
+        {
+          "post": "stalls_east_front",
+          "activity": "idle",
+          "for": 4,
+          "run": true
+        }
+      ],
+      "personality": "wry",
+      "temper": 0.3
+    },
+    {
+      "id": "priest",
+      "model": [
+        "cast_priest",
+        "npc_m_05",
+        "figure_priest"
+      ],
+      "pos": [
+        33.0,
+        0,
+        -18.6
+      ],
+      "facing": 3.14,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Vicar locking St Mary's after Compline",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "stmarys_door",
+          "activity": "idle",
+          "for": 10
+        },
+        {
+          "post": "door_north_e",
+          "activity": "inside",
+          "for": 8
+        },
+        {
+          "at": "21:24",
+          "post": "stmarys_door",
+          "activity": "sentry",
+          "for": 5
+        },
+        {
+          "post": "stmarys_door",
+          "activity": "inside",
+          "for": 50
+        },
+        {
+          "at": "22:20",
+          "post": "stmarys_door",
+          "activity": "idle",
+          "for": 6
+        },
+        {
+          "post": "door_north_e",
+          "activity": "inside",
+          "for": 40
+        }
+      ],
+      "hints": [
+        {
+          "id": "barracks_zone",
+          "solo": true,
+          "about": "priest",
+          "tab": "people",
+          "text": "Przy odwachu pod moim kościołem żołnierze zatrzymują każdego, kto nie nosi cesarskiego munduru.",
+          "gloss": "By the guard post under my church the soldiers stop anyone not wearing the Emperor's coat.",
+          "note": "The ground round the watch post at St Mary's is the soldiers' own: anyone not in an Austrian coat is stopped there."
+        }
+      ],
+      "personality": "pious",
+      "temper": 0.5
+    },
+    {
+      "id": "bishop",
+      "model": [
+        "cast_bishop",
+        "figure_priest"
+      ],
+      "pos": [
+        30.0,
+        0,
+        -14.6
+      ],
+      "facing": 2.6,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "The bishop, bound for Compline at St Mary's with his party",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "bishop_gather",
+          "activity": "idle",
+          "for": 14
+        },
+        {
+          "at": "21:14",
+          "post": "stmarys_steps_a",
+          "activity": "idle",
+          "for": 1
+        },
+        {
+          "at": "21:30",
+          "post": "stmarys_steps_a",
+          "activity": "inside",
+          "for": 600
+        },
+        {
+          "at": "22:15",
+          "post": "bishop_out",
+          "activity": "idle",
+          "for": 12
+        },
+        {
+          "post": "door_north_c",
+          "activity": "inside",
+          "for": 600
+        }
+      ],
+      "personality": "pious",
+      "temper": 0.6
+    },
+    {
+      "id": "bishop_chaplain",
+      "model": [
+        "cast_chaplain",
+        "npc_m_06",
+        "figure_priest"
+      ],
+      "pos": [
+        28.8,
+        0,
+        -13.8
+      ],
+      "facing": 2.2,
+      "behaviour": "stand",
+      "clip": "sentry",
+      "role": "Chaplain holding the bishop's lantern",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "chaplain_gather",
+          "activity": "sentry",
+          "for": 14
+        },
+        {
+          "at": "21:14",
+          "post": "stmarys_steps_b",
+          "activity": "idle",
+          "for": 1
+        },
+        {
+          "at": "21:30",
+          "post": "stmarys_steps_b",
+          "activity": "inside",
+          "for": 600
+        },
+        {
+          "at": "22:15",
+          "post": "chaplain_out",
+          "activity": "sentry",
+          "for": 12
+        },
+        {
+          "post": "door_north_c",
+          "activity": "inside",
+          "for": 600
+        }
+      ],
+      "personality": "fearful",
+      "temper": 0.3
+    },
+    {
+      "id": "bishop_noble",
+      "model": [
+        "cast_governor",
+        "figure_noble"
+      ],
+      "pos": [
+        31.4,
+        0,
+        -13.7
+      ],
+      "facing": 3.6,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Austrian official escorting the bishop",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "official_gather",
+          "activity": "idle",
+          "for": 14
+        },
+        {
+          "at": "21:14",
+          "post": "stmarys_steps_c",
+          "activity": "idle",
+          "for": 1
+        },
+        {
+          "at": "21:30",
+          "post": "stmarys_steps_c",
+          "activity": "inside",
+          "for": 600
+        },
+        {
+          "at": "22:15",
+          "post": "official_out",
+          "activity": "idle",
+          "for": 12
+        },
+        {
+          "post": "door_north_c",
+          "activity": "inside",
+          "for": 600
+        }
+      ],
+      "personality": "stern",
+      "temper": 0.7
+    },
+    {
+      "id": "smuggler",
+      "model": [
+        "cast_smuggler",
+        "npc_m_04",
+        "figure_veteran"
+      ],
+      "pos": [
+        28.2,
+        0,
+        27.4
+      ],
+      "facing": 2.4,
+      "behaviour": "stand",
+      "clip": "sentry",
+      "role": "Smuggler watching the safe-house cellar door; expects a boatman tonight",
+      "personality": "cynical-merchant",
+      "temper": 0.5
+    },
+    {
+      "id": "falconer",
+      "model": [
+        "cast_falconer",
+        "npc_m_02",
+        "figure_noble"
+      ],
+      "pos": [
+        -13.8,
+        0,
+        17.4
+      ],
+      "facing": -0.5,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Falconer of the Town Hall, walking his dog at night",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "townhall_corner",
+          "activity": "idle",
+          "for": 5
+        },
+        {
+          "post": "west_side_s",
+          "activity": "idle",
+          "for": 2
+        },
+        {
+          "post": "west_lantern",
+          "activity": "idle",
+          "for": 3
+        },
+        {
+          "post": "west_stalls",
+          "activity": "idle",
+          "for": 2
+        },
+        {
+          "post": "townhall_front",
+          "activity": "idle",
+          "for": 3
+        }
+      ],
+      "hints": [
+        {
+          "id": "town_hall_sentry",
+          "solo": true,
+          "about": "falconer",
+          "tab": "people",
+          "text": "Wartownik pod ratuszem kłania się każdemu w dobrym płaszczu. Bez płaszcza nie podejdziesz do drzwi.",
+          "gloss": "The sentry at the Town Hall bows to anyone in a good cloak. Without one you won't get near the door.",
+          "note": "The Town Hall door is the salon's ground: in a guest's cloak the sentry bows you in; in your own clothes he stops you."
+        }
+      ],
+      "personality": "stern",
+      "temper": 0.4
+    },
+    {
+      "id": "townsman_crossing_n",
+      "model": [
+        "npc_m_05",
+        "npc_m_06",
+        "figure_townsman"
+      ],
+      "pos": [
+        -2.0,
+        0,
+        -20.0
+      ],
+      "facing": 1.6,
+      "behaviour": "wander",
+      "radius": 7.0,
+      "clip": "idle",
+      "role": "Journeyman hurrying home before the watch closes the gates",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "north_crossing",
+          "activity": "walk",
+          "for": 6
+        },
+        {
+          "post": "door_north_c",
+          "activity": "inside",
+          "for": 20
+        },
+        {
+          "post": "north_crossing",
+          "activity": "idle",
+          "for": 4
+        },
+        {
+          "post": "door_west",
+          "activity": "idle",
+          "for": 3
+        }
+      ],
+      "hints": [
+        {
+          "id": "patrol_a_route",
+          "solo": true,
+          "about": "townsman_crossing_n",
+          "tab": "log",
+          "text": "Ci z północnej pierzei chodzą od winiarni aż pod studnię i z powrotem.",
+          "gloss": "The ones on the north side walk from the wine-house to the well and back.",
+          "note": "Rynek patrol A walks the north side, from the Winiarnia corner to the east well and back."
+        }
+      ],
+      "personality": "fearful",
+      "temper": 0.3
+    },
+    {
+      "id": "townswoman_crossing_s",
+      "model": [
+        "npc_f_03",
+        "npc_f_04",
+        "figure_townswoman"
+      ],
+      "pos": [
+        2.0,
+        0,
+        21.0
+      ],
+      "facing": -1.6,
+      "behaviour": "wander",
+      "radius": 6.0,
+      "clip": "idle",
+      "role": "Servant girl carrying a message across the square",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "south_crossing",
+          "activity": "idle",
+          "for": 4
+        },
+        {
+          "post": "door_south_w",
+          "activity": "idle",
+          "for": 3
+        },
+        {
+          "post": "south_crossing",
+          "activity": "walk",
+          "for": 5
+        },
+        {
+          "post": "door_south_e",
+          "activity": "inside",
+          "for": 15
+        }
+      ],
+      "hints": [
+        {
+          "id": "tavern_keeper_face",
+          "solo": true,
+          "about": "tavern_keeper",
+          "tab": "people",
+          "text": "Karczmarz z zajazdu zna każdą twarz. Wczoraj stał pod ratuszem i patrzył na gości.",
+          "gloss": "The innkeeper of the Zajazd knows every face. Yesterday he stood by the Town Hall watching the guests.",
+          "note": "The innkeeper by the Zajazd has seen your face; a borrowed cloak will not fool him. He calls the watch."
+        }
+      ],
+      "personality": "tender",
+      "temper": 0.2
+    },
+    {
+      "id": "townsman_crossing_w",
+      "model": [
+        "npc_m_04",
+        "figure_kazimierz",
+        "figure_townsman"
+      ],
+      "pos": [
+        -25.0,
+        0,
+        4.0
+      ],
+      "facing": 0.0,
+      "behaviour": "wander",
+      "radius": 5.0,
+      "clip": "idle",
+      "role": "Kazimierz trader crossing towards Grodzka street",
+      "personality": "cynical-merchant",
+      "temper": 0.4
+    },
+    {
+      "id": "boatman",
+      "model": [
+        "cast_boatman",
+        "npc_m_03",
+        "figure_townsman"
+      ],
+      "pos": [
+        29.6,
+        0,
+        16.0
+      ],
+      "facing": 1.2,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Vistula boatman up from the docks, waiting in the alley by the cart",
+      "personality": "gallows-humour",
+      "temper": 0.3
+    },
+    {
+      "id": "informer",
+      "model": [
+        "cast_informer",
+        "npc_m_06",
+        "figure_townsman"
+      ],
+      "pos": [
+        -5.8,
+        0,
+        -10.2
+      ],
+      "facing": 0.6,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Austrian police informer loitering between the Cloth Hall lanterns",
+      "schedule": [
+        {
+          "at": "21:00",
+          "post": "lantern_nw_mid",
+          "activity": "idle",
+          "for": 7
+        },
+        {
+          "post": "lantern_se_mid",
+          "activity": "idle",
+          "for": 7
+        }
+      ],
+      "hints": [
+        {
+          "id": "spy_in_crowd",
+          "solo": true,
+          "about": "spy",
+          "tab": "people",
+          "text": "Brązowy surdut przy straganach ma dobre oczy. Płaszcz go nie zmyli.",
+          "gloss": "The brown coat by the stalls has good eyes. A cloak won't fool him.",
+          "note": "The man in the brown coat by the east stalls is another pair of the police's eyes: he knows your face through any cloak."
+        }
+      ],
+      "personality": "fearful",
+      "temper": 0.4
+    },
+    {
+      "id": "tavern_keeper",
+      "model": [
+        "town_innkeeper",
+        "npc_m_01",
+        "figure_townsman"
+      ],
+      "pos": [
+        26.8,
+        0,
+        -0.8
+      ],
+      "facing": -1.57,
+      "behaviour": "stand",
+      "clip": "idle",
+      "role": "Innkeeper of the Zajazd, airing the taproom; he saw your face by the Town Hall last night",
+      "enforcer": true,
+      "zone_permit": [
+        "street",
+        "barracks"
+      ],
+      "personality": "cynical-merchant",
+      "temper": 0.5
+    },
+    {
+      "id": "spy",
+      "model": [
+        "npc_m_05",
+        "dist_journeyman",
+        "figure_townsman"
+      ],
+      "pos": [
+        9.4,
+        0,
+        11.6
+      ],
+      "facing": 0.3,
+      "behaviour": "wander",
+      "radius": 3.0,
+      "clip": "idle",
+      "role": "A man in a brown coat by the east stalls, watching faces rather than wares",
+      "enforcer": true,
+      "zone_permit": [
+        "street"
+      ],
+      "personality": "stern",
+      "temper": 0.6
+    },
+    {
+      "id": "vizsla",
+      "kind": "animal",
+      "model": [
+        "dog_hound",
+        "dog_vizsla"
+      ],
+      "pos": [
+        -15.0,
+        0,
+        18.4
+      ],
+      "facing": -0.3,
+      "behaviour": "follow",
+      "radius": 2.5,
+      "speed": 1.4,
+      "role": "The falconer's hound",
+      "follow": "falconer"
+    },
+    {
+      "id": "pomeranian",
+      "kind": "animal",
+      "model": [
+        "dog_spitz",
+        "dog_pomeranian"
+      ],
+      "pos": [
+        -12.0,
+        0,
+        7.2
+      ],
+      "facing": 0.5,
+      "behaviour": "wander",
+      "radius": 1.8,
+      "speed": 0.6,
+      "role": "A townswoman's spitz"
+    },
+    {
+      "id": "stall_cat",
+      "kind": "animal",
+      "model": "cat",
+      "pos": [
+        -10.0,
+        1.2,
+        -14.0
+      ],
+      "facing": 2.8,
+      "behaviour": "stand",
+      "role": "Cat asleep on a stall counter"
+    },
+    {
+      "id": "dorozka",
+      "kind": "vehicle",
+      "model": "carriage",
+      "pos": [
+        17.0,
+        0,
+        -22.5
+      ],
+      "behaviour": "drive",
+      "speed": 2.0,
+      "route": [
+        "road_n_e",
+        "road_n_w",
+        "road_nw",
+        "road_out_nw",
+        "road_out_sw",
+        "road_out_se",
+        "road_out_e",
+        "road_e_gap",
+        "road_ne"
+      ],
+      "route_start": 0,
+      "role": "Hired dorozka (fiacre) on its round of the Rynek, two horses, coachman on the box"
+    },
+    {
+      "id": "peasant_cart",
+      "kind": "vehicle",
+      "model": "horse_cart",
+      "pos": [
+        -42.5,
+        0,
+        40.5
+      ],
+      "behaviour": "drive",
+      "speed": 1.4,
+      "route": [
+        "road_n_e",
+        "road_n_w",
+        "road_nw",
+        "road_out_nw",
+        "road_out_sw",
+        "road_out_se",
+        "road_out_e",
+        "road_e_gap",
+        "road_ne"
+      ],
+      "route_start": 4,
+      "role": "Peasant cart with sacks and hay, late back from market"
+    },
+    {
+      "id": "inn_horse",
+      "kind": "animal",
+      "model": [
+        "horse"
+      ],
+      "pos": [
+        27.0,
+        0,
+        19.0
+      ],
+      "facing": 1.5708,
+      "behaviour": "stand",
+      "tether": true,
+      "role": "Saddle horse tethered by St Adalbert's, where the alley leads out"
+    },
+    {
+      "id": "pigeon_a",
+      "kind": "animal",
+      "model": "pigeon",
+      "pos": [
+        6.0,
+        0,
+        -9.2
+      ],
+      "facing": 0.4,
+      "behaviour": "wander",
+      "radius": 1.5,
+      "speed": 0.3,
+      "role": "Pigeon picking at spilt grain by the Cloth Hall"
+    },
+    {
+      "id": "pigeon_b",
+      "kind": "animal",
+      "model": "pigeon",
+      "pos": [
+        6.8,
+        0,
+        -9.8
+      ],
+      "facing": 2.0,
+      "behaviour": "wander",
+      "radius": 1.5,
+      "speed": 0.3,
+      "role": "Pigeon"
+    },
+    {
+      "id": "pigeon_c",
+      "kind": "animal",
+      "model": "pigeon",
+      "pos": [
+        5.4,
+        0,
+        -10.1
+      ],
+      "facing": 4.0,
+      "behaviour": "wander",
+      "radius": 1.5,
+      "speed": 0.3,
+      "role": "Pigeon"
+    },
+    {
+      "id": "crow_a",
+      "kind": "animal",
+      "model": "crow",
+      "pos": [
+        13.4,
+        0,
+        -16.9
+      ],
+      "facing": 2.5,
+      "behaviour": "wander",
+      "radius": 1.0,
+      "speed": 0.4,
+      "role": "Hooded crow at the cart's spillings"
+    },
+    {
+      "id": "crow_b",
+      "kind": "animal",
+      "model": "crow",
+      "pos": [
+        -18.4,
+        0,
+        -10.6
+      ],
+      "facing": -0.8,
+      "behaviour": "stand",
+      "role": "Crow by the barrels"
+    },
+    {
+      "id": "hawk",
+      "kind": "animal",
+      "model": "hawk",
+      "pos": [
+        0.0,
+        24.0,
+        0.0
+      ],
+      "behaviour": "circle",
+      "radius": 16.0,
+      "speed": 5.0,
+      "role": "The falconer's hawk, loose over the square"
+    },
+    {
+      "id": "smok",
+      "kind": "animal",
+      "model": "dragon",
+      "pos": [
+        -38,
+        0,
+        36
+      ],
+      "facing": 0.6,
+      "behaviour": "stand",
+      "role": "Smok Wawelski, strayed up from the south-west"
+    }
   ]
 }

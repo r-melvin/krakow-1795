@@ -6,10 +6,13 @@ and a phased plan to apply it to Kraków, 1795. Written against the code in `scr
 
 ## 1. What exists today
 
-Phases A, B, C, D and G of section 4 are in (phases E and F are not: see "Hooks" below). Every number lives in
-`data/stealth.json`; the files are `scripts/stealth/` (perception.gd, guard.gd, player.gd, watch.gd, hiding_spot.gd,
-distraction.gd, stealth_smoke.gd), `scripts/ui/hud.gd` (cues), `scripts/city/greybox_district.gd` (registration and
-placement), `population.gd` (crowd query) and `flicker.gd` (dousing).
+All phases of section 4 are in. Every number for A-D and G lives in `data/stealth.json`; the files are
+`scripts/stealth/` (perception.gd, guard.gd, player.gd, watch.gd, hiding_spot.gd, distraction.gd, stealth_smoke.gd),
+`scripts/ui/hud.gd` (cues), `scripts/city/greybox_district.gd` (registration and placement), `population.gd` (crowd
+query) and `flicker.gd` (dousing). Phases E and F are `scripts/stealth/intel.gd`, `zones.gd`, `intel_smoke.gd`, the
+Map tab of `scripts/ui/journal.gd`, a recognise check in `scripts/npc/npc.gd`, and data in `data/zones.json`,
+`data/bills.json`, `data/storylines.json` / `data/npcs.json` (`hints`, `enforcer`, `zone_permit`) and
+`data/missions.json` (`stealth`).
 
 ### Perception (A)
 - **Visibility** = posture (stand 1.0, crouch 0.6, prone 0.3, sit 0.7) x light x crowd, 0 inside a hiding spot.
@@ -66,12 +69,65 @@ placement), `population.gd` (crowd query) and `flicker.gd` (dousing).
 - Cones: the near zone always; the far zone fades in with suspicion (hidden when calm).
 - The last-known ghost: a rim-lit outline where the watch thinks the player is (Evasion, or a lone searching guard).
 
-### Hooks for phases E and F
-- Watch signals: `phase_changed`, `sound_event`, `player_spotted`, `body_found`, `runner_sent`, `runner_arrived`,
-  `runner_stopped`, `hiding_changed`, `lamp_changed`, `barked`; `watch.flags` mirrored into `Mission.flags` as
-  `stealth_<name>` (e.g. `stealth_phase`, `stealth_runner_arrived`).
-- `guard.enforcer` (sees through the disguise, red-tinted cone) and `guard.sight_modifiers` (Callables
-  `(guard, player) -> float`) for zone permits; `guard.task` / `set_task()` for scripted errands.
+### Intel (E)
+- **Overhearing** (intel.gd): 18 hints, each [Polish or German, English gloss] plus an English journal note, in
+  `data/storylines.json` `hints` (pairs, guards muttering, two storyline lines tagged `"hint"`) and on NPCs in
+  `data/npcs.json`. Within 4 m of the speaker for 5 s (a pair hint needs a second townsperson within 3.5 m; a guard
+  must be Calm or Curious) the line is spoken as a glossed bubble; a storyline line with a hint counts within 14 m
+  (storyline.gd `storyline_hint`). Written to the journal Log ("Overheard: ... (heard at <place>, <time>)"), under the
+  person it is about on the People page (guards under "The watch"), and in "Overheard" on the Storylines page.
+  Topics: the Corporal's 22:30 glass at the Winiarnia, the midnight relief (the Cloth Hall passage unguarded), the
+  smuggler's cellar door, the informer reporting at St Mary's, the lamplighter, the curfew, both patrol routes, the
+  Town Hall sentry and the cloak, the soldiers' ground at the post, the red-lantern house, the two townsman
+  enforcers.
+- **Watch routines** (`data/zones.json` `watch_routines`, guard task `errand`): at 22:30 the Corporal walks to the
+  Winiarnia for 30 game-minutes; at 00:00 the Cloth Hall sentry walks to St Mary's for 8. The hints are true.
+- **Bills** (`data/bills.json`): paper quads with inked Label3D headings (text + gloss), ruled lines and, on a wanted
+  bill, a sketched face; three on the dressing's notice board (curfew, rota, theatre) and two on facades found by a
+  ray (the magistrate's lamp order on the north row, a tax patent on the west row). E reads one (the full glossed
+  text into the Log, one line on screen); E again on a wanted bill tears it down.
+- **Patrol recording**: crouched and still (or seated on a bench, twice as fast) with a guard in the camera's view,
+  a clear line and within 26 m for 10 s: his waypoints go to the map.
+- **Journal Map tab** (journal.gd `MapView`, tab 5): a pasted paper plan drawn with `_draw`: footprints measured from
+  the district's landmark and tenement models (fallback: the greybox row layout), the Cloth Hall, St Mary's, St
+  Adalbert's and the Town Hall labelled, the disguise zones tinted (the one you stand in outlined red if you trespass),
+  lanterns seen (gold dots), hiding places used (crosses), watched rounds as dotted loops with direction arrows (red
+  for an enforcer), sentry posts, the Corporal's flag, vendors and the red lantern once near, enforcer townsmen as red
+  marks, and your position and facing. The right page: the zone, the outfit and whether it passes there, notoriety
+  in words, the rounds watched, the bills read, a key. State: `Mission.journal["intel"]` (`Intel.journal_store()`).
+- **Minimap** (`scripts/ui/minimap.gd`, added by hud.gd; M toggles, J / Tab opens the full map): a 190 px north-up
+  parchment circle in a brass ring, bottom right, redrawn at 10 Hz. Same drawing code as the Map tab
+  (`scripts/ui/city_map.gd` `draw_map(canvas, rect, centre, scale, options)`): footprints, the zone tint under the
+  player (red rim when trespassing), lanterns seen, spots used, places found, watched rounds, the objective marker
+  (missions.json `stealth.map_marks`), guards the player can see now (red dot + facing tick), the last-known ghost,
+  the player arrow; no text but N.
+
+### Disguise zones, enforcers, notoriety (F)
+- **Zones** (zones.gd, `data/zones.json`): polygons in XZ: `salon` (the Town Hall door and its east side, plus the
+  salon interior set), `barracks` (the St Mary's post and the NE corner), `church` (St Mary's and St Adalbert's
+  porches, the church interior), `kazimierz_gate` (the Grodzka road south-west), `street` (the square; also anything
+  outside every polygon). Outfits: the salon cloak (flag `invited`, or `player.disguised`) = salon + street; an
+  Austrian coat (flag `disguise_austrian`) = barracks + street; a cassock (`disguise_clergy`) = church + street;
+  none = street. A flagged outfit marked `disguised` puts `player.disguised` on. The mission may add outfits
+  (missions.json `stealth.outfits`). API: `zones.current(pos)`, `zones.permitted(player)`, `outfit()`, `trespassing()`.
+- **Trespass**: zones.gd adds `sight_factor` to every guard's `sight_modifiers` (x1.6 in a forbidden zone); guard.gd
+  then drops the 0.25 disguise factor, goes Curious on sight with a glossed bark ("Hier ist kein Durchgang!"),
+  Searching after 6 s of watching (1.5 s grace out of sight). In a permitted zone the disguise works as before. No HUD
+  text: the zone is named on the journal map only (hud.gd has no tint API for the arc, so none).
+- **Enforcers**: missions.json `stealth.enforcers` = the informer and `guard:St Mary's post` (the Corporal);
+  `enforcer: true` in npcs.json for the innkeeper of the Zajazd and the man in the brown coat by the east stalls (two
+  new townsfolk). Enforcer guards ignore the disguise and draw a red rim round their cone; an enforcer townsman who
+  sees the disguised player within 6 m in a 130-degree cone for 2 s barks ("To on! Straż!") and `watch.report(pos)`
+  sends the nearest free guard Searching there (30 s cooldown). Once seen they are marked in the journal (People,
+  "The watch", red marks on the map). The hostess has no footman in the game, so there is none.
+- **Notoriety** (intel.gd, 0..100, `Mission.journal["intel"]`, survives nights): +15 per runner reaching the
+  Corporal, +25 per guard downed in an open fight, +5 per rear takedown a comrade saw (`guard.can_see_point`, watch
+  signal `guard_downed`); -10 per night; halved whenever `Mission.flags["changed_coat"]` becomes true; -5 per wanted
+  bill torn down (+1 crackdown if a guard sees the tearing). At >= 30 wanted bills go up (board and Cloth Hall; the
+  south row at 45, the east row at 60) with a description written from `GameState.origin_id`, `gender` and the coat
+  (`bills.json` `wanted.origins`), a trait at 45, the last place seen and a reward at 60; guards' view x1.1
+  (`guard.notoriety_view_mult`). At >= 60 each patrol route gets a second patrol walking it the other way at night
+  start (`district.spawn_guard`).
 
 ### Smoke
 `godot --headless --path . --quit-after 3000 -- --smoke` runs `stealth_smoke.gd` beside the mission smoke, each check
@@ -79,11 +135,19 @@ in a private sandbox world (SubViewport with its own World3D; sandbox actors are
 groups and have no GameState / Mission side effects), printing `[smoke] stealth ...` lines ending OK / FAIL.
 `--stealth-shot=/dir` (windowed) saves `stealth_arc_light`, `_arc_dark`, `_hiding`, `_cone_curious`, `_ring`,
 `_ghost`, `_chevron`.
+`intel_smoke.gd` (started beside it, inheriting its sandbox helpers) checks E and F the same way and prints
+`[smoke] intel overheard=<n> bills=<n> patrols_recorded=<n> zone=<name> trespass=<ok|fail> enforcer=<ok|fail>
+notoriety=<n> wanted=<bool>` plus a line per check; the first district prints `[smoke] intel district bills=...`
+and records two rounds so the journal's Map shot has something on it. `--intel-shot=/dir` (windowed) saves
+`intel_bill_wanted`, `intel_enforcer_cone`, `intel_trespass`, `intel_minimap`, `intel_map`; a sandbox minimap
+check prints `[smoke] minimap ok`.
 
 ### Known limits
 - One game minute is one real second, so Caution lasts 3 s at the default; raise `phases.caution_minutes` if it
   should be felt. Side-street barricades in Caution are not built.
 - Only guards count as bodies (not the informer or other takedown targets).
+- Notoriety persists in `Mission.journal`, which lives for the session: like the journal, it is not in save.json.
+- A townsman enforcer calls the watch but never follows the player; bribing or silencing enforcers is not yet a verb.
 - Guards use the navmesh for errands and the runner but still walk their patrol legs in straight lines.
 
 ## 2. What the classics teach
