@@ -1,0 +1,5 @@
+Low poly 3D Pigeon model (rigged + animated) [untextured]
+Author: mujtaba-io (https://opengameart.org/content/low-poly-3d-pigeon-model-rigged-animated-untextured)
+File: genuinely-my-pigeon-extended-furthur.blend
+Licence: CC0 1.0 Universal (public domain dedication). https://creativecommons.org/publicdomain/zero/1.0/
+No attribution is required; we credit the authors anyway (README.md, docs/ANIMALS.md).

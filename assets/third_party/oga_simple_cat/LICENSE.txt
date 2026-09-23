@@ -1,0 +1,6 @@
+Simple Cat
+Author: Drummyfish (https://opengameart.org/content/simple-cat)
+Texture made by the author from CC0 photographs on Wikimedia Commons.
+File: cat.zip (cat_2-80.blend, cat.png, cat.obj)
+Licence: CC0 1.0 Universal (public domain dedication). https://creativecommons.org/publicdomain/zero/1.0/
+No attribution is required; we credit the authors anyway (README.md, docs/ANIMALS.md).

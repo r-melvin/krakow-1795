@@ -1,0 +1,6 @@
+Hawk Lp Rigged
+Author: Sherkiz (https://poly.pizza/m/RkN6MEbP6g)
+File: 2a7aca61-a8f6-45f6-950e-003d4bfcab45.glb
+Licence: Creative Commons Attribution 3.0 (CC-BY 3.0). https://creativecommons.org/licenses/by/3.0/
+Attribution required: "Hawk Lp Rigged" by Sherkiz, CC-BY 3.0, via Poly Pizza. Modified (rescaled, re-oriented,
+animation renamed) by assets/blender/build_animals.py.

@@ -41,7 +41,16 @@
     "lantern_se_mid": {"pos": [5.8, 0, 10.2], "facing": -2.4},
     "alley_meeting": {"pos": [24.0, 0, 12.0], "facing": 0.0},
     "safe_house_door": {"pos": [28.2, 0, 27.4], "facing": 2.4},
-    "boatman_wait": {"pos": [29.6, 0, 16.0], "facing": 1.2}
+    "boatman_wait": {"pos": [29.6, 0, 16.0], "facing": 1.2},
+    "road_n_e": {"pos": [17.0, 0, -22.5], "facing": 1.57},
+    "road_n_w": {"pos": [-10.0, 0, -22.5], "facing": 1.57},
+    "road_nw": {"pos": [-26.0, 0, -25.0], "facing": 1.57},
+    "road_out_nw": {"pos": [-42.5, 0, -25.0], "facing": 3.14},
+    "road_out_sw": {"pos": [-42.5, 0, 40.5], "facing": -1.57},
+    "road_out_se": {"pos": [40.0, 0, 40.5], "facing": 0.0},
+    "road_out_e": {"pos": [40.0, 0, -10.0], "facing": 1.57},
+    "road_e_gap": {"pos": [25.0, 0, -10.5], "facing": 0.6},
+    "road_ne": {"pos": [22.5, 0, -14.0], "facing": 0.6}
   },
   "npcs": [
     {"id": "stallholder_west", "model": ["cast_stallholder", "npc_m_00", "figure_merchant"], "pos": [-12.2, 0, -12.4], "facing": 2.4, "behaviour": "stand", "clip": "idle", "role": "Cloth merchant tying down his awning after the market", "schedule": [{"at": "21:00", "post": "stall_west", "activity": "idle", "for": 14}, {"post": "stall_west_b", "activity": "idle", "for": 5}, {"post": "door_north_w", "activity": "inside", "for": 12}, {"post": "stall_west", "activity": "idle", "for": 8}, {"post": "door_north_w", "activity": "inside", "for": 35}]},
@@ -63,9 +72,18 @@
     {"id": "townsman_crossing_w", "model": ["npc_m_04", "figure_kazimierz", "figure_townsman"], "pos": [-25.0, 0, 4.0], "facing": 0.0, "behaviour": "wander", "radius": 5.0, "clip": "idle", "role": "Kazimierz trader crossing towards Grodzka street"},
     {"id": "boatman", "model": ["cast_boatman", "npc_m_03", "figure_townsman"], "pos": [29.6, 0, 16.0], "facing": 1.2, "behaviour": "stand", "clip": "idle", "role": "Vistula boatman up from the docks, waiting in the alley by the cart"},
     {"id": "informer", "model": ["cast_informer", "npc_m_06", "figure_townsman"], "pos": [-5.8, 0, -10.2], "facing": 0.6, "behaviour": "stand", "clip": "idle", "role": "Austrian police informer loitering between the Cloth Hall lanterns", "schedule": [{"at": "21:00", "post": "lantern_nw_mid", "activity": "idle", "for": 7}, {"post": "lantern_se_mid", "activity": "idle", "for": 7}]},
-    {"id": "vizsla", "kind": "animal", "model": "dog_vizsla", "pos": [-15.0, 0, 18.4], "facing": -0.3, "behaviour": "follow", "radius": 2.5, "speed": 1.4, "role": "The falconer's Vizsla", "follow": "falconer"},
-    {"id": "pomeranian", "kind": "animal", "model": "dog_pomeranian", "pos": [-12.0, 0, 7.2], "facing": 0.5, "behaviour": "wander", "radius": 1.8, "speed": 0.6, "role": "A townswoman's lapdog"},
+    {"id": "vizsla", "kind": "animal", "model": ["dog_hound", "dog_vizsla"], "pos": [-15.0, 0, 18.4], "facing": -0.3, "behaviour": "follow", "radius": 2.5, "speed": 1.4, "role": "The falconer's hound", "follow": "falconer"},
+    {"id": "pomeranian", "kind": "animal", "model": ["dog_spitz", "dog_pomeranian"], "pos": [-12.0, 0, 7.2], "facing": 0.5, "behaviour": "wander", "radius": 1.8, "speed": 0.6, "role": "A townswoman's spitz"},
     {"id": "stall_cat", "kind": "animal", "model": "cat", "pos": [-10.0, 1.2, -14.0], "facing": 2.8, "behaviour": "stand", "role": "Cat asleep on a stall counter"},
+    {"id": "dorozka", "kind": "vehicle", "model": "carriage", "pos": [17.0, 0, -22.5], "behaviour": "drive", "speed": 2.0, "route": ["road_n_e", "road_n_w", "road_nw", "road_out_nw", "road_out_sw", "road_out_se", "road_out_e", "road_e_gap", "road_ne"], "route_start": 0, "role": "Hired dorozka (fiacre) on its round of the Rynek, two horses, coachman on the box"},
+    {"id": "peasant_cart", "kind": "vehicle", "model": "horse_cart", "pos": [-42.5, 0, 40.5], "behaviour": "drive", "speed": 1.4, "route": ["road_n_e", "road_n_w", "road_nw", "road_out_nw", "road_out_sw", "road_out_se", "road_out_e", "road_e_gap", "road_ne"], "route_start": 4, "role": "Peasant cart with sacks and hay, late back from market"},
+    {"id": "inn_horse", "kind": "animal", "model": ["horse"], "pos": [27.0, 0, 19.0], "facing": 1.5708, "behaviour": "stand", "tether": true, "role": "Saddle horse tethered by St Adalbert's, where the alley leads out"},
+    {"id": "pigeon_a", "kind": "animal", "model": "pigeon", "pos": [6.0, 0, -9.2], "facing": 0.4, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon picking at spilt grain by the Cloth Hall"},
+    {"id": "pigeon_b", "kind": "animal", "model": "pigeon", "pos": [6.8, 0, -9.8], "facing": 2.0, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon"},
+    {"id": "pigeon_c", "kind": "animal", "model": "pigeon", "pos": [5.4, 0, -10.1], "facing": 4.0, "behaviour": "wander", "radius": 1.5, "speed": 0.3, "role": "Pigeon"},
+    {"id": "crow_a", "kind": "animal", "model": "crow", "pos": [13.4, 0, -16.9], "facing": 2.5, "behaviour": "wander", "radius": 1.0, "speed": 0.4, "role": "Hooded crow at the cart's spillings"},
+    {"id": "crow_b", "kind": "animal", "model": "crow", "pos": [-18.4, 0, -10.6], "facing": -0.8, "behaviour": "stand", "role": "Crow by the barrels"},
+    {"id": "hawk", "kind": "animal", "model": "hawk", "pos": [0.0, 24.0, 0.0], "behaviour": "circle", "radius": 16.0, "speed": 5.0, "role": "The falconer's hawk, loose over the square"},
     {"id": "smok", "kind": "animal", "model": "dragon", "pos": [-38, 0, 36], "facing": 0.6, "behaviour": "stand", "role": "Smok Wawelski, strayed up from the south-west"}
   ]
 }

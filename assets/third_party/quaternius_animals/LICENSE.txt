@@ -1,0 +1,8 @@
+Quaternius - Ultimate Animated Animal Pack (https://quaternius.com/packs/ultimateanimatedanimals.html)
+Mirrored on Poly Pizza: https://poly.pizza/bundle/Animated-Animal-Pack-ILAPXeUYiS
+Files (Poly Pizza keeps its own file ids as names):
+  f1d12388-e39b-4157-b32a-646a1d089fc4.glb  Wolf   https://poly.pizza/m/P1gU3Qkr9r
+  611d25c7-430f-4bb5-ab2c-d8f5f3cb9712.glb  Husky  https://poly.pizza/m/wcWiuEqwzq
+Author: Quaternius (https://quaternius.com)
+Licence: CC0 1.0 Universal (public domain dedication). https://creativecommons.org/publicdomain/zero/1.0/
+No attribution is required; we credit the authors anyway (README.md, docs/ANIMALS.md).

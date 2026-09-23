@@ -1,0 +1,6 @@
+Rigged Horse
+Model and 2k textures: Lyndon Daniels ("Realtime Rancher's 3D Model Pack", https://opengameart.org/content/realtime-ranchers-3d-model-pack)
+Rig: ChadM (https://opengameart.org/content/rigged-horse)
+File: riggedHorse.blend (fetched by tools/fetch_animals.sh)
+Licence: CC0 1.0 Universal (public domain dedication). https://creativecommons.org/publicdomain/zero/1.0/
+No attribution is required; we credit the authors anyway (README.md, docs/ANIMALS.md).
