@@ -1,0 +1,11 @@
+{
+  "church":     {"name": "Church",               "strength": 60, "fear": 40, "agenda": "Protect Catholic authority and property; wants legitimacy and order.",           "external": false},
+  "salon":      {"name": "Salon & Intelligentsia","strength": 30, "fear": 55, "agenda": "Constitution of 3 May restored; foreign sympathy; a free press.",             "external": false},
+  "underworld": {"name": "Underworld",           "strength": 45, "fear": 20, "agenda": "Open routes, no customs men, no questions. Will sell to anyone.",             "external": false},
+  "street":     {"name": "Street",               "strength": 55, "fear": 35, "agenda": "Bread, land, revenge for 1794. Wants heads, not treaties.",                   "external": false},
+  "guilds":     {"name": "Guilds & Burghers",    "strength": 40, "fear": 60, "agenda": "Town rights, trade, low taxes. Fears riots as much as Austria.",              "external": false},
+  "magnates":   {"name": "Magnates",             "strength": 50, "fear": 30, "agenda": "Their own estates and titles. Will back whoever wins.",                        "external": false},
+  "austria":    {"name": "Austria",              "strength": 90, "fear": 0,  "agenda": "Hold Krakow. Integrate into Galicia. Crush plots quietly.",                    "external": true},
+  "russia":     {"name": "Russia",               "strength": 50, "fear": 0,  "agenda": "Weaken Austria in Krakow; fund trouble then betray it.",                       "external": true},
+  "prussia":    {"name": "Prussia",              "strength": 35, "fear": 0,  "agenda": "Control the Vistula trade; bankers over soldiers.",                            "external": true}
+}

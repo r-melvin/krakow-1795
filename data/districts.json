@@ -1,0 +1,10 @@
+{
+  "rynek":      {"name": "Old Town (Rynek)",        "controller": "austria", "unrest": 20, "watch": 3},
+  "wawel":      {"name": "Wawel",                   "controller": "austria", "unrest": 5,  "watch": 5},
+  "kazimierz":  {"name": "Kazimierz",               "controller": "guilds",  "unrest": 25, "watch": 2},
+  "stradom":    {"name": "Stradom",                 "controller": "church",  "unrest": 15, "watch": 2},
+  "kleparz":    {"name": "Kleparz",                 "controller": "street",  "unrest": 40, "watch": 2},
+  "kanonicza":  {"name": "Kanonicza",               "controller": "church",  "unrest": 10, "watch": 3},
+  "docks":      {"name": "Vistula Docks",           "controller": "underworld","unrest": 30, "watch": 1},
+  "garbary":    {"name": "Garbary",                 "controller": "street",  "unrest": 45, "watch": 1}
+}

@@ -1,0 +1,50 @@
+{
+  "noble": {
+    "name": "Szlachcic",
+    "blurb": "A landed noble of the Wisniowiecki client families. Estate near Bochnia, now under Austrian audit. Salon door open, Sejm memories fresh.",
+    "influence": {"church": 30, "salon": 40, "underworld": 0, "street": 5, "guilds": 15, "magnates": 35},
+    "skills": {"eloquence": 3, "stealth": 1, "streetwise": 0, "faith": 1, "commerce": 1},
+    "weakness": "Family estate can be seized; relatives taken as hostages.",
+    "goal": "Restore the Constitution of 3 May with yourself as its guardian."
+  },
+  "artist": {
+    "name": "Bohemian Artist",
+    "blurb": "A painter and pamphleteer. Broke, notorious, adored by students and printers, tolerated by hostesses. Owes money to men who collect.",
+    "influence": {"church": 0, "salon": 35, "underworld": 10, "street": 30, "guilds": 5, "magnates": 5},
+    "skills": {"eloquence": 3, "stealth": 2, "streetwise": 2, "faith": 0, "commerce": 0},
+    "weakness": "Scandal and debt. One good rumour ends you.",
+    "goal": "A republic of citizens, with no king at all."
+  },
+  "veteran": {
+    "name": "Peasant Veteran",
+    "blurb": "A scytheman from Raclawice, 1794. No papers, no land, one good arm. The men who fought beside you still know your name.",
+    "influence": {"church": 10, "salon": 0, "underworld": 20, "street": 40, "guilds": 0, "magnates": 0},
+    "skills": {"eloquence": 0, "stealth": 3, "streetwise": 3, "faith": 1, "commerce": 0},
+    "weakness": "No papers. A patrol stop means conscription or the rope.",
+    "goal": "Land to those who work it. Freedom from the lords as much as the Austrians."
+  },
+  "merchant": {
+    "name": "Guild Burgher",
+    "blurb": "Cloth merchant with a stall in the Sukiennice and a warehouse on the Vistula. Knows every customs man, and which ones drink.",
+    "influence": {"church": 10, "salon": 10, "underworld": 20, "street": 5, "guilds": 40, "magnates": 10},
+    "skills": {"eloquence": 2, "stealth": 1, "streetwise": 2, "faith": 0, "commerce": 3},
+    "weakness": "Ledgers can be audited; goods and warehouse seized.",
+    "goal": "A commonwealth of towns, not just of nobles."
+  },
+  "priest": {
+    "name": "Parish Priest",
+    "blurb": "Curate at St Mary's. Hears the confessions of half the Rynek. The Bishop finds you useful, for now.",
+    "influence": {"church": 45, "salon": 5, "underworld": 0, "street": 25, "guilds": 10, "magnates": 10},
+    "skills": {"eloquence": 3, "stealth": 1, "streetwise": 1, "faith": 3, "commerce": 0},
+    "weakness": "The Bishop can silence or transfer you at a word.",
+    "goal": "A Catholic commonwealth restored, its church free of Vienna."
+  },
+  "kazimierz": {
+    "name": "Kazimierz Merchant",
+    "blurb": "A financier from Kazimierz with correspondents in Breslau and Lwow. Excluded from the council, indispensable to it.",
+    "influence": {"church": 0, "salon": 15, "underworld": 25, "street": 5, "guilds": 25, "magnates": 15},
+    "skills": {"eloquence": 2, "stealth": 2, "streetwise": 2, "faith": 1, "commerce": 3},
+    "weakness": "Legal restrictions. Rivals can turn a crowd against your quarter.",
+    "goal": "A commonwealth with equal law for all its peoples."
+  }
+}
