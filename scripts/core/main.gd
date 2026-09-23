@@ -80,6 +80,7 @@ func _smoke() -> void:
 	var guards := get_tree().get_nodes_in_group("guards")
 	var player := get_tree().get_first_node_in_group("player") as Player
 	print("[smoke] guards=%d player=%s" % [guards.size(), player.global_position if player else "none"])
+	await _shots(player)
 	for g in guards:
 		print("[smoke]   %-16s state=%s suspicion=%.1f pos=%s" % [g.guard_name, Guard.State.keys()[g.state], g.suspicion, g.global_position])
 	# Walk in front of a guard: expect suspicion to rise.
@@ -93,3 +94,27 @@ func _smoke() -> void:
 			await get_tree().physics_frame
 	print("[smoke] phase=%s day=%d crackdown=%d underworld=%d" % [GameState.Phase.keys()[GameState.phase], GameState.day, GameState.crackdown, GameState.get_influence("underworld")])
 	get_tree().quit()
+
+
+## With `-- --smoke --shot=/dir`, saves player-view and overhead PNGs (needs a real window, not --headless).
+func _shots(player: Player) -> void:
+	var dir := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot="):
+			dir = a.trim_prefix("--shot=")
+	if dir == "":
+		return
+	player.rotate_camera(Vector3(-0.15, -PI * 0.75, 0))
+	for i in 5:
+		await get_tree().process_frame
+	get_viewport().get_texture().get_image().save_png(dir + "/player_view.png")
+	var cam := Camera3D.new()
+	cam.position = Vector3(0, 70, 45)
+	cam.look_at_from_position(cam.position, Vector3(0, 0, 0))
+	_world.add_child(cam)
+	cam.current = true
+	for i in 5:
+		await get_tree().process_frame
+	get_viewport().get_texture().get_image().save_png(dir + "/overhead.png")
+	cam.queue_free()
+	print("[smoke] screenshots in ", dir)

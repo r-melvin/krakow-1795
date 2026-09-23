@@ -20,7 +20,7 @@ var _pitch := -0.25
 var _pivot: Node3D
 var _arm: SpringArm3D
 var _camera: Camera3D
-var _mesh: MeshInstance3D
+var _figure: Node3D
 var _shape: CollisionShape3D
 
 
@@ -40,16 +40,17 @@ func _build_body() -> void:
 	_shape.position.y = 0.9
 	add_child(_shape)
 
-	_mesh = MeshInstance3D.new()
-	var m := CapsuleMesh.new()
-	m.radius = 0.35
-	m.height = 1.8
-	_mesh.mesh = m
-	_mesh.position.y = 0.9
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.3, 0.55)
-	_mesh.material_override = mat
-	add_child(_mesh)
+	_figure = Assets.instance("player_figure")
+	if _figure == null:
+		_figure = Node3D.new()
+		var mi := MeshInstance3D.new()
+		var m := CapsuleMesh.new()
+		m.radius = 0.35
+		m.height = 1.8
+		mi.mesh = m
+		mi.position.y = 0.9
+		_figure.add_child(mi)
+	add_child(_figure)
 
 
 func _build_camera() -> void:
@@ -107,14 +108,13 @@ func _physics_process(delta: float) -> void:
 
 	var moving := wish.length() > 0.1
 	if moving:
-		_mesh.rotation.y = lerp_angle(_mesh.rotation.y, atan2(-wish.x, -wish.z), 10 * delta)
+		_figure.rotation.y = lerp_angle(_figure.rotation.y, atan2(-wish.x, -wish.z), 10 * delta)
 
 	# Crouch: shrink the visual and collision height so guards' rays are more likely blocked by low cover.
 	var h := 1.0 if is_crouching else 1.8
 	_shape.shape.height = h
 	_shape.position.y = h * 0.5
-	_mesh.mesh.height = h
-	_mesh.position.y = h * 0.5
+	_figure.scale.y = h / 1.8
 
 	# Noise & visibility feed guard perception.
 	if not moving:
@@ -130,3 +130,9 @@ func _physics_process(delta: float) -> void:
 
 func head_position() -> Vector3:
 	return global_position + Vector3(0, 0.6 if is_crouching else 1.5, 0)
+
+
+func rotate_camera(euler: Vector3) -> void:
+	_pitch = euler.x
+	_yaw = euler.y
+	_pivot.rotation = Vector3(_pitch, _yaw, 0)

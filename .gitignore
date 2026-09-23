@@ -1,5 +1,4 @@
 .godot/
-*.import
 *.uid
 .blend1
 assets/blender/*.blend1

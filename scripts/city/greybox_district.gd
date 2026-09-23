@@ -56,11 +56,8 @@ func _environment() -> void:
 		l.omni_range = 12
 		l.shadow_enabled = true
 		add_child(l)
-		var post := CSGCylinder3D.new()
-		post.radius = 0.08
-		post.height = 3
-		post.position = Vector3(p.x, 1.5, p.z)
-		add_child(post)
+		if Assets.place(self, "lantern_post", Vector3(p.x, 0, p.z), -PI * 0.5) == null:
+			_box(Vector3(p.x, 0, p.z), Vector3(0.16, 3, 0.16))
 
 
 func _ground() -> void:
@@ -93,44 +90,53 @@ func _market_hall() -> void:
 
 
 func _tenements() -> void:
-	# Edge blocks with alley gaps.
-	var h := 10.0
-	# North row
-	_box(Vector3(-22, 0, -30), Vector3(14, h, 8))
-	_box(Vector3(-4, 0, -30), Vector3(12, h + 2, 8))
-	_box(Vector3(14, 0, -30), Vector3(14, h, 8))
-	# South row
-	_box(Vector3(-22, 0, 30), Vector3(14, h, 8))
-	_box(Vector3(-4, 0, 30), Vector3(12, h + 1, 8))
-	_box(Vector3(14, 0, 30), Vector3(14, h, 8))
-	# West column
-	_box(Vector3(-30, 0, -14), Vector3(8, h, 12))
-	_box(Vector3(-30, 0, 6), Vector3(8, h + 3, 12))
-	# East column
-	_box(Vector3(30, 0, -14), Vector3(8, h, 12))
-	_box(Vector3(30, 0, 6), Vector3(8, h, 12))
+	# glTF tenement modules (12 m wide), arcades facing the square. Fallback to CSG if the asset is missing.
+	var placed := true
+	for x in [-18.0, -6.0, 6.0, 18.0]:
+		placed = Assets.place(self, "tenement", Vector3(x, 0, -30), 0.0) != null and placed     # north row faces +Z
+		placed = Assets.place(self, "tenement", Vector3(x, 0, 30), PI) != null and placed       # south row faces -Z
+	for z in [-12.0, 0.0, 12.0]:
+		placed = Assets.place(self, "tenement", Vector3(-30, 0, z), PI * 0.5) != null and placed   # west faces +X
+	for z in [0.0, 12.0]:
+		placed = Assets.place(self, "tenement", Vector3(30, 0, z), -PI * 0.5) != null and placed   # east faces -X
+	if not placed:
+		var h := 10.0
+		_box(Vector3(-22, 0, -30), Vector3(14, h, 8))
+		_box(Vector3(-4, 0, -30), Vector3(12, h + 2, 8))
+		_box(Vector3(14, 0, -30), Vector3(14, h, 8))
+		_box(Vector3(-22, 0, 30), Vector3(14, h, 8))
+		_box(Vector3(-4, 0, 30), Vector3(12, h + 1, 8))
+		_box(Vector3(14, 0, 30), Vector3(14, h, 8))
+		_box(Vector3(-30, 0, -14), Vector3(8, h, 12))
+		_box(Vector3(-30, 0, 6), Vector3(8, h + 3, 12))
+		_box(Vector3(30, 0, 6), Vector3(8, h, 12))
 
 
 func _church() -> void:
-	# NE corner: nave + tower (St Mary's stand-in).
-	_box(Vector3(26, 0, -26), Vector3(10, 16, 10))
-	_box(Vector3(22, 0, -30), Vector3(3, 30, 3))
+	# NE corner. Nave runs north-south; towers (Blender -Y = Godot +Z) face the square.
+	if Assets.place(self, "church_mass", Vector3(36, 0, -30), 0.0) == null:
+		_box(Vector3(26, 0, -26), Vector3(10, 16, 10))
+		_box(Vector3(22, 0, -30), Vector3(3, 30, 3))
 
 
 func _cover() -> void:
-	# Market stalls, carts, barrels: low cover for crouching.
+	# Market stalls and barrels: low cover for crouching (stall counter 1.1 m).
 	var crate_mat := StandardMaterial3D.new()
 	crate_mat.albedo_color = Color(0.45, 0.32, 0.2)
-	for p in [Vector3(-8, 0, -12), Vector3(-4, 0, -12), Vector3(6, 0, 12), Vector3(10, 0, 12), Vector3(-16, 0, 2), Vector3(16, 0, -3), Vector3(-10, 0, 18), Vector3(12, 0, -18)]:
-		_box(p, Vector3(2.2, 1.1, 1.4), crate_mat)
-	for p in [Vector3(-12, 0, 14), Vector3(14, 0, 16), Vector3(-18, 0, -10), Vector3(18, 0, 10)]:
-		var b := CSGCylinder3D.new()
-		b.radius = 0.5
-		b.height = 1.0
-		b.position = p + Vector3(0, 0.5, 0)
-		b.use_collision = true
-		b.material = crate_mat
-		add_child(b)
+	var stalls := [[Vector3(-8, 0, -12), 0.0], [Vector3(-4, 0, -12), 0.0], [Vector3(6, 0, 12), PI], [Vector3(10, 0, 12), PI],
+		[Vector3(-16, 0, 2), PI * 0.5], [Vector3(16, 0, -3), -PI * 0.5], [Vector3(-10, 0, 18), 0.3], [Vector3(12, 0, -18), -0.4]]
+	for s in stalls:
+		if Assets.place(self, "market_stall", s[0], s[1]) == null:
+			_box(s[0], Vector3(2.2, 1.1, 1.4), crate_mat)
+	for p in [Vector3(-12, 0, 14), Vector3(-11.2, 0, 14.6), Vector3(14, 0, 16), Vector3(-18, 0, -10), Vector3(18, 0, 10), Vector3(18.8, 0, 10.4)]:
+		if Assets.place(self, "barrel", p, randf() * TAU) == null:
+			var b := CSGCylinder3D.new()
+			b.radius = 0.5
+			b.height = 1.0
+			b.position = p + Vector3(0, 0.5, 0)
+			b.use_collision = true
+			b.material = crate_mat
+			add_child(b)
 
 
 func _guards() -> void:

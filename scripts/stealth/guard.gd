@@ -20,7 +20,6 @@ var _wp_index := 0
 var _wait := 0.0
 var _search_timer := 0.0
 var _player: Player
-var _mesh: MeshInstance3D
 var _cone: MeshInstance3D
 var _label: Label3D
 var _alarm_reported := false
@@ -48,16 +47,17 @@ func _build_visuals() -> void:
 	shape.position.y = 0.9
 	add_child(shape)
 
-	_mesh = MeshInstance3D.new()
-	var m := CapsuleMesh.new()
-	m.radius = 0.35
-	m.height = 1.8
-	_mesh.mesh = m
-	_mesh.position.y = 0.9
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.85, 0.85, 0.9)   # Austrian white coat
-	_mesh.material_override = mat
-	add_child(_mesh)
+	var fig := Assets.instance("watchman")
+	if fig == null:
+		fig = Node3D.new()
+		var mi := MeshInstance3D.new()
+		var m := CapsuleMesh.new()
+		m.radius = 0.35
+		m.height = 1.8
+		mi.mesh = m
+		mi.position.y = 0.9
+		fig.add_child(mi)
+	add_child(fig)
 
 	# Vision cone: a flat wedge on the ground, colour shows state.
 	_cone = MeshInstance3D.new()
