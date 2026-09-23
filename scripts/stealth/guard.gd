@@ -65,7 +65,7 @@ func _build_visuals() -> void:
 	_cone.mesh = cone_mesh
 	var cmat := StandardMaterial3D.new()
 	cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	cmat.albedo_color = Color(0.2, 0.8, 0.3, 0.18)
+	cmat.albedo_color = Color(0.55, 0.75, 0.35, 0.10)
 	cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	cmat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_cone.material_override = cmat
@@ -223,14 +223,14 @@ func _update_visuals() -> void:
 	var mat := _cone.material_override as StandardMaterial3D
 	match state:
 		State.CALM:
-			mat.albedo_color = Color(0.2, 0.8, 0.3, 0.18)
+			mat.albedo_color = Color(0.55, 0.75, 0.35, 0.10)
 			_label.text = ""
 		State.CURIOUS:
-			mat.albedo_color = Color(0.9, 0.8, 0.2, 0.25)
+			mat.albedo_color = Color(0.95, 0.8, 0.25, 0.18)
 			_label.text = "?"
 		State.SEARCHING:
-			mat.albedo_color = Color(0.95, 0.5, 0.1, 0.3)
+			mat.albedo_color = Color(0.95, 0.5, 0.15, 0.22)
 			_label.text = "!?"
 		State.ALARM:
-			mat.albedo_color = Color(0.9, 0.1, 0.1, 0.35)
+			mat.albedo_color = Color(0.9, 0.15, 0.1, 0.28)
 			_label.text = "!!"

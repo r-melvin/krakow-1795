@@ -13,7 +13,8 @@ var _ground_mat: StandardMaterial3D
 
 func _ready() -> void:
 	_ground_mat = StandardMaterial3D.new()
-	_ground_mat.albedo_color = Color(0.36, 0.35, 0.36)
+	_ground_mat.albedo_color = Color(0.30, 0.28, 0.27)
+	_ground_mat.roughness = 0.9
 	_environment()
 	_ground()
 	_landmarks()
@@ -26,40 +27,68 @@ func _ready() -> void:
 func _environment() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.04, 0.045, 0.08)
+	var sky := Sky.new()
+	var sm := ProceduralSkyMaterial.new()
+	sm.sky_top_color = Color(0.02, 0.025, 0.06)
+	sm.sky_horizon_color = Color(0.10, 0.09, 0.14)
+	sm.ground_bottom_color = Color(0.02, 0.02, 0.03)
+	sm.ground_horizon_color = Color(0.08, 0.07, 0.10)
+	sm.sun_angle_max = 5.0
+	sky.sky_material = sm
+	e.background_mode = Environment.BG_SKY
+	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.3, 0.34, 0.5)
-	e.ambient_light_energy = 0.4
-	e.fog_enabled = true
-	e.fog_light_color = Color(0.09, 0.10, 0.16)
-	e.fog_density = 0.010
+	e.ambient_light_color = Color(0.16, 0.19, 0.32)
+	e.ambient_light_energy = 0.38
 	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.tonemap_exposure = 1.15
+	e.ssao_enabled = true
+	e.ssao_radius = 1.5
+	e.ssao_intensity = 2.5
 	e.glow_enabled = true
-	e.glow_intensity = 0.4
-	e.glow_bloom = 0.1
+	e.glow_intensity = 0.55
+	e.glow_bloom = 0.15
+	e.glow_hdr_threshold = 1.0
+	e.fog_enabled = true
+	e.fog_light_color = Color(0.07, 0.08, 0.13)
+	e.fog_density = 0.008
+	e.adjustment_enabled = true
+	e.adjustment_saturation = 1.15
+	e.adjustment_contrast = 1.08
 	env.environment = e
 	add_child(env)
 
+	# Low winter moon: cool, long shadows.
 	var moon := DirectionalLight3D.new()
-	moon.light_color = Color(0.62, 0.72, 1.0)
-	moon.light_energy = 0.45
-	moon.rotation_degrees = Vector3(-55, 35, 0)
+	moon.light_color = Color(0.55, 0.66, 1.0)
+	moon.light_energy = 0.22
+	moon.rotation_degrees = Vector3(-38, 40, 0)
 	moon.shadow_enabled = true
+	moon.directional_shadow_max_distance = 120
 	add_child(moon)
 
-	# Oil lanterns. Kraków had public street lighting from the 1770s, sparse.
+	# Oil lanterns. Kraków had public street lighting from the 1770s, sparse: warm pools between dark stretches.
 	for p in [Vector3(-22, 0, -22), Vector3(22, 0, -22), Vector3(-22, 0, 22), Vector3(16, 0, 24),
-			Vector3(0, 0, -24), Vector3(-6, 0, 24), Vector3(-24, 0, 0), Vector3(24, 0, 4)]:
+			Vector3(0, 0, -24), Vector3(-6, 0, 24), Vector3(-24, 0, 0), Vector3(24, 0, 4), Vector3(0, 0, 8), Vector3(0, 0, -8)]:
 		var l := OmniLight3D.new()
-		l.position = p + Vector3(0.8, 2.8, 0)
-		l.light_color = Color(1.0, 0.72, 0.42)
-		l.light_energy = 4
-		l.omni_range = 14
-		l.omni_attenuation = 1.4
+		l.position = p + Vector3(0.9, 2.9, 0)
+		l.light_color = Color(1.0, 0.68, 0.36)
+		l.light_energy = 10
+		l.omni_range = 22
+		l.omni_attenuation = 1.3
 		l.shadow_enabled = true
+		l.light_specular = 0.3
 		add_child(l)
 		Assets.place(self, "lantern_post", p, 0.0)
+
+	# Lit windows spill a little warm light onto the square's edges.
+	for p in [Vector3(-14, 6, -27), Vector3(8, 6, -27), Vector3(-27, 6, 6), Vector3(6, 6, 27), Vector3(-12, 6, 27)]:
+		var w := OmniLight3D.new()
+		w.position = p
+		w.light_color = Color(1.0, 0.75, 0.45)
+		w.light_energy = 2.5
+		w.omni_range = 9
+		add_child(w)
 
 
 func _ground() -> void:
@@ -71,7 +100,8 @@ func _ground() -> void:
 	add_child(g)
 	# Snow patches and a few paving strips to break the plane.
 	var snow := StandardMaterial3D.new()
-	snow.albedo_color = Color(0.86, 0.88, 0.93)
+	snow.albedo_color = Color(0.80, 0.83, 0.90)
+	snow.roughness = 0.95
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1795
 	for i in 24:
