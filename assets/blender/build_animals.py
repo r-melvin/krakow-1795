@@ -718,30 +718,6 @@ Q_WOLF = os.path.join(Q, "f1d12388-e39b-4157-b32a-646a1d089fc4.glb")
 Q_HUSKY = os.path.join(Q, "611d25c7-430f-4bb5-ab2c-d8f5f3cb9712.glb")
 
 
-def quaternius_dog(name, src, height, recolour):
-    reset()
-    objs = import_gltf(src)
-    rig = next(o for o in objs if o.type == "ARMATURE")
-    meshes = [o for o in objs if o.type == "MESH" and o.parent == rig]
-    for o in objs:
-        if o.type == "MESH" and o not in meshes or o.type == "EMPTY" and o.name != "RootNode" and o.parent == rig:
-            bpy.data.objects.remove(o)
-    rename_clips(rig, {"idle": ["AnimalArmature|Idle", "Idle"], "walk": ["AnimalArmature|Walk", "Walk"],
-                       "run": ["AnimalArmature|Gallop", "Gallop"]})
-    normalise(rig, meshes, height, "withers", shoulder_bone="FrontUpperLeg.L", head_bone="Head")
-    for o in list(bpy.data.objects):
-        if o.type == "EMPTY":
-            bpy.data.objects.remove(o)
-    for m in meshes:
-        for i, mat in enumerate(m.data.materials):
-            bs = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
-            c = tuple(bs.inputs["Base Color"].default_value[:3]) if bs else (0.5, 0.5, 0.5)
-            new = recolour(mat.name, c)
-            m.data.materials[i] = principled("%s_%s" % (name, mat.name), new, 0.85 if max(new) > 0.05 else 0.35, spec=0.3)
-    rig.name = name + "_rig"
-    rig_export(name, rig, meshes)
-
-
 def hound_colours(mname, c):
     """Polish hound (ogar polski): black saddle, tan legs and head, darker muzzle."""
     lum = sum(c) / 3
@@ -764,48 +740,513 @@ def spitz_colours(mname, c):
     return (0.90, 0.86, 0.76)
 
 
-# ------------------------------------------------------------------ cat (Drummyfish, CC0)
-def cat():
-    reset()
-    objs = append_blend(os.path.join(TP, "oga_simple_cat", "cat_2-80.blend"))
-    # Cube.001 is the walking cat with two shape keys (legs forward / back); Cube is a mirrored sitting variant
-    for o in objs:
-        if o.name != "Cube.001":
-            bpy.data.objects.remove(o)
-    body = bpy.data.objects["Cube.001"]
-    img = bpy.data.images.load(os.path.join(TP, "oga_simple_cat", "cat.png"))
+# ------------------------------------------------------------------ refined quadrupeds (dogs and cat from the Quaternius rigs)
+# The Quaternius meshes are ~1.9k flat-shaded triangles in flat colours. Keeping their rigs and clips, each is
+# refined here: vertices welded, silhouette reshaped per breed by bone-weighted displacement (drop ears, deep chest,
+# ruff, curled tail...), tail / ear postures baked into a new rest pose, two levels of subdivision then a decimate
+# back to a game budget, smooth shading, UVs, the flat colours (or a procedural tabby) baked to a 1024 albedo and
+# multiplied by a generated fur texture, with matching fur normal and roughness maps.
+TEX_TMP = os.path.join(ROOT, "assets", "textures", "animals")
+
+
+def _np():
+    import numpy
+    return numpy
+
+
+def _box_blur(a, n, axis):
+    """Cyclic box blur of length n along axis (keeps the tile seamless)."""
+    np = _np()
+    out = np.zeros_like(a)
+    for k in range(-(n // 2), n - n // 2):
+        out += np.roll(a, k, axis=axis)
+    return out / n
+
+
+def fur_maps(name, size=1024, streak=9, seed=1, contrast=0.3):
+    """Tileable fur: fine per-hair noise smeared into short strands (direction +u), two octaves. Returns
+    (albedo multiplier HxW, normal HxWx3 in 0..1, roughness HxW)."""
+    np = _np()
+    rng = np.random.default_rng(seed)
+    h = np.zeros((size, size), np.float32)
+    for amp, s, st in ((1.0, 1, streak), (0.6, 2, streak * 2), (0.35, 8, 3)):
+        n = rng.random((size // s, size // s)).astype(np.float32)
+        if s > 1:
+            n = np.kron(n, np.ones((s, s), np.float32))
+        n = _box_blur(n, st, 1)          # strands along u
+        n = _box_blur(n, 2, 0)
+        h += amp * (n - n.mean()) / (n.std() + 1e-6)
+    h = (h - h.min()) / (h.max() - h.min())
+    alb = (1.0 - contrast) + contrast * h
+    dx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 3.0
+    dy = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 3.0
+    nrm = np.stack([-dx, -dy, np.ones_like(h)], -1)
+    nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
+    rough = 0.55 + 0.35 * (1.0 - h)
+    return alb, nrm * 0.5 + 0.5, rough
+
+
+def np_image(name, arr, non_color=False):
+    """Float array (H, W[, 3]) -> packed Blender image (saved as PNG under assets/textures/animals, a cache)."""
+    np = _np()
+    os.makedirs(TEX_TMP, exist_ok=True)
+    if arr.ndim == 2:
+        arr = np.stack([arr] * 3, -1)
+    hgt, wid = arr.shape[:2]
+    rgba = np.concatenate([arr, np.ones((hgt, wid, 1), np.float32)], -1).astype(np.float32)
+    img = bpy.data.images.new(name, wid, hgt, alpha=False, float_buffer=False)
+    if non_color:
+        img.colorspace_settings.name = "Non-Color"
+    img.pixels.foreach_set(rgba.ravel())
+    path = os.path.join(TEX_TMP, name + ".png")
+    img.filepath_raw = path
+    img.file_format = "PNG"
+    img.save()
     img.pack()
-    body.data.materials[0] = principled("cat_fur", (0.8, 0.8, 0.8), 0.9, img, spec=0.2)
-    for m in list(body.modifiers):
-        body.modifiers.remove(m)      # "Auto Smooth" node group: shading only, and it would block shape-key export
-    for p in body.data.polygons:
-        p.use_smooth = False
-    normalise(None, [body], 0.25 * 1.28, "height", yaw=None)
-    # face -Y: the head end is the taller end
-    vs = world_verts(body)
-    mn, mx = world_bbox([body])
-    front = [v for v in vs if v.z > mn.z + (mx.z - mn.z) * 0.8]
-    fy = sum(v.y for v in front) / max(1, len(front))
-    if fy > 0:
-        body.data.transform(Matrix.Rotation(math.pi, 4, "Z"))
-    key = body.data.shape_keys
-    act = bpy.data.actions.get("KeyAction")
-    if key and act:
-        key.animation_data_create()
-        key.animation_data.action = None
-        push_nla(key, act, "walk")
-        idle = bpy.data.actions.new("idle")
-        key.animation_data.action = idle
-        for kb in key.key_blocks[1:]:
-            kb.value = 0.0
-            kb.keyframe_insert("value", frame=1)
-            kb.keyframe_insert("value", frame=30)
-        key.animation_data.action = None
-        push_nla(key, idle, "idle")
-    mn, mx = world_bbox([body])
-    c = col_box("cat", (mn.x, mn.y, 0), (mx.x, mx.y, mx.z))
-    body.name = "cat"
-    export("cat", [body, c])
+    return img
+
+
+def vgroup_weights(mesh, names):
+    """Per-vertex summed weight of the vertex groups whose name starts with any of `names`."""
+    idx = {g.index for g in mesh.vertex_groups if any(g.name.startswith(n) for n in names)}
+    out = [0.0] * len(mesh.data.vertices)
+    for v in mesh.data.vertices:
+        out[v.index] = min(1.0, sum(g.weight for g in v.groups if g.group in idx))
+    return out
+
+
+def bone_head(rig, name):
+    return rig.matrix_world @ rig.data.bones[name].head_local
+
+
+def bone_tail(rig, name):
+    return rig.matrix_world @ rig.data.bones[name].tail_local
+
+
+def weld(mesh):
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
+    bm.to_mesh(mesh.data)
+    bm.free()
+
+
+def bake_pose_into_rest(rig, mesh, pose):
+    """pose: {bone: (Matrix3 armature-space rotation, (sx, sy, sz) bone-local scale)}. Deforms the mesh by the
+    pose and makes it the rest pose, so the clips (rest-relative) keep the new posture."""
+    ad = rig.animation_data
+    muted = []
+    if ad:
+        ad.action = None
+        for t in ad.nla_tracks:
+            muted.append((t, t.mute))
+            t.mute = True
+    for pb in rig.pose.bones:
+        pb.rotation_mode = "QUATERNION"
+        pb.rotation_quaternion = (1, 0, 0, 0)
+        pb.location = (0, 0, 0)
+        pb.scale = (1, 1, 1)
+        if pb.name in pose:
+            R, sc = pose[pb.name]
+            M = pb.bone.matrix_local.to_3x3()
+            pb.rotation_quaternion = (M.inverted() @ R @ M).to_quaternion()
+            pb.scale = sc
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = mesh.evaluated_get(dg)
+    co = [v.co.copy() for v in ev.data.vertices]
+    for v, c in zip(mesh.data.vertices, co):
+        v.co = c
+    select([rig], rig)
+    bpy.ops.object.mode_set(mode="POSE")
+    bpy.ops.pose.select_all(action="SELECT")
+    bpy.ops.pose.armature_apply(selected=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for t, m in muted:
+        t.mute = m
+    bpy.context.view_layer.update()
+
+
+def reshape(mesh, fn):
+    """fn(index, Vector) -> Vector, applied to every vertex (world == local: everything is applied)."""
+    for v in mesh.data.vertices:
+        v.co = fn(v.index, v.co.copy())
+
+
+def radial(p, a, b, k):
+    """Scale point p away from segment a-b by k (inflate / slim around a bone axis)."""
+    ab = b - a
+    t = max(0.0, min(1.0, (p - a).dot(ab) / max(ab.length_squared, 1e-9)))
+    c = a + ab * t
+    return c + (p - c) * k
+
+
+def rot_about(p, pivot, axis, ang):
+    return pivot + Matrix.Rotation(ang, 3, axis) @ (p - pivot)
+
+
+def smooth_and_budget(mesh, tris_target, levels=2):
+    select([mesh], mesh)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.tris_convert_to_quads()
+    bpy.ops.object.mode_set(mode="OBJECT")
+    arm = [m for m in mesh.modifiers if m.type == "ARMATURE"]
+    for m in arm:
+        mesh.modifiers.remove(m)
+    sub = mesh.modifiers.new("Subdivision", "SUBSURF")
+    sub.levels = sub.render_levels = levels
+    sub.uv_smooth = "PRESERVE_BOUNDARIES"
+    bpy.ops.object.modifier_apply(modifier=sub.name)
+    ntri = sum(len(p.vertices) - 2 for p in mesh.data.polygons)
+    if ntri > tris_target:
+        dec = mesh.modifiers.new("Decimate", "DECIMATE")
+        dec.ratio = tris_target / ntri
+        bpy.ops.object.modifier_apply(modifier=dec.name)
+    for p in mesh.data.polygons:
+        p.use_smooth = True
+    return mesh
+
+
+def attach_armature(mesh, rig):
+    for m in list(mesh.modifiers):
+        if m.type == "ARMATURE":
+            mesh.modifiers.remove(m)
+    m = mesh.modifiers.new("Armature", "ARMATURE")
+    m.object = rig
+    mesh.parent = rig
+
+
+def bake_fur_material(name, mesh, seed, colour_fn=None, streak=9, contrast=0.3):
+    """UV-unwrap, bake the current materials' base colour to 1024, multiply by fur, one Principled material."""
+    np = _np()
+    select([mesh], mesh)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.01)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    target = bpy.data.images.new(name + "_bake", 1024, 1024, alpha=False)
+    for mat in mesh.data.materials:
+        nt = mat.node_tree
+        if colour_fn:
+            colour_fn(mat)
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = target
+        nt.nodes.active = t
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 1
+    sc.render.bake.use_pass_direct = False
+    sc.render.bake.use_pass_indirect = False
+    sc.render.bake.use_pass_color = True
+    sc.render.bake.margin = 8
+    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_clear=True, margin=8)
+    base = np.array(target.pixels[:], np.float32).reshape(1024, 1024, 4)[..., :3]
+    alb, nrm, rough = fur_maps(name, 1024, streak, seed, contrast)
+    # byte images hold sRGB values: multiply the fur in linear space, then store as sRGB again
+    lin = np.where(base <= 0.04045, base / 12.92, np.power((base + 0.055) / 1.055, 2.4)) * alb[..., None]
+    srgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(np.clip(lin, 0, None), 1 / 2.4) - 0.055)
+    a_img = np_image(name + "_albedo", np.clip(srgb, 0, 1))
+    n_img = np_image(name + "_normal", nrm, non_color=True)
+    r_img = np_image(name + "_rough", rough, non_color=True)
+    bpy.data.images.remove(target)
+    m = principled(name + "_fur", (1, 1, 1), 0.8, a_img, n_img, spec=0.3)
+    bs = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    rt = m.node_tree.nodes.new("ShaderNodeTexImage")
+    rt.image = r_img
+    m.node_tree.links.new(rt.outputs["Color"], bs.inputs["Roughness"])
+    nmap = next(n for n in m.node_tree.nodes if n.type == "NORMAL_MAP")
+    nmap.inputs["Strength"].default_value = 0.8
+    eyes = [i for i, mt in enumerate(mesh.data.materials) if mt.get("eye")]
+    mesh.data.materials.clear()
+    mesh.data.materials.append(m)
+    for p in mesh.data.polygons:
+        p.material_index = 0
+    return m
+
+
+def reground(rig, meshes):
+    mn, mx = world_bbox(meshes)
+    off = Vector((-(mn.x + mx.x) / 2, -(mn.y + mx.y) / 2, -mn.z))
+    for o in [rig] + meshes:
+        if o.parent is None:
+            o.location += off
+    bpy.context.view_layer.update()
+    select([rig] + meshes, rig)
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+
+
+def load_quaternius(src, clips):
+    reset()
+    objs = import_gltf(src)
+    rig = next(o for o in objs if o.type == "ARMATURE")
+    mesh = next(o for o in objs if o.type == "MESH" and o.parent == rig)
+    for o in objs:
+        if o.type == "MESH" and o is not mesh:
+            bpy.data.objects.remove(o)
+    rename_clips(rig, clips)
+    return rig, mesh
+
+
+def flat_colours(mesh, recolour):
+    """Replace each flat material by a Principled of the recoloured tone (the bake reads these)."""
+    for i, mat in enumerate(mesh.data.materials):
+        bs = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        c = tuple(bs.inputs["Base Color"].default_value[:3]) if bs else (0.5, 0.5, 0.5)
+        mesh.data.materials[i] = principled("src_%d_%s" % (i, mat.name), recolour(mat.name, c), 0.8)
+
+
+DOG_CLIPS = {"idle": ["AnimalArmature|Idle", "Idle"], "walk": ["AnimalArmature|Walk", "Walk"],
+             "run": ["AnimalArmature|Gallop", "Gallop"]}
+
+
+def _ears_drop(rig, mesh, length=1.9, angle=2.5):
+    """Prick ears -> long hound leathers: lengthen, thin, then swing each ear down beside the cheek."""
+    for side, sgn in ((".L", 1), (".R", -1)):
+        w = vgroup_weights(mesh, ["Ear1" + side, "Ear2" + side, "Ear3" + side, "Ear4" + side])
+        piv = bone_head(rig, "Ear1" + side)
+        tip = bone_tail(rig, "Ear4" + side)
+        up = (tip - piv).normalized()
+
+        def f(i, p, w=w, piv=piv, up=up, sgn=sgn):
+            k = min(1.0, max(0.0, (w[i] - 0.1) / 0.4))      # full swing for the leather, none for the skull
+            if k <= 0.0:
+                return p
+            d = p - piv
+            along = d.dot(up)
+            q = piv + d + up * along * (length - 1.0) * k            # longer
+            q.x = piv.x + (q.x - piv.x) * (1.0 - 0.45 * k)           # thinner leather
+            q.y = piv.y + (q.y - piv.y) * (1.0 + 0.5 * k)            # broader
+            q = rot_about(q, piv, "Y", sgn * angle * k)               # hang down outside the head
+            q = rot_about(q, piv, "Z", -sgn * 0.35 * k)               # leather set forward, along the cheek
+            return q + Vector((sgn * 0.012 * k, 0, 0))
+        reshape(mesh, f)
+
+
+def _deepen_chest(rig, mesh, k=1.3):
+    w = vgroup_weights(mesh, ["Torso"])
+    a, b = bone_head(rig, "Torso"), bone_tail(rig, "Torso2")
+    fy = bone_head(rig, "FrontUpperLeg.L").y
+
+    def f(i, p):
+        if w[i] <= 0.0:
+            return p
+        c = a.lerp(b, max(0.0, min(1.0, (p.y - a.y) / (b.y - a.y))))
+        if p.z >= c.z:
+            return p
+        # deepest behind the elbows, tucked up towards the loin
+        front = max(0.0, min(1.0, 1.0 - abs(p.y - fy) / (abs(a.y - fy) + 1e-6)))
+        return Vector((p.x, p.y, c.z + (p.z - c.z) * (1.0 + (k - 1.0) * w[i] * (0.4 + 0.6 * front))))
+    reshape(mesh, f)
+
+
+def _round_skull(rig, mesh, k=1.1, muzzle=1.0):
+    w = vgroup_weights(mesh, ["Head"])
+    h0, h1 = bone_head(rig, "Head"), bone_tail(rig, "Head")
+
+    def f(i, p):
+        if w[i] <= 0.0:
+            return p
+        fwd = (h1 - h0).normalized()
+        d = p - h0
+        along = d.dot(fwd)
+        if along > (h1 - h0).length * 0.5:     # muzzle: shorten / lengthen along the head axis
+            return p + fwd * (along - (h1 - h0).length * 0.5) * (muzzle - 1.0) * w[i]
+        return h0 + d * (1.0 + (k - 1.0) * w[i])     # cranium: rounder
+    reshape(mesh, f)
+
+
+def _tail_radius(rig, mesh, k):
+    names = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+    w = vgroup_weights(mesh, ["Tail"])
+    a, b = bone_head(rig, names[0]), bone_tail(rig, names[-1])
+    reshape(mesh, lambda i, p: p.lerp(radial(p, a, b, k), w[i]) if w[i] > 0 else p)
+
+
+def dog_hound():
+    """Ogar polski: black saddle and tan points, long drop ears, deep chest, sabre tail, longer muzzle."""
+    rig, mesh = load_quaternius(Q_WOLF, DOG_CLIPS)
+    normalise(rig, [mesh], 0.62, "withers", shoulder_bone="FrontUpperLeg.L", head_bone="Head")
+    weld(mesh)
+    tails = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+    # sabre tail carried low: bake a droop into the rest pose
+    bake_pose_into_rest(rig, mesh, {tails[0]: (rx(-1.0), (1, 1, 1)), tails[2]: (rx(0.3), (1, 1, 1))})
+    _tail_radius(rig, mesh, 0.55)
+    _ears_drop(rig, mesh)
+    _deepen_chest(rig, mesh, 1.3)
+    _round_skull(rig, mesh, 1.06, muzzle=1.15)
+    flat_colours(mesh, hound_colours)
+    # the leathers are black on an ogar (the wolf's pale inner ear would bake tan)
+    black = next(i for i, m in enumerate(mesh.data.materials) if 0.0 < sum(m.diffuse_color[:3]) < 0.15)
+    we = vgroup_weights(mesh, ["Ear"])
+    for p in mesh.data.polygons:
+        if sum(we[v] for v in p.vertices) / len(p.vertices) > 0.4:
+            p.material_index = black
+    smooth_and_budget(mesh, 12000)
+    bake_fur_material("dog_hound", mesh, seed=11, streak=7, contrast=0.28)
+    attach_armature(mesh, rig)
+    reground(rig, [mesh])
+    rig.name = "dog_hound_rig"
+    rig_export("dog_hound", rig, [mesh])
+
+
+def dog_spitz():
+    """Wolfspitz: cream coat, thick ruff and breeches, small prick ears, tail curled over the back."""
+    rig, mesh = load_quaternius(Q_HUSKY, DOG_CLIPS)
+    normalise(rig, [mesh], 0.50, "withers", shoulder_bone="FrontUpperLeg.L", head_bone="Head")
+    weld(mesh)
+    tails = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+    bake_pose_into_rest(rig, mesh, {t: (rx(0.6), (1, 1, 1)) for t in tails[1:]})
+    _tail_radius(rig, mesh, 1.5)                                    # plume
+    wn = vgroup_weights(mesh, ["Neck", "Torso3"])
+    wh = vgroup_weights(mesh, ["Head"])
+    n0, n1 = bone_head(rig, "Torso3"), bone_tail(rig, "Neck3")
+    reshape(mesh, lambda i, p: p.lerp(radial(p, n0, n1, 1.45), wn[i] * (1.0 - wh[i])) if wn[i] > 0 else p)   # ruff
+    wt = vgroup_weights(mesh, ["Torso", "Back"])
+    t0, t1 = bone_head(rig, "Back"), bone_tail(rig, "Torso2")
+    reshape(mesh, lambda i, p: p.lerp(radial(p, t0, t1, 1.12), wt[i]) if wt[i] > 0 else p)                    # coat
+    for side in (".L", ".R"):                                        # smaller ears
+        we = vgroup_weights(mesh, ["Ear1" + side, "Ear2" + side, "Ear3" + side, "Ear4" + side])
+        piv = bone_head(rig, "Ear1" + side)
+        reshape(mesh, lambda i, p, we=we, piv=piv: p.lerp(piv + (p - piv) * 0.8, we[i]) if we[i] > 0 else p)
+    _round_skull(rig, mesh, 1.08, muzzle=0.85)
+    flat_colours(mesh, spitz_colours)
+    smooth_and_budget(mesh, 12000)
+    bake_fur_material("dog_spitz", mesh, seed=12, streak=12, contrast=0.35)
+    attach_armature(mesh, rig)
+    reground(rig, [mesh])
+    rig.name = "dog_spitz_rig"
+    rig_export("dog_spitz", rig, [mesh])
+
+
+def _tabby(mat):
+    """Brown mackerel tabby from object-space position: stripes round the body, pale belly and muzzle."""
+    nt = mat.node_tree
+    bs = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bs is None:
+        return
+    base = bs.inputs["Base Color"].default_value[:3]
+    if sum(base) / 3 < 0.03:        # eyes and nose stay dark
+        return
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(tc.outputs["Object"], sep.inputs["Vector"])
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 18.0
+    nt.links.new(tc.outputs["Object"], noise.inputs["Vector"])
+    wave = nt.nodes.new("ShaderNodeTexWave")
+    wave.wave_type = "BANDS"
+    wave.bands_direction = "Y"
+    wave.inputs["Scale"].default_value = 7.0
+    wave.inputs["Distortion"].default_value = 7.0
+    wave.inputs["Detail Scale"].default_value = 2.5
+    wave.inputs["Detail"].default_value = 3.0
+    nt.links.new(tc.outputs["Object"], wave.inputs["Vector"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = 0.25
+    ramp.color_ramp.elements[0].color = (0.06, 0.045, 0.03, 1)
+    ramp.color_ramp.elements[1].position = 0.7
+    ramp.color_ramp.elements[1].color = (0.34, 0.25, 0.15, 1)
+    nt.links.new(wave.outputs["Fac"], ramp.inputs["Fac"])
+    # belly and chin pale: blend towards cream below 45% of the height
+    belly = nt.nodes.new("ShaderNodeMapRange")
+    belly.inputs["From Min"].default_value = mat.get("belly_z", 0.12)
+    belly.inputs["From Max"].default_value = mat.get("belly_z", 0.12) + 0.03
+    belly.inputs["To Min"].default_value = 1.0
+    belly.inputs["To Max"].default_value = 0.0
+    nt.links.new(sep.outputs["Z"], belly.inputs["Value"])
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.inputs["B"].default_value = (0.50, 0.42, 0.32, 1)
+    nt.links.new(belly.outputs["Result"], mix.inputs["Factor"])
+    nt.links.new(ramp.outputs["Color"], mix.inputs["A"])
+    nt.links.new(mix.outputs["Result"], bs.inputs["Base Color"])
+
+
+def cat():
+    """House cat reshaped from the Quaternius Husky rig (so it keeps idle / walk and gains a keyed sit): short
+    flat face, rounded skull, small wide ears, slim body, shorter legs, long thin tail, tabby fur, whiskers."""
+    rig, mesh = load_quaternius(Q_HUSKY, {"idle": ["AnimalArmature|Idle", "Idle"], "walk": ["AnimalArmature|Walk", "Walk"]})
+    normalise(rig, [mesh], 0.25, "withers", shoulder_bone="FrontUpperLeg.L", head_bone="Head")
+    weld(mesh)
+    tails = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+    # tail carried low then curving up (rotations only: scaling bones into the rest pose breaks the clips'
+    # translation keys, so the proportions are changed on the mesh instead)
+    pose = {t: (rx(0.22), (1, 1, 1)) for t in tails}
+    pose[tails[0]] = (rx(-1.0), (1, 1, 1))
+    bake_pose_into_rest(rig, mesh, pose)
+    _tail_radius(rig, mesh, 0.42)
+    _round_skull(rig, mesh, 1.18, muzzle=0.45)
+    wh = vgroup_weights(mesh, ["Head", "Ear"])
+    hp = bone_head(rig, "Head")
+    reshape(mesh, lambda i, p: p.lerp(hp + (p - hp) * 1.3, wh[i]) if wh[i] > 0 else p)     # bigger head
+    for side in (".L", ".R"):
+        we = vgroup_weights(mesh, ["Ear1" + side, "Ear2" + side, "Ear3" + side, "Ear4" + side])
+        piv = bone_head(rig, "Ear1" + side)
+        reshape(mesh, lambda i, p, we=we, piv=piv: p.lerp(piv + Vector(((p - piv).x * 1.15, (p - piv).y * 1.3, (p - piv).z * 0.75)), we[i]) if we[i] > 0 else p)
+    wt = vgroup_weights(mesh, ["Torso", "Back"])
+    t0, t1 = bone_head(rig, "Back"), bone_tail(rig, "Torso2")
+    reshape(mesh, lambda i, p: p.lerp(Vector((t0.x + (p.x - t0.x) * 0.82, p.y, p.z)), wt[i]) if wt[i] > 0 else p)
+    # softer, thicker limbs: a cat's legs are short and plump next to a husky's
+    for b in ("FrontUpperLeg", "FrontLowerLeg", "BackUpperLeg", "BackLowerLeg"):
+        for sd in (".L", ".R"):
+            wl = vgroup_weights(mesh, [b + sd])
+            a0, a1 = bone_head(rig, b + sd), bone_tail(rig, b + sd)
+            reshape(mesh, lambda i, p, wl=wl, a0=a0, a1=a1: p.lerp(radial(p, a0, a1, 1.3), wl[i]) if wl[i] > 0 else p)
+    flat_colours(mesh, lambda n, c: c)
+    for m in mesh.data.materials:
+        m["belly_z"] = bone_head(rig, "Back").z * 0.55
+    smooth_and_budget(mesh, 9000)
+    bake_fur_material("cat", mesh, seed=13, colour_fn=_tabby, streak=6, contrast=0.3)
+    attach_armature(mesh, rig)
+    # whiskers: thin tapered strands fanning from the muzzle, skinned to the head
+    h0, h1 = bone_head(rig, "Head"), bone_tail(rig, "Head")
+    fwd = (h1 - h0).normalized()
+    vs = world_verts(mesh)
+    wh = vgroup_weights(mesh, ["Head"])
+    front = [v for i, v in enumerate(vs) if wh[i] > 0.5]
+    tip_y = min(v.y for v in front)
+    snout = [v for v in front if v.y < tip_y + 0.012]
+    sz = sum(v.z for v in snout) / len(snout)
+    bm = bmesh.new()
+    for sgn in (-1, 1):
+        for k in range(5):
+            a = Vector((sgn * 0.006, tip_y + 0.008, sz - 0.004 + k * 0.0015))
+            d = Vector((sgn * 1.0, 0.35 + 0.1 * k, -0.25 + 0.14 * k)).normalized()
+            bm_cyl(bm, a, a + d * (0.055 + 0.006 * k), 0.00035, 0.0001, seg=3, caps=False)
+    wk = new_obj("whiskers", bm, principled("cat_whisker", (0.85, 0.83, 0.78), 0.4, spec=0.5))
+    weight_all(wk, "Head")
+    select([mesh, wk], mesh)
+    bpy.ops.object.join()
+    attach_armature(mesh, rig)
+    reground(rig, [mesh])
+    cat_sit(rig)
+    rig.name = "cat_rig"
+    rig_export("cat", rig, [mesh])
+
+
+def cat_sit(rig):
+    """Sitting: haunches down, forelegs straight, head up, tail wrapped round (keyed on the Quaternius rig)."""
+    hip = bone_head(rig, "Back")
+    frames = list(range(1, 62, 6))
+    tails = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+
+    def sit(f):
+        t = (f - 1) / 60
+        breathe = 0.02 * math.sin(t * math.tau)
+        r = {"Back": rx(-0.75), "Torso": rx(0.05 + breathe), "Neck1": rx(0.45), "Head": rx(0.25 + 0.03 * math.sin(t * math.tau * 0.5)),
+             "FrontUpperLeg.L": rx(0.7), "FrontUpperLeg.R": rx(0.7),
+             "BackLeg.L": rx(0.9), "BackLeg.R": rx(0.9),
+             "BackUpperLeg.L": rx(-1.6), "BackUpperLeg.R": rx(-1.6),
+             "BackLowerLeg.L": rx(2.1), "BackLowerLeg.R": rx(2.1),
+             tails[0]: rx(1.6), tails[1]: rz(0.5), tails[2]: rz(0.5), tails[3]: rz(0.5)}
+        return r, {"Body": Vector((0, 0, -hip.z * 0.55))}
+    act = keyed_action(rig, "sit", frames, sit, with_loc=True)
+    for fc in action_fcurves(act):
+        for k in fc.keyframe_points:
+            k.interpolation = "BEZIER"
+    push_nla(rig, act, "sit")
 
 
 # ------------------------------------------------------------------ birds
@@ -1103,8 +1544,8 @@ def hitch_rail():
 BUILDS = [
     ("horse", horse),
     ("horse_harnessed", horse_harnessed),
-    ("dog_hound", lambda: quaternius_dog("dog_hound", Q_WOLF, 0.62, hound_colours)),
-    ("dog_spitz", lambda: quaternius_dog("dog_spitz", Q_HUSKY, 0.50, spitz_colours)),
+    ("dog_hound", dog_hound),
+    ("dog_spitz", dog_spitz),
     ("cat", cat),
     ("pigeon", pigeon),
     ("crow", crow),

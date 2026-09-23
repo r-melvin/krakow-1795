@@ -6,6 +6,7 @@ by `assets/blender/build_animals.py`, plus a procedural hire carriage and farm c
 
 ```
 bash tools/fetch_animals.sh                          # ~26 MB of sources into assets/third_party/ (git-ignored)
+# (the generated fur maps are cached in assets/textures/animals/, also git-ignored)
 blender -b --python assets/blender/build_animals.py  # writes assets/models/<name>.glb (~4 MB in total)
 blender -b --python assets/blender/render_animals.py -- --out /tmp/animals   # lineup renders to check them
 ```
@@ -34,7 +35,7 @@ people.
 | [Quaternius Ultimate Animated Animal Pack](https://quaternius.com/packs/ultimateanimatedanimals.html), mirrored per model on [Poly Pizza](https://poly.pizza/bundle/Animated-Animal-Pack-ILAPXeUYiS) (direct `static.poly.pizza/<id>.glb` downloads, no login) | CC0 | Horse, White Horse, Donkey, Husky, Shiba Inu, Wolf, Fox, deer, cattle, alpaca; ~1.9k tris each, flat colours, 12+ clips (Idle, Walk, Gallop, Eating...). Stylised low-poly. The **Wolf and Husky are used** for the hound and spitz: nothing better with a rig and clips was obtainable. The Quaternius horse was the fallback. |
 | [Quaternius Farm Animal Pack](https://poly.pizza/bundle/Farm-Animal-Pack-1kUvRTPLzT) | CC0 | Horse, cow, pig, sheep, pug, llama, zebra with clips; cartoon proportions. Not used. |
 | Quaternius cats and pigeon on Poly Pizza ([Cat](https://poly.pizza/m/qKICY6xla2), [Pigeon](https://poly.pizza/m/9NGlBTpDEr)) | CC0 | Animated but chibi (huge heads and eyes). Rejected as too cartoon. |
-| [OpenGameArt: Simple Cat](https://opengameart.org/content/simple-cat) (Drummyfish) | CC0 | 114-tri cat with a photographic tabby texture made from CC0 Wikimedia photos; two-shape-key walk. Reads as a real cat at game distance. **Used.** |
+| [OpenGameArt: Simple Cat](https://opengameart.org/content/simple-cat) (Drummyfish) | CC0 | 114-tri cat with a photographic tabby texture made from CC0 Wikimedia photos; two-shape-key walk. Used in the first pass, replaced by the refined cat below (too low-poly next to the MakeHuman people). |
 | [OpenGameArt: Low poly pigeon, rigged + animated](https://opengameart.org/content/low-poly-3d-pigeon-model-rigged-animated-untextured) (mujtaba-io) | CC0 | 1k tris, 13-bone rig, flap and glide clips, untextured, modelled in flight. **Used** (ground pose, walk and colours added). |
 | [OpenGameArt: Raven](https://opengameart.org/content/raven-0) (Teh_Bucket) | CC0 | ~1.2k tris (mirrored), textured, rigged, stand and fly clips. **Used** as the crow. |
 | [Poly Pizza: Hawk Lp Rigged](https://poly.pizza/m/RkN6MEbP6g) (Sherkiz) | CC-BY 3.0 | 10k tris, textured, rigged, Fly clip. **Used** (credit required, see README). |
@@ -55,9 +56,9 @@ people.
 |---|---|---|---|---|
 | `horse` | Daniels/ChadM horse | 1.60 m at the withers | idle, walk (keyed here) | 14,986 |
 | `horse_harnessed` | same + procedural harness | 1.60 m | idle, walk | 16,478 |
-| `dog_hound` | Quaternius Wolf, recoloured black-and-tan (ogar polski) | 0.62 m | idle, walk, run | 1,962 |
-| `dog_spitz` | Quaternius Husky, recoloured cream (wolfspitz) | 0.50 m | idle, walk, run | 1,920 |
-| `cat` | Drummyfish cat | 0.25 m at the shoulder | idle, walk (shape keys) | 114 |
+| `dog_hound` | Quaternius Wolf, reshaped (ogar polski: drop ears, deep chest, low sabre tail), fur | 0.62 m | idle, walk, run | 12,000 |
+| `dog_spitz` | Quaternius Husky, reshaped (wolfspitz: ruff, plume curled over the back), fur | 0.50 m | idle, walk, run | 12,000 |
+| `cat` | Quaternius Husky rig reshaped into a cat (flat face, round skull, tabby fur, whiskers) | 0.25 m at the shoulder | idle, walk, sit (keyed here) | 9,060 |
 | `pigeon` | mujtaba-io pigeon | 0.30 m long | idle, walk (keyed here), fly | 1,010 |
 | `crow` | Teh_Bucket raven | 0.45 m long | idle, fly | 2,380 |
 | `hawk` | Sherkiz hawk | 0.55 m long | fly, idle (= fly) | 9,956 |
@@ -96,10 +97,36 @@ round the outside of the west, south and east rows, and back in through the gap 
 row. A saddle horse stands tethered by St Adalbert's (27, 19); three pigeons pick about by the Cloth Hall; two
 crows; the hawk circles 24 m up; the falconer's dog is now the hound and the lapdog the spitz.
 
+## Dogs and cat: second pass (higher fidelity)
+
+A second search for login-free, higher-fidelity CC0 / CC-BY dogs and cats came up empty:
+- OpenGameArt 3D "dog" / "hound" / "cat": low-poly or cartoon only ([Benny the Rottweiler](https://opengameart.org/content/benny-the-rottweiler)
+  is CC-BY-SA and stylised; [Canine low poly](https://opengameart.org/content/canine-low-poly) is CC-BY, blocky).
+- Smithsonian Open Access 3D (CC0): the API returns no dog or cat specimens with 3D media.
+- Wikimedia Commons 3D: statue scans (STL) only.
+- Quaternius and KayKit: no higher-poly animal packs; everything is stylised low-poly.
+- Blend Swap ([rigged, animated cat](https://blendswap.com/blend/18519), CC-BY) needs a login ("Sign in to download").
+  itch.io asset listings answer HTTP 403 to scripts. Meshy's "CC0" dogs are AI-generated and need an account.
+
+So the dogs and the cat are **refined procedurally from the Quaternius rigs** (keeping their skinning and clips):
+1. weld the flat-shaded split vertices;
+2. breed shape by bone-weighted displacement: hound leathers lengthened, thinned and swung down beside the
+   cheek, chest deepened behind the elbows, rounder skull, longer muzzle, slim sabre tail carried low; spitz
+   ruff and coat inflated, smaller ears, shorter muzzle, plume tail curled over the back; cat face flattened,
+   skull rounded, head enlarged, small wide ears, slim body, plumper legs, thin tail carried low then up;
+3. tail postures baked into a new rest pose (so the clips keep them);
+4. triangles to quads, **Subdivision Surface level 2** applied, decimated back to 12k (dogs) / 9k (cat), smooth shading;
+5. smart UV project, the coat colours (black-and-tan, cream, or a procedural mackerel tabby with a pale belly for
+   the cat) baked to a 1024 albedo, multiplied by a generated **fur texture** (strand noise) with matching
+   **fur normal and roughness maps**;
+6. cat: 10 whiskers as tapered strands skinned to the head, and a keyed **sit** clip (haunches down, forelegs
+   straight, tail wrapped); a standing cat plays "sit" in the game.
+
 ## Caveats
-- The dogs are Quaternius low-poly, flat-shaded and stylised; they are the weakest link. A realistic rigged dog
-  would need a Sketchfab account (many CC-BY ones) or a commission.
-- The cat is only 114 triangles (photo-textured card-like limbs); fine at a distance, poor close up.
+- The dogs and the cat are still built on Quaternius' low-poly bodies: smoother and furred now, with breed
+  silhouettes, but not photoreal. A realistic rigged dog or cat would need a Sketchfab / Blend Swap account.
+- The cat's tail is short for a cat (bone scaling in the rest pose broke the clips' translation keys, so only
+  rotations are baked); its legs are pale because the tabby blends to cream below the flank.
 - The hawk has only a flight clip and is modelled wings-spread, so it can only fly (hawks are not night birds;
   it is there because the falconer lost it).
 - The carriage and cart are procedural and plain-shaded (no baked wood textures yet).

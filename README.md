@@ -86,9 +86,9 @@ Change either if you prefer; nothing else in the repository constrains the choic
   details in `docs/ANIMALS.md`):
   - Horse (and the harnessed horses): model and textures by **Lyndon Daniels** ("Realtime Rancher's 3D Model
     Pack"), rig by **ChadM**, OpenGameArt, CC0. https://opengameart.org/content/rigged-horse
-  - Hound and spitz: recoloured **Quaternius** Wolf and Husky ("Ultimate Animated Animal Pack"), CC0.
+  - Hound, spitz and cat: rigs, clips and base meshes from **Quaternius** Wolf and Husky ("Ultimate Animated
+    Animal Pack"), CC0, reshaped, subdivided and given procedural fur by the build script.
     https://quaternius.com/packs/ultimateanimatedanimals.html
-  - Cat: "Simple Cat" by **Drummyfish**, OpenGameArt, CC0. https://opengameart.org/content/simple-cat
   - Pigeon: "Low poly 3D Pigeon model (rigged + animated)" by **mujtaba-io**, OpenGameArt, CC0.
     https://opengameart.org/content/low-poly-3d-pigeon-model-rigged-animated-untextured
   - Crow: "Raven" by **Teh_Bucket**, OpenGameArt, CC0. https://opengameart.org/content/raven-0

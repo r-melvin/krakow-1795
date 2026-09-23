@@ -24,14 +24,10 @@ fetch() {  # fetch <pack> <url> [<filename>]
 
 # Horse: "Realtime Rancher's" horse by Lyndon Daniels, rigged by ChadM (OpenGameArt, CC0). 2k textures packed.
 fetch oga_rigged_horse "$OGA/riggedHorse.blend"
-# Dogs: Quaternius "Ultimate Animated Animal Pack" via Poly Pizza (CC0): Wolf (hound base), Husky (spitz base).
+# Dogs and cat: Quaternius "Ultimate Animated Animal Pack" via Poly Pizza (CC0): Wolf (hound base), Husky (spitz
+# and cat base; build_animals.py reshapes, subdivides and furs them).
 fetch quaternius_animals "$PP/f1d12388-e39b-4157-b32a-646a1d089fc4.glb"   # Wolf
 fetch quaternius_animals "$PP/611d25c7-430f-4bb5-ab2c-d8f5f3cb9712.glb"   # Husky
-# Cat: "Simple Cat" by Drummyfish (OpenGameArt, CC0), photo texture from CC0 Wikimedia photos.
-fetch oga_simple_cat "$OGA/cat.zip"
-if [[ ! -f "$TP/oga_simple_cat/cat_2-80.blend" ]]; then
-	(cd "$TP/oga_simple_cat" && unzip -o -q cat.zip)
-fi
 # Pigeon: "Low poly 3D Pigeon model (rigged + animated)" by mujtaba-io (OpenGameArt, CC0).
 fetch oga_pigeon "$OGA/genuinely-my-pigeon-extended-furthur.blend"
 # Crow: "Raven" by Teh_Bucket (OpenGameArt, CC0).

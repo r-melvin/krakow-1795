@@ -8,9 +8,10 @@ extends "res://scripts/npc/walker.gd"
 ##   "drive"   a vehicle (carriage / horse_cart glb): harnessed horses in the glb's horse_slot_N empties pull
 ##             it round `route` (a loop of points) at `speed`; the vehicle trails the team on its pole like a
 ##             real trailer. Stops for the player, townsfolk, guards and other vehicles in its way.
-## Rigged models play "idle" / "walk" (or "fly") from their AnimationPlayer; older static models just stand.
+## Rigged models play "idle" / "walk" (or "fly") from their AnimationPlayer ("sit" instead of "idle" for a
+## standing animal that has one); older static models just stand.
 
-const WALK_REF := {"horse": 1.5, "horse_harnessed": 1.5, "dog_hound": 1.2, "dog_spitz": 0.9, "pigeon": 0.3}
+const WALK_REF := {"horse": 1.5, "horse_harnessed": 1.5, "dog_hound": 1.2, "dog_spitz": 0.9, "cat": 0.45, "pigeon": 0.3}
 const LIFT := {"pigeon": 0.035, "crow": 0.035}   ## small birds would vanish into the parallax-mapped setts
 const DRIVERS := ["town_coachman", "npc_m_03", "npc_m_01", "figure_townsman"]
 const TURN_RATE := 0.75        ## rad/s at full speed: ~2.7 m turning radius at 2 m/s
@@ -36,6 +37,7 @@ var _pause := 0.0
 var _rng := RandomNumberGenerator.new()
 var _anims: Array[AnimationPlayer] = []
 var _walk_ref := 1.0
+var _rest_clip := "idle"          ## "sit" for a standing animal whose model has a sit clip (the cat)
 
 # vehicle state
 var _trailer: CharacterBody3D     ## the carriage body, dragged behind the team (top-level)
@@ -71,7 +73,11 @@ func _ready() -> void:
 	nav_agent.avoidance_priority = 0.3   # animals give way to people
 	if follow != "":
 		behaviour = "follow"
-	_play("idle")
+	if behaviour == "stand":
+		for ap in _anims:
+			if ap.has_animation("sit"):
+				_rest_clip = "sit"
+	_play(_rest_clip)
 	_desync()
 
 
@@ -401,7 +407,7 @@ func _physics_process(delta: float) -> void:
 	if is_moving():
 		_play("walk", clampf(Vector2(velocity.x, velocity.z).length() / _walk_ref, 0.5, 2.5))
 	else:
-		_play("idle")
+		_play(_rest_clip)
 
 
 func _circle(delta: float) -> void:
