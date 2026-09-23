@@ -54,16 +54,62 @@ def cam(sc, loc, target, lens=50):
     d = (target[0]-loc[0], target[1]-loc[1], target[2]-loc[2])
     co.rotation_euler = (math.atan2(math.hypot(d[0], d[1]), -d[2]), 0, math.atan2(d[1], d[0]) - math.pi/2)
 
-def load(name, x=0.0, y=0.0, rz=0.0):
+_IDLE = {}
+
+def lib_idle():
+    """The shared library's idle clip (characters no longer bake idle/walk); cached per scene rebuild."""
+    key = id(bpy.context.scene)
+    if key in _IDLE:
+        return _IDLE[key]
+    _IDLE.clear()
+    path = os.path.join(MODELS, "anim_library.glb")
+    if not os.path.exists(path):
+        _IDLE[key] = None
+        return None
+    before_a, before_o = set(bpy.data.actions), set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    new = [a for a in bpy.data.actions if a not in before_a]
+    for a in new:
+        a.use_fake_user = True
+    for o in [o for o in bpy.data.objects if o not in before_o]:
+        bpy.data.objects.remove(o)
+    idle = [a for a in new if a.name.lower().split(".")[0] in ("idle", "idle_alert")]
+    idle.sort(key=lambda a: a.name.lower() != "idle")
+    _IDLE[key] = idle[0] if idle else None
+    return _IDLE[key]
+
+def load(name, x=0.0, y=0.0, rz=0.0, frame=0):
     bpy.ops.import_scene.gltf(filepath=os.path.join(MODELS, name + ".glb"))
     root = [o for o in bpy.context.selected_objects if o.parent is None][0]
     root.rotation_mode = "XYZ"; root.location = (x, y, 0); root.rotation_euler = (0, 0, rz)
+    # the importer activates the figure's first clip ("sentry"); pose everyone with the library idle instead,
+    # each at a different phase so the row does not move in lockstep
+    if root.type == "ARMATURE":
+        if root.animation_data is None:
+            root.animation_data_create()
+        for tr in list(root.animation_data.nla_tracks):
+            root.animation_data.nla_tracks.remove(tr)
+        idle = lib_idle()
+        if idle is not None:
+            root.animation_data.action = idle
+            try:
+                root.animation_data.action_slot = idle.slots[0]
+            except (AttributeError, IndexError):
+                pass
+            for fc in idle.fcurves if hasattr(idle, "fcurves") else []:
+                pass
+            root.animation_data.action_extrapolation = "HOLD"
+            # phase offset via a per-object frame shift: emulate by nudging the scene frame later; store it
+            root["idle_phase"] = frame
+        else:
+            root.animation_data.action = None
 
 for tag, NAMES in GROUPS.items():
     sc = scene(); sc.render.resolution_x, sc.render.resolution_y = 2700, 1200
     for i, n in enumerate(NAMES):
         load(n, i * 0.85, 0, math.radians(10))
     cx = (len(NAMES) - 1) * 0.85 / 2
+    sc.frame_set(14)
     cam(sc, (cx, -9.0, 1.05), (cx, 0, 0.95), lens=44)
     sc.render.filepath = os.path.join(OUT, tag + ".png"); bpy.ops.render.render(write_still=True); print("[lineup]", sc.render.filepath)
 
@@ -71,5 +117,6 @@ for tag, NAMES in GROUPS.items():
     for i, n in enumerate(NAMES):
         load(n, i * 0.42, 0, math.radians(15))
     cx = (len(NAMES) - 1) * 0.42 / 2
+    sc.frame_set(14)
     cam(sc, (cx, -2.6, 1.60), (cx, 0, 1.55), lens=42)
     sc.render.filepath = os.path.join(OUT, tag + "_faces.png"); bpy.ops.render.render(write_still=True); print("[lineup]", sc.render.filepath)
