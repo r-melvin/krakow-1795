@@ -265,6 +265,82 @@ def log(*a):
 
 
 # ------------------------------------------------------------------ body
+_TG = []
+
+
+def _TARGET_GROUPS():
+    if not _TG:
+        _TG.extend(d for d in sorted(os.listdir(TARGETS)) if os.path.isdir(os.path.join(TARGETS, d)))
+    return _TG
+
+
+# ------------------------------------------------------------------ body types by role
+GAUNT_ROLES = ("beggar", "urchin", "informer", "artist")
+GAUNT_SOME = ("peasant", "washerwoman", "carter", "journeyman", "scholar", "student", "pedlar", "lamplighter")
+ROTUND_ROLES = ("figure_merchant", "cloth_merchant", "bishop", "banker", "innkeeper", "mayor", "burgomaster",
+                "tavern_keeper", "hostess", "brewer", "councillor", "cellarman", "market_woman", "magnate")
+ROTUND_SOME = ("merchant", "trader", "dealer", "judge", "notary", "baker", "steward", "goldsmith", "distiller", "governor")
+FIT_ROLES = ("watchman", "guard", "hajduk", "raftsman", "porter", "blacksmith", "officer", "cossack", "sergeant",
+             "polizei", "boatman", "ferryman", "coachman", "tatar", "smuggler", "falconer", "tanner")
+
+
+def _seed(name, salt=0):
+    import zlib
+    return zlib.crc32(("%s:%d" % (name, salt)).encode()) & 0xffffffff
+
+
+def body_type(name):
+    """Role -> build: gaunt, rotund, fit or average. Part of each ambiguous group is decided by a stable seed."""
+    rng = random.Random(_seed(name, 1))
+    if any(k in name for k in GAUNT_ROLES):
+        return "gaunt"
+    if any(k in name for k in ROTUND_ROLES):
+        return "rotund"
+    if any(k in name for k in FIT_ROLES):
+        return "fit"
+    if any(k in name for k in GAUNT_SOME) and rng.random() < 0.5:
+        return "gaunt"
+    if any(k in name for k in ROTUND_SOME) and rng.random() < 0.6:
+        return "rotund"
+    if name.startswith("npc_"):
+        r = rng.random()
+        return "gaunt" if r < 0.2 else ("rotund" if r < 0.4 else "average")
+    return "average"
+
+
+def apply_body(name, spec):
+    """Weight and muscle from the role (see body_type), plus shape targets: a belly and waist for the rotund,
+    hollow chest and narrow waist for the gaunt, and a flatter chest than MakeHuman's athletic default for all.
+    Women take the same spread with muscle capped at 0.45. Garments are cut from the shaped helpers afterwards,
+    so a fat merchant's coat is wider."""
+    rng = random.Random(_seed(name, 2))
+    macro = dict(spec.get("macro", {}))
+    female = macro.get("gender", 0.5) < 0.5
+    kind = spec.get("body") or body_type(name)
+    wr, mr = {"gaunt": ((0.15, 0.3), (0.2, 0.35)), "rotund": ((0.75, 0.95), (0.3, 0.5)),
+              "fit": ((0.45, 0.6), (0.55, 0.7)), "average": ((0.3, 0.7), (0.25, 0.55))}[kind]
+    weight = round(rng.uniform(*wr), 2)
+    muscle = round(rng.uniform(*mr), 2)
+    if female:
+        muscle = min(muscle, 0.45)
+    macro.update({"weight": weight, "muscle": muscle})
+    targets = dict(spec.get("targets", {}))
+    shape = {"torso-muscle-pectoral-decr": 0.25, "torso-vshape-decr": 0.2}
+    if kind == "rotund":
+        belly = round(0.35 + 0.5 * (weight - 0.75) / 0.2, 2)
+        shape.update({"stomach-pregnant-incr": belly * (0.7 if female else 1.0), "measure-waist-circ-incr": 0.35,
+                      "stomach-tone-decr": 0.5, "torso-vshape-decr": 0.4})
+    elif kind == "gaunt":
+        shape.update({"measure-waist-circ-decr": 0.35, "torso-muscle-pectoral-decr": 0.45, "torso-scale-horiz-decr": 0.15,
+                      "stomach-pregnant-decr": 0.3, "torso-vshape-decr": 0.35})
+    elif kind == "fit":
+        shape = {"torso-vshape-decr": 0.05}
+    for k, v in shape.items():
+        targets.setdefault(k, v)
+    log("body %s: %s weight %.2f muscle %.2f" % (name, kind, weight, muscle))
+    return dict(spec, macro=macro, targets=targets, body=kind)
+
+
 def make_body(spec):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _mats.clear()
@@ -282,6 +358,10 @@ def make_body(spec):
     for tname, w in targets.items():
         group = tname.split("-")[0]
         path = os.path.join(TARGETS, group, tname + ".target.gz")
+        if not os.path.exists(path):
+            # e.g. "measure-waist-circ-incr" lives in targets/torso
+            path = next((os.path.join(TARGETS, g, tname + ".target.gz") for g in _TARGET_GROUPS()
+                         if os.path.exists(os.path.join(TARGETS, g, tname + ".target.gz"))), path)
         if os.path.exists(path):
             TargetService.load_target(h, path, weight=w)
         else:
@@ -336,11 +416,11 @@ def face_info(h, me, rig):
     return info
 
 
-DRAPE = {"coat", "coat_skirt", "skirt", "breeches"}
+DRAPE = {"coat", "coat_skirt", "skirt", "breeches", "cuffs"}
 DRAPE_CTX = {}
 GARMENT_EXTRA = []      # seam strips made inside garment(), collected by build_clothes
 MAT_KEY = {}
-SOFTEN = {"coat": (4, 0.6), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (3, 0.5), "stockings": (1, 0.3), "cuffs": (1, 0.3)}
+SOFTEN = {"coat": (8, 0.7), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (6, 0.6), "stockings": (1, 0.3), "cuffs": (2, 0.4)}
 
 
 def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, offset=0.0):
@@ -358,7 +438,7 @@ def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, 
     bmesh.ops.delete(bm, geom=dead_faces, context="FACES")
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
     # weld: the helper has split vertices (e.g. along the top of the shoulder) that open up when the arm is raised
-    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.0005)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=0.003)
     # smooth the cut edge so hems and collars are not sawtoothed
     bm.verts.ensure_lookup_table()
     for _ in range(3):
@@ -1016,6 +1096,101 @@ def waist_belt(key, surf, zc, rig, bone, bones, silk=None, long_coat=True):
     return out
 
 
+def _seg_perp(p, a, b):
+    """Vector from the closest point of segment ab to p, and the parameter along ab."""
+    ab = b - a
+    t = max(0.0, min(1.0, (p - a).dot(ab) / max(ab.length_squared, 1e-9)))
+    return p - (a + ab * t), t
+
+
+def wearing_ease(bm, name, dom, ctx):
+    """Cut the garment with room in it: push the helper surface out from the body (from the spine axis for the
+    torso, from the bone for arms and thighs), then relax it so muscle and rib definition does not print through.
+      coat torso : 3.2 cm at chest and belly (front), 2.5 cm at back and sides, easing to 0.6 cm at the neck
+      sleeves    : 2.8 cm over the deltoid, 1.8 cm at the upper arm, 1.5 cm on the forearm, 1.2 cm at the wrist
+      breeches   : 2.5 cm at the thigh, easing to 0.8 cm at the knee band; the inner thigh gets 40 % (crotch clear)
+      cuffs      : 1.7 cm, so they sit over the eased sleeve end
+    The rotund keep their mass: the offset follows the shaped helper, which already carries belly and chest."""
+    B = ctx["B"]
+    nz = B["neck_01"][0].z
+    wz = ctx["waist_z"]
+    knee = ctx["knee_z"]
+    sp = [B["pelvis"][0], B["spine_01"][0], B["spine_02"][0], B["spine_03"][0], B["neck_01"][0]]
+    def spine_at(z):
+        for a, b in zip(sp, sp[1:]):
+            if z <= b.z:
+                t = max(0.0, min(1.0, (z - a.z) / max(1e-6, b.z - a.z)))
+                return a.lerp(b, t)
+        return sp[-1]
+    TORSO = {"spine_01", "spine_02", "spine_03", "pelvis", "clavicle_l", "clavicle_r", "neck_01"}
+    moves = {}
+    bm.normal_update()
+    for v in bm.verts:
+        d = dom(v)
+        co = v.co
+        amt, rdir = 0.0, None
+        if d in TORSO or (name == "coat" and d in ("thigh_l", "thigh_r")):
+            c = spine_at(co.z)
+            r = Vector((co.x - c.x, co.y - c.y, 0.0))
+            if r.length < 1e-5:
+                continue
+            rdir = r.normalized()
+            front = max(0.0, -rdir.y)
+            amt = 0.025 + 0.007 * front
+            if co.z > nz - 0.10:
+                amt *= max(0.2, 1.0 - (co.z - (nz - 0.10)) / 0.10 * 0.8)
+            if d in ("clavicle_l", "clavicle_r"):
+                amt = min(amt, 0.018)
+        elif d and d[:-2] in ("upperarm", "lowerarm", "hand"):
+            s_ = d[-1]
+            a, b = B["upperarm_" + s_][0], B["lowerarm_" + s_][0]
+            h = B["hand_" + s_][0]
+            p1, t1 = _seg_perp(co, a, b)
+            p2, t2 = _seg_perp(co, b, h)
+            perp, t = (p1, t1 * 0.5) if p1.length < p2.length else (p2, 0.5 + 0.5 * t2)
+            if perp.length < 1e-5:
+                continue
+            rdir = perp.normalized()
+            # extra room over the deltoid, which bulges when the arms are lowered into the rest pose
+            amt = 0.018 - 0.006 * t + 0.01 * max(0.0, 1.0 - t / 0.25) if name != "cuffs" else 0.017
+        elif d in ("thigh_l", "thigh_r", "calf_l", "calf_r") and name in ("breeches", "cuffs"):
+            s_ = d[-1]
+            perp, t = _seg_perp(co, B["thigh_" + s_][0], B["calf_" + s_][0])
+            if perp.length < 1e-5:
+                continue
+            rdir = perp.normalized()
+            k = max(0.0, min(1.0, (co.z - knee) / 0.25))
+            amt = 0.008 + 0.017 * k
+            inner = max(0.0, -rdir.x * (1 if s_ == "l" else -1))
+            amt *= 1.0 - 0.6 * inner
+        if rdir is not None and amt > 0:
+            # blend the axis direction with the surface normal (turned outward): on the tops of the shoulders the
+            # axis push is sideways and would leave the cloth lying on the skin
+            n = v.normal if v.normal.dot(rdir) >= 0 else -v.normal
+            dvec = (rdir + n)
+            dvec = dvec.normalized() if dvec.length > 1e-6 else rdir
+            moves[v] = dvec * amt
+    for v, m in moves.items():
+        v.co += m
+    # relax: smooth the interior so the cloth spans hollows (ribs, muscle grooves) instead of printing them
+    inner = [v for v in bm.verts if not v.is_boundary]
+    for _ in range(16):
+        bmesh.ops.smooth_vert(bm, verts=inner, factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    # smoothing shrinks convex cloth (shoulder caps, deltoids): give back ~0.6 cm, then make sure every vertex keeps
+    # at least 1.4 cm over the nearest skin along its push direction
+    kd = ctx.get("skin_kd")
+    for v, m in moves.items():
+        if m.length < 1e-6:
+            continue
+        d = m.normalized()
+        v.co += d * 0.006
+        if kd:
+            co, _, dist = kd.find(v.co)
+            gap = (v.co - co).dot(d)
+            if gap < 0.014:
+                v.co += d * (0.014 - gap)
+
+
 def drape(obj, name, rig, ctx):
     """Real folds in the garment mesh (before thickening): simple subdivision for resolution, then outward-only
     displacement so nothing moves into the body.
@@ -1050,6 +1225,12 @@ def drape(obj, name, rig, ctx):
             return None
         d = v[dl]
         return max(((w, names.get(i)) for i, w in d.items() if names.get(i) in bones), default=(0, None))[1]
+    if name in ("coat", "breeches", "cuffs"):
+        wearing_ease(bm, name, dom, ctx)
+        if name == "cuffs":
+            bm.to_mesh(obj.data)
+            bm.free()
+            return None
     moves = {}
     if name in ("skirt", "coat_skirt"):
         px, py = B["pelvis"][0].x, B["pelvis"][0].y
@@ -1067,9 +1248,15 @@ def drape(obj, name, rig, ctx):
             f = 1 - (1 - f) ** 2
             g = 0.5 + 0.5 * math.sin(th * 38 + 1.2 * wander)
             sfac = (abs(rx) / rl) ** 2
-            # hem flare: +4.5 cm at the front, +6.5 cm at the back (room for knee and trailing foot), +2 cm at the sides
-            fl = (0.045 + (0.02 if ry > 0 else 0.0) - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
-            disp = A_fold * f * t ** 1.1 + 0.005 * g * max(0.0, 1 - t / 0.3) + fl
+            # hem flare: +4.5 cm at the front, +9 cm across the rear (room for the trailing calf and foot), +2 cm at the sides
+            # the rear gets the extra room: full within 50 deg of straight back (the calves stand ~60 deg off the
+            # centre line, so a narrower arc misses them), fading out by 75 deg
+            dback = abs(math.atan2(rx, ry))
+            rear = 1.0 - _smooth01((dback - math.radians(50)) / math.radians(25))
+            base = 0.045                                              # +4.5 cm all round (3 cm let the front knee through)
+            fl = (base + 0.045 * rear - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
+            # + 3 cm wearing ease all the way down, so the skirt clears the eased coat and breeches beneath it
+            disp = 0.03 + A_fold * f * t ** 1.1 + 0.005 * g * max(0.0, 1 - t / 0.3) + fl
             moves[v] = Vector((rx / rl * disp, ry / rl * disp, 0.0))
     elif name == "coat":
         cy_t = B["spine_02"][0].y
@@ -1141,26 +1328,33 @@ def drape(obj, name, rig, ctx):
         px, py = B["pelvis"][0].x, B["pelvis"][0].y
         NA = 96
         grid = {}
-        for p in ctx["legs"]:
+        for p in ctx["legs"] + [q + (q - Vector((px, py, q.z))).normalized() * -0.01 for q in ctx.get("over", [])]:
             ka = int((math.atan2(p.y - py, p.x - px) % math.tau) / math.tau * NA) % NA
             kz = int(math.floor(p.z / 0.01))
             r = math.hypot(p.x - px, p.y - py)
             if r > grid.get((ka, kz), 0.0):
                 grid[(ka, kz)] = r
         knee = ctx["knee_z"]
+        pushed = []
         for v in bm.verts:
-            if v.co.z > knee + 0.15:
-                continue
             rx, ry = v.co.x - px, v.co.y - py
             r = math.hypot(rx, ry) or 1e-6
             ka = int((math.atan2(ry, rx) % math.tau) / math.tau * NA) % NA
             kz = int(math.floor(v.co.z / 0.01))
             need = max((grid.get(((ka + da) % NA, kz + dz), 0.0) for da in (-2, -1, 0, 1, 2) for dz in (-2, -1, 0, 1, 2)), default=0.0)
-            clear = 0.012 + 0.02 * max(0.0, min(1.0, (knee + 0.15 - v.co.z) / 0.3))
+            # above the knee: 2.5 cm of ease over hips and belly (and 1.5 cm over the eased coat); below: room for the stride
+            clear = 0.025 if v.co.z > knee + 0.15 else 0.012 + 0.02 * max(0.0, min(1.0, (knee + 0.15 - v.co.z) / 0.3))
+            if ry > 0 and v.co.z < knee:
+                clear = max(clear, 0.04)          # 4 cm behind the calves
             if need and r < need + clear:
                 f = (need + clear) / r
                 v.co.x = px + rx * f
                 v.co.y = py + ry * f
+                pushed.append(v)
+        # even out the pushed cloth so hips read as one soft mass, not bumps over each thigh
+        upper = [v for v in pushed if not v.is_boundary and v.co.z > knee]
+        for _ in range(4):
+            bmesh.ops.smooth_vert(bm, verts=upper, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=False)
     if name in ("skirt", "coat_skirt"):
         # keep the hem a clean line: relax the lower boundary along itself (height and outline)
         for _ in range(4):
@@ -1206,8 +1400,8 @@ def _smooth01(x):
 def skirt_weights(obj, rig, ctx):
     """One skinning scheme for hanging cloth below the crotch (thigh head height), so raised or striding legs do
     not punch through: the helper's own weights at the crotch, blended linearly over 0.35 m into same-side thigh
-    shares of front 0.75 -> 0.55 (knee to hem), back 0.85 -> 0.75 with a calf share of up to 0.75 at the back hem
-    for the trailing foot, sides 0.9; the rest is pelvis. Left and right blend over 18 cm across the centre line
+    shares of front 0.75 -> 0.55 (knee to hem), back 0.85 with a calf share ramping from the knee to 0.9 a third of the way to the back hem
+    for the trailing foot, sides 0.9; the rest is pelvis. Left and right blend over 18 cm (front) to 14 cm (back) across the centre line
     so cloth between the legs stretches instead of tearing. (Tested in the walk frames: pelvis-dominant front and
     back panels let the legs through.)"""
     B = ctx["B"]
@@ -1231,18 +1425,22 @@ def skirt_weights(obj, rig, ctx):
         rx, ry = v.co.x - px, v.co.y - py
         rl = math.hypot(rx, ry) or 1.0
         back = ry > 0
+        u = max(0.0, (knee - z) / max(1e-3, knee - hem))
         if z > knee:
             cf, cs = (0.85 if back else 0.75), 0.9
-            calf = 0.0
         else:
-            u = (knee - z) / max(1e-3, knee - hem)
-            cf = (0.85 - 0.1 * u) if back else (0.75 - 0.2 * u)
+            cf = (0.85 + 0.05 * u) if back else (0.75 - 0.2 * u)
             cs = 0.9 - 0.05 * u
-            # the trailing foot kicks up behind: the back hem follows the calf (and the sides a little)
-            calf = (0.75 * u ** 0.7) * (min(1.0, ry / rl * 1.5) if back else 0.0) + 0.15 * u * (abs(rx) / rl)
+        # the trailing calf swings back and up under the knee: the back takes a calf share that starts 8 cm above
+        # the knee and reaches 0.9 a third of the way down to the hem (a smooth ramp, so the cloth does not crease
+        # into the boot), the sides a little
+        span = 0.08 + (knee - hem) / 3.0
+        calf = 0.9 * _smooth01((knee + 0.08 - z) / span) * (min(1.0, ry / rl * 1.5) if back else 0.0) + 0.15 * u * (abs(rx) / rl)
         sfac = (abs(rx) / rl) ** 2
         cap = cf + (cs - cf) * sfac
-        wl = _smooth01((rx + 0.09) / 0.18)
+        # left/right blend: 18 cm wide at the front, 14 cm at the back (narrower tears the centre back, wider lets the calf through)
+        bw = 0.09 - 0.02 * max(0.0, ry / rl)
+        wl = _smooth01((rx + bw) / (2 * bw))
         th = cap * (1 - calf)
         cl = cap * calf
         target = {"pelvis": 1.0 - cap, "thigh_l": th * wl, "thigh_r": th * (1.0 - wl), "calf_l": cl * wl, "calf_r": cl * (1.0 - wl)}
@@ -1429,7 +1627,7 @@ def seam_build(obj, paths, n0, key, rig, ctx):
             p = me.vertices[oi].co.lerp(me.vertices[oj].co, t)
             q = me.vertices[ii].co.lerp(me.vertices[ij].co, t)
             n = (p - q)
-            bad.append(n.length > 0.04)
+            bad.append(n.length > 0.065)
             P.append(p)
             Nn.append(n.normalized() if n.length > 1e-6 else Vector((0, 0, 1)))
             src.append(oj if t > 0.5 else oi)
@@ -1456,7 +1654,7 @@ def seam_build(obj, paths, n0, key, rig, ctx):
                 bm.faces.new((rowL[k], rowL[k2], rowR[k2], rowR[k]))
             except ValueError:
                 pass
-    if not bm.verts:
+    if not bm.faces:
         bm.free()
         return None
     o = _mk("seam_" + obj.name, bm, M(_dark(key, 0.38), 1.0, tex="plain"), rig, bone=None, angle=80, uv=0.2, recalc=False)
@@ -2131,7 +2329,15 @@ def build_clothes(h, rig, spec):
                       "bones": set(b.name for b in rig.data.bones), "arms": ARMS})
     GARMENT_EXTRA.clear()
     pts = skin_points(h, me, rig)
-    DRAPE_CTX["legs"] = [p for (p, d) in pts if d in LEGS_UP | CALF | FEET]
+    # body under the skirts: legs, and hips and belly (so a rotund belly pushes the skirt out instead of through)
+    DRAPE_CTX["legs"] = [p for (p, d) in pts if d in LEGS_UP | CALF | FEET or (d in ("pelvis", "spine_01", "spine_02") and p.z < waist_z + 0.02)]
+    from mathutils.kdtree import KDTree
+    _upper = [p for (p, d) in pts if d in TORSO | ARMS | LEGS_UP]
+    kd = KDTree(len(_upper))
+    for i, p in enumerate(_upper):
+        kd.insert(p, i)
+    kd.balance()
+    DRAPE_CTX["skin_kd"] = kd
 
     coat_len = spec.get("coat_len", "mid")
     coat = spec["coat"]
@@ -2148,7 +2354,8 @@ def build_clothes(h, rig, spec):
         if dom in ARMS:
             return not near_hand(co)
         if dom == "neck_01":
-            return not has_collar
+            # the neck bone also dominates the tops of the shoulders (trapezius): keep those, the collar covers the rest
+            return not has_collar or co.z < B["neck_01"][0].z - 0.01
         if dom in TORSO:
             if coat_len == "mid" and co.z < waist_z - 0.14 and co.y < -0.03 and abs(co.x) < 0.07 + (waist_z - 0.14 - co.z) * 0.6:
                 return False        # 1790s cutaway: the fronts curve away below the waist over the breeches
@@ -2157,6 +2364,9 @@ def build_clothes(h, rig, spec):
             return co.z > hem
         return False
     out.append(garment(h, rig, me, info, "coat", coat_fn, M(coat), 0.014))
+    # the skirt hangs over the eased coat body: it must clear the coat's outer surface, not just the skin
+    if out[-1]:
+        DRAPE_CTX["over"] = [out[-1].matrix_world @ v.co for v in out[-1].data.vertices if v.co.z < waist_z + 0.02]
 
     # cuffs
     if spec.get("cuffs"):
@@ -2170,6 +2380,12 @@ def build_clothes(h, rig, spec):
     # skirt for long coats (kontusz, sukmana, cassock, bekishe)
     if coat_len == "long":
         out.append(garment(h, rig, me, info, "skirt", lambda i, co, g, dom: helper(g, "helper-skirt"), M(coat), 0.03, offset=0.75))
+        sk = out[-1]
+        if sk and spec.get("boot_height", 0.12) > 0:
+            # under a long skirt, boots stop 2 cm above the hem; above it the coat-coloured stockings carry on, so a
+            # swinging leg that grazes the cloth shows nothing (a boot is ~1 cm proud of the calf and poked through)
+            hem_z = min(v.co.z for v in sk.data.vertices)
+            spec = dict(spec, boot_height=max(0.06, min(spec.get("boot_height", 0.12), hem_z + 0.02 - ankle_z)))
 
     names = [g.name for g in h.vertex_groups]
     TB = {"spine_01", "spine_02", "spine_03", "pelvis"}
@@ -2193,19 +2409,19 @@ def build_clothes(h, rig, spec):
         facing = spec.get("lapels") or spec.get("cuffs") or coat
         wc = spec.get("waistcoat") or (spec.get("breeches") if spec.get("breeches") not in (None, coat) else "cream")
         w = surface_panel("waistcoat", surf_v, [(-0.048, nz - 0.03), (0.048, nz - 0.03), (0.06, waist_z - 0.15), (-0.06, waist_z - 0.15)],
-                          M(wc), rig, by_z, lift=0.003, thick=0.003, rows=12, cols=5)
+                          M(wc), rig, by_z, lift=0.009, thick=0.003, rows=16, cols=5)
         if w:
             out.append(w); front_objs.append(w)
         for sx in (1, -1):
             s3 = B["spine_03"][0].z
             q = [(sx * 0.034, nz - 0.015), (sx * 0.118, nz - 0.035), (sx * 0.088, s3 - 0.07), (sx * 0.05, s3 - 0.055)]
-            lp = surface_panel("lapel", surf_v, q, M(facing), rig, by_z, lift=0.009, thick=0.004, rows=10, cols=5, curl=0.004)
+            lp = surface_panel("lapel", surf_v, q, M(facing), rig, by_z, lift=0.013, thick=0.004, rows=10, cols=5, curl=0.004)
             if lp:
                 out.append(lp)
             if coat_len == "mid":
                 zf = waist_z - 0.085
                 q = [(sx * 0.09, zf + 0.02), (sx * 0.175, zf + 0.024), (sx * 0.172, zf - 0.018), (sx * 0.093, zf - 0.024)]
-                pf = surface_panel("pocket_flap", coat_v, q, M(coat), rig, by_z, lift=0.003, thick=0.003, rows=3, cols=5, curl=0.004)
+                pf = surface_panel("pocket_flap", coat_v, q, M(coat), rig, by_z, lift=0.006, thick=0.003, rows=3, cols=5, curl=0.004)
                 if pf:
                     out.append(pf)
     if coat_len == "long":
@@ -2213,7 +2429,7 @@ def build_clothes(h, rig, spec):
         hem_z = min((v.co.z for v in skirt_o.data.vertices), default=knee_z) if skirt_o else knee_z
         edge = spec.get("trim") or (spec.get("collar") if spec.get("collar") not in (None, "cream", "white_coat", "wimple") else coat)
         fe = surface_panel("front_edge", surf_v, [(-0.016, nz - 0.02), (0.016, nz - 0.02), (0.016, hem_z + 0.03), (-0.016, hem_z + 0.03)],
-                           M(edge), rig, by_z, lift=0.003, thick=0.003, rows=18, cols=2)
+                           M(edge), rig, by_z, lift=0.006, thick=0.003, rows=18, cols=2)
         if fe:
             out.append(fe); front_objs.append(fe)
 
@@ -2229,7 +2445,7 @@ def build_clothes(h, rig, spec):
         top = B["neck_01"][0].z - 0.05
         bsurf = surf_v + [o.matrix_world @ v.co for o in front_objs for v in o.data.vertices]
         bsurf = [p for p in bsurf if abs(p.x) < 0.06]
-        lo = (waist_z - 0.08) if coat_len != "long" else hem + 0.06
+        lo = (waist_z - 0.08) if coat_len != "long" else waist_z - 0.14
         out += buttons(bsurf, rig, lo, top, 8 if coat_len != "long" else 12, M(spec.get("button_colour", "brass"), 0.35), by_z,
                        hole=M(_dark(spec.get("waistcoat") or coat, 0.3), 0.9, tex="plain"))
 
@@ -2797,16 +3013,17 @@ def pick_skin(macro, gender_f, seed=0):
 
 def build(name, spec):
     log("=== building", name)
+    spec = apply_body(name, spec)
     CURRENT["hair_tint"] = spec.get("hair_tint")
     CURRENT["max_tex"] = spec.get("max_tex", 2048)
     if "skin" not in spec:
-        spec = dict(spec, skin=pick_skin(spec.get("macro", {}), spec.get("macro", {}).get("gender", 0.5) < 0.5, spec.get("seed", hash(name) & 0xffff)))
+        spec = dict(spec, skin=pick_skin(spec.get("macro", {}), spec.get("macro", {}).get("gender", 0.5) < 0.5, spec.get("seed", _seed(name) & 0xffff)))
     if spec.get("hat") in ("bonnet", "kerchief", "cap", "wimple") and not spec.get("veil"):
         spec = dict(spec, hair=None)
     elif spec.get("hat") in ("fur", "konfederatka", "krakuska", "biretta") and not spec.get("veil"):
         spec = dict(spec, hair="short01")
     if spec.get("seed") is not None or spec.get("face_variety", True):
-        spec = dict(spec, targets=dict(face_variety(spec.get("seed", hash(name) & 0xffff)), **spec.get("targets", {})))
+        spec = dict(spec, targets=dict(face_variety(spec.get("seed", _seed(name) & 0xffff)), **spec.get("targets", {})))
     h = make_body(spec)
     skin = os.path.join(USER, "skins", spec.get("skin", "young_caucasian_male"), spec.get("skin", "young_caucasian_male") + ".mhmat")
     HumanService.set_character_skin(skin, h, skin_type="GAMEENGINE")
