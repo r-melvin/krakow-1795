@@ -48,6 +48,20 @@ HAIR_TINTS = {"black": (0.10, 0.08, 0.08), "dark_brown": (0.45, 0.32, 0.24), "br
 HAIR_BLEND = {"grey": ((0.55, 0.55, 0.56), 0.75), "white": ((0.92, 0.90, 0.86), 0.85), "blond": ((0.85, 0.72, 0.42), 0.5)}   # (colour, amount)
 CURRENT = {"hair_tint": None}
 _mats = {}
+_CLOTH_PATHS = None
+NOT_CLOTH = {"steel", "pewter", "brass", "silver", "wood", "wood_dark", "leather", "black", "iron", "skin", "eye", "hair"}
+
+
+def _cloth_textures():
+    """Baked wool broadcloth (colour, roughness, normal with drape folds) from build_assets.py, cached on disk."""
+    global _CLOTH_PATHS
+    if _CLOTH_PATHS is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("ba", os.path.join(ROOT, "assets", "blender", "build_assets.py"))
+        ba = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ba)
+        _CLOTH_PATHS = ba.bake_texture("cloth")
+    return _CLOTH_PATHS
 
 
 def M(key, rough=0.85):
@@ -55,11 +69,45 @@ def M(key, rough=0.85):
         return _mats[key]
     m = bpy.data.materials.new("cloth_" + key)
     m.use_nodes = True
-    b = m.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (*COL[key], 1.0)
+    nt = m.node_tree
+    b = nt.nodes["Principled BSDF"]
     b.inputs["Roughness"].default_value = rough
+    if key in NOT_CLOTH or key not in COL:
+        b.inputs["Base Color"].default_value = (*COL.get(key, (0.5, 0.5, 0.5)), 1.0)
+    else:
+        paths = _cloth_textures()
+        def img(p, colour):
+            im = bpy.data.images.load(p, check_existing=True)
+            im.colorspace_settings.name = "sRGB" if colour else "Non-Color"
+            return im
+        tc = nt.nodes.new("ShaderNodeTexImage"); tc.image = img(paths["col"], True)
+        tr = nt.nodes.new("ShaderNodeTexImage"); tr.image = img(paths["rough"], False)
+        tn = nt.nodes.new("ShaderNodeTexImage"); tn.image = img(paths["nrm"], False)
+        mix = nt.nodes.new("ShaderNodeMix")
+        mix.data_type = "RGBA"
+        mix.blend_type = "MULTIPLY"
+        mix.inputs["Factor"].default_value = 1.0
+        nt.links.new(tc.outputs["Color"], mix.inputs[6])
+        mix.inputs[7].default_value = (*COL[key], 1.0)
+        nt.links.new(mix.outputs[2], b.inputs["Base Color"])
+        nt.links.new(tr.outputs["Color"], b.inputs["Roughness"])
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        nm.inputs["Strength"].default_value = 1.0
+        nt.links.new(tn.outputs["Color"], nm.inputs["Color"])
+        nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
     _mats[key] = m
     return m
+
+
+def unwrap(o, repeat=0.55):
+    """Smart-project UVs and scale them so one texture repeat covers about `repeat` metres."""
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=repeat, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
 
 
 def log(*a):
@@ -138,6 +186,9 @@ def face_info(h, me, rig):
     return info
 
 
+SOFTEN = {"coat": (4, 0.6), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (3, 0.5), "stockings": (1, 0.3), "cuffs": (1, 0.3)}
+
+
 def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, offset=0.0):
     """Cut a garment out of the helper geometry: keep faces passing keep_fn, thicken, rig with body weights."""
     mesh = me.copy()
@@ -175,6 +226,14 @@ def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, 
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
+    if name in SOFTEN:
+        it, fac = SOFTEN[name]
+        sm = obj.modifiers.new("soften", "SMOOTH")
+        sm.iterations = it
+        sm.factor = fac
+        bpy.ops.object.modifier_apply(modifier="soften")
+        offset = max(offset, 0.5)
+        thickness += 0.006
     sol = obj.modifiers.new("solid", "SOLIDIFY")
     sol.thickness = thickness + 0.014
     sol.offset = offset       # 0 = both sides of the helper surface (robust to inward normals); >0 pushes outward
@@ -184,6 +243,7 @@ def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, 
     bpy.ops.object.modifier_apply(modifier="solid")
     if smooth:
         bpy.ops.object.shade_smooth_by_angle(angle=math.radians(60))
+    unwrap(obj)
     am = obj.modifiers.new("arm", "ARMATURE")
     am.object = rig
     obj.parent = rig
@@ -252,6 +312,7 @@ def band(name, pts, z0, z1, pad, mat, rig, bone, thickness=0.02, n=32, side=0, e
     sol.use_rim = True
     bpy.ops.object.modifier_apply(modifier="solid")
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(50))
+    unwrap(o, 0.4)
     _weight_to_bone(o, rig, bone)
     return o
 
@@ -291,6 +352,7 @@ def apron_panel(pts, rig, waist_z, knee_z, mat, bones, pad=0.03, bones_by_z=None
     sol.thickness = 0.008
     bpy.ops.object.modifier_apply(modifier="solid")
     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(60))
+    unwrap(o, 0.5)
     # weights by height so the panel bends with the hips and thighs
     for bn in set(b for _, b in (bones_by_z or [])):
         o.vertex_groups.new(name=bn)
@@ -413,7 +475,7 @@ def build_clothes(h, rig, spec):
             return not has_collar
         if dom in TORSO:
             return co.z > hem - 0.05
-        if dom in LEGS_UP and coat_len != "short":
+        if dom in LEGS_UP and coat_len == "long":
             return co.z > hem
         return False
     out.append(garment(h, rig, me, info, "coat", coat_fn, M(coat), 0.014))
@@ -424,6 +486,9 @@ def build_clothes(h, rig, spec):
     else:
         out.append(garment(h, rig, me, info, "cuffs", lambda i, co, g, dom: helper(g, "helper-tights") and dom in ARMS and near_hand(co), M(coat), 0.014))
 
+    # coat skirts for mid coats: knee length, flared, open at the front (1790s frock coat)
+    if coat_len == "mid":
+        out.append(garment(h, rig, me, info, "coat_skirt", lambda i, co, g, dom: helper(g, "helper-skirt") and co.z > knee_z + 0.10 and not (abs(co.x) < 0.075 and co.y < -0.02), M(coat), 0.012, offset=0.6))
     # skirt for long coats (kontusz, sukmana, cassock, bekishe)
     if coat_len == "long":
         out.append(garment(h, rig, me, info, "skirt", lambda i, co, g, dom: helper(g, "helper-skirt"), M(coat), 0.03, offset=0.75))
@@ -449,11 +514,11 @@ def build_clothes(h, rig, spec):
                        [(B["spine_03"][0].z, "spine_03"), (B["spine_02"][0].z, "spine_02"), (B["spine_01"][0].z, "spine_01"), (0.0, "pelvis")])
 
     # breeches (hip to knee) and stockings (knee to ankle)
-    breech_top = knee_z + 0.12 if coat_len == "long" else (hem if coat_len == "mid" else 9.0)
+    breech_top = knee_z + 0.12 if coat_len == "long" else 9.0
     out.append(garment(h, rig, me, info, "breeches", lambda i, co, g, dom: helper(g, "helper-tights") and ((dom in LEGS_UP and knee_z - 0.03 < co.z <= breech_top) or (dom == "pelvis" and knee_z < co.z <= min(breech_top, hem - 0.05) if coat_len != "short" else (dom == "pelvis" and co.z < waist_z))), M(spec.get("breeches", "black")), 0.012))
     # the tights helper is open at the crotch: a fitted patch over the skin closes it
     if coat_len != "long":
-        out.append(garment(h, rig, me, info, "breeches_in", lambda i, co, g, dom: skin_face(g) and dom in LEGS_UP | {"pelvis"} and knee_z + 0.05 < co.z <= min(breech_top, waist_z - 0.06), M(spec.get("breeches", "black")), 0.006))
+        out.append(garment(h, rig, me, info, "breeches_in", lambda i, co, g, dom: skin_face(g) and dom in LEGS_UP | {"pelvis"} and knee_z + 0.05 < co.z <= min(breech_top, waist_z - 0.06), M(spec.get("breeches", "black")), 0.002, offset=0.4))
     out.append(garment(h, rig, me, info, "stockings", lambda i, co, g, dom: helper(g, "helper-tights") and (dom in CALF or (dom in LEGS_UP and co.z <= knee_z - 0.03)) and co.z > ankle_z + spec.get("boot_height", 0.12), M(spec.get("stockings", "stocking")), 0.008))
 
     # boots: lower calf band of the tights + the body's own foot surface (beggars go barefoot)
@@ -468,9 +533,9 @@ def build_clothes(h, rig, spec):
             break
         leg = {"calf_l", "foot_l", "thigh_l"} if side > 0 else {"calf_r", "foot_r", "thigh_r"}
         if coat_len != "long" or bh < 0.2:
-            out.append(band("boot_top", pts, bh - 0.03, bh + 0.015, 0.02, M(spec.get("boots") or "leather", 0.5), rig, bone, thickness=0.014, n=20, side=side, bones=leg))
+            out.append(band("boot_top", pts, bh - 0.03, bh + 0.015, 0.03, M(spec.get("boots") or "leather", 0.5), rig, bone, thickness=0.010, n=20, side=side, bones=leg))
         if coat_len != "long":
-            out.append(band("knee_band", pts, knee_z - 0.03, knee_z + 0.0, 0.017, M(spec.get("breeches", "black")), rig, bone, thickness=0.012, n=20, side=side, bones=leg))
+            out.append(band("knee_band", pts, knee_z - 0.02, knee_z + 0.01, 0.024, M(spec.get("breeches", "black")), rig, bone, thickness=0.008, n=20, side=side, bones=leg))
 
     # hats: fitted solids sized from the measured head, sunk over short hair; bands hug the skull outline
     hat = spec.get("hat")
@@ -534,11 +599,11 @@ def build_clothes(h, rig, spec):
         _weight_to_bone(o, rig, "head")
         return o
     if hat == "konfederatka":
-        out.append(soft_crown("hat_top", hw + 0.09, hd + 0.05, 0.13, top_z - 0.07, M("crimson")))
-        out.append(band("hat_band", pts, top_z - 0.085, top_z - 0.03, 0.035, M("fur"), rig, "head", thickness=0.04, n=28, bones={"head"}))
+        out.append(soft_crown("hat_top", hw + 0.12, hd + 0.08, 0.13, top_z - 0.07, M("crimson")))
+        out.append(band("hat_band", pts, top_z - 0.09, top_z - 0.03, 0.04, M("fur"), rig, "head", thickness=0.05, n=28, bones={"head"}))
     elif hat == "krakuska":
-        out.append(soft_crown("hat_top", hw + 0.06, hd + 0.03, 0.11, top_z - 0.065, M("red_cap"), corner_lift=0.03))
-        out.append(band("hat_band", pts, top_z - 0.08, top_z - 0.03, 0.025, M("black"), rig, "head", thickness=0.03, n=28, bones={"head"}))
+        out.append(soft_crown("hat_top", hw + 0.09, hd + 0.06, 0.11, top_z - 0.065, M("red_cap"), corner_lift=0.03))
+        out.append(band("hat_band", pts, top_z - 0.085, top_z - 0.03, 0.03, M("black"), rig, "head", thickness=0.04, n=28, bones={"head"}))
         bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.012, radius2=0.002, depth=0.30, location=(hcx + hw / 2 + 0.02, hcy, top_z + 0.08), rotation=(0.2, 0.6, 0))
         f = bpy.context.object
         f.data.materials.append(M("feather"))
@@ -546,7 +611,7 @@ def build_clothes(h, rig, spec):
         _weight_to_bone(f, rig, "head")
         out.append(f)
     elif hat == "biretta":
-        out.append(soft_crown("hat_top", hw + 0.04, hd + 0.02, 0.10, top_z - 0.055, M("black"), corner_lift=0.015, dish=0.0))
+        out.append(soft_crown("hat_top", hw + 0.07, hd + 0.05, 0.10, top_z - 0.055, M("black"), corner_lift=0.015, dish=0.0))
         for rot in (0, 1):
             bpy.ops.mesh.primitive_cube_add(size=1, location=(hcx, hcy, top_z + 0.045 + 0.015))
             r = bpy.context.object
@@ -758,8 +823,8 @@ def rest_arms_down(rig, arm_drop=62, elbow=8):
     for side, sx in (("l", 1), ("r", -1)):
         hand = rig.pose.bones["hand_" + side]
         before = (rig.matrix_world @ hand.matrix).to_translation().z
-        aim_bone(rig, rig.pose.bones["upperarm_" + side], (sx * 0.16, 0.04, -1.0))
-        aim_bone(rig, rig.pose.bones["lowerarm_" + side], (sx * 0.10, -0.22, -1.0))
+        aim_bone(rig, rig.pose.bones["upperarm_" + side], (sx * 0.24, 0.04, -1.0))
+        aim_bone(rig, rig.pose.bones["lowerarm_" + side], (sx * 0.16, -0.20, -1.0))
         aim_bone(rig, hand, (sx * 0.08, -0.30, -1.0))
         log("arm", side, "hand z %.2f -> %.2f" % (before, (rig.matrix_world @ hand.matrix).to_translation().z))
     # bake the pose into every skinned child, then apply it as the rest pose
@@ -863,6 +928,8 @@ def simplify_textured_materials():
             continue
         imgs = [n for n in m.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
         if not imgs:
+            continue
+        if m.name.startswith("cloth_"):
             continue
         bsdf = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
         direct = bsdf and bsdf.inputs["Base Color"].links and bsdf.inputs["Base Color"].links[0].from_node.type == "TEX_IMAGE"
@@ -1034,9 +1101,9 @@ def build(name, spec):
     CURRENT["max_tex"] = spec.get("max_tex", 2048)
     if "skin" not in spec:
         spec = dict(spec, skin=pick_skin(spec.get("macro", {}), spec.get("macro", {}).get("gender", 0.5) < 0.5, spec.get("seed", hash(name) & 0xffff)))
-    if spec.get("hat") in ("bonnet", "kerchief", "cap") and not spec.get("veil"):
+    if spec.get("hat") in ("bonnet", "kerchief", "cap", "wimple") and not spec.get("veil"):
         spec = dict(spec, hair=None)
-    elif spec.get("hat") in ("wimple", "fur", "konfederatka", "krakuska", "biretta") and not spec.get("veil"):
+    elif spec.get("hat") in ("fur", "konfederatka", "krakuska", "biretta") and not spec.get("veil"):
         spec = dict(spec, hair="short01")
     if spec.get("seed") is not None or spec.get("face_variety", True):
         spec = dict(spec, targets=dict(face_variety(spec.get("seed", hash(name) & 0xffff)), **spec.get("targets", {})))

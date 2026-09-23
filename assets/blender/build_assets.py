@@ -163,7 +163,8 @@ class _G:
         n.interpolation_type = "SMOOTHSTEP"
         n.clamp = True
         s._in(n.inputs[0], x)
-        n.inputs[1].default_value, n.inputs[2].default_value = e0, e1
+        s._in(n.inputs[1], e0)
+        s._in(n.inputs[2], e1)
         n.inputs[3].default_value, n.inputs[4].default_value = 0.0, 1.0
         return n.outputs[0]
 
@@ -460,50 +461,94 @@ def _tx_snow(g):
 
 
 def _tx_cloth(g):
-    wu = g.m("SINE", g.mul(g.u, 250.0 * math.tau))
-    wv = g.m("SINE", g.mul(g.v, 250.0 * math.tau))
+    # wool broadcloth: twill weave, slubs, wear, and soft drape folds running down the cloth (v is the hang
+    # direction on garments) so the normal map catches light in the folds
+    wu = g.m("SINE", g.mul(g.u, 520.0 * math.tau))
+    wv = g.m("SINE", g.mul(g.v, 520.0 * math.tau))
     weave = g.add(0.5, g.mul(g.mul(wu, wv), 0.5))
     stain = g.smooth(g.noise(4, 4, 5, seed=39), 0.5, 0.78)
-    slub = g.noise(200, 8, 2, seed=40)
+    slub = g.noise(300, 10, 2, seed=40)
+    folds = g.noise(7.0, 0.9, 3, 0.45, seed=50)            # long streaks along v
+    folds2 = g.noise(3.0, 0.5, 2, 0.5, seed=51)
+    fold = g.add(g.mul(folds, 0.7), g.mul(folds2, 0.3))
+    crease = g.smooth(fold, 0.42, 0.5)
     col = g.mix(g.mul(g.sub(slub, 0.4), 0.3), (0.92, 0.90, 0.85), (0.78, 0.75, 0.68))
-    col = g.mix(g.mul(stain, 0.5), col, (0.50, 0.44, 0.36))
-    col = g.mix(g.mul(g.sub(1.0, weave), 0.15), col, (0.5, 0.5, 0.5))
-    h = g.add(g.mul(weave, 0.6), g.mul(slub, 0.3))
-    return col, g.add(0.86, g.mul(slub, 0.1)), h, 0.002
+    col = g.mix(g.mul(stain, 0.4), col, (0.50, 0.44, 0.36))
+    col = g.mix(g.mul(g.sub(1.0, weave), 0.05), col, (0.5, 0.5, 0.5))
+    col = g.mix(g.mul(g.one_minus(crease), 0.14), col, (0.35, 0.33, 0.30))    # faint shadow in the fold valleys
+    h = g.add(g.add(g.mul(weave, 0.03), g.mul(slub, 0.03)), g.mul(fold, 0.94))
+    return col, g.add(0.84, g.mul(slub, 0.1)), h, 0.02
 
 
 def _tx_cobbles(g):
-    # granite setts in staggered rows (26 x 30 per 4 m), sand and frost in the joints
-    cu, cv, iu, iv, par = g.cells(26.0, 30.0, 0.5)
-    r = g.white(iu, iv, 7.0)
-    r2 = g.white(iu, iv, 8.0)
-    cw, chh = 4.0 / 26.0, 4.0 / 30.0
-    shrink = g.add(0.010, g.mul(r2, 0.012))
-    rad = 0.028
-    px = g.m("ABSOLUTE", g.mul(g.sub(cu, 0.5), cw))
-    pz = g.m("ABSOLUTE", g.mul(g.sub(cv, 0.5), chh))
-    qx = g.sub(px, g.sub(g.sub(cw / 2, rad), shrink))
-    qz = g.sub(pz, g.sub(g.sub(chh / 2, rad), shrink))
+    # granite setts in staggered rows (24 x 28 per 4 m). Every stone differs: size (shrink), position inside its
+    # cell, corner rounding, dome height, tilt, hue (grey, warm brown, blue-grey, pinkish granite) and brightness;
+    # some stones sit sunken and dirty; sand and frost in the joints; wet dark patches at large scale.
+    cu, cv, iu, iv, par = g.cells(24.0, 28.0, 0.5)
+    r = g.white(iu, iv, 7.0)       # hue family
+    r2 = g.white(iu, iv, 8.0)      # size
+    r3 = g.white(iu, iv, 9.0)      # x offset
+    r4 = g.white(iu, iv, 10.0)     # z offset
+    r5 = g.white(iu, iv, 11.0)     # rounding / aspect
+    r6 = g.white(iu, iv, 12.0)     # dome / brightness
+    cw, chh = 4.0 / 24.0, 4.0 / 28.0
+    shrink = g.add(0.004, g.mul(r2, 0.011))
+    rad = g.add(0.008, g.mul(r5, 0.028))
+    offx = g.mul(g.sub(r3, 0.5), 0.10 * cw)
+    offz = g.mul(g.sub(r4, 0.5), 0.08 * chh)
+    px = g.m("ABSOLUTE", g.sub(g.mul(g.sub(cu, 0.5), cw), offx))
+    pz = g.m("ABSOLUTE", g.sub(g.mul(g.sub(cv, 0.5), chh), offz))
+    halfw = g.sub(g.sub(cw / 2, rad), g.add(shrink, g.m("ABSOLUTE", offx)))
+    halfh = g.sub(g.sub(chh / 2, rad), g.add(shrink, g.m("ABSOLUTE", offz)))
+    qx = g.sub(px, halfw)
+    qz = g.sub(pz, halfh)
     ox, oz = g.mx(qx, 0.0), g.mx(qz, 0.0)
     outside = g.m("SQRT", g.add(g.mul(ox, ox), g.mul(oz, oz)))
     inside = g.mn(g.mx(qx, qz), 0.0)
     sd = g.sub(g.add(outside, inside), rad)
     stone = g.smooth(g.mul(sd, -1.0), 0.0, 0.004)
-    dome = g.smooth(g.mul(sd, -1.0), 0.0, 0.035)
-    col = g.ramp(r, [(0.0, (0.22, 0.21, 0.21)), (0.35, (0.36, 0.34, 0.33)), (0.7, (0.50, 0.47, 0.43)), (0.9, (0.58, 0.52, 0.46)), (1.0, (0.52, 0.40, 0.35))])
-    tilt = g.mul(g.add(g.mul(g.sub(cu, 0.5), g.sub(r2, 0.5)), g.mul(g.sub(cv, 0.5), g.sub(r, 0.5))), 0.8)
-    speck = g.noise(300, 300, 1, seed=41)
-    col = g.mix(g.mul(g.smooth(speck, 0.6, 0.66), 0.6), col, (0.12, 0.12, 0.12))
-    col = g.mix(g.mul(g.smooth(speck, 0.34, 0.28), 0.5), col, (0.75, 0.73, 0.70))
+    dome = g.smooth(g.mul(sd, -1.0), 0.0, g.add(0.02, g.mul(r6, 0.03)))
+    sunken = g.smooth(r2, 0.93, 0.96)
+    # colour families and per-stone brightness
+    grey = g.ramp(r, [(0.0, (0.20, 0.19, 0.19)), (0.5, (0.36, 0.35, 0.34)), (1.0, (0.50, 0.48, 0.45))])
+    warm = g.ramp(r, [(0.0, (0.28, 0.21, 0.16)), (0.5, (0.44, 0.35, 0.27)), (1.0, (0.56, 0.46, 0.36))])
+    cool = g.ramp(r, [(0.0, (0.22, 0.25, 0.30)), (0.5, (0.34, 0.37, 0.43)), (1.0, (0.46, 0.49, 0.54))])
+    pink = g.ramp(r, [(0.0, (0.36, 0.27, 0.25)), (0.5, (0.50, 0.40, 0.37)), (1.0, (0.58, 0.48, 0.45))])
+    fam = g.mix(g.smooth(r5, 0.25, 0.35), grey, warm)
+    fam = g.mix(g.smooth(r5, 0.55, 0.65), fam, cool)
+    fam = g.mix(g.smooth(r5, 0.88, 0.94), fam, pink)
+    bright = g.add(0.78, g.mul(r6, 0.44))
+    col = g.mix(1.0, fam, bright, blend="MULTIPLY")
+    # speckle and mica flecks
+    speck = g.noise(320, 320, 1, seed=41)
+    col = g.mix(g.mul(g.smooth(speck, 0.6, 0.66), 0.5), col, (0.12, 0.12, 0.12))
+    col = g.mix(g.mul(g.smooth(speck, 0.32, 0.27), 0.45), col, (0.78, 0.76, 0.72))
+    # large-scale wet and dirty patches, wheel tracks along u
+    wet = g.smooth(g.noise(2.2, 2.2, 3, seed=45), 0.45, 0.7)
+    track = g.mul(g.smooth(g.noise(1.0, 6.0, 2, seed=46), 0.55, 0.75), 0.5)
+    col = g.mix(g.mul(wet, 0.45), col, (0.10, 0.10, 0.11))
+    col = g.mix(track, col, g.mix(1.0, col, (0.7, 0.7, 0.7), blend="MULTIPLY"))
+    col = g.mix(sunken, col, g.mix(1.0, col, (0.55, 0.55, 0.55), blend="MULTIPLY"))
+    tilt = g.mul(g.add(g.mul(g.sub(cu, 0.5), g.sub(r2, 0.5)), g.mul(g.sub(cv, 0.5), g.sub(r, 0.5))), 1.2)
     wear = g.noise(8, 8, 4, seed=42)
-    snowj = g.smooth(g.noise(9, 9, 5, seed=43), 0.60, 0.72)
-    joint = g.mix(snowj, (0.18, 0.15, 0.12), (0.80, 0.82, 0.88))
-    dust = g.mul(g.smooth(g.noise(11, 11, 5, seed=44), 0.66, 0.8), g.one_minus(dome))
-    col = g.mix(g.mul(dust, 0.25), col, (0.82, 0.84, 0.90))
+    snowj = g.smooth(g.noise(9, 9, 5, seed=43), 0.62, 0.74)
+    grain = g.noise(420, 420, 2, seed=47)
+    gravel = g.smooth(g.voronoi(160, 160, seed=48), 0.0, 0.35)
+    damp = g.smooth(g.noise(5, 5, 4, seed=49), 0.4, 0.75)
+    joint = g.ramp(grain, [(0.3, (0.13, 0.11, 0.09)), (0.55, (0.22, 0.19, 0.15)), (0.8, (0.34, 0.30, 0.24))])
+    joint = g.mix(g.mul(g.one_minus(gravel), 0.5), joint, (0.42, 0.40, 0.36))
+    joint = g.mix(g.mul(damp, 0.5), joint, (0.08, 0.07, 0.06))
+    joint = g.mix(snowj, joint, (0.82, 0.84, 0.90))
+    dust = g.mul(g.smooth(g.noise(11, 11, 5, seed=44), 0.68, 0.82), g.one_minus(dome))
+    col = g.mix(g.mul(dust, 0.22), col, (0.82, 0.84, 0.90))
     col = g.mix(stone, joint, col)
-    h = g.add(g.mul(stone, g.add(g.add(0.45, tilt), g.mul(dome, 0.55))), g.mul(g.mul(snowj, g.one_minus(stone)), 0.3))
-    rough = g.lerp(stone, 0.95, g.add(0.5, g.mul(wear, 0.3)))
-    return col, rough, h, 0.035
+    hdome = g.add(0.35, g.mul(r6, 0.65))
+    jointh = g.add(g.add(0.04, g.mul(grain, 0.08)), g.add(g.mul(g.one_minus(gravel), 0.06), g.mul(snowj, 0.22)))
+    stoneh = g.add(g.add(0.45, tilt), g.mul(dome, hdome))
+    h = g.add(g.mul(stone, stoneh), g.mul(g.one_minus(stone), jointh))
+    h = g.mix(sunken, h, g.mul(h, 0.5))
+    rough = g.lerp(stone, g.add(0.9, g.mul(gravel, 0.1)), g.add(0.45, g.add(g.mul(wear, 0.3), g.mul(wet, -0.25))))
+    return col, rough, h, 0.07
 
 
 def _tx_thatch(g):
@@ -584,6 +629,10 @@ def _tex_paths(kind):
 _baked_this_run = set()
 
 
+HEIGHT_EXPORT = {"cobbles"}
+TEX_DIR = os.path.join(ROOT, "assets", "textures")
+
+
 def bake_texture(kind):
     """Bake one texture kind to assets/textures/<kind>_{col,rough,nrm}.png (cached). Runs in a scratch scene, so it
     is safe to call in the middle of building an asset."""
@@ -633,7 +682,15 @@ def bake_texture(kind):
     vl = sc.view_layers[0]
     vl.objects.active = ob
     ob.select_set(True, view_layer=vl)
-    for p, btype in (("col", "DIFFUSE"), ("rough", "ROUGHNESS"), ("nrm", "NORMAL")):
+    passes = [("col", "DIFFUSE"), ("rough", "ROUGHNESS"), ("nrm", "NORMAL")]
+    if kind in HEIGHT_EXPORT:
+        passes.append(("hgt", "EMIT"))
+    for p, btype in passes:
+        if btype == "EMIT":
+            # route the height field through emission so it bakes as a plain greyscale image
+            nt.links.new(hgt, bsdf.inputs["Emission Color"])
+            bsdf.inputs["Emission Strength"].default_value = 1.0
+            nt.links.new(g.add(0.0, 0.0), bsdf.inputs["Base Color"])
         img = bpy.data.images.new("%s_%s" % (kind, p), res, res, alpha=False)
         img.colorspace_settings.name = "sRGB" if p == "col" else "Non-Color"
         tnode.image = img
@@ -645,9 +702,14 @@ def bake_texture(kind):
         with bpy.context.temp_override(scene=sc, view_layer=vl, active_object=ob, object=ob,
                                        selected_objects=[ob], selected_editable_objects=[ob]):
             bpy.ops.object.bake(**kw)
-        img.filepath_raw = paths[p]
+        img.filepath_raw = paths.get(p, os.path.join(TEX_DIR, "%s_%s.png" % (kind, p)))
         img.file_format = "PNG"
         img.save()
+        if btype == "EMIT":
+            gdir = os.path.join(ROOT, "assets", "ground")
+            os.makedirs(gdir, exist_ok=True)
+            img.filepath_raw = os.path.join(gdir, "%s_height.png" % kind)
+            img.save()
         bpy.data.images.remove(img)
     win.scene = prev
     bpy.data.objects.remove(ob, do_unlink=True)

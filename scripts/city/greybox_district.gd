@@ -140,6 +140,18 @@ func _ground() -> void:
 			for c in n.get_children():
 				stack.append(c)
 		slab.queue_free()
+	if slab_mesh and ResourceLoader.exists("res://assets/ground/cobbles_height.png"):
+		var base := slab_mesh.surface_get_material(0)
+		if base is BaseMaterial3D:
+			var pm := (base as BaseMaterial3D).duplicate() as BaseMaterial3D
+			pm.heightmap_enabled = true
+			pm.heightmap_texture = load("res://assets/ground/cobbles_height.png")
+			pm.heightmap_scale = 3.0
+			pm.heightmap_deep_parallax = true
+			pm.heightmap_min_layers = 8
+			pm.heightmap_max_layers = 24
+			slab_mesh = slab_mesh.duplicate()
+			slab_mesh.surface_set_material(0, pm)
 	if slab_mesh:
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -224,16 +236,25 @@ func _guards() -> void:
 		{"name": "St Mary's post", "wps": [Vector3(24, 0, -14), Vector3(24, 0, 4), Vector3(24, 0, -8)]},
 	]
 	for r in routes:
-		var g := CharacterBody3D.new()
-		g.set_script(GuardScript)
-		g.guard_name = r["name"]
-		var wps: Array[Vector3] = []
-		for w in r["wps"]:
-			wps.append(w)
-		g.waypoints = wps
-		g.position = wps[0]
-		add_child(g)
-		g.add_child(avoidance_obstacle(0.45))
+		spawn_guard(r["name"], r["wps"])
+
+
+## One watch patrol (or a sentry: a single waypoint, or two equal ones) facing `facing` at the start.
+func spawn_guard(guard_name: String, points: Array, facing: float = 0.0) -> CharacterBody3D:
+	var g := CharacterBody3D.new()
+	g.set_script(GuardScript)
+	g.guard_name = guard_name
+	var wps: Array[Vector3] = []
+	for w in points:
+		wps.append(w if w is Vector3 else Vector3(float(w[0]), float(w[1]), float(w[2])))
+	if wps.size() == 1:
+		wps.append(wps[0])
+	g.waypoints = wps
+	g.position = wps[0]
+	g.rotation.y = facing
+	add_child(g)
+	g.add_child(avoidance_obstacle(0.45))
+	return g
 
 
 func _population() -> void:
