@@ -35,12 +35,12 @@ func _ready() -> void:
 	add_child(back)
 
 	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 26)
+	outer.add_theme_constant_override("separation", 18)
 	var m := UiTheme.margin(outer, 0)
 	m.add_theme_constant_override("margin_left", 72)
 	m.add_theme_constant_override("margin_right", 72)
-	m.add_theme_constant_override("margin_top", 56)
-	m.add_theme_constant_override("margin_bottom", 48)
+	m.add_theme_constant_override("margin_top", 40)
+	m.add_theme_constant_override("margin_bottom", 36)
 	add_child(UiTheme.full_rect(m))
 
 	# Header
@@ -51,7 +51,7 @@ func _ready() -> void:
 	head.add_child(hv)
 	hv.add_child(UiTheme.kicker("Day %d  ·  Kraków, winter 1795" % GameState.day))
 	var who: String = GameState.origin.get("name", "Nobody")
-	hv.add_child(UiTheme.label(who + (" (woman)" if GameState.gender == "f" else ""), 44, UiTheme.TEXT, "display_light"))
+	hv.add_child(UiTheme.label(who + (" (woman)" if GameState.gender == "f" else ""), 38, UiTheme.TEXT, "display_light"))
 	hv.add_child(UiTheme.label(GameState.origin.get("goal", ""), 18, UiTheme.TEXT_DIM, "italic"))
 
 	var cols := HBoxContainer.new()
@@ -69,27 +69,35 @@ func _ready() -> void:
 	lp.add_child(lv)
 	lv.add_child(UiTheme.kicker("Tonight"))
 	var title: String = m_title if m_title != "" else DEFAULT_TITLE
-	lv.add_child(UiTheme.heading(title, 42))
+	lv.add_child(UiTheme.heading(title, 34))
 	lv.add_child(HSeparator.new())
+	# The briefing scrolls inside the panel; the footer with the buttons stays pinned at the bottom so the
+	# screen fits any window height (long briefings used to push "Go out tonight" off a 1080p screen).
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	lv.add_child(scroll)
+	var sv := VBoxContainer.new()
+	sv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sv.add_theme_constant_override("separation", 12)
+	scroll.add_child(sv)
 	var brief: String = m_brief if m_brief != "" else DEFAULT_BRIEFING
-	lv.add_child(UiTheme.body(brief, 20))
+	sv.add_child(UiTheme.body(brief, 18))
 	if not m_objs.is_empty():
-		lv.add_child(UiTheme.spacer(6))
-		lv.add_child(UiTheme.kicker("Objectives"))
+		sv.add_child(UiTheme.spacer(4))
+		sv.add_child(UiTheme.kicker("Objectives"))
 		for o in m_objs:
 			var t: String = ("◇  " if not o.get("optional", false) else "◌  ") + str(o.get("text", ""))
 			if o.get("optional", false):
 				t += "  (optional)"
-			lv.add_child(UiTheme.body(t, 18, UiTheme.TEXT if not o.get("optional", false) else UiTheme.TEXT_DIM))
-	lv.add_child(UiTheme.spacer(6))
-	lv.add_child(_where())
-	_summary_label = UiTheme.body("", 17, UiTheme.TEXT_DIM)
+			sv.add_child(UiTheme.body(t, 17, UiTheme.TEXT if not o.get("optional", false) else UiTheme.TEXT_DIM))
+	sv.add_child(UiTheme.spacer(4))
+	sv.add_child(_where())
+	_summary_label = UiTheme.body("", 16, UiTheme.TEXT_DIM)
 	_summary_label.visible = false
-	lv.add_child(_summary_label)
-	var lspace := Control.new()
-	lspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lv.add_child(lspace)
-	lv.add_child(UiTheme.label("Night falls at 21:00. The watch changes at midnight.", 16, UiTheme.TEXT_DIM, "italic"))
+	sv.add_child(_summary_label)
+	lv.add_child(UiTheme.label("Night falls at 21:00. The watch changes at midnight.", 15, UiTheme.TEXT_DIM, "italic"))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	lv.add_child(row)
