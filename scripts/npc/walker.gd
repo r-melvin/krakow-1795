@@ -142,29 +142,68 @@ func _apply_motion(delta: float) -> void:
 
 
 ## Speech bubble above any Node3D (townsfolk, guards). Replaces a previous bubble on the same node.
+## Kept sparse on purpose: nothing is shown beyond SPEECH_RANGE from the player, at most SPEECH_MAX bubbles
+## are up at once (guards always get through; the farthest civilian bubble makes room), the English gloss
+## under a foreign line only appears within SPEECH_GLOSS_RANGE, and civilian bubbles fade after ~3 s.
+const SPEECH_RANGE := 14.0
+const SPEECH_GLOSS_RANGE := 7.0
+const SPEECH_MAX := 3
+static var _bubbles: Array = []
+
 static func speech(node: Node3D, text: String, secs: float, height: float = 2.15) -> void:
-	if node == null or not is_instance_valid(node):
+	if node == null or not is_instance_valid(node) or not node.is_inside_tree():
 		return
+	var priority := node.is_in_group("guards") or node.is_in_group("mission")
+	var player := node.get_tree().get_first_node_in_group("player") as Node3D
+	var dist := 0.0
+	if player:
+		dist = player.global_position.distance_to(node.global_position)
+		if dist > SPEECH_RANGE and not priority:
+			return
+		if dist > SPEECH_GLOSS_RANGE and "\n(" in text:
+			text = text.substr(0, text.find("\n("))
+	_bubbles = _bubbles.filter(func(b) -> bool: return is_instance_valid(b) and b.is_inside_tree())
 	var old := node.get_node_or_null("SpeechBubble")
 	if old:
 		old.name = "SpeechBubbleOld"
+		_bubbles.erase(old)
 		old.queue_free()
+	if _bubbles.size() >= SPEECH_MAX:
+		if priority and player:
+			var far: Node = null
+			var far_d := -1.0
+			for b in _bubbles:
+				var bp := (b.get_parent() as Node3D)
+				var d := player.global_position.distance_to(bp.global_position) if bp else 999.0
+				if bp and not bp.is_in_group("guards") and d > far_d:
+					far = b
+					far_d = d
+			if far:
+				_bubbles.erase(far)
+				far.queue_free()
+			else:
+				return
+		else:
+			return
 	var l := Label3D.new()
 	l.name = "SpeechBubble"
 	l.text = text
 	l.position.y = height
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.font_size = 34
-	l.outline_size = 10
+	l.font_size = 30 if priority else 26
+	l.outline_size = 9
 	l.outline_modulate = Color(0.05, 0.04, 0.03, 0.9)
-	l.modulate = Color(1.0, 0.95, 0.82)
+	l.modulate = Color(1.0, 0.95, 0.82) if priority else Color(0.9, 0.86, 0.76, 0.92)
 	l.pixel_size = 0.0045
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.width = 520
+	l.width = 460
 	l.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	l.no_depth_test = true
+	l.no_depth_test = priority          # civilians' words do not show through walls
 	l.render_priority = 5
 	node.add_child(l)
+	_bubbles.append(l)
+	var hold := secs if priority else minf(secs, 3.2)
 	var tw := l.create_tween()     # dies with the label, so a freed world leaves no dangling timer
-	tw.tween_interval(secs)
+	tw.tween_interval(hold)
+	tw.tween_property(l, "modulate:a", 0.0, 0.4)
 	tw.tween_callback(l.queue_free)
