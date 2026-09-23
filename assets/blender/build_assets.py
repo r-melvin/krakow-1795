@@ -1,16 +1,33 @@
-"""Stylised assets for Krakow 1795 (Rynek Glowny, winter 1795/96). Fable (2004) flavour:
-rounded bevelled forms, walls that lean, roofs that sag and flare, chunky stone, big hands and boots.
+"""Assets for Krakow 1795 (Rynek Glowny, winter 1795/96). Fable (2004) silhouettes (walls that lean a little,
+roofs that sag and flare, chunky stone) dressed in baked PBR materials so the buildings sit beside the realistic
+MakeHuman characters: lime plaster, brick, sandstone, beaver-tail roof tiles, weathered oak, iron, glass, snow.
 
-Run:  blender -b --python assets/blender/build_assets.py
+Run:  blender -b --python assets/blender/build_assets.py [-- --rebake] [-- --only tenement_a,st_marys]
+      blender -b --python assets/blender/build_assets.py -- --textures      (bake the texture cache only)
+      blender -b --python assets/blender/build_assets.py -- --animals       (animals and the dragon)
 Writes one .glb per asset into assets/models/.
 
 Conventions
 - Metres. Blender Z up. glTF export maps Blender (x, y, z) -> Godot (x, z, -y).
 - Buildings: front face at Blender -Y (Godot +Z). Origin at base centre.
 - Figures: front at Blender +Y (Godot -Z), matching a Node3D's forward. Origin at feet.
-- Collision meshes are named <asset>-col; Godot turns them into StaticBody3D colliders on import.
+- Collision meshes are named <asset>-colonly; Godot turns them into StaticBody3D colliders on import.
 - Blender 5.x: transform_apply also bakes location, so every primitive ends up with world-space vertices and a
   zero origin. Every helper that edits vertices relies on that.
+
+Materials
+- M(key) returns a textured material when PAL key maps to a texture kind in TEX_OF (plaster, brick, sandstone,
+  tile, oak, iron, metal, glass, snow, cloth, cobbles, thatch, log, field); otherwise a flat colour.
+- Each kind is a procedural node tree (tileable: 4D noise on a torus, cell patterns with integer counts) baked
+  with Cycles onto a plane the size of one texture repeat: DIFFUSE colour, ROUGHNESS, tangent NORMAL. The PNGs
+  are cached in assets/textures/ (skipped on re-runs unless --rebake). Texel density is ~512 px/m everywhere
+  (2048 px over 4 m for plaster, tile, cobbles, field; 1024 px over 2 m for the rest).
+- The export material multiplies the baked colour by a per-key tint (glTF baseColorFactor), so one plaster
+  bake serves ochre, rose, cream, sage and blue houses. Keys ending in "_damp" use the plaster bake with a
+  rising-damp tide line anchored at z=0 (plinths).
+- UVs are generated at export (auto_uv) per face: walls map u along the wall, v up; roof slopes map v up the
+  slope so tile courses run level; vertical cylinders and domes map around their axis. Faces keep a random
+  per-part offset so repeats do not line up.
 """
 import bpy
 import bmesh
@@ -18,14 +35,21 @@ import math
 import os
 import random
 import sys
+import time
 from mathutils import Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, "assets", "models")
+TEX = os.path.join(ROOT, "assets", "textures")
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(TEX, exist_ok=True)
 RNG = random.Random(1795)
+RNG_UV = random.Random(96)
+REBAKE = "--rebake" in sys.argv
+WONK = 0.5          # global scale on finish(wonk=...): old masonry, not cartoon
+JPEG_Q = 88
 
-# ------------------------------------------------------------------ palette (warm, painterly)
+# ------------------------------------------------------------------ palette
 PAL = {
     "plaster_ochre": (0.90, 0.64, 0.30), "plaster_rose": (0.86, 0.52, 0.42), "plaster_cream": (0.94, 0.84, 0.58),
     "plaster_sage": (0.58, 0.68, 0.44), "plaster_blue": (0.50, 0.64, 0.78), "plaster_white": (0.94, 0.91, 0.84),
@@ -33,7 +57,7 @@ PAL = {
     "brick": (0.58, 0.28, 0.19), "brick_dark": (0.42, 0.19, 0.14),
     "tile": (0.56, 0.26, 0.16), "tile_dark": (0.38, 0.17, 0.12), "tile_moss": (0.46, 0.34, 0.18),
     "copper": (0.26, 0.50, 0.44), "lead": (0.32, 0.33, 0.37), "gold": (0.95, 0.74, 0.30),
-    "glass": (0.12, 0.15, 0.22), "glass_warm": (0.55, 0.38, 0.16),
+    "glass": (0.09, 0.11, 0.15), "glass_warm": (0.50, 0.34, 0.15),
     "wood": (0.46, 0.31, 0.18), "wood_dark": (0.26, 0.17, 0.10), "timber": (0.30, 0.20, 0.12),
     "iron": (0.10, 0.10, 0.11), "canvas": (0.76, 0.66, 0.50), "canvas_stripe": (0.58, 0.22, 0.20),
     "snow": (0.90, 0.92, 0.96), "skin": (0.86, 0.66, 0.54), "hair": (0.24, 0.16, 0.10), "eye": (0.05, 0.05, 0.06),
@@ -41,36 +65,757 @@ PAL = {
     "crimson": (0.58, 0.10, 0.16), "zupan_gold": (0.86, 0.68, 0.30), "sukmana": (0.84, 0.80, 0.70),
     "red_cap": (0.76, 0.12, 0.12), "green_coat": (0.16, 0.32, 0.22), "brown_coat": (0.38, 0.25, 0.14),
     "navy": (0.14, 0.18, 0.34), "feather": (0.10, 0.48, 0.36), "shutter": (0.30, 0.42, 0.36),
+    # architecture added with the texture pass
+    "void": (0.025, 0.025, 0.03), "plaster_lime": (0.93, 0.93, 0.92), "plaster_limeblue": (0.80, 0.86, 0.92),
+    "plaster_grey": (0.74, 0.72, 0.68), "cobble": (1.0, 1.0, 1.0), "thatch": (1.0, 1.0, 1.0), "log": (1.0, 1.0, 1.0),
+    "log_lime": (0.95, 0.96, 1.0), "field": (1.0, 1.0, 1.0), "water": (0.05, 0.08, 0.10), "hay": (0.72, 0.60, 0.36),
+    "salt": (0.86, 0.85, 0.82), "straw": (0.80, 0.70, 0.45),
 }
 _mats = {}
+
+# texture kind -> (resolution, metres per repeat)
+TEXSPEC = {
+    "plaster": (2048, 4.0), "plaster_damp": (2048, 4.0), "tile": (2048, 4.0), "cobbles": (2048, 4.0), "field": (2048, 4.0),
+    "brick": (1024, 2.0), "sandstone": (1024, 2.0), "oak": (1024, 2.0), "iron": (1024, 2.0), "metal": (1024, 2.0),
+    "glass": (1024, 2.0), "snow": (1024, 2.0), "cloth": (1024, 2.0), "thatch": (1024, 2.0), "log": (1024, 2.0),
+}
+TEX_OF = {}
+for _k in ("plaster_ochre", "plaster_rose", "plaster_cream", "plaster_sage", "plaster_blue", "plaster_white",
+           "plaster_lime", "plaster_limeblue", "plaster_grey"):
+    TEX_OF[_k] = "plaster"
+TEX_OF.update({"stone": "sandstone", "stone_dark": "sandstone", "stone_pale": "sandstone", "brick": "brick",
+               "brick_dark": "brick", "tile": "tile", "tile_dark": "tile", "tile_moss": "tile", "wood": "oak",
+               "wood_dark": "oak", "timber": "oak", "shutter": "oak", "iron": "iron", "lead": "metal",
+               "copper": "metal", "glass": "glass", "glass_warm": "glass", "snow": "snow", "canvas": "cloth",
+               "canvas_stripe": "cloth", "cobble": "cobbles", "thatch": "thatch", "log": "log", "log_lime": "log",
+               "field": "field", "hay": "thatch", "straw": "thatch", "salt": "snow"})
+# tint = glTF baseColorFactor over the bake. Neutral bakes (plaster, metal, glass, cloth) take the palette colour.
+TINT = {"brick": (1, 1, 1), "brick_dark": (0.70, 0.64, 0.62), "tile": (1, 1, 1), "tile_dark": (0.74, 0.68, 0.66),
+        "tile_moss": (0.86, 0.86, 0.72), "stone": (0.92, 0.91, 0.90), "stone_dark": (0.64, 0.63, 0.62),
+        "stone_pale": (1, 1, 1), "wood": (1, 1, 1), "wood_dark": (0.56, 0.52, 0.50), "timber": (0.70, 0.66, 0.62),
+        "shutter": (0.60, 0.82, 0.74), "iron": (1, 1, 1), "snow": (1, 1, 1), "cobble": (1, 1, 1), "thatch": (0.85, 0.8, 0.74),
+        "log": (0.78, 0.70, 0.62), "log_lime": (1, 1, 1), "field": (1, 1, 1), "hay": (1.0, 1.0, 1.0),
+        "straw": (1.0, 1.0, 1.0), "salt": (0.95, 0.93, 0.90)}
+METALLIC = {"iron": 0.55, "metal": 0.25}
+_tex_rep = {}        # material name -> metres per repeat (read by auto_uv)
+
+
+def _desat(c, k=0.18, dim=0.96):
+    l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+    return tuple((v + (l - v) * k) * dim for v in c)
 
 
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _mats.clear()
+    _tex_rep.clear()
+
+
+# ------------------------------------------------------------------ procedural texture graphs
+class _G:
+    """Tiny node-graph builder for tileable procedural textures in UV space (u, v in 0..1 = one repeat)."""
+
+    def __init__(s, nt):
+        s.nt, s.N, s.L = nt, nt.nodes, nt.links
+        tc = s.N.new("ShaderNodeTexCoord")
+        sep = s.N.new("ShaderNodeSeparateXYZ")
+        s.L.new(tc.outputs["UV"], sep.inputs[0])
+        s.u, s.v = sep.outputs[0], sep.outputs[1]
+        s.cu, s.su = s.m("COSINE", s.mul(s.u, math.tau)), s.m("SINE", s.mul(s.u, math.tau))
+        s.cv, s.sv = s.m("COSINE", s.mul(s.v, math.tau)), s.m("SINE", s.mul(s.v, math.tau))
+
+    def _in(s, sock, val):
+        if isinstance(val, bpy.types.NodeSocket):
+            s.L.new(val, sock)
+        elif isinstance(val, (tuple, list)):
+            val = tuple(val)
+            if sock.type == "RGBA" and len(val) == 3:
+                val = val + (1.0,)
+            sock.default_value = val
+        else:
+            sock.default_value = val
+
+    def m(s, op, a, b=0.0, c=0.0, clamp=False):
+        n = s.N.new("ShaderNodeMath")
+        n.operation = op
+        n.use_clamp = clamp
+        s._in(n.inputs[0], a)
+        s._in(n.inputs[1], b)
+        s._in(n.inputs[2], c)
+        return n.outputs[0]
+
+    def add(s, a, b): return s.m("ADD", a, b)
+    def sub(s, a, b): return s.m("SUBTRACT", a, b)
+    def mul(s, a, b): return s.m("MULTIPLY", a, b)
+    def div(s, a, b): return s.m("DIVIDE", a, b)
+    def mn(s, a, b): return s.m("MINIMUM", a, b)
+    def mx(s, a, b): return s.m("MAXIMUM", a, b)
+    def fl(s, a): return s.m("FLOOR", a)
+    def fr(s, a): return s.m("FRACT", a)
+    def mod(s, a, b): return s.m("FLOORED_MODULO", a, b)
+    def clamp(s, a): return s.m("ADD", a, 0.0, clamp=True)
+    def one_minus(s, a): return s.m("SUBTRACT", 1.0, a, clamp=True)
+    def lerp(s, t, a, b): return s.add(a, s.mul(t, s.sub(b, a)))
+    def edge(s, c): return s.mn(c, s.sub(1.0, c))          # distance of a cell coordinate to the nearest cell edge
+
+    def smooth(s, x, e0, e1):
+        n = s.N.new("ShaderNodeMapRange")
+        n.interpolation_type = "SMOOTHSTEP"
+        n.clamp = True
+        s._in(n.inputs[0], x)
+        n.inputs[1].default_value, n.inputs[2].default_value = e0, e1
+        n.inputs[3].default_value, n.inputs[4].default_value = 0.0, 1.0
+        return n.outputs[0]
+
+    def comb(s, x, y, z=0.0):
+        n = s.N.new("ShaderNodeCombineXYZ")
+        s._in(n.inputs[0], x)
+        s._in(n.inputs[1], y)
+        s._in(n.inputs[2], z)
+        return n.outputs[0]
+
+    def _torus(s, fu, fv, seed):
+        ru, rv = fu / math.tau, fv / math.tau
+        x = s.add(s.mul(s.cu, ru), seed * 5.31)
+        y = s.mul(s.su, ru)
+        z = s.mul(s.cv, rv)
+        w = s.add(s.mul(s.sv, rv), seed * 2.73)
+        return s.comb(x, y, z), w
+
+    def noise(s, fu, fv, detail=3.0, rough=0.5, dist=0.0, seed=0.0, wshift=None):
+        """Tileable fBm: ~fu features across and fv up one repeat."""
+        vec, w = s._torus(fu, fv, seed)
+        if wshift is not None:
+            w = s.add(w, wshift)
+        n = s.N.new("ShaderNodeTexNoise")
+        n.noise_dimensions = "4D"
+        s.L.new(vec, n.inputs["Vector"])
+        s._in(n.inputs["W"], w)
+        n.inputs["Scale"].default_value = 1.0
+        n.inputs["Detail"].default_value = detail
+        n.inputs["Roughness"].default_value = rough
+        n.inputs["Distortion"].default_value = dist
+        return n.outputs["Fac"]
+
+    def voronoi(s, fu, fv, feature="F1", seed=0.0, rand=1.0):
+        vec, w = s._torus(fu, fv, seed)
+        n = s.N.new("ShaderNodeTexVoronoi")
+        n.voronoi_dimensions = "4D"
+        n.feature = feature
+        s.L.new(vec, n.inputs["Vector"])
+        s._in(n.inputs["W"], w)
+        n.inputs["Scale"].default_value = 1.0
+        n.inputs["Randomness"].default_value = rand
+        return n.outputs["Distance"]
+
+    def white(s, a, b, seed=0.0):
+        n = s.N.new("ShaderNodeTexWhiteNoise")
+        n.noise_dimensions = "3D"
+        s.L.new(s.comb(a, b, seed), n.inputs["Vector"])
+        return n.outputs["Value"]
+
+    def mix(s, fac, a, b, blend="MIX"):
+        n = s.N.new("ShaderNodeMix")
+        n.data_type = "RGBA"
+        n.blend_type = blend
+        n.clamp_factor = True
+        s._in(n.inputs[0], fac)
+        s._in([i for i in n.inputs if i.name == "A" and i.type == "RGBA"][0], a)
+        s._in([i for i in n.inputs if i.name == "B" and i.type == "RGBA"][0], b)
+        return [o for o in n.outputs if o.type == "RGBA"][0]
+
+    def ramp(s, x, stops):
+        n = s.N.new("ShaderNodeValToRGB")
+        els = n.color_ramp.elements
+        while len(els) < len(stops):
+            els.new(0.5)
+        for e, (p, c) in zip(els, stops):
+            e.position = p
+            e.color = tuple(c) + (1.0,)
+        s._in(n.inputs[0], x)
+        return n.outputs[0]
+
+    def cells(s, nu, nv, stagger=0.5):
+        """Running-bond cells: nu across, nv up (integers so the pattern tiles). Returns cu, cv, iu, iv, row parity."""
+        rv = s.mul(s.v, nv)
+        iv = s.fl(rv)
+        cv = s.fr(rv)
+        par = s.mod(iv, 2.0)
+        ru = s.add(s.mul(s.u, nu), s.mul(par, stagger))
+        iu = s.mod(s.fl(ru), nu)
+        return s.fr(ru), cv, iu, s.mod(iv, nv), par
+
+
+def _tx_plaster(g, damp=False):
+    big = g.noise(3, 3, 4, 0.55, seed=1)
+    mid = g.noise(14, 14, 5, 0.55, seed=2)
+    fine = g.noise(110, 110, 3, 0.6, seed=3)
+    streak = g.noise(40, 2.2, 4, 0.5, dist=0.4, seed=4)
+    zone = g.smooth(g.noise(5, 1.5, 2, 0.5, seed=5), 0.45, 0.68)
+    streakm = g.mul(g.smooth(streak, 0.52, 0.72), zone)
+    col = g.ramp(big, [(0.2, (0.78, 0.75, 0.69)), (0.8, (0.94, 0.92, 0.87))])
+    col = g.mix(g.mul(g.sub(mid, 0.3), 0.5), col, (0.72, 0.69, 0.62))
+    col = g.mix(g.mul(streakm, 0.6), col, (0.40, 0.37, 0.33))
+    # plaster lost in patches: the rough lime render and a hint of brick show through
+    lossn = g.noise(6, 6, 6, 0.6, seed=6)
+    loss = g.smooth(lossn, 0.675, 0.685)
+    repair = g.smooth(g.noise(7, 7, 2, 0.4, seed=60), 0.60, 0.62)
+    col = g.mix(g.mul(repair, 0.35), col, (0.86, 0.84, 0.78))
+    under = g.mix(g.smooth(g.noise(30, 60, 2, seed=7), 0.4, 0.7), (0.60, 0.52, 0.44), (0.52, 0.30, 0.22))
+    col = g.mix(loss, col, under)
+    rim = g.mul(g.smooth(lossn, 0.69, 0.705), g.one_minus(loss))
+    col = g.mix(g.mul(rim, 0.5), col, (0.55, 0.52, 0.47))
+    # hairline cracks, only in some zones
+    vd = g.voronoi(6, 6, "DISTANCE_TO_EDGE", seed=8)
+    crack = g.mul(g.one_minus(g.smooth(vd, 0.0, 0.007)), g.smooth(g.noise(3, 3, 2, seed=9), 0.66, 0.74))
+    col = g.mix(g.mul(crack, 0.55), col, (0.30, 0.28, 0.25))
+    h = g.add(0.55, g.mul(g.sub(fine, 0.5), 0.45))
+    h = g.add(h, g.mul(g.sub(mid, 0.5), 0.35))
+    h = g.sub(h, g.mul(loss, 0.45))
+    h = g.sub(h, g.mul(crack, 0.5))
+    rough = g.add(0.80, g.mul(fine, 0.12))
+    rough = g.sub(rough, g.mul(streakm, 0.06))
+    if damp:
+        zm = g.mul(g.v, 4.0)                                       # metres above the base (v anchored at z=0)
+        tide = g.add(0.85, g.mul(g.sub(g.noise(10, 0, 3, 0.6, seed=10), 0.5), 0.7))
+        above = g.smooth(g.sub(zm, tide), -0.06, 0.02)
+        dampm = g.one_minus(above)
+        col = g.mix(g.mul(dampm, 0.62), col, (0.34, 0.33, 0.28))
+        salts = g.mul(g.mul(g.smooth(g.sub(zm, tide), -0.25, -0.03), dampm), g.smooth(fine, 0.55, 0.62))
+        col = g.mix(g.mul(salts, 0.7), col, (0.93, 0.93, 0.90))
+        splash = g.one_minus(g.smooth(zm, 0.0, 0.4))
+        col = g.mix(g.mul(splash, 0.5), col, (0.22, 0.20, 0.17))
+        rough = g.sub(rough, g.mul(dampm, 0.22))
+        h = g.sub(h, g.mul(splash, g.mul(fine, 0.3)))
+    h = g.add(h, g.mul(repair, 0.08))
+    return col, rough, h, 0.014
+
+
+def _tx_brick(g):
+    # English-style bond: a course of stretchers (8 per 2 m), a course of headers (16), 26 courses per 2 m
+    rv = g.mul(g.v, 26.0)
+    iv = g.fl(rv)
+    cv = g.fr(rv)
+    par = g.mod(iv, 2.0)
+    nu = g.add(8.0, g.mul(par, 8.0))
+    ru = g.add(g.mul(g.u, nu), g.mul(par, 0.5))
+    iu = g.mod(g.fl(ru), nu)
+    cu = g.fr(ru)
+    du = g.mul(g.edge(cu), g.div(2.0, nu))
+    dv = g.mul(g.edge(cv), 2.0 / 26.0)
+    d = g.mn(du, dv)
+    bm = g.smooth(d, 0.004, 0.007)
+    hb = g.smooth(d, 0.004, 0.018)
+    r = g.white(g.add(iu, g.mul(par, 57.0)), iv, 1.0)
+    r2 = g.white(g.add(iu, g.mul(par, 57.0)), iv, 2.0)
+    bc = g.ramp(r, [(0.0, (0.34, 0.13, 0.08)), (0.35, (0.48, 0.21, 0.13)), (0.75, (0.57, 0.27, 0.17)), (1.0, (0.64, 0.36, 0.23))])
+    glaze = g.mul(par, g.smooth(r2, 0.80, 0.82))                # dark glazed headers (Gothic zendrowka)
+    bc = g.mix(g.mul(glaze, 0.8), bc, (0.24, 0.12, 0.10))
+    fine = g.noise(90, 90, 4, 0.6, seed=11)
+    bc = g.mix(g.mul(g.sub(fine, 0.35), 0.45), bc, (0.28, 0.14, 0.10))
+    soot = g.smooth(g.noise(4, 3, 4, seed=12), 0.5, 0.75)
+    bc = g.mix(g.mul(soot, 0.35), bc, (0.20, 0.16, 0.14))
+    mort = g.mix(g.noise(60, 60, 3, seed=13), (0.50, 0.47, 0.42), (0.66, 0.63, 0.57))
+    mort = g.mix(g.mul(soot, 0.4), mort, (0.30, 0.28, 0.25))
+    col = g.mix(bm, mort, bc)
+    h = g.add(g.mul(bm, g.add(0.55, g.mul(hb, 0.35))), g.mul(fine, 0.12))
+    rough = g.lerp(bm, 0.95, g.sub(0.86, g.mul(glaze, 0.45)))
+    return col, rough, h, 0.012
+
+
+def _tx_sandstone(g):
+    cu, cv, iu, iv, par = g.cells(3.0, 4.0, 0.5)
+    d = g.mn(g.mul(g.edge(cu), 2.0 / 3.0), g.mul(g.edge(cv), 0.5))
+    bm = g.smooth(d, 0.002, 0.005)
+    ch = g.smooth(d, 0.002, 0.02)
+    r = g.white(iu, iv, 3.0)
+    col = g.ramp(r, [(0.0, (0.52, 0.47, 0.39)), (0.3, (0.64, 0.58, 0.47)), (0.65, (0.72, 0.66, 0.53)), (1.0, (0.78, 0.71, 0.60))])
+    tool = g.add(0.5, g.mul(g.m("SINE", g.mul(g.add(g.mul(g.u, 150.0), g.mul(g.v, 150.0)), math.tau)), 0.5))
+    blot = g.noise(10, 10, 5, 0.6, seed=61)
+    col = g.mix(g.mul(g.sub(blot, 0.35), 0.5), col, (0.46, 0.42, 0.35))
+    bed = g.noise(2.5, 36, 3, 0.5, dist=0.6, seed=14)
+    col = g.mix(g.mul(g.sub(bed, 0.4), 0.5), col, (0.52, 0.46, 0.36))
+    grain = g.noise(160, 160, 2, 0.6, seed=15)
+    col = g.mix(g.mul(g.sub(grain, 0.4), 0.3), col, (0.84, 0.80, 0.70))
+    grime = g.mul(g.smooth(g.noise(4, 4, 5, seed=16), 0.48, 0.72), g.smooth(g.noise(30, 3, 3, dist=0.3, seed=17), 0.4, 0.7))
+    col = g.mix(g.mul(grime, 0.55), col, (0.30, 0.28, 0.25))
+    pits = g.one_minus(g.smooth(g.voronoi(70, 70, "F1", seed=18), 0.05, 0.14))
+    pits = g.mul(pits, g.smooth(g.noise(6, 6, 2, seed=19), 0.5, 0.65))
+    col = g.mix(g.mul(pits, 0.5), col, (0.35, 0.32, 0.27))
+    col = g.mix(g.mul(g.one_minus(bm), 0.75), col, (0.40, 0.37, 0.32))
+    h = g.add(g.mul(bm, g.add(0.6, g.mul(ch, 0.3))), g.mul(grain, 0.15))
+    h = g.sub(h, g.mul(pits, 0.35))
+    h = g.add(h, g.add(g.mul(tool, 0.06), g.mul(blot, 0.2)))
+    rough = g.add(0.84, g.mul(grain, 0.1))
+    return col, rough, h, 0.016
+
+
+def _tx_tile(g):
+    # beaver-tail (karpiowka) tiles: 16 across, 24 courses per 4 m, v runs up the slope, staggered by half a tile
+    cu, cv, iu, iv, par = g.cells(16.0, 24.0, 0.5)
+    x = g.sub(g.mul(cu, 2.0), 1.0)
+    e = g.mul(g.mul(x, x), 0.30)                                  # rounded tail: edge sits higher at the sides
+    t = g.sub(cv, e)
+    own = g.smooth(t, -0.015, 0.012)
+    gap = g.smooth(g.mul(g.edge(cu), 0.25), 0.002, 0.006)
+    h_own = g.sub(1.0, g.mul(g.clamp(t), 0.45))
+    h_below = g.sub(0.52, g.mul(g.sub(e, cv), 0.25))
+    h = g.lerp(own, h_below, h_own)
+    h = g.mul(h, g.add(0.7, g.mul(gap, 0.3)))
+    r = g.white(iu, iv, 4.0)
+    col = g.ramp(r, [(0.0, (0.34, 0.13, 0.08)), (0.3, (0.46, 0.18, 0.10)), (0.7, (0.54, 0.24, 0.13)), (1.0, (0.50, 0.29, 0.18))])
+    fine = g.noise(120, 120, 3, 0.6, seed=20)
+    col = g.mix(g.mul(g.sub(fine, 0.35), 0.35), col, (0.30, 0.15, 0.10))
+    dirt = g.one_minus(g.smooth(t, 0.0, 0.25))
+    col = g.mix(g.mul(dirt, 0.35), col, (0.22, 0.14, 0.10))
+    lich = g.mul(g.smooth(g.noise(6, 6, 5, seed=21), 0.56, 0.68), g.smooth(g.noise(50, 50, 3, seed=22), 0.35, 0.6))
+    col = g.mix(g.mul(lich, 0.75), col, (0.40, 0.40, 0.30))
+    spot = g.mul(g.one_minus(g.smooth(g.voronoi(90, 90, "F1", seed=23), 0.08, 0.16)), g.smooth(g.noise(8, 8, 2, seed=24), 0.55, 0.65))
+    col = g.mix(g.mul(spot, 0.7), col, (0.70, 0.62, 0.34))
+    col = g.mix(g.mul(g.one_minus(own), 0.55), col, (0.10, 0.06, 0.05))
+    col = g.mix(g.mul(g.one_minus(gap), 0.6), col, (0.08, 0.05, 0.04))
+    rough = g.add(0.68, g.add(g.mul(lich, 0.2), g.mul(fine, 0.08)))
+    return col, rough, h, 0.025
+
+
+def _tx_oak(g):
+    iu = g.fl(g.mul(g.u, 8.0))
+    cu = g.fr(g.mul(g.u, 8.0))
+    r = g.white(iu, 0.0, 5.0)
+    grain = g.noise(90, 2.5, 6, 0.6, dist=0.5, seed=25, wshift=g.mul(r, 13.0))
+    rings = g.add(0.5, g.mul(g.m("SINE", g.mul(g.add(g.mul(g.u, 56.0), g.mul(grain, 4.0)), math.tau)), 0.5))
+    ringl = g.smooth(rings, 0.78, 0.96)
+    col = g.ramp(r, [(0.0, (0.24, 0.16, 0.10)), (1.0, (0.38, 0.27, 0.17))])
+    col = g.mix(g.mul(ringl, 0.4), col, (0.20, 0.14, 0.09))
+    col = g.mix(g.mul(g.sub(grain, 0.3), 0.4), col, (0.52, 0.42, 0.30))
+    weather = g.smooth(g.noise(4, 5, 4, seed=26), 0.38, 0.7)
+    col = g.mix(g.mul(weather, 0.5), col, (0.36, 0.34, 0.31))
+    check = g.mul(g.smooth(g.noise(160, 3, 3, seed=27), 0.74, 0.77), g.smooth(g.noise(5, 5, 2, seed=28), 0.5, 0.62))
+    col = g.mix(g.mul(check, 0.9), col, (0.08, 0.06, 0.05))
+    gap = g.smooth(g.mul(g.edge(cu), 0.25), 0.002, 0.005)
+    col = g.mix(g.one_minus(gap), col, (0.06, 0.05, 0.04))
+    h = g.add(g.mul(gap, 0.6), g.mul(grain, 0.25))
+    h = g.sub(h, g.add(g.mul(check, 0.35), g.mul(ringl, 0.08)))
+    rough = g.add(0.74, g.mul(weather, 0.15))
+    return col, rough, h, 0.006
+
+
+def _tx_iron(g):
+    dents = g.smooth(g.voronoi(40, 40, "F1", seed=29), 0.0, 0.6)
+    rust = g.mul(g.smooth(g.noise(8, 8, 6, 0.6, seed=30), 0.58, 0.68), 0.8)
+    fine = g.noise(120, 120, 3, seed=31)
+    col = g.mix(g.mul(fine, 0.3), (0.11, 0.11, 0.12), (0.20, 0.19, 0.19))
+    rc = g.ramp(fine, [(0.3, (0.26, 0.12, 0.05)), (0.7, (0.46, 0.24, 0.10))])
+    col = g.mix(rust, col, rc)
+    h = g.add(g.mul(dents, 0.35), g.mul(rust, g.mul(fine, 0.5)))
+    rough = g.add(0.45, g.mul(rust, 0.45))
+    return col, rough, h, 0.004
+
+
+def _tx_metal(g):
+    iu = g.fl(g.mul(g.u, 4.0))
+    cu = g.fr(g.mul(g.u, 4.0))
+    seam = g.one_minus(g.smooth(g.mul(g.edge(cu), 0.5), 0.004, 0.014))
+    cv = g.fr(g.add(g.mul(g.v, 2.0), g.mul(g.mod(iu, 2.0), 0.5)))
+    cross = g.one_minus(g.smooth(g.edge(cv), 0.002, 0.006))
+    streak = g.noise(24, 2, 4, dist=0.3, seed=32)
+    big = g.noise(3, 3, 3, seed=33)
+    col = g.mix(g.mul(g.sub(streak, 0.25), 0.5), (0.84, 0.84, 0.82), (0.62, 0.62, 0.60))
+    col = g.mix(g.mul(big, 0.3), col, (0.95, 0.95, 0.92))
+    col = g.mix(g.mul(g.add(seam, cross), 0.4), col, (0.45, 0.45, 0.44))
+    h = g.add(g.add(seam, g.mul(cross, 0.5)), g.mul(g.noise(5, 5, 2, seed=34), 0.2))
+    rough = g.add(0.5, g.mul(streak, 0.25))
+    return col, rough, h, 0.01
+
+
+def _tx_glass(g):
+    # small leaded panes (8 x 8 per 2 m), each with its own tint and crown-glass wobble
+    iu = g.fl(g.mul(g.u, 8.0))
+    iv = g.fl(g.mul(g.v, 8.0))
+    cu = g.fr(g.mul(g.u, 8.0))
+    cv = g.fr(g.mul(g.v, 8.0))
+    d = g.mul(g.mn(g.edge(cu), g.edge(cv)), 0.25)
+    came = g.one_minus(g.smooth(d, 0.006, 0.010))
+    r = g.white(iu, iv, 6.0)
+    pane = g.ramp(r, [(0.0, (0.82, 0.86, 0.84)), (1.0, (1.0, 1.0, 0.97))])
+    dirt = g.smooth(g.noise(6, 6, 4, seed=35), 0.5, 0.8)
+    pane = g.mix(g.mul(dirt, 0.3), pane, (0.70, 0.68, 0.62))
+    col = g.mix(came, pane, (0.08, 0.08, 0.08))
+    wob = g.noise(30, 30, 2, seed=36)
+    bull = g.sub(0.25, g.mul(g.add(g.mul(g.sub(cu, 0.5), g.sub(cu, 0.5)), g.mul(g.sub(cv, 0.5), g.sub(cv, 0.5))), 0.5))
+    h = g.add(g.mul(came, 1.0), g.add(g.mul(wob, 0.15), g.mul(bull, 0.3)))
+    rough = g.lerp(came, g.add(0.05, g.mul(dirt, 0.25)), 0.55)
+    return col, rough, h, 0.003
+
+
+def _tx_snow(g):
+    lumps = g.noise(6, 6, 5, 0.55, seed=37)
+    fine = g.noise(140, 140, 2, seed=38)
+    col = g.mix(lumps, (0.80, 0.83, 0.90), (0.95, 0.96, 0.99))
+    sp = g.smooth(fine, 0.72, 0.76)
+    col = g.mix(g.mul(sp, 0.4), col, (1.0, 1.0, 1.0))
+    h = g.add(g.mul(lumps, 0.7), g.mul(fine, 0.12))
+    rough = g.add(0.62, g.mul(fine, 0.2))
+    return col, rough, h, 0.03
+
+
+def _tx_cloth(g):
+    wu = g.m("SINE", g.mul(g.u, 250.0 * math.tau))
+    wv = g.m("SINE", g.mul(g.v, 250.0 * math.tau))
+    weave = g.add(0.5, g.mul(g.mul(wu, wv), 0.5))
+    stain = g.smooth(g.noise(4, 4, 5, seed=39), 0.5, 0.78)
+    slub = g.noise(200, 8, 2, seed=40)
+    col = g.mix(g.mul(g.sub(slub, 0.4), 0.3), (0.92, 0.90, 0.85), (0.78, 0.75, 0.68))
+    col = g.mix(g.mul(stain, 0.5), col, (0.50, 0.44, 0.36))
+    col = g.mix(g.mul(g.sub(1.0, weave), 0.15), col, (0.5, 0.5, 0.5))
+    h = g.add(g.mul(weave, 0.6), g.mul(slub, 0.3))
+    return col, g.add(0.86, g.mul(slub, 0.1)), h, 0.002
+
+
+def _tx_cobbles(g):
+    # granite setts in staggered rows (26 x 30 per 4 m), sand and frost in the joints
+    cu, cv, iu, iv, par = g.cells(26.0, 30.0, 0.5)
+    r = g.white(iu, iv, 7.0)
+    r2 = g.white(iu, iv, 8.0)
+    cw, chh = 4.0 / 26.0, 4.0 / 30.0
+    shrink = g.add(0.010, g.mul(r2, 0.012))
+    rad = 0.028
+    px = g.m("ABSOLUTE", g.mul(g.sub(cu, 0.5), cw))
+    pz = g.m("ABSOLUTE", g.mul(g.sub(cv, 0.5), chh))
+    qx = g.sub(px, g.sub(g.sub(cw / 2, rad), shrink))
+    qz = g.sub(pz, g.sub(g.sub(chh / 2, rad), shrink))
+    ox, oz = g.mx(qx, 0.0), g.mx(qz, 0.0)
+    outside = g.m("SQRT", g.add(g.mul(ox, ox), g.mul(oz, oz)))
+    inside = g.mn(g.mx(qx, qz), 0.0)
+    sd = g.sub(g.add(outside, inside), rad)
+    stone = g.smooth(g.mul(sd, -1.0), 0.0, 0.004)
+    dome = g.smooth(g.mul(sd, -1.0), 0.0, 0.035)
+    col = g.ramp(r, [(0.0, (0.22, 0.21, 0.21)), (0.35, (0.36, 0.34, 0.33)), (0.7, (0.50, 0.47, 0.43)), (0.9, (0.58, 0.52, 0.46)), (1.0, (0.52, 0.40, 0.35))])
+    tilt = g.mul(g.add(g.mul(g.sub(cu, 0.5), g.sub(r2, 0.5)), g.mul(g.sub(cv, 0.5), g.sub(r, 0.5))), 0.8)
+    speck = g.noise(300, 300, 1, seed=41)
+    col = g.mix(g.mul(g.smooth(speck, 0.6, 0.66), 0.6), col, (0.12, 0.12, 0.12))
+    col = g.mix(g.mul(g.smooth(speck, 0.34, 0.28), 0.5), col, (0.75, 0.73, 0.70))
+    wear = g.noise(8, 8, 4, seed=42)
+    snowj = g.smooth(g.noise(9, 9, 5, seed=43), 0.60, 0.72)
+    joint = g.mix(snowj, (0.18, 0.15, 0.12), (0.80, 0.82, 0.88))
+    dust = g.mul(g.smooth(g.noise(11, 11, 5, seed=44), 0.66, 0.8), g.one_minus(dome))
+    col = g.mix(g.mul(dust, 0.25), col, (0.82, 0.84, 0.90))
+    col = g.mix(stone, joint, col)
+    h = g.add(g.mul(stone, g.add(g.add(0.45, tilt), g.mul(dome, 0.55))), g.mul(g.mul(snowj, g.one_minus(stone)), 0.3))
+    rough = g.lerp(stone, 0.95, g.add(0.5, g.mul(wear, 0.3)))
+    return col, rough, h, 0.035
+
+
+def _tx_thatch(g):
+    # rye straw laid in overlapping courses (5 per 2 m), stalk ends pointing down the slope; weathered grey-brown,
+    # darker and mossy where the straw is old, bright fresh patches where it was mended
+    rv = g.mul(g.v, 5.0)
+    cv = g.fr(rv)
+    iv = g.fl(rv)
+    wob = g.mul(g.sub(g.noise(9, 3, 3, seed=57), 0.5), 0.35)
+    cvw = g.fr(g.add(rv, wob))
+    stalk = g.noise(320, 4, 4, 0.7, dist=1.2, seed=45, wshift=g.mul(iv, 3.1))
+    fine = g.noise(600, 12, 2, 0.6, seed=58)
+    clump = g.noise(24, 5, 3, seed=46)
+    col = g.ramp(stalk, [(0.25, (0.16, 0.13, 0.09)), (0.5, (0.34, 0.29, 0.20)), (0.7, (0.48, 0.41, 0.28)), (0.85, (0.60, 0.52, 0.36))])
+    col = g.mix(g.mul(g.smooth(fine, 0.55, 0.75), 0.4), col, (0.62, 0.55, 0.40))
+    grey = g.smooth(g.noise(4, 4, 4, seed=47), 0.35, 0.7)
+    col = g.mix(g.mul(grey, 0.5), col, (0.36, 0.34, 0.31))
+    fresh = g.smooth(g.noise(3, 3, 3, seed=59), 0.66, 0.72)
+    col = g.mix(g.mul(fresh, 0.5), col, (0.62, 0.52, 0.30))
+    moss = g.mul(g.smooth(g.noise(5, 5, 5, seed=48), 0.55, 0.7), g.smooth(clump, 0.4, 0.6))
+    col = g.mix(g.mul(moss, 0.75), col, (0.17, 0.20, 0.10))
+    shade = g.one_minus(g.smooth(cvw, 0.0, 0.18))
+    col = g.mix(g.mul(shade, 0.35), col, (0.08, 0.07, 0.05))
+    h = g.add(g.mul(g.sub(1.0, g.mul(cvw, 0.35)), 0.5), g.add(g.mul(stalk, 0.45), g.mul(clump, 0.25)))
+    return col, g.add(0.86, g.mul(stalk, 0.1)), h, 0.05
+
+
+def _tx_log(g):
+    # horizontal hewn logs (8 per 2 m) with clay chinking, limewashed and flaking
+    rv = g.mul(g.v, 8.0)
+    cv = g.fr(rv)
+    iv = g.fl(rv)
+    y = g.sub(g.mul(cv, 2.0), 1.0)
+    bulge = g.m("SQRT", g.mx(g.sub(1.0, g.mul(y, y)), 0.0))
+    chink = g.one_minus(g.smooth(bulge, 0.25, 0.45))
+    grain = g.noise(3, 60, 5, 0.6, dist=0.5, seed=49, wshift=g.mul(iv, 7.0))
+    wood = g.ramp(grain, [(0.3, (0.30, 0.22, 0.14)), (0.7, (0.46, 0.35, 0.23))])
+    lime = g.mix(g.noise(40, 40, 3, seed=50), (0.86, 0.87, 0.88), (0.96, 0.96, 0.95))
+    flake = g.smooth(g.noise(8, 10, 6, seed=51), 0.62, 0.64)
+    col = g.mix(flake, lime, wood)
+    col = g.mix(chink, col, (0.62, 0.56, 0.46))
+    split = g.mul(g.smooth(g.noise(4, 120, 3, seed=52), 0.74, 0.77), g.one_minus(chink))
+    col = g.mix(g.mul(split, 0.8), col, (0.12, 0.10, 0.08))
+    h = g.add(g.mul(bulge, 0.8), g.mul(grain, 0.1))
+    h = g.sub(h, g.add(g.mul(split, 0.2), g.mul(flake, 0.05)))
+    return col, g.add(0.82, g.mul(flake, 0.1)), h, 0.04
+
+
+def _tx_field(g):
+    # ploughed strip field under snow: furrows run along u (22 per 4 m), stubble rows, soil showing on the ridges
+    rv = g.mul(g.v, 22.0)
+    cv = g.fr(rv)
+    ridge = g.m("SINE", g.mul(g.fr(g.add(rv, g.mul(g.noise(2, 1, 2, seed=63), 1.5))), math.pi))
+    wind = g.noise(3, 3, 4, seed=53)
+    snow_depth = g.add(g.mul(wind, 0.8), g.mul(g.noise(40, 12, 3, seed=62), 0.3))
+    bare = g.smooth(g.sub(ridge, snow_depth), 0.05, 0.25)
+    soil = g.mix(g.noise(60, 60, 4, seed=54), (0.16, 0.12, 0.09), (0.30, 0.23, 0.16))
+    snow = g.mix(g.noise(20, 20, 3, seed=55), (0.80, 0.83, 0.90), (0.95, 0.96, 0.99))
+    col = g.mix(bare, snow, soil)
+    stub = g.one_minus(g.smooth(g.voronoi(160, 22 * 6, "F1", seed=56), 0.06, 0.12))
+    stub = g.mul(stub, g.smooth(ridge, 0.4, 0.7))
+    col = g.mix(g.mul(stub, 0.85), col, (0.52, 0.44, 0.26))
+    h = g.add(g.mul(ridge, 0.7), g.add(g.mul(stub, 0.25), g.mul(g.one_minus(bare), 0.15)))
+    rough = g.lerp(bare, 0.7, 0.92)
+    return col, rough, h, 0.05
+
+
+RECIPES = {"plaster": _tx_plaster, "plaster_damp": lambda g: _tx_plaster(g, damp=True), "brick": _tx_brick,
+           "sandstone": _tx_sandstone, "tile": _tx_tile, "oak": _tx_oak, "iron": _tx_iron, "metal": _tx_metal,
+           "glass": _tx_glass, "snow": _tx_snow, "cloth": _tx_cloth, "cobbles": _tx_cobbles, "thatch": _tx_thatch,
+           "log": _tx_log, "field": _tx_field}
+
+
+def _tex_paths(kind):
+    return {p: os.path.join(TEX, "%s_%s.png" % (kind, p)) for p in ("col", "rough", "nrm")}
+
+
+_baked_this_run = set()
+
+
+def bake_texture(kind):
+    """Bake one texture kind to assets/textures/<kind>_{col,rough,nrm}.png (cached). Runs in a scratch scene, so it
+    is safe to call in the middle of building an asset."""
+    paths = _tex_paths(kind)
+    if all(os.path.exists(p) for p in paths.values()) and (not REBAKE or kind in _baked_this_run):
+        return paths
+    t0 = time.time()
+    res, rep = TEXSPEC[kind]
+    win = bpy.context.window
+    prev = win.scene
+    sc = bpy.data.scenes.new("_bake_" + kind)
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 2
+    sc.cycles.use_denoising = False
+    sc.render.threads_mode = "AUTO"
+    bk = sc.render.bake
+    bk.margin = 0
+    me = bpy.data.meshes.new("_bakeplane")
+    bm = bmesh.new()
+    h = rep / 2
+    vs = [bm.verts.new(c) for c in ((-h, -h, 0), (h, -h, 0), (h, h, 0), (-h, h, 0))]
+    f = bm.faces.new(vs)
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for lp, uv in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+        lp[uvl].uv = uv
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new("_bakeplane", me)
+    sc.collection.objects.link(ob)
+    mat = bpy.data.materials.new("_bake_" + kind)
+    nt = mat.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    g = _G(nt)
+    col, rough, hgt, dist = RECIPES[kind](g)
+    nt.links.new(col, bsdf.inputs["Base Color"])
+    nt.links.new(rough, bsdf.inputs["Roughness"])
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Distance"].default_value = dist
+    bump.inputs["Strength"].default_value = 1.0
+    nt.links.new(hgt, bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    me.materials.append(mat)
+    tnode = nt.nodes.new("ShaderNodeTexImage")
+    nt.nodes.active = tnode
+    win.scene = sc
+    vl = sc.view_layers[0]
+    vl.objects.active = ob
+    ob.select_set(True, view_layer=vl)
+    for p, btype in (("col", "DIFFUSE"), ("rough", "ROUGHNESS"), ("nrm", "NORMAL")):
+        img = bpy.data.images.new("%s_%s" % (kind, p), res, res, alpha=False)
+        img.colorspace_settings.name = "sRGB" if p == "col" else "Non-Color"
+        tnode.image = img
+        kw = dict(type=btype, margin=0, use_clear=True)
+        if btype == "DIFFUSE":
+            kw["pass_filter"] = {"COLOR"}
+        if btype == "NORMAL":
+            kw["normal_space"] = "TANGENT"
+        with bpy.context.temp_override(scene=sc, view_layer=vl, active_object=ob, object=ob,
+                                       selected_objects=[ob], selected_editable_objects=[ob]):
+            bpy.ops.object.bake(**kw)
+        img.filepath_raw = paths[p]
+        img.file_format = "PNG"
+        img.save()
+        bpy.data.images.remove(img)
+    win.scene = prev
+    bpy.data.objects.remove(ob, do_unlink=True)
+    bpy.data.meshes.remove(me)
+    bpy.data.materials.remove(mat)
+    bpy.data.scenes.remove(sc)
+    _baked_this_run.add(kind)
+    print("[tex] baked %s %dpx in %.1fs" % (kind, res, time.time() - t0))
+    return paths
+
+
+def _img(path, colour):
+    im = bpy.data.images.load(path, check_existing=True)
+    im.colorspace_settings.name = "sRGB" if colour else "Non-Color"
+    return im
+
+
+def _tex_material(key, kind, tint):
+    paths = bake_texture(kind)
+    m = bpy.data.materials.new(key)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    ic = nt.nodes.new("ShaderNodeTexImage")
+    ic.image = _img(paths["col"], True)
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.blend_type = "MULTIPLY"
+    mix.inputs[0].default_value = 1.0
+    a = [i for i in mix.inputs if i.name == "A" and i.type == "RGBA"][0]
+    b = [i for i in mix.inputs if i.name == "B" and i.type == "RGBA"][0]
+    nt.links.new(ic.outputs["Color"], a)
+    b.default_value = (*[min(1.0, c) for c in tint], 1.0)
+    nt.links.new([o for o in mix.outputs if o.type == "RGBA"][0], bsdf.inputs["Base Color"])
+    ir = nt.nodes.new("ShaderNodeTexImage")
+    ir.image = _img(paths["rough"], False)
+    nt.links.new(ir.outputs["Color"], bsdf.inputs["Roughness"])
+    inr = nt.nodes.new("ShaderNodeTexImage")
+    inr.image = _img(paths["nrm"], False)
+    nmap = nt.nodes.new("ShaderNodeNormalMap")
+    nt.links.new(inr.outputs["Color"], nmap.inputs["Color"])
+    nt.links.new(nmap.outputs["Normal"], bsdf.inputs["Normal"])
+    bsdf.inputs["Metallic"].default_value = METALLIC.get(kind, 0.0)
+    _tex_rep[key] = TEXSPEC[kind][1]
+    return m
 
 
 def M(key, rough=0.85, emit=None, emit_strength=0.0):
+    """Material by palette key. Architectural keys get baked PBR textures; the rest stay flat colours."""
     if key in _mats:
         return _mats[key]
-    m = bpy.data.materials.new(key)
-    m.use_nodes = True
-    bsdf = m.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*PAL[key], 1.0)
-    bsdf.inputs["Roughness"].default_value = rough
-    if emit:
-        bsdf.inputs["Emission Color"].default_value = (*emit, 1.0)
-        bsdf.inputs["Emission Strength"].default_value = emit_strength
+    kind = None
+    if key.endswith("_damp") and key[:-5] in PAL:
+        kind, tint = "plaster_damp", _desat(PAL[key[:-5]])
+    elif key in TEX_OF and not emit:
+        kind = TEX_OF[key]
+        tint = TINT.get(key) or _desat(PAL[key])
+    if kind:
+        m = _tex_material(key, kind, tint)
+        if key == "glass_warm":           # lit windows: a warm glow for the night scene
+            bsdf = m.node_tree.nodes["Principled BSDF"]
+            bsdf.inputs["Emission Color"].default_value = (1.0, 0.64, 0.30, 1.0)
+            bsdf.inputs["Emission Strength"].default_value = 1.5
+    else:
+        m = bpy.data.materials.new(key)
+        bsdf = m.node_tree.nodes["Principled BSDF"]
+        bsdf.inputs["Base Color"].default_value = (*PAL[key], 1.0)
+        bsdf.inputs["Roughness"].default_value = rough
+        if key == "gold":
+            bsdf.inputs["Metallic"].default_value = 0.8
+        if emit:
+            bsdf.inputs["Emission Color"].default_value = (*emit, 1.0)
+            bsdf.inputs["Emission Strength"].default_value = emit_strength
     _mats[key] = m
     return m
 
 
-# ------------------------------------------------------------------ finishing: the "Fable" pass
+def is_wood(mat):
+    return mat is not None and TEX_OF.get(mat.name) == "oak"
+
+
+# ------------------------------------------------------------------ UVs
+def _tag(o, mode=0.0, c=(0.0, 0.0), grain=0.0, mat=None, offset=None):
+    """Per-face UV hints read by auto_uv: mode 1 = map around a vertical axis at c; grain 1 = rotate 90 degrees
+    (wood running horizontally); a random per-part offset, except damp plinths which stay anchored at z=0."""
+    me = o.data
+    n = len(me.polygons)
+    if n == 0:
+        return o
+    anchor = mat is not None and mat.name.endswith("_damp")
+    ou, ov = RNG_UV.random(), (0.0 if anchor else RNG_UV.random())
+    if offset is not None:
+        ou, ov = offset
+    a = me.attributes.get("uvp") or me.attributes.new("uvp", "FLOAT_VECTOR", "FACE")
+    a.data.foreach_set("vector", [mode, c[0], c[1]] * n)
+    b = me.attributes.get("uvo") or me.attributes.new("uvo", "FLOAT_VECTOR", "FACE")
+    b.data.foreach_set("vector", [ou, ov, grain] * n)
+    return o
+
+
+def auto_uv(o):
+    """Project UVs per face at a fixed texel density (metres per repeat from the material)."""
+    me = o.data
+    if not me.polygons:
+        return
+    for uvl_ in list(me.uv_layers)[1:]:
+        me.uv_layers.remove(uvl_)
+    uvl = me.uv_layers[0] if me.uv_layers else me.uv_layers.new(name="UVMap")
+    n = len(me.polygons)
+    P = [0.0] * (3 * n)
+    O = [0.0] * (3 * n)
+    if "uvp" in me.attributes:
+        me.attributes["uvp"].data.foreach_get("vector", P)
+    if "uvo" in me.attributes:
+        me.attributes["uvo"].data.foreach_get("vector", O)
+    reps = [(_tex_rep.get(m.name, 2.0) if m else 2.0) for m in me.materials] or [2.0]
+    co = [v.co.copy() for v in me.vertices]
+    lv = [0] * len(me.loops)
+    me.loops.foreach_get("vertex_index", lv)
+    out = [0.0] * (2 * len(me.loops))
+    Z = Vector((0, 0, 1))
+    Y = Vector((0, 1, 0))
+    for p in me.polygons:
+        i = p.index
+        nrm = p.normal
+        mode = P[3 * i]
+        ou, ov, grain = O[3 * i], O[3 * i + 1], O[3 * i + 2]
+        rep = reps[min(p.material_index, len(reps) - 1)]
+        li0 = p.loop_start
+        if mode > 0.5 and abs(nrm.z) < 0.9:
+            cx, cy = P[3 * i + 1], P[3 * i + 2]
+            fc = p.center
+            a0 = math.atan2(fc.y - cy, fc.x - cx)
+            r = max(0.05, math.hypot(fc.x - cx, fc.y - cy))
+            for li in range(li0, li0 + p.loop_total):
+                v = co[lv[li]]
+                a = math.atan2(v.y - cy, v.x - cx)
+                while a - a0 > math.pi:
+                    a -= math.tau
+                while a - a0 < -math.pi:
+                    a += math.tau
+                uu, vv = a * r, v.z
+                if grain > 0.5:
+                    uu, vv = -vv, uu
+                out[2 * li] = uu / rep + ou
+                out[2 * li + 1] = vv / rep + ov
+            continue
+        if abs(nrm.z) > 0.95:
+            s = (Y - nrm * nrm.dot(Y)).normalized()
+        else:
+            s = (Z - nrm * nrm.z).normalized()
+        t = s.cross(nrm)
+        for li in range(li0, li0 + p.loop_total):
+            v = co[lv[li]]
+            uu, vv = v.dot(t), v.dot(s)
+            if grain > 0.5:
+                uu, vv = -vv, uu
+            out[2 * li] = uu / rep + ou
+            out[2 * li + 1] = vv / rep + ov
+    uvl.data.foreach_set("uv", out)
+
+
+# ------------------------------------------------------------------ finishing: the "Fable" pass (halved for masonry)
 def finish(o, bevel=0.06, seg=2, subsurf=0, wonk=0.0, smooth=40.0, keep_base=True):
     """Wonk the corners, bevel the edges, optionally subdivide, then smooth by angle."""
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True)
     bpy.context.view_layer.objects.active = o
+    wonk *= WONK
     if wonk > 0:
         bm = bmesh.new()
         bm.from_mesh(o.data)
@@ -123,11 +868,12 @@ def edit_verts(o, fn):
 
 
 # ------------------------------------------------------------------ primitives (world-space verts, zero origin)
-def _finish_prim(o, name, mat):
+def _finish_prim(o, name, mat, mode=0.0, c=(0.0, 0.0), grain=0.0):
     o.name = name
     if mat:
         o.data.materials.append(mat)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    _tag(o, mode, c, grain, mat)
     return o
 
 
@@ -136,7 +882,8 @@ def box(name, size, loc, mat=None, rot=(0, 0, 0), **fin):
     bpy.ops.mesh.primitive_cube_add(size=1, location=(loc[0], loc[1], loc[2] + size[2] / 2), rotation=rot)
     o = bpy.context.object
     o.scale = size
-    o = _finish_prim(o, name, mat)
+    grain = 1.0 if is_wood(mat) and size[2] < max(size[0], size[1]) else 0.0
+    o = _finish_prim(o, name, mat, grain=grain)
     return finish(o, **fin) if fin else o
 
 
@@ -144,7 +891,8 @@ def cbox(name, size, center, mat=None, rot=(0, 0, 0), **fin):
     bpy.ops.mesh.primitive_cube_add(size=1, location=center, rotation=rot)
     o = bpy.context.object
     o.scale = size
-    o = _finish_prim(o, name, mat)
+    grain = 1.0 if is_wood(mat) and size[2] < max(size[0], size[1]) else 0.0
+    o = _finish_prim(o, name, mat, grain=grain)
     return finish(o, **fin) if fin else o
 
 
@@ -168,7 +916,9 @@ def cyl(name, r, h, loc, mat=None, verts=24, rot=(0, 0, 0), r2=None, center=Fals
         bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=h, location=c, rotation=rot)
     else:
         bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=r, radius2=r2, depth=h, location=c, rotation=rot)
-    o = _finish_prim(bpy.context.object, name, mat)
+    upright = tuple(rot) == (0, 0, 0)
+    o = _finish_prim(bpy.context.object, name, mat, mode=1.0 if upright else 0.0, c=(loc[0], loc[1]),
+                     grain=0.0 if upright or not is_wood(mat) else 1.0)
     return finish(o, **fin) if fin else o
 
 
@@ -176,13 +926,13 @@ def sphere(name, r, center, mat=None, seg=20, rings=12, zscale=1.0, **fin):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=seg, ring_count=rings, radius=r, location=center)
     o = bpy.context.object
     o.scale.z = zscale
-    o = _finish_prim(o, name, mat)
+    o = _finish_prim(o, name, mat, mode=1.0, c=(center[0], center[1]))
     fin.setdefault("bevel", 0)
     return finish(o, **fin)
 
 
-def torus(name, R, r, center, mat=None, rot=(0, 0, 0), **fin):
-    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=24, minor_segments=10, location=center, rotation=rot)
+def torus(name, R, r, center, mat=None, rot=(0, 0, 0), seg=24, mseg=10, **fin):
+    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=seg, minor_segments=mseg, location=center, rotation=rot)
     o = _finish_prim(bpy.context.object, name, mat)
     fin.setdefault("bevel", 0)
     return finish(o, **fin)
@@ -195,21 +945,74 @@ def blob(name, size, loc, mat=None, **fin):
     return box(name, size, loc, mat, **fin)
 
 
-def roof(name, L, W, H, loc, mat, sag=0.25, flare=0.30, cuts=6, top_w=0.0, along_x=True, **fin):
+def _mesh_obj(name, bm, mat):
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.collection.objects.link(o)
+    if mat:
+        o.data.materials.append(mat)
+    _tag(o, mat=mat)
+    return o
+
+
+def wedge(name, size, loc, mat=None, **fin):
+    """Triangular prism, ridge along X at the top, base centre at loc (a lean-to roof, a step, a gable end)."""
+    L, W, H = size
+    bm = bmesh.new()
+    a = [bm.verts.new((loc[0] - L / 2, loc[1] - W / 2, loc[2])), bm.verts.new((loc[0] - L / 2, loc[1] + W / 2, loc[2])),
+         bm.verts.new((loc[0] - L / 2, loc[1], loc[2] + H))]
+    b = [bm.verts.new((loc[0] + L / 2, v.co.y, v.co.z)) for v in a]
+    bm.faces.new(a)
+    bm.faces.new(list(reversed(b)))
+    for i in range(3):
+        j = (i + 1) % 3
+        bm.faces.new((a[i], b[i], b[j], a[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj(name, bm, mat)
+    fin.setdefault("bevel", 0)
+    return finish(o, **fin)
+
+
+def pyramid(name, size, loc, mat=None, apex=0.0, **fin):
+    """Four-sided pyramid (spire, pinnacle, hipped cap). size = (x, y, h); apex = flat top half-width."""
+    X, Y, H = size
+    bm = bmesh.new()
+    base = [bm.verts.new((loc[0] + sx * X / 2, loc[1] + sy * Y / 2, loc[2])) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    if apex > 0:
+        top = [bm.verts.new((loc[0] + sx * apex, loc[1] + sy * apex, loc[2] + H)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        bm.faces.new(top)
+        for i in range(4):
+            bm.faces.new((base[i], base[(i + 1) % 4], top[(i + 1) % 4], top[i]))
+    else:
+        t = bm.verts.new((loc[0], loc[1], loc[2] + H))
+        for i in range(4):
+            bm.faces.new((base[i], base[(i + 1) % 4], t))
+    bm.faces.new(list(reversed(base)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj(name, bm, mat)
+    fin.setdefault("bevel", 0)
+    return finish(o, **fin)
+
+
+def roof(name, L, W, H, loc, mat, sag=0.25, flare=0.30, cuts=6, top_w=0.0, along_x=True, courses=0, ridge=False, **fin):
     """Sagging, flaring roof solid. Ridge along X (or Y). loc = base centre at eaves level.
     flare: how far the mid-slope sits below the straight chord (0 = straight, 0.3 = pagoda-ish sweep).
-    top_w: width of a flat ridge (for mansard lower slopes)."""
+    top_w: width of a flat ridge (for mansard lower slopes).
+    courses: number of raised tile-course lines laid across each slope; ridge: half-round ridge tiles."""
+    def P(u, py, pz):
+        if along_x:
+            return Vector((loc[0] + (L / 2) * u, loc[1] + py, loc[2] + pz))
+        return Vector((loc[0] + py, loc[1] + (L / 2) * u, loc[2] + pz))
+
     bm = bmesh.new()
-    slices = []
+    slices, profs = [], []
     for i in range(cuts + 1):
         t = -1 + 2 * i / cuts
-        u = t if along_x else t
-        x = loc[0] + (L / 2) * u
         hr = H - sag * (1 - t * t)
-        prof = []
         half = W / 2
-        # eave, mid, ridge (one or two points), mid, eave
-        prof.append((-half, 0.0))
+        prof = [(-half, 0.0)]
         ym = -half + (half - top_w / 2) * 0.45
         zm = hr * 0.45 - flare * hr * 0.45
         prof.append((ym, zm))
@@ -220,13 +1023,8 @@ def roof(name, L, W, H, loc, mat, sag=0.25, flare=0.30, cuts=6, top_w=0.0, along
             prof.append((0.0, hr))
         prof.append((-ym, zm))
         prof.append((half, 0.0))
-        vs = []
-        for (py, pz) in prof:
-            if along_x:
-                vs.append(bm.verts.new((x, loc[1] + py, loc[2] + pz)))
-            else:
-                vs.append(bm.verts.new((loc[0] + py, loc[1] + (L / 2) * u, loc[2] + pz)))
-        slices.append(vs)
+        profs.append((t, prof))
+        slices.append([bm.verts.new(P(t, py, pz)) for (py, pz) in prof])
     n = len(slices[0])
     for i in range(cuts):
         a, b = slices[i], slices[i + 1]
@@ -236,15 +1034,63 @@ def roof(name, L, W, H, loc, mat, sag=0.25, flare=0.30, cuts=6, top_w=0.0, along
     bm.faces.new(list(reversed(slices[0])))
     bm.faces.new(slices[-1])
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    me = bpy.data.meshes.new(name)
-    bm.to_mesh(me)
-    bm.free()
-    o = bpy.data.objects.new(name, me)
-    bpy.context.collection.objects.link(o)
-    o.data.materials.append(mat)
+    o = _mesh_obj(name, bm, mat)
     fin.setdefault("bevel", 0.05)
     fin.setdefault("smooth", 35)
-    return finish(o, **fin)
+    o = finish(o, **fin)
+    if not courses and not ridge:
+        return o
+    # raised course lines and ridge tiles as a second mesh on the finished surface
+    bm = bmesh.new()
+
+    def along(prof, idx, f):
+        """Point and outward normal (in profile space) at fraction f from eave (idx[0]) to ridge (idx[-1])."""
+        segs = [(prof[idx[k]], prof[idx[k + 1]]) for k in range(len(idx) - 1)]
+        lens = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in segs]
+        tot = sum(lens)
+        d = f * tot
+        for (a, b), ln in zip(segs, lens):
+            if d <= ln or (a, b) == segs[-1]:
+                k = min(1.0, d / ln) if ln else 0
+                py, pz = a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k
+                sy, sz = (b[0] - a[0]) / ln, (b[1] - a[1]) / ln
+                ny, nz = -sz, sy
+                if nz < 0:
+                    ny, nz = -ny, -nz
+                return py, pz, sy, sz, ny, nz
+            d -= ln
+
+    sides = [[0, 1, 2], [n - 1, n - 2, n - 3]]
+    for idx in sides:
+        for c in range(courses):
+            f = 0.08 + 0.84 * (c + 0.5) / courses
+            rows = []
+            for (t, prof) in profs:
+                py, pz, sy, sz, ny, nz = along(prof, idx, f)
+                r0 = P(t, py + ny * 0.005, pz + nz * 0.005)
+                r1 = P(t, py + ny * 0.055 - sy * 0.01, pz + nz * 0.055 - sz * 0.01)
+                r2 = P(t, py + sy * 0.30 + ny * 0.012, pz + sz * 0.30 + nz * 0.012)
+                rows.append([bm.verts.new(r0), bm.verts.new(r1), bm.verts.new(r2)])
+            for a, b in zip(rows, rows[1:]):
+                bm.faces.new((a[0], b[0], b[1], a[1]))
+                bm.faces.new((a[1], b[1], b[2], a[2]))
+    if ridge and top_w == 0:
+        rings = []
+        for (t, prof) in profs:
+            py, pz = prof[2]
+            ring = []
+            for k in range(7):
+                ang = math.pi * k / 6
+                ring.append(bm.verts.new(P(t * 1.01, py + 0.13 * math.cos(ang), pz - 0.04 + 0.11 * math.sin(ang))))
+            rings.append(ring)
+        for a, b in zip(rings, rings[1:]):
+            for k in range(6):
+                bm.faces.new((a[k], a[k + 1], b[k + 1], b[k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    c = _mesh_obj(name + "_courses", bm, mat)
+    for p in c.data.polygons:
+        p.use_smooth = False
+    return join([o, c], name)
 
 
 def arch(name, w, h, depth, loc, mat, rot_z=0.0, verts=24, **fin):
@@ -275,41 +1121,364 @@ def join(objs, name):
     return j
 
 
+def tris(o):
+    return sum(len(p.vertices) - 2 for p in o.data.polygons)
+
+
+TRI_LOG = {}
+
+
 def export(name, visual, col=None):
     if col is not None:
         col.name = name + "-colonly"
         col.parent = visual
         col.display_type = "WIRE"
     visual.name = name
+    auto_uv(visual)
     path = os.path.join(OUT, name + ".glb")
     bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=True, export_yup=True)
-    print("[assets] wrote", os.path.relpath(path, ROOT), "tris~", sum(len(p.polygons) for p in [visual.data]))
+    bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=True, export_yup=True,
+                              export_image_format="JPEG", export_jpeg_quality=JPEG_Q, export_image_quality=JPEG_Q)
+    TRI_LOG[name] = tris(visual)
+    print("[assets] wrote", os.path.relpath(path, ROOT), "tris", TRI_LOG[name], "MB %.1f" % (os.path.getsize(path) / 1e6))
 
 
-# ------------------------------------------------------------------ architectural details
-def window(parts, x, y_face, z, w=1.1, h=1.8, arched=False, shutters=False, warm=False):
-    """Window on a wall facing -Y, outer face at y_face. Chunky wonky wooden frame, dark or lit glass, mullions."""
+# ------------------------------------------------------------------ facades with real openings (no booleans)
+REV = 0.15          # window reveal: glass sits this far behind the wall face
+_FACES = {           # face -> (A axis along the wall, outward normal N); A x Z = N
+    "-Y": (Vector((1, 0, 0)), Vector((0, -1, 0))),
+    "+Y": (Vector((-1, 0, 0)), Vector((0, 1, 0))),
+    "-X": (Vector((0, -1, 0)), Vector((-1, 0, 0))),
+    "+X": (Vector((0, 1, 0)), Vector((1, 0, 0))),
+}
+
+
+def _wp(face, plane, a, z, out=0.0):
+    """World point on a wall: `a` along the wall, `z` up, `out` metres outward from the wall plane."""
+    A, N = _FACES[face]
+    axis = Vector((abs(N.x), abs(N.y), 0))
+    return A * a + Vector((0, 0, z)) + axis * plane + N * out
+
+
+def rise_of(shape, w):
+    return {"rect": 0.0, "round": w / 2, "pointed": w * 0.866, "seg": w * 0.18}[shape]
+
+
+def outline(ac, zb, w, h, shape="rect", seg=8):
+    """Opening outline, counter-clockwise in (a, z). h is the full height including the arch."""
+    xl, xr, zt = ac - w / 2, ac + w / 2, zb + h
+    zs = zt - rise_of(shape, w)
+    pts = [(xl, zb), (xr, zb), (xr, zs)]
+    if shape == "round":
+        for k in range(1, seg):
+            t = math.pi * k / seg
+            pts.append((ac + w / 2 * math.cos(t), zs + w / 2 * math.sin(t)))
+    elif shape == "pointed":
+        n = max(3, seg // 2)
+        for k in range(1, n + 1):
+            t = math.radians(60) * k / n
+            pts.append((xl + w * math.cos(t), zs + w * math.sin(t)))
+        for k in range(1, n):
+            t = math.radians(120) + math.radians(60) * k / n
+            pts.append((xr + w * math.cos(t), zs + w * math.sin(t)))
+    elif shape == "seg":
+        r = (w * w / 4 + (zt - zs) ** 2) / (2 * (zt - zs))
+        cz = zt - r
+        a0 = math.asin((w / 2) / r)
+        for k in range(1, seg):
+            t = math.pi / 2 - a0 + 2 * a0 * k / seg
+            pts.append((ac + r * math.cos(t), cz + r * math.sin(t)))
+    pts.append((xl, zs))
+    return pts
+
+
+def facade(name, mat, face, plane, a0, a1, z0, z1, openings, depth=REV, back=True):
+    """A wall face from a0..a1, z0..z1 on `plane`, with openings punched as an inset ring of faces.
+    openings: (a_centre, z_bottom, width, full_height, shape). Each opening gets a reveal `depth` deep and
+    (back=True) a back face, so it reads as a recess with or without a wall behind. The outer rim is folded
+    back by `depth` too: put the building mass `depth` behind the plane."""
+    xs, zs = {round(a0, 4), round(a1, 4)}, {round(z0, 4), round(z1, 4)}
+    ops = []
+    for (ac, zb, w, h, shape) in openings:
+        xl, xr, zt = ac - w / 2, ac + w / 2, zb + h
+        zsp = zt - rise_of(shape, w)
+        xs |= {round(xl, 4), round(xr, 4)}
+        zs |= {round(zb, 4), round(zt, 4)}
+        if shape != "rect":
+            xs.add(round(ac, 4))
+            zs.add(round(zsp, 4))
+        ops.append((ac, zb, w, h, shape, xl, xr, zt, zsp))
+    xs, zs = sorted(xs), sorted(zs)
+    bm = bmesh.new()
+    cache = {}
+
+    def F(vs):
+        try:
+            bm.faces.new(vs)
+        except ValueError:
+            pass          # shared edge with the rim (door sills at z0): keep one copy
+
+    def V(a, z, d=0.0):
+        k = (round(a, 4), round(z, 4), round(d, 4))
+        if k not in cache:
+            cache[k] = bm.verts.new(_wp(face, plane, a, z, -d))
+        return cache[k]
+
+    def on_x(z, a_from, a_to):
+        """Grid points strictly between a_from and a_to on a horizontal line (either direction)."""
+        lo, hi = min(a_from, a_to), max(a_from, a_to)
+        mids = [x for x in xs if lo + 1e-4 < x < hi - 1e-4]
+        return mids if a_to > a_from else list(reversed(mids))
+
+    def on_z(a, z_from, z_to):
+        lo, hi = min(z_from, z_to), max(z_from, z_to)
+        mids = [z for z in zs if lo + 1e-4 < z < hi - 1e-4]
+        return mids if z_to > z_from else list(reversed(mids))
+
+    def refine(pts):
+        """Insert grid points along axis-aligned edges of a closed outline so faces share every vertex."""
+        out = []
+        for i, p in enumerate(pts):
+            q = pts[(i + 1) % len(pts)]
+            out.append(p)
+            if abs(p[1] - q[1]) < 1e-5:
+                out += [(x, p[1]) for x in on_x(p[1], p[0], q[0])]
+            elif abs(p[0] - q[0]) < 1e-5:
+                out += [(p[0], z) for z in on_z(p[0], p[1], q[1])]
+        return out
+
+    for i in range(len(xs) - 1):
+        for j in range(len(zs) - 1):
+            am, zm = (xs[i] + xs[i + 1]) / 2, (zs[j] + zs[j + 1]) / 2
+            if any(o[5] < am < o[6] and o[1] < zm < o[7] for o in ops):
+                continue
+            F([V(xs[i], zs[j]), V(xs[i + 1], zs[j]), V(xs[i + 1], zs[j + 1]), V(xs[i], zs[j + 1])])
+    for (ac, zb, w, h, shape, xl, xr, zt, zsp) in ops:
+        ol = outline(ac, zb, w, h, shape)
+        if shape != "rect":
+            # spandrels between the arch and the opening's bounding rectangle
+            arc = ol[2:]                                   # (xr, zs) .. apex .. (xl, zs)
+            apex_i = min(range(len(arc)), key=lambda k: abs(arc[k][0] - ac) + abs(arc[k][1] - zt))
+            right, left = arc[:apex_i + 1], arc[apex_i:]
+            rs = [(xr, zsp)] + [(xr, z) for z in on_z(xr, zsp, zt)] + [(xr, zt)] + [(x, zt) for x in on_x(zt, xr, ac)] + list(reversed(right))[:-1]
+            ls = list(reversed(left)) + [(x, zt) for x in on_x(zt, ac, xl)] + [(xl, zt)] + [(xl, z) for z in on_z(xl, zt, zsp)]
+            for poly in (ls, rs):
+                vs = []
+                for (pa, pz) in poly:
+                    v = V(pa, pz)
+                    if v not in vs:
+                        vs.append(v)
+                if len(vs) >= 3:
+                    F(vs)
+        ring = refine(ol)
+        for k in range(len(ring)):
+            p, q = ring[k], ring[(k + 1) % len(ring)]
+            F((V(*p), V(*q), V(q[0], q[1], depth), V(p[0], p[1], depth)))
+        if back:
+            F([V(a, z, depth) for (a, z) in ring])
+    rim = refine([(a0, z0), (a0, z1), (a1, z1), (a1, z0)])
+    for k in range(len(rim)):
+        p, q = rim[k], rim[(k + 1) % len(rim)]
+        F((V(*p), V(*q), V(q[0], q[1], depth), V(p[0], p[1], depth)))
+    o = _mesh_obj(name, bm, mat)
+    for p in o.data.polygons:
+        p.use_smooth = False
+    return o
+
+
+def slab(name, pts, face, plane, d0, d1, mat, smooth=False):
+    """Extrude a CCW outline (a, z) between d0 and d1 metres outward of a wall plane (glass, leaves, voussoirs)."""
+    bm = bmesh.new()
+    f = [bm.verts.new(_wp(face, plane, a, z, d1)) for (a, z) in pts]
+    b = [bm.verts.new(_wp(face, plane, a, z, d0)) for (a, z) in pts]
+    bm.faces.new(f)
+    bm.faces.new(list(reversed(b)))
+    n = len(pts)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((f[i], b[i], b[j], f[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj(name, bm, mat)
+    for p in o.data.polygons:
+        p.use_smooth = smooth
+    return o
+
+
+def fbox(name, face, plane, a, out, zb, sa, sd, sz, mat, **fin):
+    """Box on a wall: centred at `a` along it, its centre `out` metres outward, base at zb; sa along the wall,
+    sd outward, sz up."""
+    A, N = _FACES[face]
+    c = _wp(face, plane, a, 0.0, out)
+    size = (sa, sd, sz) if abs(A.x) > 0.5 else (sd, sa, sz)
+    return box(name, size, (c.x, c.y, zb), mat, **fin)
+
+
+def voussoirs(parts, face, plane, ac, zs, w, t, mat, shape="round", n=9, proud=0.08, key=0.12):
+    """Stone arch ring over an opening of width w springing at zs: n wedge blocks and a taller keystone."""
+    for k in range(n):
+        gap = 0.012
+        t0, t1 = math.pi * k / n + gap, math.pi * (k + 1) / n - gap
+        if shape == "pointed":
+            # map the half-circle parameter onto the two arcs of an equilateral pointed arch
+            def P(tt, r_off):
+                if tt <= math.pi / 2:
+                    ang = math.radians(60) * (tt / (math.pi / 2))
+                    return (ac - w / 2 + (w + r_off) * math.cos(ang), zs + (w + r_off) * math.sin(ang))
+                ang = math.radians(120) + math.radians(60) * ((tt - math.pi / 2) / (math.pi / 2))
+                return (ac + w / 2 + (w + r_off) * math.cos(ang), zs + (w + r_off) * math.sin(ang))
+        else:
+            def P(tt, r_off):
+                return (ac + (w / 2 + r_off) * math.cos(tt), zs + (w / 2 + r_off) * math.sin(tt))
+        ro = t + (key if k == n // 2 else 0.0)
+        pts = [P(t0, 0.0), P(t0, ro), P(t1, ro), P(t1, 0.0)]
+        parts.append(slab("vous", pts, face, plane, 0.0, proud + (0.03 if k == n // 2 else 0.0), mat))
+
+
+def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters=False, surround="stone_pale",
+             sill=True, head="lintel", cross=True, bars=False, snow=True):
+    """Glazed window set into a facade() opening (a, zb, w, h, shape) with its REV-deep reveal: glass and a
+    timber frame at the back of the reveal, a stone sill and lintel (or an arch of voussoirs), a raised
+    surround, optional open shutters and iron bars."""
     fr = M("wood_dark")
-    t = 0.14
-    parts.append(box("jamb", (t, 0.16, h + 0.1), (x - w / 2 - t / 2, y_face - 0.08, z - 0.05), fr, bevel=0.03, wonk=0.015))
-    parts.append(box("jamb", (t, 0.16, h + 0.1), (x + w / 2 + t / 2, y_face - 0.08, z - 0.05), fr, bevel=0.03, wonk=0.015))
-    if arched:
-        parts.append(arch("head", w + 2 * t, (w + 2 * t) / 2 + 0.1, 0.16, (x, y_face - 0.08, z + h - (w + 2 * t) / 2 - 0.1 + 0.05), fr, bevel=0.03))
-        parts.append(arch("glass", w, w / 2, 0.08, (x, y_face - 0.10, z + h - w / 2), M("glass_warm" if warm else "glass", 0.3), bevel=0))
+    ol = outline(a, zb, w, h, shape)
+    zs = zb + h - rise_of(shape, w)
+    parts.append(slab("glass", ol, face, plane, -REV + 0.005, -REV + 0.025, M("glass_warm" if warm else "glass")))
+    t = 0.07
+    fz = zs - zb
+    parts.append(fbox("frame", face, plane, a - w / 2 + t / 2, -REV + 0.06, zb, t, 0.07, fz, fr))
+    parts.append(fbox("frame", face, plane, a + w / 2 - t / 2, -REV + 0.06, zb, t, 0.07, fz, fr))
+    parts.append(fbox("frame", face, plane, a, -REV + 0.06, zb, w, 0.07, t, fr))
+    parts.append(fbox("frame", face, plane, a, -REV + 0.06, zs - t, w, 0.07, t, fr))
+    if cross:
+        parts.append(fbox("mull", face, plane, a, -REV + 0.065, zb, 0.07, 0.06, fz, fr))
+        if shape == "rect":
+            parts.append(fbox("trans", face, plane, a, -REV + 0.065, zb + fz * 0.66, w, 0.06, 0.07, fr))
+    if bars:
+        for k in range(3):
+            parts.append(fbox("bar", face, plane, a - w / 3 + w / 3 * k, -0.04, zb, 0.03, 0.03, fz, M("iron")))
+        parts.append(fbox("bar", face, plane, a, -0.04, zb + fz * 0.5, w, 0.03, 0.03, M("iron")))
+    if sill:
+        parts.append(fbox("sill", face, plane, a, (0.12 - REV) / 2, zb - 0.12, w + 0.3, 0.12 + REV, 0.12, M("stone"), bevel=0.02, seg=1))
+        if snow:
+            parts.append(fbox("sill_snow", face, plane, a, (0.1 - REV) / 2 + 0.01, zb, w + 0.2, 0.08 + REV, 0.05, M("snow"), bevel=0.02, seg=1))
+    if surround:
+        sm = M(surround)
+        bw = 0.13
+        parts.append(fbox("sur", face, plane, a - w / 2 - bw / 2, 0.025, zb - 0.02, bw, 0.05, zs - zb + 0.02, sm))
+        parts.append(fbox("sur", face, plane, a + w / 2 + bw / 2, 0.025, zb - 0.02, bw, 0.05, zs - zb + 0.02, sm))
+    if shape == "rect":
+        if head == "lintel":
+            parts.append(fbox("lintel", face, plane, a, 0.04, zs, w + 0.42, 0.08, 0.24, M("stone"), bevel=0.02, seg=1))
+            parts.append(fbox("hood", face, plane, a, 0.08, zs + 0.24, w + 0.56, 0.16, 0.08, M("stone"), bevel=0.02, seg=1))
+            if snow:
+                parts.append(fbox("hood_snow", face, plane, a, 0.08, zs + 0.32, w + 0.5, 0.14, 0.04, M("snow"), bevel=0.015, seg=1))
     else:
-        parts.append(box("head", (w + 2 * t, 0.18, t), (x, y_face - 0.09, z + h), fr, bevel=0.03, wonk=0.015))
-    parts.append(box("glass", (w, 0.08, h), (x, y_face - 0.10, z), M("glass_warm" if warm else "glass", 0.3), bevel=0))
-    parts.append(box("mull", (0.07, 0.05, h - 0.02), (x, y_face - 0.15, z), M("wood_dark"), bevel=0.02))
-    parts.append(box("mull", (w, 0.05, 0.07), (x, y_face - 0.15, z + h * 0.6), M("wood_dark"), bevel=0.02))
-    parts.append(box("sill", (w + 0.5, 0.30, 0.14), (x, y_face - 0.15, z - 0.18), M("stone"), bevel=0.04, wonk=0.02))
+        voussoirs(parts, face, plane, a, zs, w, 0.16, M("stone"), shape=shape, n=7 if shape == "round" else 8)
     if shutters:
+        sw = w / 2 + 0.04
         for sx in (-1, 1):
-            parts.append(box("shutter", (0.45, 0.08, h - 0.1), (x + sx * (w / 2 + t + 0.25), y_face - 0.05, z), M("shutter"), bevel=0.03, wonk=0.02))
+            parts.append(fbox("shutter", face, plane, a + sx * (w / 2 + 0.16 + sw / 2), 0.04, zb, sw, 0.05, fz, M("shutter"), bevel=0.01, seg=1))
+            for zz in (zb + 0.2, zb + fz - 0.3):
+                parts.append(fbox("hinge", face, plane, a + sx * (w / 2 + 0.16 + sw / 2), 0.07, zz, sw * 0.8, 0.012, 0.04, M("iron")))
 
 
-def cornice(parts, w, d, z, t=0.28, proud=0.25, mat=None, wonk=0.03):
-    parts.append(box("cornice", (w + proud * 2, d + proud * 2, t), (0, 0, z), mat or M("stone"), bevel=0.06, wonk=wonk))
+def door_unit(parts, face, plane, a, w=2.0, h=3.0, portal=True, fanlight=True, surround="stone"):
+    """Panelled double door in a round-arched facade() opening (a, 0, w, h + w/2, "round"): two leaves with
+    raised panels and iron straps, a fanlight with radial bars, a stone portal of jambs and voussoirs."""
+    wd = M("wood_dark")
+    iron = M("iron")
+    lw = w / 2 - 0.02
+    for sx in (-1, 1):
+        lx = a + sx * (w / 4 + 0.005)
+        parts.append(fbox("leaf", face, plane, lx, -REV + 0.05, 0.0, lw, 0.07, h, wd))
+        for r in range(3):
+            pz = 0.25 + r * (h - 0.4) / 3
+            ph = (h - 0.4) / 3 - 0.18
+            parts.append(fbox("panel", face, plane, lx, -REV + 0.095, pz, lw - 0.24, 0.03, ph, wd, bevel=0.012, seg=1))
+        for zz in (0.45, h * 0.5, h - 0.45):
+            parts.append(fbox("strap", face, plane, lx - sx * 0.04, -REV + 0.12, zz, lw - 0.1, 0.012, 0.07, iron))
+            for k in range(4):
+                parts.append(fbox("stud", face, plane, lx - lw / 2 + 0.12 + k * (lw - 0.24) / 3, -REV + 0.13, zz + 0.02, 0.035, 0.02, 0.035, iron))
+    parts.append(torus("ring", 0.09, 0.015, tuple(_wp(face, plane, a + 0.22, 1.25, -REV + 0.14)), iron,
+                       rot=(math.pi / 2, 0, 0) if face in ("-Y", "+Y") else (0, math.pi / 2, 0), seg=12, mseg=6))
+    parts.append(fbox("transom", face, plane, a, -REV + 0.07, h, w, 0.1, 0.12, wd))
+    if fanlight:
+        r = w / 2
+        pts = [(a - r, h + 0.12), (a + r, h + 0.12)] + [(a + r * math.cos(math.pi * k / 10), h + 0.12 + r * math.sin(math.pi * k / 10)) for k in range(1, 10)]
+        parts.append(slab("fan", pts, face, plane, -REV + 0.005, -REV + 0.02, M("glass_warm")))
+        for k in range(1, 6):
+            ang = math.pi * k / 6
+            c, s = math.cos(ang), math.sin(ang)
+            px, pz = -s * 0.015, c * 0.015
+            bar = [(a + px, h + 0.12 + pz), (a - px, h + 0.12 - pz), (a - px + c * r, h + 0.12 - pz + s * r), (a + px + c * r, h + 0.12 + pz + s * r)]
+            parts.append(slab("fanbar", bar, face, plane, -REV + 0.02, -REV + 0.04, iron))
+    if portal:
+        st = M(surround)
+        for sx in (-1, 1):
+            parts.append(fbox("jamb", face, plane, a + sx * (w / 2 + 0.2), 0.08, 0.0, 0.4, 0.16, h, st, bevel=0.03, seg=1))
+            parts.append(fbox("jamb_base", face, plane, a + sx * (w / 2 + 0.2), 0.11, 0.0, 0.5, 0.22, 0.45, M("stone_dark"), bevel=0.03, seg=1))
+            parts.append(fbox("impost", face, plane, a + sx * (w / 2 + 0.2), 0.12, h - 0.02, 0.52, 0.24, 0.16, st, bevel=0.02, seg=1))
+        voussoirs(parts, face, plane, a, h + 0.12, w, 0.4, st, n=9, proud=0.14, key=0.18)
+        parts.append(fbox("cornice", face, plane, a, 0.18, h + 0.12 + w / 2 + 0.58, w + 1.3, 0.36, 0.14, st, bevel=0.03, seg=1))
+        parts.append(fbox("corn_snow", face, plane, a, 0.18, h + 0.12 + w / 2 + 0.72, w + 1.2, 0.32, 0.05, M("snow"), bevel=0.02, seg=1))
+    parts.append(fbox("step", face, plane, a, 0.3, 0.0, w + 0.9, 0.6, 0.16, M("stone_dark"), bevel=0.03, seg=1))
+    parts.append(fbox("threshold", face, plane, a, -REV / 2, 0.0, w, REV, 0.1, M("stone_dark")))
+
+
+def shop_sign(parts, x, y_face, z, board=True, emblem="disc", side=1):
+    """Wrought-iron bracket sticking out of a -Y wall at (x, z) with a hanging oak sign board."""
+    iron = M("iron")
+    L = 1.0
+    parts.append(box("plate", (0.1, 0.04, 0.36), (x, y_face - 0.02, z - 0.28), iron))
+    parts.append(box("arm", (0.035, L, 0.035), (x, y_face - L / 2, z), iron))
+    ang = math.atan2(0.45, L * 0.8)
+    parts.append(cbox("brace", (0.03, math.hypot(L * 0.8, 0.45), 0.03), (x, y_face - L * 0.4, z - 0.225), iron, rot=(-ang, 0, 0)))
+    parts.append(torus("scroll", 0.1, 0.014, (x, y_face - L * 0.55, z - 0.12), iron, rot=(0, math.pi / 2, 0), seg=10, mseg=4))
+    parts.append(sphere("finial", 0.035, (x, y_face - L, z + 0.01), iron, seg=8, rings=5))
+    if board:
+        for dy in (-0.25, 0.25):
+            parts.append(box("chain", (0.012, 0.012, 0.14), (x, y_face - L * 0.6 + dy, z - 0.14), iron))
+        parts.append(box("board", (0.05, 0.72, 0.52), (x, y_face - L * 0.6, z - 0.66), M("wood"), bevel=0.012, seg=1))
+        parts.append(box("board_rim", (0.06, 0.76, 0.05), (x, y_face - L * 0.6, z - 0.16), M("wood_dark"), bevel=0.01, seg=1))
+        if emblem == "disc":
+            parts.append(cyl("emblem", 0.17, 0.07, (x, y_face - L * 0.6, z - 0.40), M("gold", 0.35), verts=16, rot=(0, math.pi / 2, 0), center=True))
+        elif emblem == "key":
+            parts.append(box("emblem", (0.07, 0.4, 0.06), (x, y_face - L * 0.6, z - 0.43), M("gold", 0.35)))
+            parts.append(torus("emblem_r", 0.08, 0.025, (x, y_face - L * 0.6 - 0.24, z - 0.40), M("gold", 0.35), rot=(0, math.pi / 2, 0), seg=12, mseg=4))
+        elif emblem == "pretzel":
+            for dy in (-0.07, 0.07):
+                parts.append(torus("emblem", 0.1, 0.03, (x, y_face - L * 0.6 + dy, z - 0.42), M("plaster_ochre"), rot=(0, math.pi / 2, 0), seg=12, mseg=5))
+        elif emblem == "boot":
+            parts.append(box("emblem", (0.07, 0.14, 0.26), (x, y_face - L * 0.6 + 0.05, z - 0.52), M("black")))
+            parts.append(box("emblem2", (0.07, 0.3, 0.1), (x, y_face - L * 0.6 - 0.03, z - 0.62), M("black")))
+
+
+def drainpipe(parts, x, y, z_top, walls, r=0.055):
+    """Lead downpipe at (x, y) from a hopper head under the cornice to a shoe at the pavement; `walls` lists
+    (z, wall_y) for the brackets that tie it back to each storey's face."""
+    lead = M("lead")
+    parts.append(cyl("pipe", r, z_top - 0.25, (x, y, 0.25), lead, verts=8))
+    parts.append(taper_box("hopper", (0.26, 0.24, 0.32), (x, y, z_top - 0.05), lead, top=1.35))
+    parts.append(box("gutter_link", (0.1, abs(walls[-1][1] - y) + 0.2, 0.1), (x, (y + walls[-1][1]) / 2, z_top + 0.15), lead))
+    parts.append(cyl("shoe", r, 0.3, (x, y - 0.1, 0.16), lead, verts=8, rot=(math.radians(60), 0, 0), center=True))
+    for (z, wy) in walls:
+        d = abs(wy - y) + 0.04
+        parts.append(box("clip", (0.05, d, 0.05), (x, (wy + y) / 2, z), M("iron")))
+        parts.append(cyl("collar", r + 0.015, 0.06, (x, y, z - 0.005), lead, verts=8))
+
+
+def cornice(parts, w, d, z, t=0.28, proud=0.25, mat=None, wonk=0.03, front=None, modillions=True):
+    """Moulded cornice around a w x d block at height z: fascia, projecting corona with a cyma on top, and (for
+    the -Y front at y=front) a row of modillion blocks under the corona."""
+    mat = mat or M("stone")
+    parts.append(box("cornice_f", (w + proud * 0.5, d + proud * 0.5, t * 0.35), (0, 0, z), mat, bevel=0.02, seg=1, wonk=wonk * 0.5))
+    parts.append(box("cornice_c", (w + proud * 2, d + proud * 2, t * 0.4), (0, 0, z + t * 0.35), mat, bevel=0.04, seg=1, wonk=wonk))
+    parts.append(box("cornice_t", (w + proud * 1.5, d + proud * 1.5, t * 0.25), (0, 0, z + t * 0.75), mat, bevel=0.03, seg=1, wonk=wonk * 0.5))
+    if front is not None and modillions:
+        n = max(4, int(w / 0.55))
+        for i in range(n + 1):
+            x = -w / 2 + w * i / n
+            parts.append(box("modil", (0.12, proud, t * 0.25), (x, front - proud / 2 - proud * 0.25, z + t * 0.1), mat))
 
 
 def quoins(parts, width, depth, z0, z1, face, cx=0.0):
@@ -317,125 +1486,182 @@ def quoins(parts, width, depth, z0, z1, face, cx=0.0):
     z = z0
     i = 0
     while z < z1 - 0.3:
+        hgt = min(0.5, z1 - z - 0.06)
         for sx in (-1, 1):
             w = 0.9 if i % 2 == 0 else 0.6
-            parts.append(box("quoin", (w, 0.30, 0.5), (cx + sx * (width / 2 - w / 2 + 0.05), face - 0.10, z), M("stone_pale"), bevel=0.05, wonk=0.02))
+            parts.append(box("quoin", (w, 0.12, hgt), (cx + sx * (width / 2 - w / 2 + 0.02), face - 0.05, z), M("stone_pale"), bevel=0.03, seg=1, wonk=0.02))
         z += 0.56
         i += 1
 
 
 def door(parts, x, face, w=2.2, h=3.2):
+    """Legacy portal (slabs on a plain wall). New facades use facade() + door_unit()."""
     parts.append(arch("portal", w + 0.7, h + 0.4, 0.42, (x, face - 0.30, 0), M("stone"), bevel=0.06))
     parts.append(arch("door", w, h, 0.16, (x, face - 0.36, 0), M("wood_dark"), bevel=0.03))
-    for i in range(1, 4):
-        parts.append(box("plank", (0.04, 0.04, h - 0.5), (x - w / 2 + w * i / 4, face - 0.40, 0.1), M("black"), bevel=0))
     for zz in (0.8, h - 1.0):
         parts.append(box("strap", (w - 0.3, 0.05, 0.14), (x, face - 0.41, zz), M("iron", 0.6), bevel=0.02))
-        for sx in (-1, 1):
-            parts.append(sphere("stud", 0.06, (x + sx * (w / 2 - 0.25), face - 0.44, zz + 0.07), M("iron", 0.6), seg=8, rings=6))
-    parts.append(torus("ring", 0.14, 0.03, (x + 0.55, face - 0.45, 1.4), M("iron", 0.6), rot=(math.pi / 2, 0, 0)))
     parts.append(box("keystone", (0.5, 0.46, 0.7), (x, face - 0.32, h + 0.2), M("stone_pale"), bevel=0.05, wonk=0.02))
     parts.append(box("step", (w + 1.0, 0.7, 0.18), (x, face - 0.45, 0), M("stone_dark"), bevel=0.05, wonk=0.02))
 
 
 def chimney(parts, x, y, z, h=2.6):
-    lean_x, lean_y = RNG.uniform(-0.08, 0.08), RNG.uniform(-0.05, 0.05)
-    c = taper_box("chimney", (0.9, 0.9, h), (x, y, z), M("brick"), top=0.85, bevel=0.06, wonk=0.03)
+    lean_x, lean_y = RNG.uniform(-0.04, 0.04), RNG.uniform(-0.025, 0.025)
+    c = box("chimney", (0.9, 0.9, h), (x, y, z), M("brick"), bevel=0.03, seg=1, wonk=0.02)
     shear(c, lean_x, lean_y, z0=z)
     parts.append(c)
     tx, ty = x + h * lean_x, y + h * lean_y
-    parts.append(box("cap", (1.1, 1.1, 0.22), (tx, ty, z + h - 0.02), M("stone_dark"), bevel=0.05, wonk=0.02))
-    parts.append(cyl("pot", 0.22, 0.6, (tx, ty, z + h + 0.18), M("brick_dark"), verts=12, r2=0.18, bevel=0.03))
-    parts.append(box("snow", (0.9, 0.9, 0.1), (tx, ty, z + h + 0.20), M("snow"), bevel=0.04))
+    parts.append(box("band", (1.0, 1.0, 0.12), (x + (h - 0.5) * lean_x, y + (h - 0.5) * lean_y, z + h - 0.5), M("brick_dark"), bevel=0.02, seg=1))
+    parts.append(box("cap", (1.1, 1.1, 0.16), (tx, ty, z + h - 0.02), M("stone_dark"), bevel=0.03, seg=1))
+    for k, dx in enumerate((-0.2, 0.2)):
+        parts.append(cyl("pot", 0.14, 0.45, (tx + dx, ty, z + h + 0.14), M("brick_dark"), verts=10, r2=0.11))
+    parts.append(box("snow", (1.0, 1.0, 0.08), (tx, ty, z + h + 0.14), M("snow"), bevel=0.03, seg=1))
+
+
+def plinth(parts, x0, x1, y_face, h=0.5, proud=0.08, mat=None, skip=()):
+    """Stone or damp-plaster plinth along a -Y wall from x0 to x1, broken at each (xa, xb) in skip."""
+    segs, a = [], x0
+    for (xa, xb) in sorted(skip):
+        if xa > a:
+            segs.append((a, xa))
+        a = max(a, xb)
+    if a < x1:
+        segs.append((a, x1))
+    for (xa, xb) in segs:
+        if xb - xa > 0.05:
+            parts.append(box("plinth", (xb - xa, proud + 0.05, h), ((xa + xb) / 2, y_face - proud / 2 + 0.025, 0), mat or M("stone_dark"), bevel=0.02, seg=1))
+
+
+def dormer(parts, x, y_front, zb, w, h, wall, roofmat, depth=1.6, warm=False, snow=True):
+    """Dormer with a real window: plaster cheeks and front, a recessed casement, a small tiled gable roof."""
+    parts.append(box("dormer", (w, depth - REV, h), (x, y_front + REV + (depth - REV) / 2, zb), wall, bevel=0.03, seg=1))
+    ww, wh = w * 0.52, h * 0.58
+    op = [(x, zb + 0.28, ww, wh, "rect")]
+    parts.append(facade("dormer_face", wall, "-Y", y_front, x - w / 2 - 0.01, x + w / 2 + 0.01, zb, zb + h, op))
+    win_unit(parts, "-Y", y_front, x, zb + 0.28, ww, wh, "rect", warm=warm, surround=None, head=None, cross=True, snow=snow)
+    parts.append(box("dormer_board", (w + 0.12, 0.08, 0.12), (x, y_front - 0.03, zb + h - 0.06), M("wood_dark")))
+    parts.append(roof("dormer_r", depth + 0.35, w + 0.4, h * 0.55, (x, y_front + depth / 2 - 0.15, zb + h), roofmat, sag=0.03, flare=0.1, cuts=3, along_x=False, bevel=0.03))
+    if snow:
+        parts.append(roof("dormer_snow", depth + 0.3, w + 0.44, h * 0.55 + 0.06, (x, y_front + depth / 2 - 0.15, zb + h + 0.02), M("snow"), sag=0.03, flare=0.1, cuts=3, along_x=False, top_w=0.2, bevel=0.03))
 
 
 # ------------------------------------------------------------------ TENEMENT (kamienica)
+SIGNS = iter(["disc", "key", "pretzel", "boot", "disc", "key", "boot", "pretzel"] * 4)
+
+
 def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, arched_windows=False, shutters=False):
     reset()
     D = 8.0
     GF, FL = 4.2, 3.3
     body_h = GF + FL * (storeys - 1)
     plaster = M(colour)
+    spale = M("stone_pale")
     stone = M("stone")
     parts = []
     face = -D / 2
     jetty = 0.22
 
-    # storeys as separate wonky masses: ground floor stone, upper floors plaster stepping slightly outward
-    parts.append(box("gf", (width, D, GF), (0, 0, 0), M("stone_pale"), bevel=0.10, wonk=0.06))
-    for i in range(1, int((GF - 0.4) / 0.62)):
-        parts.append(box("course", (width + 0.06, 0.05, 0.05), (0, face - 0.03, i * 0.62), M("stone_dark"), bevel=0))
-    for s in range(1, storeys):
-        z0 = GF + FL * (s - 1)
-        parts.append(box("floor", (width + jetty * s * 0.4, D + jetty * s, FL), (0, -jetty * s * 0.5, z0), plaster, bevel=0.12, wonk=0.07))
-        parts.append(box("beam", (width + jetty * s * 0.4 + 0.3, 0.26, 0.26), (0, face - jetty * s - 0.10, z0 - 0.1), M("timber"), bevel=0.05, wonk=0.02))
-    quoins(parts, width, D, GF, body_h, face - jetty * (storeys - 1) - 0.02)
-
     bay_w = width / bays
     xs = [-width / 2 + bay_w * (i + 0.5) for i in range(bays)]
     px = xs[bays // 2] if bays % 2 else xs[0]
-    door(parts, px, face)
-    for x in xs:
-        if abs(x - px) < 0.1:
-            continue
-        window(parts, x, face, 1.4, w=1.2, h=1.7, arched=True, warm=RNG.random() < 0.4)
+    dw, dh = 2.0, 2.9
+
+    # ground floor: rusticated sandstone, a portal and arched shop windows recessed into it
+    gf_open = [(px, 0.0, dw, dh + 0.12 + dw / 2, "round")]
+    gf_win = [(x, 1.25, 1.3, 2.2, "round") for x in xs if abs(x - px) > 0.1]
+    parts.append(box("gf", (width, D - REV, GF), (0, REV / 2, 0), spale, bevel=0.05, seg=1, wonk=0.03))
+    parts.append(facade("gf_face", spale, "-Y", face, -width / 2 - 0.01, width / 2 + 0.01, 0.0, GF, gf_open + gf_win))
+    door_unit(parts, "-Y", face, px, dw, dh)
+    for (x, zb, w, h, sh) in gf_win:
+        win_unit(parts, "-Y", face, x, zb, w, h, sh, warm=RNG.random() < 0.5, surround=None, bars=True, cross=True)
+    plinth(parts, -width / 2, width / 2, face, h=0.55, skip=[(px - dw / 2 - 0.45, px + dw / 2 + 0.45)])
+    parts.append(box("gf_band", (width + 0.1, 0.22, 0.22), (0, face - 0.06, GF - 0.26), stone, bevel=0.03, seg=1))
+    side = 1 if px < 0.5 else -1
+    sx_ = px + side * (dw / 2 + 1.05)
+    if abs(sx_) < width / 2 - 0.6:
+        shop_sign(parts, sx_, face, 3.5, emblem=next(SIGNS))
+
+    walls = [(1.0, face), (3.0, face)]
     for s in range(1, storeys):
         z0 = GF + FL * (s - 1)
         yf = face - jetty * s
-        for x in xs:
-            window(parts, x, yf, z0 + 0.8, arched=arched_windows and s == 1, shutters=shutters, warm=RNG.random() < 0.3)
+        ws = width + jetty * s * 0.4
+        parts.append(box("floor", (ws, D + jetty * s - REV, FL), (0, -jetty * s * 0.5 + REV / 2, z0), plaster, bevel=0.06, seg=1, wonk=0.035))
+        ops = [(x, z0 + 0.8, 1.1, 1.85 if not (arched_windows and s == 1) else 2.1, "round" if (arched_windows and s == 1) else "rect") for x in xs]
+        parts.append(facade("face", plaster, "-Y", yf, -ws / 2 - 0.01, ws / 2 + 0.01, z0, z0 + FL, ops))
+        for (x, zb, w, h, sh) in ops:
+            win_unit(parts, "-Y", yf, x, zb, w, h, sh, warm=RNG.random() < 0.3, shutters=shutters and sh == "rect")
+        parts.append(box("string", (ws + 0.16, 0.30 + jetty, 0.22), (0, yf + 0.1 + jetty / 2 - 0.12, z0 - 0.12), spale, bevel=0.03, seg=1, wonk=0.02))
+        quoins(parts, ws, D, z0 + 0.12, z0 + FL, yf)
         if pilasters:
             for i in range(bays + 1):
                 px_ = -width / 2 + bay_w * i
                 px_ = max(min(px_, width / 2 - 0.3), -width / 2 + 0.3)
-                parts.append(box("pil", (0.5, 0.16, FL - 0.4), (px_, yf - 0.08, z0 + 0.15), M("plaster_white"), bevel=0.04, wonk=0.02))
+                parts.append(box("pil", (0.42, 0.10, FL - 0.4), (px_, yf - 0.05, z0 + 0.15), M("plaster_white"), bevel=0.02, seg=1))
+                parts.append(box("pil_cap", (0.56, 0.16, 0.14), (px_, yf - 0.08, z0 + FL - 0.3), spale, bevel=0.02, seg=1))
+        walls.append((z0 + 1.2, yf))
 
     yfront = face - jetty * (storeys - 1)
-    cornice(parts, width + jetty * (storeys - 1) * 0.4, D + jetty * (storeys - 1), body_h - 0.05, t=0.45, proud=0.40)
+    wtop = width + jetty * (storeys - 1) * 0.4
+    dtop = D + jetty * (storeys - 1)
+    cornice(parts, wtop, dtop, body_h - 0.05, t=0.5, proud=0.40, modillions=False)
+    # the cornice is centred on the top storey mass
+    for p_ in parts[-3:]:
+        edit_verts(p_, lambda co: setattr(co, "y", co.y - jetty * (storeys - 1) * 0.5))
+    nmod = max(4, int(wtop / 0.55))
+    for i in range(nmod + 1):
+        x = -wtop / 2 + wtop * i / nmod
+        parts.append(box("modil", (0.12, 0.34, 0.14), (x, yfront - 0.17, body_h), stone))
+    drainpipe(parts, (wtop / 2 - 0.35) * (1 if side < 0 else -1), yfront - 0.14, body_h - 0.25, walls)
     top = body_h + 0.4
-    Wr = D + jetty * (storeys - 1) + 1.2
+    Wr = dtop + 1.2
+    yc = -jetty * (storeys - 1) * 0.5
 
     if roof_kind == "gable":
-        parts.append(roof("roof", width + 0.9, Wr, 4.6, (0, -jetty * (storeys - 1) * 0.5, top), M("tile"), sag=0.35, flare=0.30))
+        parts.append(roof("roof", width + 0.9, Wr, 4.6, (0, yc, top), M("tile"), sag=0.18, flare=0.16, courses=6, ridge=True))
         for x in xs[:: max(1, bays - 1)]:
-            parts.append(box("dormer", (1.3, 1.6, 1.4), (x, yfront + 1.3, top + 0.9), plaster, bevel=0.06, wonk=0.03))
-            parts.append(roof("dormer_r", (1.8), 1.7, 0.9, (x, yfront + 1.3, top + 2.3), M("tile_dark"), sag=0.05, flare=0.2, cuts=3, along_x=False))
-            parts.append(box("dormer_w", (0.7, 0.08, 0.8), (x, yfront + 0.5, top + 1.2), M("glass_warm", 0.3), bevel=0))
-            parts.append(box("dormer_f", (0.9, 0.10, 1.0), (x, yfront + 0.48, top + 1.1), M("wood_dark"), bevel=0.02))
+            dormer(parts, x, yfront + 1.0, top + 0.55, 1.3, 1.45, plaster, M("tile_dark"), warm=RNG.random() < 0.4)
         chimney(parts, width * 0.3, 1.2, top + 2.0)
         roof_top = top + 4.8
     elif roof_kind == "attyka":
-        parts.append(box("attic_wall", (width + 0.3, D + jetty * (storeys - 1) + 0.2, 2.3), (0, -jetty * (storeys - 1) * 0.5, top - 0.4), plaster, bevel=0.10, wonk=0.04))
+        aw_front = yfront - 0.05
+        parts.append(box("attic_wall", (width + 0.3, dtop + 0.2 - REV, 2.3), (0, yc + REV / 2, top - 0.4), plaster, bevel=0.06, seg=1, wonk=0.03))
+        blind = [(x, top + 0.0, bay_w * 0.5, 1.6, "round") for x in xs]
+        parts.append(facade("attic_face", plaster, "-Y", yc - (dtop + 0.2) / 2, -(width + 0.3) / 2 - 0.01, (width + 0.3) / 2 + 0.01, top - 0.4, top + 1.9, blind))
+        af = yc - (dtop + 0.2) / 2
         for x in xs:
-            parts.append(arch("blind", bay_w * 0.55, 1.5, 0.14, (x, yfront - 0.10, top + 0.1), M("plaster_white"), bevel=0.03))
+            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x - bay_w * 0.25 - 0.14, af - 0.04, top), M("plaster_white"), bevel=0.015, seg=1))
+            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x + bay_w * 0.25 + 0.14, af - 0.04, top), M("plaster_white"), bevel=0.015, seg=1))
+            voussoirs(parts, "-Y", af, x, top + 1.6 - bay_w * 0.25, bay_w * 0.5, 0.12, M("plaster_white"), n=7, proud=0.05, key=0.08)
+        parts.append(box("attic_base", (width + 0.5, 0.3, 0.2), (0, af - 0.1, top - 0.45), spale, bevel=0.03, seg=1))
+        parts.append(box("coping", (width + 0.6, dtop + 0.5, 0.18), (0, yc, top + 1.9), stone, bevel=0.03, seg=1, wonk=0.02))
+        parts.append(box("coping_snow", (width + 0.5, dtop + 0.4, 0.06), (0, yc, top + 2.08), M("snow"), bevel=0.02, seg=1))
         n = max(2, int(width / 2.2))
+        py_ = af + 0.2
         for i in range(n + 1):
             x = -width / 2 + (width / n) * i
-            parts.append(box("pin", (0.5, 0.5, 0.9), (x, yfront + 0.25, top + 1.8), stone, bevel=0.06, wonk=0.02))
-            parts.append(cyl("pin_top", 0.32, 0.7, (x, yfront + 0.25, top + 2.7), stone, verts=8, r2=0.08, bevel=0.03))
-            parts.append(sphere("pin_ball", 0.20, (x, yfront + 0.25, top + 3.5), M("gold", 0.35), seg=12, rings=8))
+            parts.append(box("pin_base", (0.62, 0.62, 0.16), (x, py_, top + 2.08), stone, bevel=0.02, seg=1))
+            parts.append(box("pin", (0.48, 0.48, 0.8), (x, py_, top + 2.24), stone, bevel=0.03, seg=1, wonk=0.02))
+            parts.append(box("pin_cap", (0.6, 0.6, 0.12), (x, py_, top + 3.04), stone, bevel=0.02, seg=1))
+            parts.append(pyramid("pin_top", (0.34, 0.34, 0.8), (x, py_, top + 3.16), stone, apex=0.03))
+            parts.append(sphere("pin_ball", 0.13, (x, py_, top + 4.05), M("gold", 0.35), seg=10, rings=6))
         for i in range(n):
             x = -width / 2 + (width / n) * (i + 0.5)
-            parts.append(cyl("cren", (width / n) * 0.42, 0.42, (x, yfront + 0.25, top + 1.8), stone, verts=20, rot=(math.pi / 2, 0, 0), center=True, bevel=0.03))
-        parts.append(roof("lowroof", width, D - 1.5, 1.4, (0, 0.6, top + 1.7), M("tile_dark"), sag=0.1, flare=0.1))
+            parts.append(cyl("cren", (width / n) * 0.36, 0.3, (x, py_, top + 2.08), stone, verts=16, rot=(math.pi / 2, 0, 0), center=True, bevel=0.02, seg=1))
+        parts.append(roof("lowroof", width, D - 1.5, 1.4, (0, 0.6, top + 1.7), M("tile_dark"), sag=0.05, flare=0.05, courses=3))
         chimney(parts, -width * 0.25, 1.5, top + 1.5, h=2.2)
         roof_top = top + 3.7
     else:  # mansard
-        parts.append(roof("mansard_lo", width + 0.9, Wr, 2.8, (0, -jetty * (storeys - 1) * 0.5, top), M("tile"), sag=0.15, flare=-0.10, top_w=Wr * 0.5))
-        parts.append(roof("mansard_hi", width + 0.9, Wr * 0.5, 2.2, (0, -jetty * (storeys - 1) * 0.5, top + 2.8), M("tile_dark"), sag=0.25, flare=0.2))
+        parts.append(roof("mansard_lo", width + 0.9, Wr, 2.8, (0, yc, top), M("tile"), sag=0.08, flare=-0.05, top_w=Wr * 0.5, courses=4))
+        parts.append(roof("mansard_hi", width + 0.9, Wr * 0.5, 2.2, (0, yc, top + 2.8), M("tile_dark"), sag=0.12, flare=0.1, courses=2, ridge=True))
         for x in xs:
-            # dormers punch out through the lower slope
-            parts.append(box("dormer", (1.2, 1.9, 1.5), (x, yfront + 0.9, top + 0.35), plaster, bevel=0.06, wonk=0.03))
-            parts.append(box("dormer_w", (0.65, 0.08, 0.85), (x, yfront - 0.09, top + 0.65), M("glass_warm", 0.3), bevel=0))
-            parts.append(box("dormer_f", (0.9, 0.12, 1.05), (x, yfront - 0.06, top + 0.55), M("wood_dark"), bevel=0.02))
-            parts.append(roof("dormer_r", 1.6, 2.1, 0.7, (x, yfront + 0.9, top + 1.85), M("lead"), sag=0.05, flare=0.2, cuts=3, along_x=False))
+            dormer(parts, x, yfront + 0.05, top + 0.3, 1.2, 1.55, plaster, M("lead"), depth=1.9, warm=RNG.random() < 0.4)
         chimney(parts, -width * 0.3, 1.0, top + 2.6, h=2.4)
         roof_top = top + 4.9
 
-    parts.append(box("snow_c", (width + 1.0, D + 1.0, 0.12), (0, -jetty * (storeys - 1) * 0.5, body_h + 0.4), M("snow"), bevel=0.05, wonk=0.03))
+    parts.append(box("snow_c", (wtop + 0.9, dtop + 0.9, 0.1), (0, yc, body_h + 0.45), M("snow"), bevel=0.04, seg=1, wonk=0.03))
 
     visual = join(parts, name)
-    lean_x, lean_y = RNG.uniform(-0.025, 0.025), RNG.uniform(-0.02, 0.005)
+    lean_x, lean_y = RNG.uniform(-0.0125, 0.0125), RNG.uniform(-0.01, 0.0025)
     shear(visual, lean_x, lean_y)
     col = box("col", (width + 0.2, D + jetty * (storeys - 1), roof_top), (0, -jetty * (storeys - 1) * 0.5, 0))
     shear(col, lean_x, lean_y)
@@ -453,55 +1679,72 @@ def sukiennice():
     half = (L - gap) / 2
     for sx in (-1, 1):
         cx = sx * (gap / 2 + half / 2)
-        parts.append(box("hall", (half, W, H), (cx, 0, 0), plaster, bevel=0.18, wonk=0.05))
+        parts.append(box("hall", (half, W - 2 * REV, H), (cx, 0, 0), plaster, bevel=0.1, seg=1, wonk=0.05))
         col.append(box("c", (half, W, H), (cx, 0, 0)))
         n = int(half / 3.4)
-        for i in range(n):
-            x = cx - half / 2 + half / n * (i + 0.5)
-            for sy in (-1, 1):
-                yf = sy * W / 2
-                parts.append(arch("winf", 1.9, 4.0, 0.22, (x, yf - sy * 0.06, 2.8), stone, bevel=0.04))
-                parts.append(arch("win", 1.4, 3.6, 0.14, (x, yf - sy * 0.14, 3.0), M("glass_warm" if RNG.random() < 0.5 else "glass", 0.3), bevel=0))
-    parts.append(box("gap_roof", (gap + 0.6, W, 2.2), (0, 0, H - 2.2), plaster, bevel=0.1))
+        xs = [cx - half / 2 + half / n * (i + 0.5) for i in range(n)]
+        for face, plane, sgn in (("-Y", -W / 2, 1), ("+Y", W / 2, -1)):
+            a0, a1 = sorted((sgn * (cx - half / 2), sgn * (cx + half / 2)))
+            ops = [(sgn * x, 2.6, 1.5, 3.9, "round") for x in xs]
+            parts.append(facade("hall_face", plaster, face, plane, a0 - 0.01, a1 + 0.01, 0.0, H, ops))
+            for (a, zb, w, h, sh) in ops:
+                win_unit(parts, face, plane, a, zb, w, h, sh, warm=RNG.random() < 0.5, surround=None, cross=True)
+            parts.append(fbox("plinth", face, plane, sgn * cx, 0.04, 0.0, half, 0.08, 1.1, M("plaster_cream_damp"), bevel=0.02, seg=1))
+            parts.append(fbox("plinth_cap", face, plane, sgn * cx, 0.07, 1.1, half, 0.14, 0.1, stone, bevel=0.02, seg=1))
+    parts.append(box("gap_roof", (gap + 0.6, W, 2.2), (0, 0, H - 2.2), plaster, bevel=0.06, seg=1))
     for sy in (-1, 1):
-        parts.append(arch("gap_arch", gap + 0.5, 6.4, 0.5, (0, sy * (W / 2 - 0.05), 0), stone, bevel=0.06))
-        parts.append(arch("gap_void", gap - 0.4, 5.9, 0.6, (0, sy * (W / 2 - 0.05), 0), M("glass", 0.6), bevel=0))
+        parts.append(arch("gap_arch", gap + 0.5, 6.4, 0.5, (0, sy * (W / 2 - 0.05), 0), stone, bevel=0.04, seg=1))
+        parts.append(arch("gap_void", gap - 0.4, 5.9, 0.6, (0, sy * (W / 2 - 0.05), 0), M("void"), bevel=0))
+        voussoirs(parts, "-Y" if sy < 0 else "+Y", sy * (W / 2 + 0.2), 0, 5.9 - (gap - 0.4) / 2, gap - 0.4, 0.45, stone, n=9, proud=0.1, key=0.2)
     col.append(box("c", (gap + 0.6, W, 2.2), (0, 0, H - 2.2)))
 
-    cornice(parts, L, W, H - 0.1, t=0.4, proud=0.35)
+    cornice(parts, L, W, H - 0.1, t=0.5, proud=0.35, modillions=False)
+    for sy in (-1, 1):
+        for i in range(int(L / 0.6) + 1):
+            parts.append(box("modil", (0.12, 0.3, 0.14), (-L / 2 + i * 0.6, sy * (W / 2 + 0.15), H - 0.05), stone))
     A0 = H + 0.3
-    parts.append(box("attic", (L + 0.4, W + 0.4, 2.6), (0, 0, A0), plaster, bevel=0.1, wonk=0.03))
+    AW = W + 0.4
+    parts.append(box("attic", (L + 0.4, AW - 2 * REV, 2.6), (0, 0, A0), plaster, bevel=0.06, seg=1, wonk=0.03))
     n = 15
     step = L / n
+    for face, plane, sgn in (("-Y", -AW / 2, 1), ("+Y", AW / 2, -1)):
+        ops = [(sgn * (-L / 2 + step * (i + 0.5)), A0 + 0.35, step * 0.42, 1.7, "round") for i in range(n)]
+        parts.append(facade("attic_face", plaster, face, plane, -(L + 0.4) / 2 - 0.01, (L + 0.4) / 2 + 0.01, A0, A0 + 2.6, ops))
+    for sx in (-1, 1):
+        parts.append(box("attic_end", (0.02, AW, 2.6), (sx * (L / 2 + 0.2), 0, A0), plaster))
+    parts.append(box("attic_cop", (L + 0.8, AW + 0.3, 0.2), (0, 0, A0 + 2.6), stone, bevel=0.03, seg=1, wonk=0.02))
+    parts.append(box("attic_snow", (L + 0.7, AW + 0.2, 0.06), (0, 0, A0 + 2.8), M("snow"), bevel=0.02, seg=1))
     for i in range(n + 1):
         x = -L / 2 + step * i
         for sy in (-1, 1):
             y = sy * (W / 2 + 0.25)
-            parts.append(box("pin", (0.55, 0.55, 1.6), (x, y, A0 + 2.2), stone, bevel=0.06, wonk=0.02))
-            parts.append(cyl("pin_top", 0.36, 0.8, (x, y, A0 + 3.8), stone, verts=8, r2=0.08, bevel=0.03))
-            parts.append(sphere("ball", 0.22, (x, y, A0 + 4.7), M("gold", 0.35), seg=12, rings=8))
+            parts.append(box("pin", (0.5, 0.5, 1.0), (x, y, A0 + 2.8), stone, bevel=0.03, seg=1, wonk=0.02))
+            parts.append(box("pin_cap", (0.62, 0.62, 0.12), (x, y, A0 + 3.8), stone, bevel=0.02, seg=1))
+            parts.append(pyramid("pin_top", (0.36, 0.36, 0.9), (x, y, A0 + 3.92), stone, apex=0.03))
+            parts.append(sphere("ball", 0.16, (x, y, A0 + 4.95), M("gold", 0.35), seg=10, rings=6))
     for i in range(n):
         x = -L / 2 + step * (i + 0.5)
         for sy in (-1, 1):
             y = sy * (W / 2 + 0.25)
-            parts.append(cyl("cren", step * 0.42, 0.5, (x, y, A0 + 2.6), stone, verts=20, rot=(math.pi / 2, 0, 0), center=True, bevel=0.03))
-            parts.append(blob("mascaron", (0.5, 0.35, 0.6), (x, y - sy * 0.18, A0 + 1.3), M("stone_dark")))
-    parts.append(roof("roof", L - 0.5, W - 1.2, 2.2, (0, 0, A0 + 2.4), M("tile_dark"), sag=0.2, flare=0.1))
+            parts.append(cyl("cren", step * 0.40, 0.4, (x, y, A0 + 2.8), stone, verts=16, rot=(math.pi / 2, 0, 0), center=True, bevel=0.02, seg=1))
+            parts.append(blob("mascaron", (0.46, 0.3, 0.56), (x + step * 0.5, y - sy * 0.12, A0 + 1.0), M("stone_dark"), subsurf=1))
+    parts.append(roof("roof", L - 0.5, W - 1.2, 2.2, (0, 0, A0 + 2.4), M("tile_dark"), sag=0.1, flare=0.05, courses=3, ridge=True))
 
     for sx in (-1, 1):
         x0 = sx * (L / 2 + 1.5)
         for j in range(4):
             y = -W / 2 + (W / 3) * j
-            parts.append(cyl("colm", 0.40, 5.0, (x0 + sx * 1.2, y, 0), stone, verts=16, r2=0.33, bevel=0.03))
-            parts.append(box("colcap", (1.0, 1.0, 0.35), (x0 + sx * 1.2, y, 5.0), stone, bevel=0.06, wonk=0.02))
-            parts.append(box("colbase", (0.9, 0.9, 0.3), (x0 + sx * 1.2, y, 0), stone, bevel=0.05))
+            parts.append(cyl("colm", 0.36, 4.6, (x0 + sx * 1.2, y, 0.35), stone, verts=16, r2=0.30, bevel=0.02, seg=1))
+            parts.append(box("colcap", (0.95, 0.95, 0.25), (x0 + sx * 1.2, y, 4.95), stone, bevel=0.04, seg=1, wonk=0.02))
+            parts.append(cyl("colcap2", 0.42, 0.18, (x0 + sx * 1.2, y, 4.78), stone, verts=16, r2=0.5))
+            parts.append(box("colbase", (0.9, 0.9, 0.35), (x0 + sx * 1.2, y, 0), stone, bevel=0.03, seg=1))
             col.append(box("c", (0.7, 0.7, 5.0), (x0 + sx * 1.2, y, 0)))
-        parts.append(box("logroof", (3.4, W + 0.5, 0.8), (x0, 0, 5.35), stone, bevel=0.08, wonk=0.02))
-        parts.append(box("logbal", (3.4, W + 0.5, 0.9), (x0, 0, 6.15), plaster, bevel=0.08, wonk=0.02))
+        parts.append(box("logroof", (3.4, W + 0.5, 0.8), (x0, 0, 5.2), stone, bevel=0.05, seg=1, wonk=0.02))
+        parts.append(box("logbal", (3.4, W + 0.5, 0.9), (x0, 0, 6.0), plaster, bevel=0.05, seg=1, wonk=0.02))
         for j in range(3):
             y = -W / 2 + (W / 3) * (j + 0.5)
-            parts.append(arch("logarch", W / 3 - 0.9, 2.0, 3.4, (x0, y, 3.3), M("glass", 0.5), rot_z=math.pi / 2, bevel=0))
-        col.append(box("c", (3.4, W + 0.5, 1.7), (x0, 0, 5.35)))
+            parts.append(arch("logarch", W / 3 - 0.9, 2.0, 3.4, (x0, y, 3.3), M("void"), rot_z=math.pi / 2, bevel=0))
+        col.append(box("c", (3.4, W + 0.5, 1.7), (x0, 0, 5.2)))
 
     for sy in (-1, 1):
         for i in range(-2, 3):
@@ -509,12 +1752,13 @@ def sukiennice():
                 continue
             x = i * 6.0 + (1.5 if i < 0 else -1.5)
             y = sy * (W / 2 + 1.0)
-            parts.append(box("kram", (3.0, 1.9, 2.3), (x, y, 0), M("wood"), bevel=0.06, wonk=0.05))
-            parts.append(roof("kram_roof", 3.5, 2.4, 0.9, (x, y, 2.3), M("wood_dark"), sag=0.08, flare=0.2, cuts=3))
-            parts.append(box("kram_shut", (2.4, 0.10, 1.2), (x, y + sy * 1.0, 0.9), M("wood_dark"), bevel=0.03, wonk=0.02))
+            parts.append(box("kram", (3.0, 1.9, 2.3), (x, y, 0), M("wood"), bevel=0.03, seg=1, wonk=0.04))
+            parts.append(roof("kram_roof", 3.5, 2.4, 0.9, (x, y, 2.3), M("tile_dark"), sag=0.04, flare=0.1, cuts=3, courses=2))
+            parts.append(box("kram_shut", (2.4, 0.08, 1.2), (x, y + sy * 0.98, 0.9), M("wood_dark"), bevel=0.02, seg=1))
+            parts.append(box("kram_sill", (2.6, 0.4, 0.08), (x, y + sy * 1.1, 0.85), M("wood_dark"), bevel=0.01, seg=1))
             col.append(box("c", (3.0, 1.9, 2.3), (x, y, 0)))
 
-    parts.append(box("snow", (L + 0.8, W + 0.8, 0.12), (0, 0, H + 0.3), M("snow"), bevel=0.05, wonk=0.03))
+    parts.append(box("snow", (L + 0.8, W + 0.8, 0.1), (0, 0, H + 0.35), M("snow"), bevel=0.04, seg=1, wonk=0.03))
     visual = join(parts, "sukiennice")
     export("sukiennice", visual, join(col, "col"))
 
@@ -527,34 +1771,78 @@ def st_marys():
     stone = M("stone")
     parts, col = [], []
     NW, NL, NH = 14.0, 30.0, 18.0
-    parts.append(box("nave", (NW, NL, NH), (0, 2, 0), brick, bevel=0.2, wonk=0.05))
+    front = -NL / 2 + 2
+    parts.append(box("nave", (NW - 2 * REV, NL - REV, NH), (0, 2 + REV / 2, 0), brick, bevel=0.1, seg=1, wonk=0.04))
     col.append(box("c", (NW, NL, NH), (0, 2, 0)))
+    # clerestory: tall pointed windows above the aisle roofs, recessed into the nave walls
+    ys = [-NL / 2 + 4 + (NL - 2) / 5 * (j + 0.5) for j in range(5)]
+    for face, plane, sgn in (("-X", -NW / 2, -1), ("+X", NW / 2, 1)):
+        ops = [(sgn * y, NH * 0.6 + 2.0, 1.6, 4.4, "pointed") for y in ys]
+        parts.append(facade("clere", brick, face, plane, -NL / 2 + 2 - 0.01 if sgn > 0 else -(NL / 2 + 2) - 0.01,
+                            NL / 2 + 2 + 0.01 if sgn > 0 else NL / 2 - 2 + 0.01, NH * 0.6 + 0.3, NH, ops))
+        for (a, zb, w, h, sh) in ops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, sill=True, cross=True, snow=True)
     for sx in (-1, 1):
-        parts.append(box("aisle", (3.0, NL - 2, NH * 0.6), (sx * (NW / 2 + 1.5), 2, 0), brick, bevel=0.15, wonk=0.04))
+        face = "-X" if sx < 0 else "+X"
+        plane = sx * (NW / 2 + 3.0)
+        parts.append(box("aisle", (3.0 - REV, NL - 2, NH * 0.6), (sx * (NW / 2 + 1.5 - REV / 2), 2, 0), brick, bevel=0.08, seg=1, wonk=0.04))
         col.append(box("c", (3.0, NL - 2, NH * 0.6), (sx * (NW / 2 + 1.5), 2, 0)))
-        parts.append(roof("aisle_roof", NL - 2, 3.6, 2.2, (sx * (NW / 2 + 1.5), 2, NH * 0.6), M("tile"), sag=0.1, flare=0.1, along_x=False, top_w=0.0))
+        ops = [(sx * y, 2.0, 1.7, 7.2, "pointed") for y in ys]
+        a0, a1 = sorted((sx * (-NL / 2 + 3), sx * (NL / 2 + 1)))
+        parts.append(facade("aisle_face", brick, face, plane, a0 - 0.01, a1 + 0.01, 0.0, NH * 0.6, ops))
+        for (a, zb, w, h, sh) in ops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, cross=True)
+        parts.append(fbox("aisle_plinth", face, plane, sx * 2, 0.06, 0, NL - 2, 0.12, 0.8, M("stone_dark"), bevel=0.02, seg=1))
+        parts.append(roof("aisle_roof", NL - 2, 3.6, 2.2, (sx * (NW / 2 + 1.5), 2, NH * 0.6), M("tile"), sag=0.05, flare=0.05, along_x=False, courses=2))
         for j in range(6):
             y = -NL / 2 + 4 + (NL - 2) / 5 * j
-            parts.append(taper_box("buttress", (1.4, 1.2, NH * 0.62), (sx * (NW / 2 + 3.5), y, 0), bdark, top=0.55, bevel=0.06, wonk=0.03))
+            parts.append(taper_box("buttress", (1.4, 1.2, NH * 0.62), (sx * (NW / 2 + 3.5), y, 0), bdark, top=0.55, bevel=0.04, seg=1, wonk=0.03))
+            parts.append(pyramid("butt_cap", (0.9, 0.8, 0.8), (sx * (NW / 2 + 3.5) - sx * 0.15, y, NH * 0.62), stone))
             col.append(box("c", (1.4, 1.2, NH * 0.62), (sx * (NW / 2 + 3.5), y, 0)))
-        for j in range(5):
-            y = -NL / 2 + 4 + (NL - 2) / 5 * (j + 0.5)
-            parts.append(arch("cw", 1.6, 5.5, 0.25, (sx * (NW / 2 + 0.05), y, NH * 0.6 + 1.2), M("glass", 0.3), rot_z=math.pi / 2, bevel=0))
-    parts.append(roof("roof", NL, NW + 0.8, 9.5, (0, 2, NH), M("tile_dark"), sag=0.4, flare=0.25, along_x=False))
-    parts.append(cyl("apse", NW / 2 - 1, NH - 3, (0, NL / 2 + 2, 0), brick, verts=10, bevel=0.1))
+    parts.append(roof("roof", NL, NW + 0.8, 9.5, (0, 2, NH), M("tile_dark"), sag=0.2, flare=0.12, along_x=False, courses=6, ridge=True))
+    parts.append(cyl("apse", NW / 2 - 1, NH - 3, (0, NL / 2 + 2, 0), brick, verts=10, bevel=0.06, seg=1))
     col.append(cyl("c", NW / 2 - 1, NH - 3, (0, NL / 2 + 2, 0), None, verts=8))
-    parts.append(cyl("apse_roof", NW / 2 - 0.8, 5, (0, NL / 2 + 2, NH - 3), M("tile_dark"), verts=10, r2=0.2, bevel=0.03))
+    parts.append(cyl("apse_roof", NW / 2 - 0.8, 5, (0, NL / 2 + 2, NH - 3), M("tile_dark"), verts=10, r2=0.2, bevel=0.02, seg=1))
+    for k in range(5):
+        a = math.pi * (k + 0.5) / 5
+        bx, by = (NW / 2 - 0.6) * math.cos(a), NL / 2 + 2 + (NW / 2 - 0.6) * math.sin(a)
+        parts.append(taper_box("apse_butt", (1.1, 1.1, NH - 4), (bx, by, 0), bdark, top=0.6, bevel=0.03, seg=1))
+        wx, wy = (NW / 2 - 1.02) * math.cos(a + math.pi / 10), NL / 2 + 2 + (NW / 2 - 1.02) * math.sin(a + math.pi / 10)
+        parts.append(cbox("apse_win", (1.2, 0.08, 6.5), (wx, wy, 7.5), M("glass"), rot=(0, 0, a + math.pi / 10 - math.pi / 2)))
 
-    front = -NL / 2 + 2
+    # west front between the towers: a tall pointed window over the stepped portal
+    fo = [(0.0, 8.8, 3.0, 7.6, "pointed")]
+    parts.append(facade("west", brick, "-Y", front, -2.45, 2.45, 0.0, NH, fo))
+    win_unit(parts, "-Y", front, 0.0, 8.8, 3.0, 7.6, "pointed", warm=True, surround=None, cross=True)
+    for x in (-5.5, 5.5):
+        tall = x < 0
+        TH = 30.0 if tall else 25.0
+        tf = front - 1.0 - 3.1
+        parts.append(box("tower", (6.2 - REV, 6.2 - REV, TH), (x + (REV / 2 if tall else -REV / 2), front - 1.0 + REV / 2, 0), brick, bevel=0.1, seg=1, wonk=0.04))
+        col.append(box("c", (6.2, 6.2, TH), (x, front - 1.0, 0)))
+        zz_list = (8, 16, 24) if tall else (8, 14)
+        ops = [(x, zz, 1.5, 4.2, "pointed") for zz in zz_list]
+        parts.append(facade("tower_f", brick, "-Y", tf, x - 3.11, x + 3.11, 0.0, TH, ops))
+        for (a, zb, w, h, sh) in ops:
+            win_unit(parts, "-Y", tf, a, zb, w, h, sh, surround=None, cross=False)
+        sface, splane = ("-X", x - 3.1) if tall else ("+X", x + 3.1)
+        sa = -(front - 1.0) if tall else (front - 1.0)
+        sops = [(sa, zz, 1.4, 4.0, "pointed") for zz in zz_list]
+        parts.append(facade("tower_s", brick, sface, splane, sa - 3.11, sa + 3.11, 0.0, TH, sops))
+        for (a, zb, w, h, sh) in sops:
+            win_unit(parts, sface, splane, a, zb, w, h, sh, surround=None, cross=False)
+        for zz in [z - 0.6 for z in zz_list] + [TH - 0.4]:
+            parts.append(box("band", (6.5, 6.5, 0.25), (x, front - 1.0, zz), stone, bevel=0.03, seg=1))
+        for cx_ in (x - 3.1, x + 3.1):
+            parts.append(taper_box("t_butt", (1.0, 1.0, TH * 0.55), (cx_, tf - 0.2, 0), bdark, top=0.55, bevel=0.03, seg=1, wonk=0.02))
+            parts.append(taper_box("t_butt2", (0.6, 0.6, TH * 0.25), (cx_, tf - 0.05, TH * 0.55), bdark, top=0.5, bevel=0.02, seg=1))
     x = -NW / 2 + 1.5
-    parts.append(taper_box("tn", (6.2, 6.2, 30.0), (x, front - 1.0, 0), brick, top=0.92, bevel=0.15, wonk=0.04))
-    col.append(box("c", (6.2, 6.2, 30.0), (x, front - 1.0, 0)))
-    parts.append(cyl("tn_oct", 3.5, 7.0, (x, front - 1.0, 30.0), brick, verts=8, bevel=0.08))
+    parts.append(cyl("tn_oct", 3.5, 7.0, (x, front - 1.0, 30.0), brick, verts=8, bevel=0.05, seg=1))
     for k in range(8):
         a = math.tau * k / 8
-        parts.append(box("tn_pin", (0.55, 0.55, 2.0), (x + 3.3 * math.cos(a), front - 1.0 + 3.3 * math.sin(a), 36.0), stone, bevel=0.05))
-        parts.append(cyl("tn_pintop", 0.4, 1.2, (x + 3.3 * math.cos(a), front - 1.0 + 3.3 * math.sin(a), 38.0), stone, verts=8, r2=0.05, bevel=0.03))
-    parts.append(cyl("tn_spire", 3.1, 13.5, (x, front - 1.0, 37.0), M("lead", 0.5), verts=16, r2=0.06, bevel=0.03))
+        parts.append(box("tn_pin", (0.55, 0.55, 2.0), (x + 3.3 * math.cos(a), front - 1.0 + 3.3 * math.sin(a), 36.0), stone, bevel=0.03, seg=1))
+        parts.append(cyl("tn_pintop", 0.4, 1.2, (x + 3.3 * math.cos(a), front - 1.0 + 3.3 * math.sin(a), 38.0), stone, verts=8, r2=0.05, bevel=0.02, seg=1))
+    parts.append(cyl("tn_spire", 3.1, 13.5, (x, front - 1.0, 37.0), M("lead", 0.5), verts=16, r2=0.06, bevel=0.02, seg=1))
     parts.append(torus("tn_crown", 2.5, 0.28, (x, front - 1.0, 40.8), M("gold", 0.35)))
     for k in range(8):
         a = math.tau * k / 8
@@ -562,27 +1850,21 @@ def st_marys():
     for k in range(4):
         a = math.tau * k / 4 + math.pi / 4
         parts.append(cyl("tn_turret", 0.7, 4.5, (x + 3.6 * math.cos(a), front - 1.0 + 3.6 * math.sin(a), 34.5), M("lead", 0.5), verts=8, r2=0.03, bevel=0))
-    for zz in (8, 16, 24):
-        parts.append(arch("tn_w", 1.5, 4.2, 0.25, (x, front - 4.05, zz), M("glass", 0.3), bevel=0))
-        parts.append(arch("tn_wf", 1.9, 4.5, 0.2, (x, front - 4.0, zz - 0.15), stone, bevel=0.03))
     x = NW / 2 - 1.5
-    parts.append(taper_box("ts", (6.2, 6.2, 25.0), (x, front - 1.0, 0), brick, top=0.92, bevel=0.15, wonk=0.04))
-    col.append(box("c", (6.2, 6.2, 25.0), (x, front - 1.0, 0)))
-    parts.append(cyl("ts_drum", 3.3, 2.6, (x, front - 1.0, 25.0), stone, verts=16, bevel=0.06))
+    parts.append(cyl("ts_drum", 3.3, 2.6, (x, front - 1.0, 25.0), stone, verts=16, bevel=0.04, seg=1))
     parts.append(sphere("ts_dome", 3.5, (x, front - 1.0, 27.6), M("copper", 0.5), seg=24, rings=14, zscale=0.95))
-    parts.append(cyl("ts_lantern", 1.0, 2.6, (x, front - 1.0, 30.6), stone, verts=10, bevel=0.04))
-    parts.append(cyl("ts_lantop", 1.3, 1.8, (x, front - 1.0, 33.2), M("copper", 0.5), verts=10, r2=0.05, bevel=0.03))
-    parts.append(cyl("ts_clock", 1.3, 0.25, (x, front - 4.05, 20.0), M("plaster_white"), verts=24, rot=(math.pi / 2, 0, 0), center=True, bevel=0.03))
-    for zz in (8, 14):
-        parts.append(arch("ts_w", 1.5, 4.2, 0.25, (x, front - 4.05, zz), M("glass", 0.3), bevel=0))
-        parts.append(arch("ts_wf", 1.9, 4.5, 0.2, (x, front - 4.0, zz - 0.15), stone, bevel=0.03))
-    parts.append(arch("portal", 4.4, 8.0, 0.7, (0, front - 0.35, 0), stone, bevel=0.08))
-    parts.append(arch("portal2", 3.6, 7.4, 0.5, (0, front - 0.45, 0), M("stone_dark"), bevel=0.05))
-    parts.append(arch("door", 2.9, 6.8, 0.3, (0, front - 0.55, 0), M("wood_dark"), bevel=0.03))
-    parts.append(torus("rose", 2.4, 0.35, (0, front - 0.2, 12.5), stone, rot=(math.pi / 2, 0, 0)))
-    parts.append(cyl("rose_g", 2.2, 0.3, (0, front - 0.15, 12.5), M("glass_warm", 0.3), verts=24, rot=(math.pi / 2, 0, 0), center=True, bevel=0))
-    parts.append(roof("gable", 1.2, NW + 0.8, 9.5, (0, front + 0.6, NH), bdark, sag=0.0, flare=0.25, cuts=2, along_x=False))
-    parts.append(box("snow", (NW + 0.8, NL, 0.12), (0, 2, NH + 0.02), M("snow"), bevel=0.05))
+    parts.append(cyl("ts_lantern", 1.0, 2.6, (x, front - 1.0, 30.6), stone, verts=10, bevel=0.03, seg=1))
+    parts.append(cyl("ts_lantop", 1.3, 1.8, (x, front - 1.0, 33.2), M("copper", 0.5), verts=10, r2=0.05, bevel=0.02, seg=1))
+    parts.append(cyl("ts_clock", 1.3, 0.25, (x, front - 4.2, 20.0), M("plaster_white"), verts=24, rot=(math.pi / 2, 0, 0), center=True, bevel=0.02, seg=1))
+    parts.append(torus("ts_clockrim", 1.3, 0.1, (x, front - 4.3, 20.0), M("gold", 0.4), rot=(math.pi / 2, 0, 0), seg=24, mseg=6))
+    parts.append(arch("portal", 4.4, 8.0, 0.7, (0, front - 0.35, 0), stone, bevel=0.05, seg=1))
+    parts.append(arch("portal2", 3.6, 7.4, 0.5, (0, front - 0.45, 0), M("stone_dark"), bevel=0.04, seg=1))
+    parts.append(arch("door", 2.9, 6.8, 0.3, (0, front - 0.55, 0), M("wood_dark"), bevel=0.02, seg=1))
+    for zz in (1.2, 3.0, 4.8):
+        parts.append(box("dstrap", (2.6, 0.04, 0.1), (0, front - 0.72, zz), M("iron")))
+    parts.append(box("dsplit", (0.06, 0.04, 5.3), (0, front - 0.72, 0), M("iron")))
+    parts.append(roof("gable", 1.2, NW + 0.8, 9.5, (0, front + 0.6, NH), bdark, sag=0.0, flare=0.12, cuts=2, along_x=False))
+    parts.append(box("snow", (NW + 0.8, NL, 0.1), (0, 2, NH + 0.02), M("snow"), bevel=0.03, seg=1))
     visual = join(parts, "st_marys")
     export("st_marys", visual, join(col, "col"))
 
@@ -590,36 +1872,53 @@ def st_marys():
 # ------------------------------------------------------------------ TOWN HALL (Ratusz, before 1820)
 def town_hall():
     reset()
-    parts, col = [], []
+    parts, col, tower = [], [], []
     brick = M("brick")
     stone = M("stone")
-    parts.append(box("hall", (16.0, 8.0, 9.0), (-9.0, 0, 0), M("plaster_white"), bevel=0.15, wonk=0.06))
+    white = M("plaster_white")
+    parts.append(box("hall", (16.0, 8.0 - REV, 9.0), (-9.0, REV / 2, 0), white, bevel=0.1, seg=1, wonk=0.05))
     col.append(box("c", (16.0, 8.0, 9.0), (-9.0, 0, 0)))
-    parts.append(roof("hall_roof", 16.8, 9.0, 4.4, (-9.0, 0, 9.0), M("tile"), sag=0.3, flare=0.25))
-    quoins(parts, 16.0, 8.0, 0.3, 9.0, -4.0, cx=-9.0)
-    for i in range(4):
-        x = -15.5 + 4.0 * i
-        window(parts, x, -4.0, 1.5, w=1.2, h=2.0, arched=True, warm=True)
-        window(parts, x, -4.0, 5.5, w=1.2, h=2.0, shutters=True)
-    parts.append(taper_box("tower", (7.0, 7.0, 24.0), (0, 0, 0), brick, top=0.9, bevel=0.15, wonk=0.04))
+    parts.append(roof("hall_roof", 16.8, 9.0, 4.4, (-9.0, 0, 9.0), M("tile"), sag=0.15, flare=0.12, courses=5, ridge=True))
+    xs = [-15.5 + 4.0 * i for i in range(4)]
+    ops = [(x, 1.4, 1.2, 2.5, "round") for x in xs] + [(x, 5.4, 1.2, 2.1, "rect") for x in xs]
+    parts.append(facade("hall_face", white, "-Y", -4.0, -17.01, -0.99, 0.0, 9.0, ops))
+    for (a, zb, w, h, sh) in ops:
+        win_unit(parts, "-Y", -4.0, a, zb, w, h, sh, warm=sh == "round", shutters=sh == "rect", surround="stone_pale" if sh == "rect" else None)
+    quoins(parts, 16.0, 8.0, 1.0, 9.0, -4.0, cx=-9.0)
+    parts.append(box("plinth", (16.0, 0.12, 1.0), (-9.0, -4.04, 0), M("plaster_white_damp"), bevel=0.02, seg=1))
+    parts.append(box("string", (16.1, 0.24, 0.2), (-9.0, -4.08, 4.5), stone, bevel=0.02, seg=1))
+    cornice(parts, 16.0, 8.0, 8.8, t=0.4, proud=0.3, modillions=False)
+    for p_ in parts[-3:]:
+        edit_verts(p_, lambda co: setattr(co, "x", co.x - 9.0))
+    drainpipe(parts, -16.6, -4.2, 8.6, [(1.5, -4.0), (4.8, -4.0), (7.5, -4.0)])
+
+    tower.append(box("tower", (7.0, 7.0 - REV, 24.0), (0, REV / 2, 0), brick, bevel=0.1, seg=1, wonk=0.04))
     col.append(box("c", (7.0, 7.0, 24.0), (0, 0, 0)))
-    parts.append(box("tower_base", (7.8, 7.8, 3.0), (0, 0, 0), stone, bevel=0.1, wonk=0.03))
-    for zz in (6, 12, 18):
-        parts.append(arch("tw", 1.2, 3.0, 0.25, (0, -3.6, zz), M("glass", 0.3), bevel=0))
-        parts.append(arch("twf", 1.6, 3.3, 0.2, (0, -3.55, zz - 0.15), stone, bevel=0.03))
+    tops = [(0, zz, 1.2, 3.0, "round") for zz in (6, 12, 18)]
+    tower.append(facade("tower_f", brick, "-Y", -3.5, -3.51, 3.51, 3.0, 24.0, tops))
+    for (a, zb, w, h, sh) in tops:
+        win_unit(tower, "-Y", -3.5, a, zb, w, h, sh, surround=None, cross=False)
+    tower.append(box("tower_base", (7.8, 7.8 - 0.4 - REV, 3.0), (0, (0.4 + REV) / 2, 0), stone, bevel=0.06, seg=1, wonk=0.03))
+    tower.append(facade("base_f", stone, "-Y", -3.9, -3.91, 3.91, 0.0, 3.0, [(0, 0.0, 1.5, 1.9 + 0.12 + 0.75, "round")]))
+    door_unit(tower, "-Y", -3.9, 0.0, 1.5, 1.9, portal=False)
+    voussoirs(tower, "-Y", -3.9, 0.0, 1.9 + 0.12, 1.5, 0.2, M("stone_pale"), n=7, proud=0.1, key=0.1)
+    for zz in (5.4, 11.4, 17.4, 23.6):
+        tower.append(box("band", (7.3, 7.3, 0.22), (0, 0, zz), stone, bevel=0.03, seg=1))
     for k in range(4):
         a = math.tau * k / 4
-        cx, cy = 3.5 * math.sin(a), -3.5 * math.cos(a)
-        parts.append(cyl("clock", 1.5, 0.3, (cx, cy, 20.5), M("plaster_white"), verts=24, rot=(math.pi / 2, 0, a), center=True, bevel=0.03))
-        parts.append(torus("clockrim", 1.5, 0.12, (cx, cy, 20.5), M("gold", 0.4), rot=(math.pi / 2, 0, a)))
-    door(parts, 0, -3.5, w=1.8, h=3.4)
-    parts.append(cyl("drum", 3.7, 3.0, (0, 0, 24.0), stone, verts=8, bevel=0.08))
-    parts.append(sphere("onion", 3.7, (0, 0, 28.6), M("copper", 0.5), seg=24, rings=14, zscale=1.15))
-    parts.append(cyl("onion_neck", 1.4, 2.2, (0, 0, 31.9), stone, verts=10, bevel=0.05))
-    parts.append(sphere("onion2", 1.7, (0, 0, 34.7), M("copper", 0.5), seg=20, rings=12, zscale=1.2))
-    parts.append(cyl("spike", 0.18, 3.0, (0, 0, 36.3), M("gold", 0.4), verts=8, r2=0.02, bevel=0))
-    parts.append(sphere("ball", 0.5, (0, 0, 37.8), M("gold", 0.4), seg=12, rings=8))
-    parts.append(box("snow", (7.4, 7.4, 0.1), (0, 0, 24.0), M("snow"), bevel=0.05))
+        cx, cy = 3.6 * math.sin(a), -3.6 * math.cos(a)
+        tower.append(cyl("clock", 1.5, 0.3, (cx, cy, 20.5), white, verts=24, rot=(math.pi / 2, 0, a), center=True, bevel=0.02, seg=1))
+        tower.append(torus("clockrim", 1.5, 0.12, (cx * 1.03, cy * 1.03, 20.5), M("gold", 0.4), rot=(math.pi / 2, 0, a)))
+    tower.append(cyl("drum", 3.7, 3.0, (0, 0, 24.0), stone, verts=8, bevel=0.05, seg=1))
+    tower.append(sphere("onion", 3.7, (0, 0, 28.6), M("copper", 0.5), seg=24, rings=14, zscale=1.15))
+    tower.append(cyl("onion_neck", 1.4, 2.2, (0, 0, 31.9), stone, verts=10, bevel=0.03, seg=1))
+    tower.append(sphere("onion2", 1.7, (0, 0, 34.7), M("copper", 0.5), seg=20, rings=12, zscale=1.2))
+    tower.append(cyl("spike", 0.18, 3.0, (0, 0, 36.3), M("gold", 0.4), verts=8, r2=0.02, bevel=0))
+    tower.append(sphere("ball", 0.5, (0, 0, 37.8), M("gold", 0.4), seg=12, rings=8))
+    tower.append(box("snow", (7.4, 7.4, 0.1), (0, 0, 24.0), M("snow"), bevel=0.03, seg=1))
+    t = join(tower, "tower")
+    shear(t, 0.006, 0.004)          # the real tower leans; it still does
+    parts.append(t)
     visual = join(parts, "town_hall")
     export("town_hall", visual, join(col, "col"))
 
@@ -628,17 +1927,31 @@ def town_hall():
 def st_adalbert():
     reset()
     parts, col = [], []
-    parts.append(box("body", (7.0, 7.0, 5.0), (0, 0, 0), M("plaster_white"), bevel=0.2, wonk=0.08))
+    white = M("plaster_white")
+    parts.append(box("body", (7.0 - 2 * REV, 7.0 - REV, 5.0), (0, REV / 2, 0), white, bevel=0.1, seg=1, wonk=0.06))
     col.append(box("c", (7.0, 7.0, 5.0), (0, 0, 0)))
-    parts.append(box("base", (7.6, 7.6, 1.0), (0, 0, 0), M("stone_dark"), bevel=0.1, wonk=0.04))
-    parts.append(cyl("drum", 3.6, 2.2, (0, 0, 5.0), M("plaster_white"), verts=16, bevel=0.08))
-    parts.append(sphere("dome", 3.8, (0, 0, 7.4), M("copper", 0.5), seg=24, rings=14, zscale=0.85))
-    parts.append(cyl("lantern", 0.9, 1.6, (0, 0, 10.4), M("plaster_white"), verts=10, bevel=0.04))
-    parts.append(cyl("lantop", 1.2, 1.3, (0, 0, 12.0), M("copper", 0.5), verts=10, r2=0.03, bevel=0.03))
-    door(parts, 0, -3.5, w=1.4, h=2.6)
+    ops = [(0.0, 0.0, 1.4, 2.4 + 0.12 + 0.7, "round"), (-2.3, 2.0, 0.8, 1.8, "round"), (2.3, 2.0, 0.8, 1.8, "round")]
+    parts.append(facade("front", white, "-Y", -3.5, -3.51, 3.51, 0.0, 5.0, ops))
+    door_unit(parts, "-Y", -3.5, 0.0, 1.4, 2.4, portal=True)
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", -3.5, a, zb, w, h, sh, warm=True, surround=None)
+    for face, plane in (("-X", -3.5), ("+X", 3.5)):
+        sops = [(0.0, 2.0, 0.8, 1.8, "round")]
+        parts.append(facade("side", white, face, plane, -3.49, 3.49, 0.0, 5.0, sops))
+        win_unit(parts, face, plane, 0.0, 2.0, 0.8, 1.8, "round", warm=True, surround=None)
+    parts.append(box("base_back", (7.6, 3.8, 1.0), (0, 1.9, 0), M("stone_dark"), bevel=0.05, seg=1, wonk=0.03))
+    plinth(parts, -3.8, 3.8, -3.5, h=1.0, proud=0.3, mat=M("stone_dark"), skip=[(-1.3, 1.3)])
     for sx in (-1, 1):
-        parts.append(arch("w", 0.7, 1.6, 0.25, (sx * 2.3, -3.55, 2.2), M("glass_warm", 0.3), bevel=0))
-    parts.append(box("snow", (7.3, 7.3, 0.1), (0, 0, 5.0), M("snow"), bevel=0.05))
+        parts.append(box("base_side", (0.3, 3.9, 1.0), (sx * 3.65, -1.6, 0), M("stone_dark"), bevel=0.03, seg=1))
+    cornice(parts, 7.0, 7.0, 4.9, t=0.35, proud=0.2, modillions=False)
+    parts.append(cyl("drum", 3.6, 2.2, (0, 0, 5.0), white, verts=16, bevel=0.05, seg=1))
+    for k in range(8):
+        a = math.tau * (k + 0.5) / 8
+        parts.append(cbox("drum_win", (0.7, 0.1, 1.1), (3.58 * math.cos(a), 3.58 * math.sin(a), 6.1), M("glass"), rot=(0, 0, a + math.pi / 2)))
+    parts.append(sphere("dome", 3.8, (0, 0, 7.4), M("copper", 0.5), seg=24, rings=14, zscale=0.85))
+    parts.append(cyl("lantern", 0.9, 1.6, (0, 0, 10.4), white, verts=10, bevel=0.03, seg=1))
+    parts.append(cyl("lantop", 1.2, 1.3, (0, 0, 12.0), M("copper", 0.5), verts=10, r2=0.03, bevel=0.02, seg=1))
+    parts.append(box("snow", (7.3, 7.3, 0.1), (0, 0, 5.3), M("snow"), bevel=0.03, seg=1))
     visual = join(parts, "st_adalbert")
     export("st_adalbert", visual, join(col, "col"))
 
@@ -646,52 +1959,55 @@ def st_adalbert():
 # ------------------------------------------------------------------ street furniture
 def market_stall():
     reset()
-    parts = [box("counter", (2.4, 1.2, 1.1), (0, 0, 0), M("wood"), bevel=0.05, wonk=0.04),
-             box("counter_top", (2.7, 1.5, 0.10), (0, 0, 1.1), M("wood_dark"), bevel=0.04, wonk=0.02)]
+    parts = [box("counter", (2.4, 1.2, 1.1), (0, 0, 0), M("wood"), bevel=0.03, seg=1, wonk=0.04),
+             box("counter_top", (2.7, 1.5, 0.10), (0, 0, 1.1), M("wood_dark"), bevel=0.02, seg=1, wonk=0.02)]
     for x in (-1.15, 1.15):
         for y in (-0.55, 0.55):
-            parts.append(cyl("post", 0.07, 2.4, (x, y, 0), M("wood_dark"), verts=8, bevel=0.02))
-    parts.append(roof("awning", 3.0, 2.0, 0.7, (0, 0, 2.3), M("canvas"), sag=0.15, flare=0.3, cuts=4, bevel=0.03))
+            parts.append(cyl("post", 0.07, 2.4, (x, y, 0), M("wood_dark"), verts=8, bevel=0.01, seg=1))
+    parts.append(roof("awning", 3.0, 2.0, 0.7, (0, 0, 2.3), M("canvas"), sag=0.12, flare=0.25, cuts=4, bevel=0.02))
     for i in range(3):
         parts.append(box("stripe", (0.3, 1.9, 0.03), (-0.9 + i * 0.9, 0, 2.31), M("canvas_stripe"), bevel=0))
     parts.append(blob("sack", (0.55, 0.45, 0.45), (-0.7, 0.1, 1.18), M("canvas")))
-    parts.append(box("crate", (0.6, 0.45, 0.35), (0.6, 0.1, 1.18), M("wood_dark"), bevel=0.03, wonk=0.02))
-    parts.append(blob("loaf", (0.3, 0.2, 0.15), (0.0, 0.2, 1.18), M("plaster_ochre")))
+    parts.append(box("crate", (0.6, 0.45, 0.35), (0.6, 0.1, 1.18), M("wood_dark"), bevel=0.02, seg=1, wonk=0.02))
+    parts.append(blob("loaf", (0.3, 0.2, 0.15), (0.0, 0.2, 1.18), M("zupan_gold")))
     export("market_stall", join(parts, "market_stall"), box("c", (2.4, 1.2, 1.1), (0, 0, 0)))
 
 
 def barrel():
     reset()
-    parts = [cyl("lo", 0.38, 0.5, (0, 0, 0), M("wood"), verts=16, r2=0.47, bevel=0.02),
-             cyl("hi", 0.47, 0.5, (0, 0, 0.5), M("wood"), verts=16, r2=0.38, bevel=0.02)]
+    parts = [cyl("lo", 0.38, 0.5, (0, 0, 0), M("wood"), verts=16, r2=0.47, bevel=0.01, seg=1),
+             cyl("hi", 0.47, 0.5, (0, 0, 0.5), M("wood"), verts=16, r2=0.38, bevel=0.01, seg=1)]
     for z in (0.12, 0.82):
-        parts.append(cyl("hoop", 0.46, 0.07, (0, 0, z), M("iron", 0.5), verts=16, r2=0.46, bevel=0.01))
-    parts.append(cyl("hoopm", 0.49, 0.07, (0, 0, 0.47), M("iron", 0.5), verts=16, bevel=0.01))
+        parts.append(cyl("hoop", 0.46, 0.07, (0, 0, z), M("iron", 0.5), verts=16, r2=0.46, bevel=0.01, seg=1))
+    parts.append(cyl("hoopm", 0.49, 0.07, (0, 0, 0.47), M("iron", 0.5), verts=16, bevel=0.01, seg=1))
+    parts.append(cyl("snow", 0.36, 0.05, (0, 0, 1.0), M("snow"), verts=16, bevel=0.01, seg=1))
     export("barrel", join(parts, "barrel"), cyl("c", 0.47, 1.0, (0, 0, 0), None, verts=8))
 
 
 def crate_stack():
     reset()
-    parts = [box("c1", (1.0, 0.8, 0.6), (0, 0, 0), M("wood"), bevel=0.04, wonk=0.02),
-             box("c2", (0.8, 0.8, 0.5), (0.1, 0.05, 0.6), M("wood_dark"), bevel=0.04, wonk=0.02, rot=(0, 0, 0.15)),
-             box("c3", (0.9, 0.7, 0.55), (1.0, 0.1, 0), M("wood"), bevel=0.04, wonk=0.02)]
+    parts = [box("c1", (1.0, 0.8, 0.6), (0, 0, 0), M("wood"), bevel=0.02, seg=1, wonk=0.02),
+             box("c2", (0.8, 0.8, 0.5), (0.1, 0.05, 0.6), M("wood_dark"), bevel=0.02, seg=1, wonk=0.02, rot=(0, 0, 0.15)),
+             box("c3", (0.9, 0.7, 0.55), (1.0, 0.1, 0), M("wood"), bevel=0.02, seg=1, wonk=0.02)]
+    for (x, y, z, sx, sy) in ((0, 0, 0.6, 1.0, 0.8), (1.0, 0.1, 0.55, 0.9, 0.7)):
+        parts.append(box("slat", (sx + 0.02, 0.04, 0.06), (x, y - sy / 2, z - 0.25), M("wood_dark")))
     export("crate_stack", join(parts, "crate_stack"), box("c", (2.0, 0.9, 1.1), (0.5, 0, 0)))
 
 
 def cart():
     reset()
     wood, dark = M("wood"), M("wood_dark")
-    parts = [box("bed", (1.2, 2.2, 0.15), (0, 0, 0.6), wood, bevel=0.03, wonk=0.02)]
+    parts = [box("bed", (1.2, 2.2, 0.15), (0, 0, 0.6), wood, bevel=0.02, seg=1, wonk=0.02)]
     for sx in (-1, 1):
-        parts.append(box("side", (0.08, 2.2, 0.5), (sx * 0.6, 0, 0.75), wood, bevel=0.02, wonk=0.02))
-        parts.append(cyl("wheel", 0.62, 0.12, (sx * 0.74, -0.2, 0.6), dark, verts=16, rot=(0, math.pi / 2, 0), center=True, bevel=0.02))
-        parts.append(cyl("rim", 0.62, 0.13, (sx * 0.74, -0.2, 0.6), M("iron", 0.5), verts=16, rot=(0, math.pi / 2, 0), center=True, r2=0.62, bevel=0.01))
+        parts.append(box("side", (0.08, 2.2, 0.5), (sx * 0.6, 0, 0.75), wood, bevel=0.01, seg=1, wonk=0.02))
+        parts.append(cyl("wheel", 0.62, 0.12, (sx * 0.74, -0.2, 0.6), dark, verts=16, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
+        parts.append(cyl("rim", 0.62, 0.13, (sx * 0.74, -0.2, 0.6), M("iron", 0.5), verts=16, rot=(0, math.pi / 2, 0), center=True, r2=0.62, bevel=0.01, seg=1))
         parts.append(cyl("wheel_in", 0.5, 0.14, (sx * 0.74, -0.2, 0.6), M("black"), verts=16, rot=(0, math.pi / 2, 0), center=True, bevel=0))
         for k in range(4):
-            parts.append(cbox("spoke", (0.06, 0.06, 1.1), (sx * 0.74, -0.2, 0.6), wood, rot=(0, 0, math.tau * k / 8) if False else (math.tau * k / 8, 0, 0), bevel=0.01))
+            parts.append(cbox("spoke", (0.06, 0.06, 1.1), (sx * 0.74, -0.2, 0.6), wood, rot=(math.tau * k / 8, 0, 0), bevel=0.01, seg=1))
         parts.append(sphere("hub", 0.12, (sx * 0.78, -0.2, 0.6), dark, seg=10, rings=6))
-        parts.append(cyl("shaft", 0.05, 1.7, (sx * 0.42, 1.1, 0.45), dark, verts=8, rot=(math.pi / 2 - 0.15, 0, 0), bevel=0.01))
-    parts.append(box("back", (1.2, 0.08, 0.5), (0, -1.1, 0.75), wood, bevel=0.02))
+        parts.append(cyl("shaft", 0.05, 1.7, (sx * 0.42, 1.1, 0.45), dark, verts=8, rot=(math.pi / 2 - 0.15, 0, 0), bevel=0.01, seg=1))
+    parts.append(box("back", (1.2, 0.08, 0.5), (0, -1.1, 0.75), wood, bevel=0.01, seg=1))
     parts.append(cyl("axle", 0.06, 1.7, (0, -0.2, 0.6), dark, verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0))
     parts.append(blob("load", (1.0, 1.5, 0.6), (0, -0.1, 0.7), M("canvas")))
     export("cart", join(parts, "cart"), box("c", (1.5, 2.4, 1.25), (0, 0, 0)))
@@ -703,31 +2019,32 @@ def well():
     parts = []
     for k in range(8):
         a = math.tau * k / 8
-        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a), 1.15 * math.sin(a), 0.25), stone, rot=(0, 0, a + math.pi / 2), bevel=0.06, wonk=0.03))
-        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a + math.pi / 8), 1.15 * math.sin(a + math.pi / 8), 0.75), stone, rot=(0, 0, a + math.pi / 8 + math.pi / 2), bevel=0.06, wonk=0.03))
-    parts.append(cyl("hole", 1.0, 0.05, (0, 0, 1.0), M("glass", 0.4), verts=16, bevel=0))
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a), 1.15 * math.sin(a), 0.25), stone, rot=(0, 0, a + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a + math.pi / 8), 1.15 * math.sin(a + math.pi / 8), 0.75), stone, rot=(0, 0, a + math.pi / 8 + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+    parts.append(cyl("hole", 1.0, 0.05, (0, 0, 0.9), M("void"), verts=16, bevel=0))
     for sx in (-1, 1):
-        parts.append(cyl("post", 0.09, 2.4, (sx * 1.1, 0, 1.0), M("wood_dark"), verts=8, bevel=0.02))
-    parts.append(cyl("beam", 0.08, 2.6, (0, 0, 3.35), M("wood_dark"), verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0.02))
-    parts.append(roof("wroof", 3.2, 1.8, 0.9, (0, 0, 3.45), M("tile_dark"), sag=0.1, flare=0.25, cuts=3))
-    parts.append(cyl("windlass", 0.14, 2.0, (0, 0, 2.9), M("wood"), verts=10, rot=(0, math.pi / 2, 0), center=True, bevel=0.02))
-    parts.append(cyl("bucket", 0.16, 0.3, (0, 0, 1.6), M("wood"), verts=10, r2=0.14, bevel=0.02))
-    parts.append(box("snowcap", (1.2, 1.2, 0.1), (0.4, 0.3, 1.0), M("snow"), bevel=0.05, wonk=0.03))
+        parts.append(cyl("post", 0.09, 2.4, (sx * 1.1, 0, 1.0), M("wood_dark"), verts=8, bevel=0.01, seg=1))
+    parts.append(cyl("beam", 0.08, 2.6, (0, 0, 3.35), M("wood_dark"), verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
+    parts.append(roof("wroof", 3.2, 1.8, 0.9, (0, 0, 3.45), M("tile_dark"), sag=0.05, flare=0.12, cuts=3, courses=2))
+    parts.append(roof("wroof_snow", 3.2, 1.7, 0.95, (0, 0, 3.48), M("snow"), sag=0.05, flare=0.12, cuts=3, top_w=0.3))
+    parts.append(cyl("windlass", 0.14, 2.0, (0, 0, 2.9), M("wood"), verts=10, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
+    parts.append(cyl("rope", 0.015, 1.2, (0, 0, 1.78), M("canvas"), verts=6))
+    parts.append(cyl("bucket", 0.16, 0.3, (0, 0, 1.5), M("wood"), verts=10, r2=0.14, bevel=0.01, seg=1))
     export("well", join(parts, "well"), cyl("c", 1.4, 1.0, (0, 0, 0), None, verts=8))
 
 
 def lantern_post():
     reset()
     iron = M("iron", 0.6)
-    parts = [cyl("post", 0.12, 3.6, (0, 0, 0), M("wood_dark"), verts=10, r2=0.09, bevel=0.02),
-             box("post_cap", (0.3, 0.3, 0.12), (0, 0, 3.6), iron, bevel=0.03)]
-    # curved bracket from short cylinders
+    parts = [cyl("post", 0.12, 3.6, (0, 0, 0), M("wood_dark"), verts=10, r2=0.09, bevel=0.01, seg=1),
+             box("post_cap", (0.3, 0.3, 0.12), (0, 0, 3.6), iron, bevel=0.02, seg=1),
+             cyl("post_foot", 0.2, 0.4, (0, 0, 0), M("stone_dark"), verts=10, r2=0.16, bevel=0.02, seg=1)]
     for i in range(4):
         a = math.pi / 2 * (i + 0.5) / 4
         cx, cz = 0.55 - 0.55 * math.cos(a), 2.85 + 0.55 * math.sin(a)
         parts.append(cyl("arm", 0.03, 0.26, (cx, 0, cz), iron, verts=8, rot=(0, a, 0), center=True, bevel=0))
     parts.append(cyl("arm2", 0.03, 0.4, (0.75, 0, 3.4), iron, verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0))
-    parts.append(box("cage", (0.36, 0.36, 0.5), (0.9, 0, 2.75), iron, bevel=0.03))
+    parts.append(box("cage", (0.36, 0.36, 0.5), (0.9, 0, 2.75), iron, bevel=0.02, seg=1))
     parts.append(box("glow", (0.30, 0.30, 0.44), (0.9, 0, 2.78), M("gold", 0.3, emit=(1.0, 0.72, 0.35), emit_strength=6.0), bevel=0.02))
     parts.append(cyl("cap", 0.28, 0.25, (0.9, 0, 3.25), iron, verts=8, r2=0.03, bevel=0.01))
     for s in (-1, 1):
@@ -736,28 +2053,905 @@ def lantern_post():
     export("lantern_post", join(parts, "lantern_post"), cyl("c", 0.14, 3.6, (0, 0, 0), None, verts=6))
 
 
-# Human figures are built by build_characters.py (MakeHuman via MPFB2). Nothing here.
+def ground_cobbles():
+    """4 x 4 m tileable granite-sett paving slab: top at z=0, 0.2 m thick, centred on the origin. Its texture
+    repeats exactly once across the slab (no random UV offset), so slabs laid edge to edge on a 4 m grid, all at
+    the same rotation, pave seamlessly. Includes a flat collision box."""
+    reset()
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=8, y_subdivisions=8, size=4.0, location=(0, 0, 0))
+    top = bpy.context.object
+    top = _finish_prim(top, "top", M("cobble"))
+    _tag(top, mat=M("cobble"), offset=(0.5, 0.5))
+    rng = random.Random(44)
+    def f(co):
+        if abs(abs(co.x) - 2) > 1e-3 and abs(abs(co.y) - 2) > 1e-3:
+            co.z += rng.uniform(-0.012, 0.004)
+    edit_verts(top, f)
+    skirt = box("skirt", (4.0, 4.0, 0.2), (0, 0, -0.2), M("stone_dark"))
+    bm = bmesh.new()
+    bm.from_mesh(skirt.data)
+    bmesh.ops.delete(bm, geom=[fc for fc in bm.faces if fc.normal.z > 0.5], context="FACES")
+    bm.to_mesh(skirt.data)
+    bm.free()
+    export("ground_cobbles", join([top, skirt], "ground_cobbles"), box("c", (4.0, 4.0, 0.5), (0, 0, -0.5)))
 
 
-if __name__ == "__main__" and "--animals" not in sys.argv:
-    tenement("tenement_a", 10.0, 3, "gable", "plaster_ochre", bays=3, shutters=True)
-    tenement("tenement_b", 8.0, 3, "attyka", "plaster_rose", bays=2)
-    tenement("tenement_c", 12.0, 4, "mansard", "plaster_cream", bays=3, pilasters=True, arched_windows=True)
-    tenement("tenement_d", 10.0, 3, "attyka", "plaster_sage", bays=3, arched_windows=True, shutters=True)
-    tenement("tenement_e", 8.0, 4, "gable", "plaster_blue", bays=2, shutters=True)
-    sukiennice()
-    st_marys()
-    town_hall()
-    st_adalbert()
-    market_stall()
-    barrel()
-    crate_stack()
-    cart()
-    well()
-    lantern_post()
-    print("[assets] done")
+# ------------------------------------------------------------------ shared blocks for the district variants
+def front_block(parts, W, D, H, mat, ops, z0=0.0, cx=0.0, cy=0.0, bevel=0.06, wonk=0.04):
+    """Mass W x D x H with a -Y facade (openings `ops` in world x) recessed REV. Returns the facade plane y."""
+    parts.append(box("mass", (W, D - REV, H), (cx, cy + REV / 2, z0), mat, bevel=bevel, seg=1, wonk=wonk))
+    plane = cy - D / 2
+    parts.append(facade("front", mat, "-Y", plane, cx - W / 2 - 0.01, cx + W / 2 + 0.01, z0, z0 + H, ops))
+    return plane
 
 
+def gable_slab(parts, face, plane, a0, a1, zb, rise, mat, thick=0.3, out=0.0):
+    """Triangular gable wall standing on zb between a0 and a1 (plaster, brick or boards)."""
+    pts = [(a0, zb), (a1, zb), ((a0 + a1) / 2, zb + rise)]
+    parts.append(slab("gable", pts, face, plane, out - thick, out, mat))
+
+
+def hip_roof(name, L, W, H, loc, mat, hip=None, thick=0.25):
+    """Hipped roof solid (thatch, shingles): eaves rectangle L x W at loc.z, ridge along X, hips `hip` long."""
+    hip = W / 2 if hip is None else hip
+    x, y, z = loc
+    bm = bmesh.new()
+    e = [bm.verts.new((x + sx * L / 2, y + sy * W / 2, z)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    r = [bm.verts.new((x - L / 2 + hip, y, z + H)), bm.verts.new((x + L / 2 - hip, y, z + H))]
+    lo = [bm.verts.new((v.co.x - (v.co.x - x) * 0.04, v.co.y - (v.co.y - y) * 0.06, z - thick)) for v in e]
+    bm.faces.new((e[0], e[1], r[1], r[0]))
+    bm.faces.new((e[2], e[3], r[0], r[1]))
+    bm.faces.new((e[1], e[2], r[1]))
+    bm.faces.new((e[3], e[0], r[0]))
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new((e[i], lo[i], lo[j], e[j]))
+    bm.faces.new(list(reversed(lo)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj(name, bm, mat)
+    return finish(o, bevel=0.08, seg=2, smooth=35)
+
+
+def hip_snow(name, L, W, H, loc, hip=None, frac=0.62):
+    """Snow lying on the upper `frac` of a hip_roof(L, W, H, loc): same slopes, so it hugs the thatch."""
+    hip = W / 2 if hip is None else hip
+    x, y, z = loc
+    Wf = W * frac
+    Lf = L - (W - Wf)
+    return hip_roof(name, Lf, Wf, H * frac + 0.08, (x, y, z + H * (1 - frac) + 0.02), M("snow"), hip=max(0.1, hip - (W - Wf) / 2), thick=0.06)
+
+
+def pitched(parts, name, L, W, H, loc, mat, along_x=True, snow=True, courses=0, sag=0.06, flare=0.06):
+    parts.append(roof(name, L, W, H, loc, mat, sag=sag, flare=flare, along_x=along_x, courses=courses, ridge=courses > 0))
+    if snow:
+        x, y, z = loc
+        parts.append(roof(name + "_snow", L - 0.1, W * 0.47, H * 0.45 + 0.1, (x, y, z + H * 0.54), M("snow"), sag=sag,
+                          flare=0.0, along_x=along_x, top_w=0.25, cuts=4))
+
+
+def small_windows(parts, plane, xs, zb, w=0.8, h=1.1, shape="rect", **kw):
+    for x in xs:
+        win_unit(parts, "-Y", plane, x, zb, w, h, shape, **kw)
+
+
+def shop_door(parts, plane, x, w=1.6, h=2.2):
+    """Arched shop door: timber leaves with an iron-barred fanlight and a plain stone surround."""
+    door_unit(parts, "-Y", plane, x, w, h, portal=False)
+    voussoirs(parts, "-Y", plane, x, h + 0.12, w, 0.26, M("stone"), n=7, proud=0.07, key=0.1)
+    for sx in (-1, 1):
+        parts.append(box("dj", (0.26, 0.1, h + 0.12), (x + sx * (w / 2 + 0.13), plane - 0.05, 0), M("stone"), bevel=0.02, seg=1))
+
+
+# ------------------------------------------------------------------ KAZIMIERZ
+def kaz_house_a():
+    """Two-storey Kazimierz house, eaves to the street: plain lime plaster, small windows, two arched shop doors."""
+    reset()
+    parts = []
+    W, D, GF, FL = 9.0, 8.0, 3.6, 3.0
+    wall = M("plaster_lime")
+    gops = [(-2.4, 0.0, 1.6, 2.2 + 0.12 + 0.8, "round"), (2.4, 0.0, 1.6, 2.2 + 0.12 + 0.8, "round"), (0.0, 1.3, 0.8, 1.1, "rect")]
+    y = front_block(parts, W, D, GF, wall, gops)
+    for x in (-2.4, 2.4):
+        shop_door(parts, y, x)
+    win_unit(parts, "-Y", y, 0.0, 1.3, 0.8, 1.1, bars=True, surround=None)
+    parts.append(box("plinth", (W, 0.1, 0.5), (0, y - 0.03, 0), M("plaster_lime_damp")))
+    uops = [(x, GF + 0.8, 0.8, 1.2, "rect") for x in (-3.0, -1.0, 1.0, 3.0)]
+    y2 = front_block(parts, W, D, FL, wall, uops, z0=GF)
+    small_windows(parts, y2, [o[0] for o in uops], GF + 0.8, 0.8, 1.2, surround="stone", shutters=True, warm=False)
+    parts.append(box("string", (W + 0.1, 0.2, 0.18), (0, y - 0.06, GF - 0.1), M("stone"), bevel=0.02, seg=1))
+    cornice(parts, W, D, GF + FL - 0.05, t=0.3, proud=0.22, modillions=False)
+    pitched(parts, "roof", W + 0.8, D + 1.0, 3.6, (0, 0, GF + FL + 0.2), M("tile"), courses=4)
+    dormer(parts, 0.0, -D / 2 + 1.1, GF + FL + 0.55, 1.2, 1.3, wall, M("tile_dark"))
+    chimney(parts, 2.6, 1.0, GF + FL + 1.6, h=2.0)
+    shop_sign(parts, -0.9, y, 3.1, emblem="key")
+    drainpipe(parts, W / 2 - 0.25, y - 0.12, GF + FL - 0.2, [(1.0, y), (4.0, y2)])
+    visual = join(parts, "kaz_house_a")
+    shear(visual, 0.006, -0.004)
+    export("kaz_house_a", visual, box("c", (W, D, GF + FL + 3.8), (0, 0, 0)))
+
+
+def kaz_house_b():
+    """Gable-fronted Gothic house, narrow and deep, grey plaster, pointed shop arch and a stepped brick gable."""
+    reset()
+    parts = []
+    W, D, H = 7.0, 11.0, 6.6
+    wall = M("plaster_grey")
+    ops = [(-1.4, 0.0, 1.8, 3.4, "pointed"), (1.8, 1.2, 0.7, 1.2, "rect"),
+           (-1.6, 4.0, 0.7, 1.3, "rect"), (0.0, 4.0, 0.7, 1.3, "rect"), (1.6, 4.0, 0.7, 1.3, "rect")]
+    y = front_block(parts, W, D, H, wall, ops)
+    door_unit(parts, "-Y", y, -1.4, 1.8, 1.8, portal=False, fanlight=False)
+    tymp = [(-2.3, 1.92), (-0.5, 1.92)] + outline(-1.4, 0.0, 1.8, 3.4, "pointed")[3:-1]
+    parts.append(slab("tymp", tymp, "-Y", y, -REV + 0.01, -REV + 0.05, M("wood_dark")))
+    voussoirs(parts, "-Y", y, -1.4, 3.4 - 1.8 * 0.866, 1.8, 0.24, M("stone"), shape="pointed", n=8, proud=0.08, key=0.06)
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, bars=zb < 2, surround="stone", warm=RNG.random() < 0.4)
+    parts.append(box("plinth", (W, 0.1, 0.5), (0, y - 0.03, 0), M("stone_dark")))
+    parts.append(box("string", (W + 0.1, 0.18, 0.16), (0, y - 0.06, 3.6), M("stone"), bevel=0.02, seg=1))
+    rise = 4.6
+    gable_slab(parts, "-Y", y, -W / 2, W / 2, H, rise, M("brick"), thick=0.4, out=0.0)
+    for k in range(4):                                     # stepped gable copings
+        zz = H + rise * k / 4
+        hw = W / 2 * (1 - k / 4)
+        for sx in (-1, 1):
+            parts.append(box("step", (0.7, 0.55, 0.9), (sx * (hw - 0.35), y + 0.05, zz), M("brick_dark"), bevel=0.02, seg=1))
+            parts.append(box("stepcap", (0.8, 0.65, 0.1), (sx * (hw - 0.35), y + 0.05, zz + 0.9), M("stone"), bevel=0.02, seg=1))
+    parts.append(slab("gwin", outline(0.0, H + 1.0, 0.8, 1.6, "pointed"), "-Y", y, 0.0, 0.03, M("glass")))
+    parts.append(slab("gwin2", outline(0.0, H + 3.0, 0.5, 0.9, "round"), "-Y", y, 0.0, 0.03, M("glass")))
+    parts.append(roof("roof", D, W + 0.6, rise, (0, 0.2, H), M("tile_dark"), sag=0.05, flare=0.04, along_x=False, courses=5, ridge=True))
+    chimney(parts, 1.4, 2.5, H + 1.6, h=2.6)
+    visual = join(parts, "kaz_house_b")
+    shear(visual, -0.005, -0.004)
+    export("kaz_house_b", visual, box("c", (W, D, H + rise), (0, 0, 0)))
+
+
+def kaz_synagogue():
+    """Old Synagogue (Stara Synagoga): Gothic stone hall with brick buttresses, tall pointed windows, the roof
+    hidden behind a Renaissance attic with a blind arcade and crenellation; no tower. A lower women's annex."""
+    reset()
+    parts, col = [], []
+    W, D, H = 12.0, 20.0, 9.0
+    wall = M("stone_pale")
+    ops = [(0.0, 0.0, 1.8, 2.4 + 0.12 + 0.9, "round"), (-3.4, 3.5, 1.2, 3.6, "round"), (3.4, 3.5, 1.2, 3.6, "round")]
+    parts.append(box("hall", (W - 2 * REV, D - REV, H), (0, REV / 2, 0), wall, bevel=0.06, seg=1, wonk=0.04))
+    col.append(box("c", (W, D, H), (0, 0, 0)))
+    y = -D / 2
+    parts.append(facade("front", wall, "-Y", y, -W / 2 - 0.01, W / 2 + 0.01, 0, H, ops))
+    door_unit(parts, "-Y", y, 0.0, 1.8, 2.4, surround="stone")
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, warm=True, surround=None)
+    ys = [-D / 2 + 2.5 + i * 3.75 for i in range(5)]
+    for face, plane, sgn in (("-X", -W / 2, -1), ("+X", W / 2, 1)):
+        sops = [(sgn * yy + sgn * 1.9, 2.8, 1.3, 5.0, "pointed") for yy in ys[:-1]]
+        parts.append(facade("side", wall, face, plane, -D / 2 - 0.01, D / 2 + 0.01, 0, H, sops))
+        for (a, zb, w, h, sh) in sops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, warm=True, surround=None, cross=False)
+        for yy in ys:
+            parts.append(taper_box("butt", (1.2, 1.3, H * 0.8), (sgn * (W / 2 + 0.55), yy, 0), M("brick"), top=0.6, bevel=0.03, seg=1, wonk=0.03))
+            parts.append(pyramid("butt_cap", (0.75, 0.8, 0.7), (sgn * (W / 2 + 0.4), yy, H * 0.8), M("stone")))
+    for x in (-W / 2, W / 2):
+        parts.append(taper_box("fbutt", (1.2, 1.2, H * 0.8), (x, y - 0.5, 0), M("brick"), top=0.6, bevel=0.03, seg=1))
+    # Renaissance attic all round, hiding a low roof
+    A0 = H
+    parts.append(box("attic", (W + 0.3, D + 0.3 - 2 * REV, 2.4), (0, 0, A0), M("plaster_white"), bevel=0.04, seg=1))
+    aops = [(x, A0 + 0.3, 1.2, 1.6, "round") for x in (-4.2, -1.4, 1.4, 4.2)]
+    parts.append(facade("attic_f", M("plaster_white"), "-Y", -(D + 0.3) / 2, -(W + 0.3) / 2 - 0.01, (W + 0.3) / 2 + 0.01, A0, A0 + 2.4, aops))
+    parts.append(facade("attic_b", M("plaster_white"), "+Y", (D + 0.3) / 2, -(W + 0.3) / 2 - 0.01, (W + 0.3) / 2 + 0.01, A0, A0 + 2.4, aops))
+    parts.append(box("attic_base", (W + 0.6, D + 0.6, 0.25), (0, 0, A0 - 0.1), M("stone"), bevel=0.03, seg=1))
+    parts.append(box("coping", (W + 0.6, D + 0.6, 0.18), (0, 0, A0 + 2.4), M("stone"), bevel=0.02, seg=1))
+    for i in range(7):
+        x = -W / 2 + W * i / 6
+        for yy in (-(D + 0.3) / 2 + 0.2, (D + 0.3) / 2 - 0.2):
+            parts.append(box("merlon", (0.7, 0.4, 0.8), (x, yy, A0 + 2.58), M("stone"), bevel=0.02, seg=1))
+            parts.append(pyramid("merlon_top", (0.5, 0.3, 0.4), (x, yy, A0 + 3.38), M("stone")))
+    parts.append(roof("lowroof", W - 0.4, D - 0.6, 1.8, (0, 0, A0 + 0.5), M("tile_dark"), along_x=False, sag=0.03, flare=0.03, courses=2))
+    parts.append(box("snow", (W + 0.5, D + 0.5, 0.06), (0, 0, A0 + 2.58), M("snow")))
+    # women's annex against the west side
+    ax = -W / 2 - 3.2
+    parts.append(box("annex", (4.0, 10.0, 5.0), (ax, 2.0, 0), M("plaster_grey"), bevel=0.05, seg=1, wonk=0.04))
+    col.append(box("c", (4.0, 10.0, 5.0), (ax, 2.0, 0)))
+    parts.append(facade("annex_f", M("plaster_grey"), "-Y", 2.0 - 5.0 - 0.001, ax - 2.01, ax + 2.01, 0, 5.0, [(ax, 1.8, 0.8, 1.4, "round")]))
+    win_unit(parts, "-Y", 2.0 - 5.0 - 0.001, ax, 1.8, 0.8, 1.4, "round", surround=None)
+    parts.append(roof("annex_roof", 10.4, 4.6, 1.5, (ax, 2.0, 5.0), M("tile"), along_x=False, sag=0.03, flare=0.03, courses=2))
+    visual = join(parts, "kaz_synagogue")
+    export("kaz_synagogue", visual, join(col, "col"))
+
+
+# ------------------------------------------------------------------ GARBARY (tanners' suburb)
+def timber_frame(parts, face, plane, a0, a1, z0, z1, posts=4, braces=True):
+    """Oak posts, rails and braces laid on a plastered wall face."""
+    oak = M("timber")
+    for i in range(posts + 1):
+        a = a0 + (a1 - a0) * i / posts
+        parts.append(fbox("post", face, plane, a, 0.05, z0, 0.2, 0.1, z1 - z0, oak, bevel=0.01, seg=1))
+    for zz in (z0, (z0 + z1) / 2, z1 - 0.2):
+        parts.append(fbox("rail", face, plane, (a0 + a1) / 2, 0.05, zz, a1 - a0, 0.1, 0.2, oak, bevel=0.01, seg=1))
+    if braces:
+        for i in range(posts):
+            aa, bb = a0 + (a1 - a0) * i / posts, a0 + (a1 - a0) * (i + 1) / posts
+            zm = (z0 + z1) / 2
+            pts = [(aa + 0.1, zm), (aa + 0.26, zm), (bb - 0.1, z1 - 0.2), (bb - 0.26, z1 - 0.2)] if i % 2 == 0 else \
+                  [(bb - 0.26, zm), (bb - 0.1, zm), (aa + 0.26, z1 - 0.2), (aa + 0.1, z1 - 0.2)]
+            parts.append(slab("brace", pts, face, plane, 0.0, 0.1, oak))
+
+
+def garb_workshop():
+    """Tannery shed: timber-framed walls on three sides, open to the street, tanning vats and hides on poles."""
+    reset()
+    parts, col = [], []
+    W, D, H = 10.0, 7.0, 3.4
+    infill = M("plaster_lime")
+    oak = M("timber")
+    parts.append(box("back", (W, 0.3, H), (0, D / 2 - 0.15, 0), infill, bevel=0.02, seg=1, wonk=0.03))
+    timber_frame(parts, "-Y", D / 2 - 0.3, -W / 2, W / 2, 0.0, H, posts=5)
+    col.append(box("c", (W, 0.3, H), (0, D / 2 - 0.15, 0)))
+    for sx in (-1, 1):
+        parts.append(box("side", (0.3, D, H), (sx * (W / 2 - 0.15), 0, 0), infill, bevel=0.02, seg=1, wonk=0.03))
+        timber_frame(parts, "-X" if sx < 0 else "+X", sx * W / 2, -D / 2, D / 2, 0.0, H, posts=3)
+        col.append(box("c", (0.3, D, H), (sx * (W / 2 - 0.15), 0, 0)))
+    for x in (-W / 6, W / 6):
+        parts.append(box("fpost", (0.26, 0.26, H), (x, -D / 2 + 0.2, 0), oak, bevel=0.02, seg=1, wonk=0.02))
+        col.append(box("c", (0.26, 0.26, H), (x, -D / 2 + 0.2, 0)))
+    parts.append(box("head", (W + 0.2, 0.3, 0.3), (0, -D / 2 + 0.2, H - 0.3), oak, bevel=0.02, seg=1))
+    parts.append(box("floor", (W, D, 0.08), (0, 0, 0), M("stone_dark")))
+    gable_slab(parts, "-X", -W / 2, -D / 2, D / 2, H, 2.8, M("wood_dark"), thick=0.12)
+    gable_slab(parts, "+X", W / 2, -D / 2, D / 2, H, 2.8, M("wood_dark"), thick=0.12)
+    pitched(parts, "roof", W + 0.9, D + 1.2, 2.9, (0, 0, H), M("tile_moss"), courses=3)
+    for i, (x, y) in enumerate(((-3.0, 0.8), (-1.2, 1.4), (0.8, 0.9), (2.8, 1.3))):
+        parts.append(cyl("vat", 0.7, 1.0, (x, y, 0), M("wood"), verts=14, bevel=0.01, seg=1))
+        for z in (0.15, 0.8):
+            parts.append(cyl("hoop", 0.72, 0.06, (x, y, z), M("iron"), verts=14))
+        parts.append(cyl("liquor", 0.64, 0.02, (x, y, 0.9), M("water" if i % 2 else "brown_coat", 0.15), verts=14))
+        col.append(cyl("c", 0.7, 1.0, (x, y, 0), None, verts=8))
+    parts.append(cyl("pole", 0.05, W - 1.0, (0, -1.6, 2.4), oak, verts=8, rot=(0, math.pi / 2, 0), center=True))
+    for k in range(5):
+        hide = box("hide", (0.9, 0.03, 1.3), (-3.6 + k * 1.8, -1.6, 1.1), M("brown_coat" if k % 2 else "sukmana"), bevel=0.01, seg=1, wonk=0.1)
+        parts.append(hide)
+    parts.append(box("bark", (1.6, 1.0, 0.7), (4.0, -1.5, 0), M("wood_dark"), bevel=0.05, seg=1, wonk=0.12))
+    visual = join(parts, "garb_workshop")
+    export("garb_workshop", visual, join(col, "col"))
+
+
+def garb_house():
+    """Low plaster house of the tanners' suburb: one storey, limewash with a blue tint, board gables, mossy tiles."""
+    reset()
+    parts = []
+    W, D, H = 8.0, 6.5, 3.2
+    wall = M("plaster_limeblue")
+    ops = [(-1.6, 0.0, 1.0, 2.0, "rect"), (0.6, 1.0, 0.8, 1.0, "rect"), (2.6, 1.0, 0.8, 1.0, "rect")]
+    y = front_block(parts, W, D, H, wall, ops)
+    parts.append(fbox("door", "-Y", y, -1.6, -REV + 0.05, 0, 0.96, 0.06, 1.98, M("wood_dark")))
+    for zz in (0.4, 1.5):
+        parts.append(fbox("strap", "-Y", y, -1.6, -REV + 0.09, zz, 0.9, 0.02, 0.06, M("iron")))
+    parts.append(fbox("lintel", "-Y", y, -1.6, 0.04, 2.0, 1.4, 0.1, 0.18, M("timber")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, surround=None, head=None, shutters=True, sill=True)
+        parts.append(fbox("lintel", "-Y", y, a, 0.04, zb + h, w + 0.4, 0.1, 0.16, M("timber")))
+    parts.append(box("plinth", (W, 0.1, 0.45), (0, y - 0.03, 0), M("plaster_limeblue_damp")))
+    for sx in (-1, 1):
+        face = "-X" if sx < 0 else "+X"
+        gable_slab(parts, face, sx * W / 2, -D / 2 - 0.2, D / 2 + 0.2, H, 3.0, M("wood"), thick=0.08, out=0.05)
+        for k in range(1, 6):
+            a = -D / 2 + (D) * k / 6
+            parts.append(fbox("batten", face, sx * W / 2, a, 0.1, H, 0.06, 0.04, 3.0 * (1 - abs(a) / (D / 2 + 0.2)) - 0.05, M("wood_dark")))
+    parts.append(box("sole", (W + 0.1, D + 0.1, 0.2), (0, 0, H - 0.1), M("timber"), bevel=0.02, seg=1))
+    pitched(parts, "roof", W + 1.0, D + 1.4, 3.1, (0, 0, H), M("tile_moss"), courses=3)
+    chimney(parts, 1.2, 0.4, H + 1.4, h=1.8)
+    visual = join(parts, "garb_house")
+    shear(visual, 0.008, 0.004)
+    export("garb_house", visual, box("c", (W, D, H + 3.1), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ DOCKS (the Vistula at Kazimierz)
+def dock_granary():
+    """Brick granary (spichlerz): four storeys, gable to the river, small shuttered windows, stacked loading doors
+    and a hoist beam with a pulley under the ridge."""
+    reset()
+    parts = []
+    W, D, H = 10.0, 12.0, 11.0
+    brick = M("brick")
+    ops = []
+    for s in range(4):
+        z = 0.6 + s * 2.7
+        ops.append((0.0, z if s else 0.0, 1.6, 2.1 if s else 2.4, "seg" if s == 0 else "rect"))
+        for x in (-3.2, 3.2):
+            ops.append((x, z + 0.8, 0.6, 0.8, "rect"))
+    y = front_block(parts, W, D, H, brick, ops, bevel=0.05, wonk=0.03)
+    for (a, zb, w, h, sh) in ops:
+        if abs(a) < 0.1:
+            for sx in (-1, 1):
+                parts.append(fbox("ldoor", "-Y", y, a + sx * (w / 4 + 0.01), -REV + 0.05, zb, w / 2 - 0.03, 0.06, h - (0.3 if sh == "seg" else 0.02), M("wood_dark")))
+                parts.append(fbox("lstrap", "-Y", y, a + sx * (w / 4), -REV + 0.1, zb + 0.4, w / 2 - 0.1, 0.02, 0.07, M("iron")))
+            parts.append(fbox("lsill", "-Y", y, a, 0.05, zb - 0.1, w + 0.3, 0.3, 0.12, M("stone")))
+        else:
+            parts.append(slab("glass", outline(a, zb, w, h), "-Y", y, -REV + 0.005, -REV + 0.02, M("void")))
+            parts.append(fbox("ishutter", "-Y", y, a + 0.5, 0.03, zb, 0.36, 0.04, h, M("iron")))
+            parts.append(fbox("bar", "-Y", y, a, -0.05, zb, 0.03, 0.03, h, M("iron")))
+            parts.append(fbox("sill", "-Y", y, a, 0.02, zb - 0.1, w + 0.2, 0.2, 0.1, M("stone")))
+    for s in range(1, 4):
+        parts.append(box("band", (W + 0.1, 0.12, 0.14), (0, y - 0.05, 0.6 + s * 2.7 - 0.3), M("brick_dark")))
+    rise = 6.0
+    gable_slab(parts, "-Y", y, -W / 2, W / 2, H, rise, brick, thick=0.35, out=0.0)
+    parts.append(slab("gdoor", outline(0.0, H + 0.3, 1.2, 1.9), "-Y", y, 0.0, 0.05, M("wood_dark")))
+    for k in range(3):
+        parts.append(slab("gslit", outline(-1.8 + k * 1.8, H + 3.0 + (0.6 if k == 1 else 0), 0.25, 0.9), "-Y", y, 0.0, 0.03, M("void")))
+    parts.append(box("hoist", (0.3, 2.2, 0.3), (0, y - 0.8, H + 2.9), M("timber"), bevel=0.02, seg=1))
+    parts.append(box("hoist_brace", (0.2, 0.2, 1.3), (0, y - 0.35, H + 1.7), M("timber")))
+    parts.append(cyl("pulley", 0.2, 0.08, (0, y - 1.7, H + 2.7), M("wood"), verts=12, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(cyl("rope", 0.02, H + 2.2, (0, y - 1.9, 0.5), M("canvas"), verts=6))
+    parts.append(box("hook", (0.1, 0.05, 0.25), (0, y - 1.9, 0.3), M("iron")))
+    parts.append(roof("roof", D, W + 0.6, rise, (0, 0.2, H), M("tile"), along_x=False, sag=0.08, flare=0.05, courses=6, ridge=True))
+    for k in range(3):
+        parts.append(box("vent", (0.5, 0.9, 0.6), (W / 2 * 0.55, -3 + k * 3, H + 2.4), M("tile_dark"), bevel=0.03, seg=1))
+    for zz in (2.0, 7.0):
+        for sx in (-1, 1):
+            parts.append(box("anchor", (0.08, 0.06, 0.8), (sx * 2.2, y - 0.03, zz), M("iron")))
+    visual = join(parts, "dock_granary")
+    export("dock_granary", visual, box("c", (W, D, H + rise), (0, 0, 0)))
+
+
+def dock_wharf():
+    """Timber quay segment, 8 m along the river (X) and 4 m deep, deck top at z=0 (street level), front edge
+    (river side) at -Y; oak piles run 2.5 m down to the water. Mooring posts and a coiled rope."""
+    reset()
+    parts = []
+    L, Dp = 8.0, 4.0
+    for k in range(16):
+        x = -L / 2 + L * (k + 0.5) / 16
+        parts.append(box("plank", (L / 16 - 0.02, Dp, 0.08), (x, 0, -0.08), M("wood"), bevel=0.01, seg=1, wonk=0.02))
+    for x in (-L / 2 + 0.3, 0.0, L / 2 - 0.3):
+        for y in (-Dp / 2 + 0.2, Dp / 2 - 0.3):
+            parts.append(cyl("pile", 0.16, 2.6, (x, y, -2.68), M("timber"), verts=10, bevel=0.01, seg=1))
+    parts.append(box("stringer", (L, 0.24, 0.3), (0, -Dp / 2 + 0.2, -0.4), M("timber"), bevel=0.02, seg=1))
+    parts.append(box("stringer", (L, 0.24, 0.3), (0, Dp / 2 - 0.3, -0.4), M("timber"), bevel=0.02, seg=1))
+    parts.append(box("fender", (L, 0.2, 0.25), (0, -Dp / 2 - 0.05, -0.3), M("wood_dark"), bevel=0.02, seg=1))
+    for k in range(9):
+        parts.append(box("fender_v", (0.18, 0.14, 1.6), (-L / 2 + k * L / 8, -Dp / 2 - 0.12, -1.6), M("wood_dark"), bevel=0.01, seg=1))
+    for x in (-2.8, 2.8):
+        parts.append(cyl("bollard", 0.18, 0.7, (x, -Dp / 2 + 0.4, 0), M("timber"), verts=12, r2=0.2, bevel=0.02, seg=1))
+        parts.append(cyl("bollard_cap", 0.24, 0.1, (x, -Dp / 2 + 0.4, 0.7), M("iron"), verts=12))
+        parts.append(cyl("bollard_snow", 0.2, 0.05, (x, -Dp / 2 + 0.4, 0.8), M("snow"), verts=12))
+    parts.append(torus("coil", 0.32, 0.05, (0.8, -0.6, 0.05), M("canvas"), seg=16, mseg=6))
+    parts.append(torus("coil2", 0.22, 0.05, (0.8, -0.6, 0.13), M("canvas"), seg=16, mseg=6))
+    parts.append(box("snow", (L - 1.0, 1.6, 0.03), (-0.5, 1.0, 0), M("snow"), bevel=0.01, seg=1, wonk=0.1))
+    parts.append(box("sack", (0.9, 0.6, 0.5), (-2.6, 0.9, 0), M("canvas"), bevel=0.1, seg=2, wonk=0.05))
+    visual = join(parts, "dock_wharf")
+    export("dock_wharf", visual, box("c", (L, Dp, 0.4), (0, 0, -0.4)))
+
+
+def salt_barge():
+    """Vistula salt barge (galar) loaded with Wieliczka salt blocks. Waterline at z=0, hull 14 m along X,
+    3.2 m beam, gunwale 0.7 m above the water. Prop: no collision beyond a hull box."""
+    reset()
+    parts = []
+    L, B = 14.0, 3.2
+    hull = box("hull", (L, B, 1.2), (0, 0, -0.5), M("timber"), bevel=0.06, seg=1)
+    def taper(co):
+        t = max(0.0, (abs(co.x) - L * 0.32) / (L * 0.18))
+        co.y *= 1.0 - 0.45 * t
+        if t > 0 and co.z > -0.3:
+            co.z += 0.35 * t
+        if t > 0 and co.z < -0.3:
+            co.x -= math.copysign(0.8 * t, co.x)
+    edit_verts(hull, taper)
+    parts.append(hull)
+    parts.append(box("deck", (L * 0.62, B - 0.4, 0.06), (0, 0, 0.55), M("wood")))
+    for k in range(7):
+        parts.append(box("rib", (0.12, B + 0.02, 0.1), (-L * 0.3 + k * L * 0.1, 0, 0.62), M("wood_dark")))
+    for i in range(4):
+        for j in range(2):
+            for lv in range(2 - (i % 2)):
+                parts.append(cyl("salt", 0.32, 0.9, (-3.0 + i * 1.9 + lv * 0.3, -0.6 + j * 1.2, 0.93 + lv * 0.62), M("salt"), verts=10, rot=(0, math.pi / 2, 0), center=True, bevel=0.03, seg=1))
+    parts.append(cyl("oar", 0.06, 6.0, (L / 2 + 1.2, 0, 1.2), M("wood"), verts=8, rot=(0, math.pi / 2 - 0.2, 0), center=True))
+    parts.append(box("blade", (1.4, 0.06, 0.4), (L / 2 + 3.6, 0, 0.35), M("wood"), bevel=0.01, seg=1))
+    parts.append(box("oar_post", (0.2, 0.2, 1.0), (L / 2 - 1.0, 0, 0.6), M("timber")))
+    parts.append(box("snow", (L * 0.5, B - 0.6, 0.03), (0, 0, 1.25), M("snow"), wonk=0.2))
+    visual = join(parts, "salt_barge")
+    export("salt_barge", visual, box("c", (L, B, 1.8), (0, 0, -0.5)))
+
+
+# ------------------------------------------------------------------ KLEPARZ (market town north of the walls)
+def klep_house():
+    """Kleparz house: one and a half storeys, ochre lime plaster, a timber porch on posts, a dormer in the roof."""
+    reset()
+    parts = []
+    W, D, H = 10.0, 7.0, 3.4
+    wall = M("plaster_ochre")
+    ops = [(0.0, 0.0, 1.1, 2.1, "rect")] + [(x, 1.0, 0.85, 1.15, "rect") for x in (-3.4, -1.7, 1.7, 3.4)]
+    y = front_block(parts, W, D, H, wall, ops)
+    parts.append(fbox("door", "-Y", y, 0.0, -REV + 0.05, 0, 1.06, 0.06, 2.08, M("wood_dark")))
+    for r in range(2):
+        parts.append(fbox("dpanel", "-Y", y, 0.0, -REV + 0.09, 0.3 + r * 0.95, 0.8, 0.03, 0.75, M("wood_dark"), bevel=0.01, seg=1))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, surround="plaster_white", head="lintel", shutters=True, warm=RNG.random() < 0.4)
+    parts.append(box("plinth", (W, 0.1, 0.5), (0, y - 0.03, 0), M("plaster_ochre_damp")))
+    for x in (-1.1, 1.1):
+        parts.append(cyl("porch_post", 0.1, 2.6, (x, y - 1.6, 0.15), M("timber"), verts=8, bevel=0.01, seg=1))
+    parts.append(box("porch_floor", (2.8, 1.8, 0.15), (0, y - 0.9, 0), M("wood"), bevel=0.01, seg=1))
+    parts.append(roof("porch_roof", 2.2, 3.0, 0.9, (0, y - 0.9, 2.75), M("tile_dark"), along_x=False, sag=0.02, flare=0.05, cuts=3))
+    parts.append(box("porch_beam", (2.6, 0.18, 0.18), (0, y - 1.6, 2.6), M("timber")))
+    cornice(parts, W, D, H - 0.05, t=0.25, proud=0.2, modillions=False, mat=M("plaster_white"))
+    pitched(parts, "roof", W + 0.8, D + 1.0, 3.6, (0, 0, H + 0.15), M("tile"), courses=4)
+    dormer(parts, -2.6, -D / 2 + 1.0, H + 0.5, 1.2, 1.3, wall, M("tile_dark"))
+    dormer(parts, 2.6, -D / 2 + 1.0, H + 0.5, 1.2, 1.3, wall, M("tile_dark"))
+    chimney(parts, 0.0, 0.8, H + 1.8, h=1.9)
+    visual = join(parts, "klep_house")
+    shear(visual, -0.006, 0.003)
+    export("klep_house", visual, box("c", (W, D, H + 3.8), (0, 0, 0)))
+
+
+def klep_stable():
+    """Timber stable for market-day horses: vertical oak boards, a stable door split in halves, a hay loft under a
+    thatched roof with its hatch open and hay showing."""
+    reset()
+    parts = []
+    W, D, H = 12.0, 7.0, 3.2
+    boards = M("wood")
+    ops = [(-3.0, 0.0, 1.4, 2.3, "rect"), (3.0, 0.0, 1.4, 2.3, "rect"), (0.0, 1.5, 0.9, 0.5, "rect")]
+    y = front_block(parts, W, D, H, boards, ops, wonk=0.05)
+    for x in (-3.0, 3.0):
+        parts.append(fbox("door_lo", "-Y", y, x, -REV + 0.05, 0, 1.36, 0.06, 1.2, M("wood_dark")))
+        parts.append(fbox("door_hi", "-Y", y, x - 0.5, -0.3, 1.25, 0.1, 0.9, 1.0, M("wood_dark")))
+        parts.append(fbox("door_x", "-Y", y, x, -REV + 0.1, 0.1, 1.2, 0.03, 0.12, M("timber")))
+        parts.append(fbox("frame", "-Y", y, x, 0.05, 2.3, 1.8, 0.12, 0.2, M("timber")))
+    parts.append(slab("hay_hole", outline(0.0, 1.5, 0.9, 0.5), "-Y", y, -REV + 0.005, -REV + 0.02, M("void")))
+    for x in (-W / 2, -W / 6, W / 6, W / 2):
+        parts.append(fbox("post", "-Y", y, x, 0.08, 0, 0.22, 0.16, H, M("timber"), bevel=0.01, seg=1))
+    parts.append(box("sill", (W + 0.2, 0.3, 0.3), (0, y + 0.05, 0), M("timber")))
+    for sx in (-1, 1):
+        face = "-X" if sx < 0 else "+X"
+        gable_slab(parts, face, sx * W / 2, -D / 2, D / 2, H, 3.6, boards, thick=0.1, out=0.02)
+        parts.append(slab("loft", outline(0.0, H + 0.6, 1.2, 1.3), face, sx * W / 2, 0.02, 0.05, M("void")))
+        parts.append(fbox("hay", face, sx * W / 2, 0.0, 0.1, H + 0.6, 1.1, 0.3, 0.7, M("hay"), bevel=0.1, seg=1, wonk=0.12))
+        parts.append(fbox("hatch", face, sx * W / 2, 0.95, 0.3, H + 0.6, 0.08, 0.6, 1.3, M("wood_dark")))
+    parts.append(hip_roof("roof", W + 1.2, D + 1.4, 3.8, (0, 0, H), M("thatch"), hip=1.2))
+    parts.append(hip_snow("roof_snow", W + 1.2, D + 1.4, 3.8, (0, 0, H), hip=1.2))
+    parts.append(box("trough", (2.0, 0.5, 0.5), (0, y - 0.6, 0), M("wood_dark"), bevel=0.02, seg=1))
+    parts.append(box("trough_ice", (1.8, 0.4, 0.02), (0, y - 0.6, 0.45), M("glass")))
+    parts.append(box("hay_pile", (1.6, 1.2, 0.8), (-5.2, y - 1.0, 0), M("hay"), bevel=0.3, seg=2, wonk=0.2))
+    visual = join(parts, "klep_stable")
+    export("klep_stable", visual, box("c", (W, D, H + 3.8), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ KANONICZA (canons' street under Wawel)
+def kan_house():
+    """Canon's house: two storeys and an attic, cream plaster, a Renaissance stone portal with pilasters and an
+    entablature, and a deep gate passage (the courtyard entry) with an arcade glimpsed at its end."""
+    reset()
+    parts, col = [], []
+    W, D, GF, FL = 13.0, 10.0, 4.2, 3.4
+    wall = M("plaster_cream")
+    gate_w = 3.0
+    ops = [(-3.0, 0.0, 1.8, 2.8 + 0.12 + 0.9, "round"), (2.8, 0.0, gate_w, 2.6 + gate_w / 2, "round"), (-5.6, 1.4, 0.9, 1.6, "rect")]
+    gl, gr = 2.8 - gate_w / 2 - 0.3, 2.8 + gate_w / 2 + 0.3
+    parts.append(box("mass_l", (gl + W / 2, D - REV, GF), ((gl - W / 2) / 2, REV / 2, 0), wall, bevel=0.05, seg=1))
+    parts.append(box("mass_r", (W / 2 - gr, D - REV, GF), ((gr + W / 2) / 2, REV / 2, 0), wall, bevel=0.05, seg=1))
+    y = -D / 2
+    parts.append(facade("front_l", wall, "-Y", y, -W / 2 - 0.01, gl, 0, GF, ops[:1] + ops[2:]))
+    parts.append(facade("front_r", wall, "-Y", y, gr, W / 2 + 0.01, 0, GF, []))
+    parts.append(facade("gate", wall, "-Y", y, gl, gr, 0.0, GF, [ops[1]], depth=D * 0.8, back=False))
+    parts.append(box("gate_floor", (gate_w, D * 0.8, 0.06), (2.8, y + D * 0.4, 0), M("cobble")))
+    col.append(box("c", (W / 2 + 0.8, D, GF + FL), (-W / 4, 0, 0)))
+    col.append(box("c", (W / 2 - 4.3, D, GF + FL), (W / 2 - (W / 2 - 4.3) / 2, 0, 0)))
+    col.append(box("c", (gate_w + 0.2, D, FL + 0.9), (2.8, 0, GF - 0.9)))
+    # courtyard arcade seen through the passage
+    for k in range(3):
+        x = 2.8 - 2.4 + k * 2.4
+        parts.append(cyl("arc_col", 0.18, 2.6, (x, y + D * 0.8 + 1.6, 0), M("stone"), verts=12, bevel=0.01, seg=1))
+    parts.append(box("arc_beam", (6.0, 0.4, 0.5), (2.8, y + D * 0.8 + 1.6, 2.6), M("plaster_white")))
+    parts.append(box("court_wall", (8.0, 0.3, 4.0), (2.8, y + D * 0.8 + 3.5, 0), M("plaster_white")))
+    parts.append(box("court_floor", (8.0, 3.6, 0.04), (2.8, y + D * 0.8 + 1.8, 0), M("snow")))
+    door_unit(parts, "-Y", y, -3.0, 1.8, 2.8, portal=False)
+    st = M("stone_pale")
+    for sx in (-1, 1):
+        parts.append(box("pil", (0.42, 0.24, 3.9), (-3.0 + sx * 1.35, y - 0.12, 0.35), st, bevel=0.02, seg=1))
+        parts.append(box("pil_base", (0.56, 0.32, 0.35), (-3.0 + sx * 1.35, y - 0.16, 0), M("stone"), bevel=0.02, seg=1))
+        parts.append(box("pil_cap", (0.56, 0.32, 0.2), (-3.0 + sx * 1.35, y - 0.16, 4.25), st, bevel=0.02, seg=1))
+    voussoirs(parts, "-Y", y, -3.0, 2.92, 1.8, 0.3, st, n=9, proud=0.1, key=0.14)
+    parts.append(box("architrave", (3.4, 0.34, 0.24), (-3.0, y - 0.17, 4.45), st, bevel=0.02, seg=1))
+    parts.append(box("frieze", (3.3, 0.26, 0.34), (-3.0, y - 0.13, 4.69), M("stone"), bevel=0.01, seg=1))
+    parts.append(box("inscr", (2.2, 0.03, 0.2), (-3.0, y - 0.27, 4.76), M("gold", 0.4)))
+    parts.append(box("cornice_p", (3.7, 0.44, 0.18), (-3.0, y - 0.22, 5.03), st, bevel=0.02, seg=1))
+    parts.append(wedge("pediment", (3.4, 0.3, 0.6), (-3.0, y - 0.15, 5.21), st))
+    voussoirs(parts, "-Y", y, 2.8, 2.6, gate_w, 0.36, M("stone"), n=11, proud=0.1, key=0.16)
+    for sx in (-1, 1):
+        parts.append(box("gjamb", (0.4, 0.2, 2.6), (2.8 + sx * (gate_w / 2 + 0.2), y - 0.1, 0), M("stone"), bevel=0.02, seg=1))
+        parts.append(cyl("bumper", 0.22, 0.6, (2.8 + sx * (gate_w / 2 - 0.1), y + 0.3, 0), M("stone_dark"), verts=10, r2=0.12))
+    win_unit(parts, "-Y", y, -5.6, 1.4, 0.9, 1.6, "rect", bars=True, surround="stone")
+    parts.append(box("plinth", (W, 0.1, 0.5), (0, y - 0.03, 0), M("stone_dark")))
+    uops = [(x, GF + 0.8, 1.1, 1.9, "rect") for x in (-5.0, -2.5, 0.0, 2.5, 5.0)]
+    y2 = front_block(parts, W, D, FL, wall, uops, z0=GF)
+    for (a, zb, w, h, sh) in uops:
+        win_unit(parts, "-Y", y2, a, zb, w, h, sh, surround="stone_pale", warm=RNG.random() < 0.35)
+    parts.append(box("string", (W + 0.16, 0.26, 0.22), (0, y - 0.08, GF - 0.12), st, bevel=0.02, seg=1))
+    quoins(parts, W, D, 0.5, GF + FL, y)
+    cornice(parts, W, D, GF + FL - 0.05, t=0.45, proud=0.35, modillions=False)
+    for i in range(24):
+        parts.append(box("modil", (0.12, 0.3, 0.13), (-W / 2 + i * W / 23, y - 0.15, GF + FL), M("stone")))
+    top = GF + FL + 0.35
+    pitched(parts, "roof", W + 0.8, D + 1.1, 4.4, (0, 0, top), M("tile"), courses=5)
+    for x in (-3.5, 0.0, 3.5):
+        dormer(parts, x, y + 1.1, top + 0.55, 1.2, 1.35, wall, M("tile_dark"), warm=x == 0.0)
+    chimney(parts, -4.4, 1.2, top + 1.6, h=2.2)
+    chimney(parts, 4.4, 1.6, top + 1.4, h=2.2)
+    drainpipe(parts, -W / 2 + 0.25, y - 0.12, GF + FL - 0.2, [(1.0, y), (4.5, y2)])
+    visual = join(parts, "kan_house")
+    export("kan_house", visual, join(col, "col"))
+
+
+# ------------------------------------------------------------------ WAWEL
+def wawel_wall():
+    """Curtain wall segment, 8 m along X, 2.4 m thick, 9 m to the wall-walk: battered sandstone base, brick upper
+    wall, arrow loops, crenellated parapet with merlons. Outside face at -Y. Segments butt end to end."""
+    reset()
+    parts = []
+    L, T, H = 8.0, 2.4, 9.0
+    base = box("batter", (L, T + 0.6, 2.6), (0, 0.3, 0), M("stone"), bevel=0.03, seg=1)
+    edit_verts(base, lambda co: setattr(co, "y", co.y + (0.6 if co.y < 0 and co.z > 1.0 else 0.0)))
+    parts.append(base)
+    ops = [(x, 4.8, 0.22, 1.4, "rect") for x in (-2.4, 0.0, 2.4)]
+    parts.append(box("wall", (L, T - REV, H - 2.6), (0, REV / 2, 2.6), M("brick"), bevel=0.02, seg=1))
+    parts.append(facade("face", M("brick"), "-Y", -T / 2, -L / 2, L / 2, 2.6, H, ops, depth=0.5))
+    for (a, zb, w, h, sh) in ops:
+        parts.append(box("loop_sill", (0.5, 0.2, 0.1), (a, -T / 2 - 0.05, zb - 0.1), M("stone")))
+        parts.append(box("loop_cross", (0.6, 0.02, 0.12), (a, -T / 2 + 0.3, zb + 0.6), M("void")))
+    parts.append(box("band", (L, 0.25, 0.25), (0, -T / 2 - 0.05, 2.55), M("stone"), bevel=0.02, seg=1))
+    for k in range(5):
+        parts.append(box("corbel", (0.3, 0.45, 0.4), (-L / 2 + 0.8 + k * 1.6, -T / 2 - 0.2, H - 0.4), M("stone"), bevel=0.02, seg=1))
+    parts.append(box("parapet_base", (L, 0.7, 0.2), (0, -T / 2 - 0.1, H), M("stone"), bevel=0.02, seg=1))
+    parts.append(box("parapet", (L, 0.6, 1.0), (0, -T / 2 - 0.05, H + 0.2), M("brick"), bevel=0.02, seg=1))
+    for k in range(4):
+        x = -L / 2 + 1.0 + k * 2.0
+        parts.append(box("merlon", (1.1, 0.6, 1.1), (x, -T / 2 - 0.05, H + 1.2), M("brick"), bevel=0.02, seg=1, wonk=0.02))
+        parts.append(box("merlon_cap", (1.2, 0.7, 0.1), (x, -T / 2 - 0.05, H + 2.3), M("stone")))
+        parts.append(box("merlon_snow", (1.1, 0.6, 0.06), (x, -T / 2 - 0.05, H + 2.4), M("snow")))
+    parts.append(box("walk", (L, T - 0.6, 0.1), (0, 0.3, H), M("stone_dark")))
+    parts.append(box("walk_snow", (L - 0.2, T - 0.9, 0.05), (0, 0.35, H + 0.1), M("snow"), wonk=0.1))
+    parts.append(box("inner_rail", (L, 0.3, 0.9), (0, T / 2 - 0.15, H), M("brick")))
+    visual = join(parts, "wawel_wall")
+    export("wawel_wall", visual, box("c", (L, T + 0.6, H + 1.2), (0, 0.3, 0)))
+
+
+def wawel_gate():
+    """Gate tower, 9 x 9 m, 16 m to the parapet: a vaulted passage straight through (walkable), a half-raised
+    portcullis, arrow loops, machicolation corbels, a battlemented parapet and a pyramidal roof. Front at -Y."""
+    reset()
+    parts, col = [], []
+    S, H = 9.0, 16.0
+    gw, gh = 3.4, 3.4 + 1.7
+    gate = (0.0, 0.0, gw, gh, "round")
+    # the front facade's reveal runs the full depth: it is the passage; its rim folded back S is the side walls
+    parts.append(facade("front", M("stone"), "-Y", -S / 2, -S / 2, S / 2, 0.0, 5.5, [gate], depth=S, back=False))
+    parts.append(facade("back", M("stone"), "+Y", S / 2, -S / 2, S / 2, 0.0, 5.5, [gate], depth=0.01, back=False))
+    ops = [(x, zz, 0.25, 1.5, "rect") for zz in (7.5, 11.0) for x in (-2.5, 2.5)] + [(0.0, 8.5, 1.0, 2.0, "round")]
+    parts.append(box("upper", (S - 2 * 0.3, S - 2 * 0.3, H - 5.5), (0, 0, 5.5), M("brick"), bevel=0.02, seg=1))
+    for face, plane in (("-Y", -S / 2), ("+Y", S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        parts.append(facade("up_" + face, M("brick"), face, plane, -S / 2, S / 2, 5.5, H, ops, depth=0.3))
+    for (a, zb, w, h, sh) in ops:
+        if w > 0.5:
+            win_unit(parts, "-Y", -S / 2, a, zb, w, h, sh, surround=None, cross=False)
+    parts.append(box("roofslab", (S, S, 0.3), (0, 0, 5.2), M("stone")))
+    parts.append(box("band", (S + 0.3, S + 0.3, 0.3), (0, 0, 5.5), M("stone"), bevel=0.02, seg=1))
+    voussoirs(parts, "-Y", -S / 2, 0.0, gh - gw / 2, gw, 0.5, M("stone_pale"), n=11, proud=0.12, key=0.2)
+    parts.append(box("arms", (1.2, 0.12, 1.4), (0, -S / 2 - 0.1, 6.2), M("stone_pale"), bevel=0.03, seg=1))
+    parts.append(cyl("arms_boss", 0.4, 0.1, (0, -S / 2 - 0.18, 6.9), M("gold", 0.4), verts=16, rot=(math.pi / 2, 0, 0), center=True))
+    for k in range(7):
+        parts.append(box("pc_v", (0.08, 0.1, 2.4), (-gw / 2 + 0.3 + k * (gw - 0.6) / 6, -S / 2 + 0.6, 2.6), M("iron")))
+    for k in range(4):
+        parts.append(box("pc_h", (gw - 0.2, 0.1, 0.08), (0, -S / 2 + 0.6, 2.8 + k * 0.6), M("iron")))
+    for k in range(7):
+        parts.append(cyl("pc_tooth", 0.05, 0.25, (-gw / 2 + 0.3 + k * (gw - 0.6) / 6, -S / 2 + 0.6, 2.35), M("iron"), verts=4, r2=0.005))
+    for face, plane in (("-Y", -S / 2), ("+Y", S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        for k in range(6):
+            a = -S / 2 + 0.75 + k * 1.5
+            parts.append(fbox("corbel", face, plane, a, 0.25, H - 0.6, 0.35, 0.5, 0.6, M("stone"), bevel=0.02, seg=1))
+    parts.append(box("parapet", (S + 1.0, S + 1.0, 1.0), (0, 0, H), M("brick"), bevel=0.02, seg=1))
+    for sx in range(5):
+        for side in range(4):
+            x = -S / 2 - 0.2 + sx * (S + 0.4) / 4
+            px, py = [(x, -S / 2 - 0.25), (x, S / 2 + 0.25), (-S / 2 - 0.25, x), (S / 2 + 0.25, x)][side]
+            parts.append(box("merlon", (0.9, 0.9, 1.0), (px, py, H + 1.0), M("brick"), bevel=0.02, seg=1))
+            parts.append(box("merlon_cap", (1.0, 1.0, 0.1), (px, py, H + 2.0), M("stone")))
+    parts.append(pyramid("roof", (S - 0.4, S - 0.4, 6.0), (0, 0, H + 1.0), M("tile_dark"), apex=0.2))
+    parts.append(pyramid("roof_snow", (S * 0.55, S * 0.55, 2.7), (0, 0, H + 4.35), M("snow"), apex=0.2))
+    parts.append(cyl("finial", 0.12, 1.6, (0, 0, H + 7.0), M("gold", 0.4), verts=8, r2=0.02))
+    visual = join(parts, "wawel_gate")
+    for sx in (-1, 1):
+        col.append(box("c", ((S - gw) / 2, S, H + 1), (sx * (S / 2 - (S - gw) / 4), 0, 0)))
+    col.append(box("c", (gw, S, H + 1 - gh), (0, 0, gh)))
+    export("wawel_gate", visual, join(col, "col"))
+
+
+DISTRICT_BUILDS = [
+    ("kaz_house_a", kaz_house_a), ("kaz_house_b", kaz_house_b), ("kaz_synagogue", kaz_synagogue),
+    ("garb_workshop", garb_workshop), ("garb_house", garb_house), ("dock_granary", dock_granary),
+    ("dock_wharf", dock_wharf), ("salt_barge", salt_barge), ("klep_house", klep_house), ("klep_stable", klep_stable),
+    ("kan_house", kan_house), ("wawel_wall", wawel_wall), ("wawel_gate", wawel_gate),
+]
+
+
+# ------------------------------------------------------------------ FARMLAND outside the walls (Lesser Poland, 1795)
+def farm_field():
+    """8 x 8 m strip-field tile: furrows along X as real geometry matched to the baked furrow texture (snow in
+    the troughs, soil and stubble on the ridges). Top near z=0; tiles seamlessly on an 8 m grid at one rotation."""
+    reset()
+    L = 8.0
+    nx, ny = 8, 352
+    bm = bmesh.new()
+    rng = random.Random(8)
+    lift = [rng.uniform(-0.02, 0.02) for _ in range(nx + 1)]
+    lift[0] = lift[-1] = 0.0
+    rows = []
+    for j in range(ny + 1):
+        yy = -L / 2 + L * j / ny
+        cv = ((yy / 4.0 + 0.5) * 22.0) % 1.0
+        z = 0.06 * (math.sin(math.pi * cv) - 0.5)
+        rows.append([bm.verts.new((-L / 2 + L * i / nx, yy, z + lift[i])) for i in range(nx + 1)])
+    for j in range(ny):
+        for i in range(nx):
+            bm.faces.new((rows[j][i], rows[j][i + 1], rows[j + 1][i + 1], rows[j + 1][i]))
+    o = _mesh_obj("field", bm, M("field"))
+    _tag(o, mat=M("field"), offset=(0.5, 0.5))
+    for p in o.data.polygons:
+        p.use_smooth = True
+    skirt = box("skirt", (L, L, 0.3), (0, 0, -0.33), M("field"))
+    export("farm_field", join([o, skirt], "farm_field"), box("c", (L, L, 0.5), (0, 0, -0.5)))
+
+
+def farm_fence():
+    """Split-rail fence segment, 4 m along X, centred; posts at both ends (neighbouring segments share them)."""
+    reset()
+    parts = []
+    for x in (-2.0, 0.0, 2.0):
+        p = cyl("post", 0.08, 1.35, (x, 0, 0), M("timber"), verts=7, r2=0.065, bevel=0.01, seg=1)
+        shear(p, RNG.uniform(-0.03, 0.03), RNG.uniform(-0.04, 0.04))
+        parts.append(p)
+        parts.append(cyl("post_snow", 0.07, 0.05, (x, 0, 1.35), M("snow"), verts=7))
+    for zz, dy in ((0.55, 0.09), (1.05, -0.09)):
+        for k in range(2):
+            x0 = -2.0 + 2.0 * k
+            r = box("rail", (2.3, 0.1, 0.13), (x0 + 1.0, dy, zz), M("wood"), bevel=0.02, seg=1, wonk=0.03)
+            edit_verts(r, lambda co, x0=x0: setattr(co, "z", co.z - 0.05 * math.sin(math.pi * min(1, max(0, (co.x - x0) / 2.0)))))
+            parts.append(r)
+            parts.append(box("rail_snow", (2.1, 0.08, 0.04), (x0 + 1.0, dy, zz + 0.1), M("snow"), wonk=0.03))
+    parts.append(box("drift", (4.0, 0.7, 0.18), (0, 0.1, 0), M("snow"), bevel=0.15, seg=2, wonk=0.1))
+    export("farm_fence", join(parts, "farm_fence"), box("c", (4.2, 0.3, 1.3), (0, 0, 0)))
+
+
+def log_corners(parts, W, D, H, n=10):
+    """Crossed log ends sticking out at the four corners of a log house."""
+    for k in range(n):
+        z = (k + 0.5) * H / n
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                if k % 2:
+                    parts.append(cyl("logend", 0.12, 0.5, (sx * (W / 2 + 0.1), sy * D / 2, z), M("timber"), verts=6, rot=(0, math.pi / 2, 0), center=True))
+                else:
+                    parts.append(cyl("logend", 0.12, 0.5, (sx * W / 2, sy * (D / 2 + 0.1), z), M("timber"), verts=6, rot=(math.pi / 2, 0, 0), center=True))
+
+
+def farm_cottage():
+    """Chata: a limewashed log cottage on an oak sill, small windows with blue frames, a thatched hipped roof
+    under snow and a limewashed chimney. Door on the long side facing -Y."""
+    reset()
+    parts = []
+    W, D, H = 9.0, 6.0, 2.5
+    wall = M("log_lime")
+    ops = [(-1.2, 0.2, 0.95, 1.85, "rect"), (1.2, 0.9, 0.6, 0.7, "rect"), (3.0, 0.9, 0.6, 0.7, "rect"), (-3.2, 0.9, 0.6, 0.7, "rect")]
+    parts.append(box("sill_beam", (W + 0.3, D + 0.3, 0.25), (0, 0, 0), M("timber"), bevel=0.03, seg=1, wonk=0.03))
+    y = front_block(parts, W, D, H - 0.25, wall, ops, z0=0.25, wonk=0.05)
+    parts.append(fbox("door", "-Y", y, -1.2, -REV + 0.05, 0.45, 0.92, 0.06, 1.83, M("shutter")))
+    parts.append(fbox("door_x", "-Y", y, -1.2, -REV + 0.1, 1.1, 0.85, 0.03, 0.1, M("wood_dark")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb + 0.25, w, h, sh, surround=None, head=None, sill=False, cross=True, warm=RNG.random() < 0.5)
+        parts.append(fbox("wframe", "-Y", y, a, 0.03, zb + 0.2, w + 0.2, 0.06, h + 0.12, M("plaster_limeblue")))
+    parts.append(fbox("step", "-Y", y, -1.2, 0.3, 0, 1.2, 0.6, 0.2, M("stone_dark"), bevel=0.03, seg=1))
+    log_corners(parts, W, D, H)
+    parts.append(hip_roof("roof", W + 1.6, D + 1.8, 3.9, (0, 0, H), M("thatch"), hip=2.0, thick=0.35))
+    parts.append(hip_snow("roof_snow", W + 1.6, D + 1.8, 3.9, (0, 0, H), hip=2.0))
+    parts.append(box("ridge", (W - 2.0, 0.5, 0.25), (0, 0, H + 3.8), M("thatch"), bevel=0.1, seg=2))
+    parts.append(box("chim", (0.8, 0.8, 1.6), (0.9, 0.3, H + 3.0), M("plaster_lime"), bevel=0.04, seg=1, wonk=0.05))
+    parts.append(box("chim_cap", (0.95, 0.95, 0.1), (0.9, 0.3, H + 4.6), M("snow"), bevel=0.03, seg=1))
+    parts.append(box("drift", (W + 1.0, 1.0, 0.25), (0, y - 0.8, 0), M("snow"), bevel=0.2, seg=2, wonk=0.12))
+    parts.append(box("bench", (1.6, 0.35, 0.08), (1.9, y - 0.4, 0.45), M("wood")))
+    for x in (1.3, 2.5):
+        parts.append(box("bench_leg", (0.08, 0.3, 0.45), (x, y - 0.4, 0), M("wood")))
+    visual = join(parts, "farm_cottage")
+    shear(visual, 0.006, -0.005)
+    export("farm_cottage", visual, box("c", (W + 0.3, D + 0.3, H + 4.0), (0, 0, 0)))
+
+
+def farm_barn():
+    """Stodola: an oak-framed barn of vertical boards with a great double door (one leaf ajar) and a steep
+    thatched roof under snow."""
+    reset()
+    parts, col = [], []
+    W, D, H = 14.0, 8.0, 4.0
+    boards = M("timber")
+    dw, dh = 4.0, 3.6
+    ops = [(0.0, 0.0, dw, dh, "rect")]
+    y = front_block(parts, W, D, H, boards, ops, wonk=0.05)
+    parts.append(fbox("leaf_l", "-Y", y, -dw / 4, -REV + 0.06, 0.05, dw / 2 - 0.04, 0.08, dh - 0.1, M("wood")))
+    leaf = fbox("leaf_r", "-Y", y, dw / 4, -REV + 0.06, 0.05, dw / 2 - 0.04, 0.08, dh - 0.1, M("wood"))
+    c, s = math.cos(0.5), math.sin(0.5)
+    hx, hy = dw / 2, y - REV + 0.06
+    def swing(co):
+        dx, dy = co.x - hx, co.y - hy
+        co.x, co.y = hx + dx * c + dy * s, hy - dx * s + dy * c
+    edit_verts(leaf, swing)
+    parts.append(leaf)
+    parts.append(slab("dark", outline(dw / 4, 0.05, dw / 2, dh - 0.1), "-Y", y, -REV + 0.0, -REV + 0.01, M("void")))
+    for zz in (0.5, dh - 0.8):
+        parts.append(fbox("brace", "-Y", y, -dw / 4, -REV + 0.12, zz, dw / 2 - 0.2, 0.04, 0.16, M("wood_dark")))
+    parts.append(fbox("lintel", "-Y", y, 0, 0.05, dh, dw + 0.8, 0.14, 0.3, M("wood_dark")))
+    for x in (-W / 2, -W / 4, -dw / 2 - 0.1, dw / 2 + 0.1, W / 4, W / 2):
+        parts.append(fbox("post", "-Y", y, x, 0.07, 0, 0.26, 0.14, H, M("wood_dark"), bevel=0.01, seg=1))
+    parts.append(box("sole", (W + 0.3, D + 0.3, 0.3), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.04))
+    for sx in (-1, 1):
+        gable_slab(parts, "-X" if sx < 0 else "+X", sx * W / 2, -D / 2, D / 2, H, 2.2, boards, thick=0.1, out=0.02)
+    parts.append(hip_roof("roof", W + 1.4, D + 1.8, 5.2, (0, 0, H), M("thatch"), hip=1.6, thick=0.35))
+    parts.append(hip_snow("roof_snow", W + 1.4, D + 1.8, 5.2, (0, 0, H), hip=1.6))
+    parts.append(box("ridge", (W - 2.4, 0.5, 0.3), (0, 0, H + 5.1), M("thatch"), bevel=0.1, seg=2))
+    parts.append(box("straw", (2.0, 1.6, 0.7), (0.4, y + 1.2, 0), M("hay"), bevel=0.3, seg=2, wonk=0.2))
+    visual = join(parts, "farm_barn")
+    export("farm_barn", visual, box("c", (W, D, H + 5.0), (0, 0, 0)))
+
+
+def _haystack(name, R, H):
+    reset()
+    parts = [cyl("stack", R, H * 0.45, (0, 0, 0), M("hay"), verts=16, r2=R * 1.05, bevel=0.1, seg=2),
+             sphere("top", R * 1.05, (0, 0, H * 0.45), M("hay"), seg=16, rings=10, zscale=(H * 0.55) / (R * 1.05))]
+    bm = bmesh.new()
+    bm.from_mesh(parts[1].data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < H * 0.45 - 0.01], context="VERTS")
+    bm.to_mesh(parts[1].data)
+    bm.free()
+    parts.append(sphere("snowcap", R * 0.8, (0, 0, H * 0.45 + H * 0.22), M("snow"), seg=16, rings=8, zscale=(H * 0.36) / (R * 0.8)))
+    bm = bmesh.new()
+    bm.from_mesh(parts[-1].data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < H * 0.72], context="VERTS")
+    bm.to_mesh(parts[-1].data)
+    bm.free()
+    parts.append(cyl("pole", 0.06, H + 0.7, (0, 0, 0), M("timber"), verts=6, r2=0.035))
+    parts.append(box("skirt", (R * 2.2, R * 2.2, 0.15), (0, 0, 0), M("snow"), bevel=0.3, seg=2, wonk=0.2))
+    for k in range(4):
+        a = math.tau * k / 4 + 0.4
+        parts.append(cyl("rope", 0.02, H * 0.7, (R * 0.9 * math.cos(a), R * 0.9 * math.sin(a), H * 0.2), M("canvas"), verts=4, rot=(0.25 * math.sin(a), -0.25 * math.cos(a), 0)))
+    export(name, join(parts, name), cyl("c", R, H * 0.8, (0, 0, 0), None, verts=8))
+
+
+def farm_haystack():
+    """Stog: a tall hay rick around a central pole, tied down, snow on its crown (4.5 m)."""
+    _haystack("farm_haystack", 1.9, 4.5)
+
+
+def farm_haystack_small():
+    _haystack("farm_haystack_small", 1.1, 2.4)
+
+
+def farm_mill():
+    """Water mill on a stream: timber mill house with a thatched roof, an overshot wheel on the +X side fed by a
+    wooden flume, the stream running along Y in a stone-banked channel (water at z=-0.35)."""
+    reset()
+    parts, col = [], []
+    W, D, H = 7.0, 8.0, 3.8
+    boards = M("timber")
+    ops = [(-1.0, 0.0, 1.1, 2.1, "rect"), (1.6, 1.3, 0.7, 0.8, "rect")]
+    parts.append(box("footing", (W + 0.3, D + 0.3, 0.5), (0, 0, 0), M("stone"), bevel=0.03, seg=1, wonk=0.04))
+    y = front_block(parts, W, D, H - 0.5, boards, ops, z0=0.5)
+    parts.append(fbox("door", "-Y", y, -1.0, -REV + 0.05, 0.5, 1.06, 0.06, 2.06, M("wood_dark")))
+    parts.append(fbox("step", "-Y", y, -1.0, 0.35, 0, 1.4, 0.7, 0.5, M("stone_dark"), bevel=0.03, seg=1))
+    win_unit(parts, "-Y", y, 1.6, 1.8, 0.7, 0.8, "rect", surround=None, head=None, cross=True, warm=True)
+    for x in (-W / 2, 0.0, W / 2):
+        parts.append(fbox("post", "-Y", y, x, 0.07, 0.5, 0.24, 0.14, H - 0.5, M("wood_dark"), bevel=0.01, seg=1))
+    col.append(box("c", (W + 0.3, D + 0.3, H), (0, 0, 0)))
+    parts.append(hip_roof("roof", W + 1.4, D + 1.6, 3.6, (0, 0, H), M("thatch"), hip=1.4, thick=0.3))
+    parts.append(hip_snow("roof_snow", W + 1.4, D + 1.6, 3.6, (0, 0, H), hip=1.4))
+    parts.append(box("chim", (0.6, 0.6, 1.4), (-1.5, 1.5, H + 2.2), M("brick"), bevel=0.03, seg=1))
+    # stream and banks along Y beside the +X wall
+    sx0 = W / 2 + 1.4
+    parts.append(box("water", (2.4, 16.0, 0.02), (sx0, 0, -0.37), M("water", 0.08)))
+    for dx in (-1.3, 1.3):
+        parts.append(box("bank", (0.5, 16.0, 0.6), (sx0 + dx, 0, -0.55), M("stone_dark"), bevel=0.04, seg=1, wonk=0.06))
+    parts.append(box("bed", (2.4, 16.0, 0.1), (sx0, 0, -0.9), M("stone_dark")))
+    parts.append(box("ice", (0.8, 5.0, 0.03), (sx0 + 0.7, -4.0, -0.35), M("snow"), wonk=0.2))
+    # overshot wheel: two rims, spokes, paddles, axle into the wall
+    R = 2.2
+    wc = (sx0, 0.0, R - 0.25)
+    for dx in (-0.4, 0.4):
+        parts.append(torus("rim", R, 0.07, (wc[0] + dx, wc[1], wc[2]), M("wood_dark"), rot=(0, math.pi / 2, 0), seg=24, mseg=5))
+        for k in range(8):
+            a = math.tau * k / 8
+            parts.append(cbox("spoke", (0.08, 0.1, R * 2), (wc[0] + dx, wc[1], wc[2]), M("wood"), rot=(a, 0, 0)))
+    for k in range(16):
+        a = math.tau * k / 16
+        parts.append(cbox("paddle", (0.9, 0.06, 0.45), (wc[0], wc[1] + (R - 0.15) * math.cos(a), wc[2] + (R - 0.15) * math.sin(a)), M("wood"), rot=(a, 0, 0)))
+    parts.append(cyl("axle", 0.14, 2.2, (W / 2 + 0.4, 0.0, wc[2]), M("timber"), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(box("bearing", (0.4, 0.5, 0.5), (sx0 + 0.75, 0.0, wc[2] - 0.5), M("stone"), bevel=0.02, seg=1))
+    col.append(box("c", (1.2, 2 * R, 2 * R), (sx0, 0, 0)))
+    # flume on trestles bringing water over the top of the wheel
+    fz = wc[2] + R + 0.15
+    parts.append(box("flume", (0.9, 6.0, 0.35), (sx0, -3.3, fz), M("wood"), bevel=0.02, seg=1))
+    parts.append(box("flume_water", (0.7, 6.0, 0.02), (sx0, -3.3, fz + 0.28), M("water", 0.08)))
+    for yy in (-5.5, -3.0):
+        for dx in (-0.35, 0.35):
+            parts.append(box("trestle", (0.14, 0.14, fz + 0.37), (sx0 + dx, yy, -0.37), M("timber")))
+    visual = join(parts, "farm_mill")
+    export("farm_mill", visual, join(col, "col"))
+
+
+def farm_shrine():
+    """Roadside kapliczka: a limewashed brick pillar on a stone step with a glazed niche holding a small figure
+    of the Virgin, a tin-roofed cap and an iron cross."""
+    reset()
+    parts = []
+    S, H = 0.9, 2.2
+    parts.append(box("step", (1.5, 1.5, 0.25), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.03))
+    parts.append(box("pillar", (S, S - 0.3, H), (0, 0.15, 0.25), M("plaster_lime"), bevel=0.03, seg=1, wonk=0.03))
+    niche = (0.0, 1.35, 0.5, 0.8, "round")
+    parts.append(facade("niche_f", M("plaster_lime"), "-Y", -S / 2, -S / 2 - 0.01, S / 2 + 0.01, 0.25, H + 0.25, [niche], depth=0.3))
+    parts.append(box("niche_sill", (0.66, 0.22, 0.06), (0, -S / 2 - 0.02, 1.29), M("stone")))
+    parts.append(cyl("robe", 0.1, 0.45, (0, -S / 2 + 0.16, 1.35), M("navy"), verts=10, r2=0.06))
+    parts.append(sphere("head", 0.055, (0, -S / 2 + 0.16, 1.86), M("plaster_white"), seg=10, rings=6))
+    parts.append(torus("halo", 0.08, 0.008, (0, -S / 2 + 0.2, 1.9), M("gold", 0.3), rot=(math.pi / 2, 0, 0), seg=12, mseg=4))
+    parts.append(slab("niche_glass", outline(0.0, 1.35, 0.5, 0.8, "round"), "-Y", -S / 2, -0.02, 0.0, M("glass")))
+    parts.append(box("cornice", (S + 0.2, S + 0.2, 0.12), (0, 0, H + 0.25), M("plaster_lime"), bevel=0.03, seg=1))
+    parts.append(pyramid("cap", (S + 0.3, S + 0.3, 0.7), (0, 0, H + 0.37), M("lead"), apex=0.02))
+    parts.append(pyramid("cap_snow", (S * 0.7, S * 0.7, 0.45), (0, 0, H + 0.62), M("snow"), apex=0.02))
+    parts.append(box("cross_v", (0.04, 0.04, 0.6), (0, 0, H + 1.05), M("iron")))
+    parts.append(box("cross_h", (0.3, 0.04, 0.04), (0, 0, H + 1.45), M("iron")))
+    parts.append(box("drift", (1.6, 1.6, 0.1), (0, 0.1, 0.0), M("snow"), bevel=0.2, seg=2, wonk=0.1))
+    export("farm_shrine", join(parts, "farm_shrine"), box("c", (1.5, 1.5, H + 0.4), (0, 0, 0)))
+
+
+def farm_manor():
+    """Folwark manor (dwor): single storey, limewashed, a four-column porch with a pediment, a broken
+    (mansard) roof with dormers, shuttered windows and two chimneys."""
+    reset()
+    parts, col = [], []
+    W, D, H = 22.0, 12.0, 4.2
+    wall = M("plaster_white")
+    xs = [-9.2, -6.6, -4.0, 4.0, 6.6, 9.2, -1.4, 1.4]
+    ops = [(0.0, 0.0, 1.6, 3.2 + 0.12 + 0.8, "round")] + [(x, 1.1, 1.1, 1.9, "rect") for x in xs]
+    y = front_block(parts, W, D, H, wall, ops)
+    plinth(parts, -W / 2, W / 2, y, h=0.55, proud=0.06, mat=M("plaster_white_damp"), skip=[(-3.1, 3.1)])
+    col.append(box("c", (W, D, H + 4.0), (0, 0, 0)))
+    door_unit(parts, "-Y", y, 0.0, 1.6, 3.2, portal=False)
+    for x in xs:
+        win_unit(parts, "-Y", y, x, 1.1, 1.1, 1.9, "rect", shutters=True, surround="plaster_white", warm=RNG.random() < 0.4)
+    cornice(parts, W, D, H - 0.05, t=0.35, proud=0.28, modillions=False, mat=M("plaster_white"))
+    # porch: steps, four columns, entablature, pediment, its own little roof
+    py = y - 2.2
+    parts.append(box("porch_floor", (6.0, 2.6, 0.55), (0, y - 1.3, 0), M("stone"), bevel=0.03, seg=1))
+    for k in range(3):
+        parts.append(box("porch_step", (3.0, 0.35, 0.18 * (3 - k)), (0, y - 2.6 - 0.35 * (k + 0.5), 0), M("stone"), bevel=0.02, seg=1))
+    for x in (-2.4, -0.8, 0.8, 2.4):
+        parts.append(cyl("col", 0.2, 3.1, (x, py, 0.55), M("plaster_white"), verts=12, r2=0.17, bevel=0.01, seg=1))
+        parts.append(box("col_cap", (0.5, 0.5, 0.16), (x, py, 3.62), M("stone"), bevel=0.02, seg=1))
+        parts.append(box("col_base", (0.5, 0.5, 0.14), (x, py, 0.55), M("stone"), bevel=0.02, seg=1))
+    parts.append(box("entab", (5.6, 2.6, 0.45), (0, y - 1.25, 3.78), M("plaster_white"), bevel=0.03, seg=1))
+    parts.append(slab("pediment", [(-2.9, 4.23), (2.9, 4.23), (0.0, 5.4)], "-Y", py - 0.2, -0.25, 0.1, M("plaster_white")))
+    parts.append(cyl("oculus", 0.28, 0.06, (0, py - 0.32, 4.7), M("glass"), verts=12, rot=(math.pi / 2, 0, 0), center=True))
+    parts.append(roof("porch_roof", 2.8, 6.2, 1.2, (0, y - 1.2, 4.23), M("tile_dark"), along_x=False, sag=0.02, flare=0.03, cuts=3))
+    parts.append(roof("porch_snow", 2.7, 3.0, 0.62, (0, y - 1.2, 4.83), M("snow"), along_x=False, sag=0.02, top_w=0.2, cuts=3))
+    # mansard (lamany) roof
+    top = H + 0.3
+    parts.append(roof("mansard_lo", W + 0.8, D + 1.2, 2.3, (0, 0, top), M("tile_dark"), sag=0.06, flare=-0.05, top_w=(D + 1.2) * 0.55, courses=3))
+    parts.append(roof("mansard_hi", W + 0.8, (D + 1.2) * 0.55, 1.8, (0, 0, top + 2.3), M("tile_dark"), sag=0.08, flare=0.05, courses=2, ridge=True))
+    parts.append(roof("mansard_snow", W + 0.6, (D + 1.2) * 0.5, 1.75, (0, 0, top + 2.38), M("snow"), sag=0.08, flare=0.05, top_w=0.3))
+    for x in (-6.6, 6.6):
+        dormer(parts, x, -D / 2 + 0.3, top + 0.35, 1.2, 1.4, wall, M("tile_dark"), depth=1.8, warm=False)
+    for x in (-5.0, 5.0):
+        chimney(parts, x, 0.8, top + 2.8, h=1.6)
+    parts.append(box("drift", (W, 1.0, 0.2), (0, y - 0.6, 0), M("snow"), bevel=0.2, seg=2, wonk=0.15))
+    visual = join(parts, "farm_manor")
+    export("farm_manor", visual, join(col, "col"))
+
+
+FARM_BUILDS = [
+    ("farm_field", farm_field), ("farm_fence", farm_fence), ("farm_cottage", farm_cottage), ("farm_barn", farm_barn),
+    ("farm_haystack", farm_haystack), ("farm_haystack_small", farm_haystack_small), ("farm_mill", farm_mill),
+    ("farm_shrine", farm_shrine), ("farm_manor", farm_manor),
+]
 # ------------------------------------------------------------------ ANIMALS AND THE DRAGON (lofted along the body axis)
 def loft_y(name, rings, mat, verts=16, subsurf=2, smooth=60):
     """Tube lofted along Y: rings are (y, cx, cz, rx, rz). Front of the animal at -Y."""
@@ -1134,3 +3328,39 @@ if __name__ == "__main__" and "--animals" in sys.argv:
     dog("dog_mongrel", (0.50, 0.38, 0.24), H=0.48, L=1.0, ear="fold", tail="sabre", muzzle=1.0)                                     # street dog
     dog("dog_pug", (0.80, 0.68, 0.50), H=0.28, L=0.85, chest=1.2, slim=1.2, ear="fold", tail="curl", muzzle=0.25, second=(0.15, 0.12, 0.10))   # salon pug
     print("[assets] dogs done")
+
+
+# ------------------------------------------------------------------ build
+BUILDS = [
+    ("tenement_a", lambda: tenement("tenement_a", 10.0, 3, "gable", "plaster_ochre", bays=3, shutters=True)),
+    ("tenement_b", lambda: tenement("tenement_b", 8.0, 3, "attyka", "plaster_rose", bays=2)),
+    ("tenement_c", lambda: tenement("tenement_c", 12.0, 4, "mansard", "plaster_cream", bays=3, pilasters=True, arched_windows=True)),
+    ("tenement_d", lambda: tenement("tenement_d", 10.0, 3, "attyka", "plaster_sage", bays=3, arched_windows=True, shutters=True)),
+    ("tenement_e", lambda: tenement("tenement_e", 8.0, 4, "gable", "plaster_blue", bays=2, shutters=True)),
+    ("sukiennice", sukiennice), ("st_marys", st_marys), ("town_hall", town_hall), ("st_adalbert", st_adalbert),
+    ("market_stall", market_stall), ("barrel", barrel), ("crate_stack", crate_stack), ("cart", cart), ("well", well),
+    ("lantern_post", lantern_post), ("ground_cobbles", ground_cobbles),
+] + globals().get("DISTRICT_BUILDS", []) + globals().get("FARM_BUILDS", [])
+
+
+def _cli_list(flag):
+    if flag in sys.argv:
+        i = sys.argv.index(flag)
+        if i + 1 < len(sys.argv):
+            return sys.argv[i + 1].split(",")
+    return None
+
+
+if __name__ == "__main__" and "--animals" not in sys.argv:
+    t0 = time.time()
+    for k in RECIPES:
+        bake_texture(k)
+    print("[tex] cache ready in %.1fs (%s)" % (time.time() - t0, TEX))
+    if "--textures" not in sys.argv:
+        only = _cli_list("--only")
+        for name, fn in BUILDS:
+            if only and name not in only:
+                continue
+            fn()
+        print("[assets] tris", " ".join("%s=%d" % kv for kv in TRI_LOG.items()))
+    print("[assets] done in %.1fs" % (time.time() - t0))

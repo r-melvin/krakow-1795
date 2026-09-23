@@ -1,36 +1,102 @@
+"""Contact sheets of the exported glTF assets, rendered with EEVEE under a low winter sun and a sky-blue world.
+
+Run:  blender -b --python assets/blender/render_sheets.py -- <outdir> [group,group,...]
+Groups: tenements, landmarks, props, districts, farm, figures (figures only when named).
+"""
 import bpy, math, os, sys
-ROOT = "/home/richard/Projects/games/prototypes/krakow-1795/assets/models"
-OUT = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else os.path.join(os.path.dirname(ROOT), "..", "docs", "screenshots")
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "models")
+args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+OUT = args[0] if args else os.path.join(os.path.dirname(ROOT), "..", "docs", "screenshots")
+WANT = args[1].split(",") if len(args) > 1 else ["tenements", "landmarks", "props", "districts", "farm"]
 groups = {
-  "tenements": (["tenement_a","tenement_b","tenement_c","tenement_d","tenement_e"], 14.0, 9.0),
-  "landmarks": (["st_adalbert","town_hall","sukiennice","st_marys"], 40.0, 18.0),
-  "props": (["market_stall","barrel","crate_stack","cart","well","lantern_post"], 4.5, 1.6),
-  "figures": (["watchman","figure_noble","figure_artist","figure_veteran","figure_merchant","figure_priest","figure_kazimierz","figure_townsman","figure_townswoman"], 1.3, 1.0),
+    "tenements": (["tenement_a", "tenement_b", "tenement_c", "tenement_d", "tenement_e"], 14.0, 9.0),
+    "landmarks": (["st_adalbert", "town_hall", "sukiennice", "st_marys"], 40.0, 18.0),
+    "props": (["market_stall", "barrel", "crate_stack", "cart", "well", "lantern_post", "ground_cobbles"], 5.0, 1.6),
+    "districts": (["kaz_house_a", "kaz_house_b", "kaz_synagogue", "garb_workshop", "garb_house", "dock_granary",
+                   "dock_wharf", "salt_barge", "klep_house", "klep_stable", "kan_house", "wawel_wall", "wawel_gate"], 17.0, 7.0),
+    "farm": (["farm_field", "farm_fence", "farm_cottage", "farm_barn", "farm_haystack", "farm_haystack_small",
+              "farm_mill", "farm_shrine", "farm_manor"], 15.0, 4.0),
+    "figures": (["watchman", "figure_noble", "figure_artist", "figure_veteran", "figure_merchant", "figure_priest",
+                 "figure_kazimierz", "figure_townsman", "figure_townswoman"], 1.3, 1.0),
 }
 for gname, (names, spacing, h) in groups.items():
+    if gname not in WANT:
+        continue
+    names = [n for n in names if os.path.exists(os.path.join(ROOT, n + ".glb"))]
+    if not names:
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.render.engine = "BLENDER_EEVEE"
     sc.render.resolution_x, sc.render.resolution_y = 2400, 1200
-    sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
-    sc.world.node_tree.nodes["Background"].inputs[0].default_value = (0.45, 0.55, 0.7, 1)
-    sc.world.node_tree.nodes["Background"].inputs[1].default_value = 0.8
-    sun = bpy.data.lights.new("sun", "SUN"); sun.energy = 3.0; sun.angle = 0.3
-    so = bpy.data.objects.new("sun", sun); sc.collection.objects.link(so); so.rotation_euler = (math.radians(50), 0, math.radians(-35))
-    for i, n in enumerate(names):
+    sc.view_settings.view_transform = "AgX"
+    sc.view_settings.look = "AgX - Medium High Contrast"
+    sc.eevee.taa_render_samples = 32
+    try:
+        sc.eevee.use_shadows = True
+        sc.eevee.use_raytracing = True
+    except AttributeError:
+        pass
+    sc.world = bpy.data.worlds.new("w")
+    bg = sc.world.node_tree.nodes["Background"]
+    bg.inputs[0].default_value = (0.42, 0.52, 0.68, 1)
+    bg.inputs[1].default_value = 0.9
+    sun = bpy.data.lights.new("sun", "SUN")
+    sun.energy = 4.0
+    sun.angle = math.radians(2.0)
+    sun.color = (1.0, 0.93, 0.84)
+    so = bpy.data.objects.new("sun", sun)
+    sc.collection.objects.link(so)
+    so.rotation_euler = (math.radians(55), 0, math.radians(-35))
+    # a snowy ground plane so the buildings sit on something
+    bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, -0.01))
+    gp = bpy.context.object
+    gm = bpy.data.materials.new("ground")
+    gm.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.62, 0.64, 0.68, 1)
+    gm.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.9
+    gp.data.materials.append(gm)
+    # pack assets left to right by their real widths, two rows when there are many
+    import mathutils
+    roots = []
+    for n in names:
         bpy.ops.import_scene.gltf(filepath=os.path.join(ROOT, n + ".glb"))
         objs = list(bpy.context.selected_objects)
         root = [o for o in objs if o.parent is None][0]
         for o in objs:
             if "-col" in o.name:
                 o.hide_render = True
-        root.location.x = i * spacing
-    span = len(names) * spacing
-    cx = span / 2 - spacing / 2
-    cam = bpy.data.cameras.new("c"); cam.type = "ORTHO"; cam.ortho_scale = span * 1.02
-    co = bpy.data.objects.new("cam", cam); sc.collection.objects.link(co); sc.camera = co
-    co.location = (cx - span * 0.25, -span * 0.9, h + span * 0.30)
-    d = (cx - co.location.x, 0 - co.location.y, h - co.location.z)
+        bpy.context.view_layer.update()
+        pts = [o.matrix_world @ mathutils.Vector(c) for o in objs if o.type == "MESH" and "-col" not in o.name for c in o.bound_box]
+        roots.append((root, min(p.x for p in pts), max(p.x for p in pts), max(p.z for p in pts), min(p.y for p in pts), max(p.y for p in pts)))
+    gap = max(1.0, spacing * 0.12)
+    total = sum(r[2] - r[1] + gap for r in roots)
+    rows = 2 if len(roots) > 6 else 1
+    row_w = total / rows
+    cur, row, rowdepth, placed = 0.0, 0, 0.0, []
+    yoff = 0.0
+    for (root, x0, x1, top, y0, y1) in roots:
+        if rows > 1 and cur > row_w * 1.02 and row == 0:
+            row, cur = 1, 0.0
+            yoff = max(pp[4] for pp in placed) + 4.0
+        root.location.x = cur - x0
+        root.location.y = yoff - y0 if row else -y1
+        placed.append((cur, cur + x1 - x0, top, row, root.location.y + y1))
+        cur += x1 - x0 + gap
+    span = max(pp[1] for pp in placed)
+    h = max(pp[2] for pp in placed) * 0.45
+    cx = span / 2
+    depth = max(pp[4] for pp in placed)
+    gp.scale = (span * 3, span * 3, 1)
+    gp.location.x = cx
+    cam = bpy.data.cameras.new("c")
+    cam.type = "ORTHO"
+    cam.ortho_scale = span * 1.06
+    co = bpy.data.objects.new("cam", cam)
+    sc.collection.objects.link(co)
+    sc.camera = co
+    cy = depth * 0.35
+    co.location = (cx - span * 0.2, cy - span * 0.9, h + span * 0.42)
+    d = (cx - co.location.x, cy - co.location.y, h - co.location.z)
     co.rotation_euler = (math.atan2(math.hypot(d[0], d[1]), -d[2]), 0, math.atan2(d[1], d[0]) - math.pi / 2)
     sc.render.filepath = os.path.join(OUT, "sheet_%s.png" % gname)
     bpy.ops.render.render(write_still=True)

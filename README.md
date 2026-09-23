@@ -26,6 +26,12 @@ WASD move, Shift sprint, Ctrl or C crouch, mouse look, Esc release mouse.
 ```
 blender -b --python assets/blender/build_assets.py
 ```
+Buildings carry baked PBR materials (lime plaster with grime, cracks and rising damp, brick, sandstone, beaver-tail
+roof tiles, weathered oak, iron, leaded glass, snow, thatch, cobbles): procedural Cycles bakes cached in
+`assets/textures/` (ignored by Godot; `-- --rebake` to redo, `-- --textures` to bake only, `-- --only a,b` for a
+subset). Besides the Rynek set it builds district variants (`kaz_*`, `garb_*`, `dock_*`, `salt_barge`, `klep_*`,
+`kan_house`, `wawel_wall`, `wawel_gate`), farmland (`farm_*`) and a tileable 4 m paving slab `ground_cobbles`.
+Sheets: `blender -b --python assets/blender/render_sheets.py -- <outdir> [tenements,landmarks,props,districts,farm]`.
 Contact sheets in `docs/screenshots/*.jpg`. Era references baked into the generator:
 Sukiennice in its Renaissance state (attyka parapet, end loggias, no side arcades), St Mary's with its unequal
 towers, the Town Hall still standing (demolished 1820), St Adalbert's dome, kamienice with attyka / gable /

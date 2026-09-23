@@ -34,3 +34,6 @@ __pycache__/
 *.pyc
 assets/models/*.png
 assets/models/*.png.import
+docs/**/*.import
+assets/models/*.jpg
+assets/models/*.jpg.import

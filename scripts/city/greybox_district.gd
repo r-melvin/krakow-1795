@@ -127,26 +127,43 @@ func _ground() -> void:
 	gb.size = Vector3(90, 1, 90)
 	gs.shape = gb
 	g.add_child(gs)
-	var gm := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = gb.size
-	bm.material = _ground_mat
-	gm.mesh = bm
-	g.add_child(gm)
 	add_child(g)
-	# Snow patches and a few paving strips to break the plane.
-	var snow := StandardMaterial3D.new()
-	snow.albedo_color = Color(0.80, 0.83, 0.90)
-	snow.roughness = 0.95
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1795
-	for i in 24:
-		var s := CSGBox3D.new()
-		s.size = Vector3(rng.randf_range(2, 7), 0.06, rng.randf_range(2, 6))
-		s.position = Vector3(rng.randf_range(-26, 26), 0.03, rng.randf_range(-26, 26))
-		s.rotation.y = rng.randf() * TAU
-		s.material = snow
-		add_child(s)
+	# Granite setts: one 4 m slab mesh instanced over the square (top at y=0), the box above stays as collision.
+	var slab := Assets.instance("ground_cobbles")
+	var slab_mesh: Mesh = null
+	if slab:
+		var stack: Array = [slab]
+		while stack.size() > 0 and slab_mesh == null:
+			var n: Node = stack.pop_back()
+			if n is MeshInstance3D and not (n.get_parent() is StaticBody3D):
+				slab_mesh = (n as MeshInstance3D).mesh
+			for c in n.get_children():
+				stack.append(c)
+		slab.queue_free()
+	if slab_mesh:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = slab_mesh
+		var n_side := 23
+		mm.instance_count = n_side * n_side
+		var i := 0
+		for ix in n_side:
+			for iz in n_side:
+				var x := (ix - (n_side - 1) * 0.5) * 4.0
+				var z := (iz - (n_side - 1) * 0.5) * 4.0
+				mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(x, 0.0, z)))
+				i += 1
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = "Cobbles"
+		mmi.multimesh = mm
+		add_child(mmi)
+	else:
+		var gm := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = gb.size
+		bm.material = _ground_mat
+		gm.mesh = bm
+		g.add_child(gm)
 
 
 func _landmarks() -> void:
