@@ -1,4 +1,6 @@
 extends Node3D
+
+const FlickerLight := preload("res://scripts/city/flicker.gd")
 ## Rynek Glowny, compressed to ~1/3 scale for play. Built from Blender glTF placed by script.
 ## Layout (Godot axes, metres): square is 60x60 centred on the origin. +X east, +Z south.
 ##   Sukiennice in the middle, Town Hall + tower SW, St Mary's NE, St Adalbert's SE.
@@ -29,6 +31,7 @@ func _ready() -> void:
 	_landmarks()
 	_tenements()
 	_furniture()
+	_dressing()
 	_guards()
 	_population()
 	_safe_house()
@@ -45,25 +48,54 @@ func _environment() -> void:
 	sm.sky_horizon_color = Color(0.10, 0.09, 0.14)
 	sm.ground_bottom_color = Color(0.02, 0.02, 0.03)
 	sm.ground_horizon_color = Color(0.08, 0.07, 0.10)
-	sm.sun_angle_max = 5.0
+	sm.sun_angle_max = 1.6              # the moon's disc, drawn by the sky from the directional light
+	sm.sun_curve = 0.12
 	sky.sky_material = sm
 	e.background_mode = Environment.BG_SKY
 	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color(0.16, 0.19, 0.32)
-	e.ambient_light_energy = 0.5
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	e.tonemap_exposure = 1.15
+	e.ambient_light_color = Color(0.18, 0.21, 0.34)
+	e.ambient_light_energy = 0.6
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	# ACES rolls lantern hot-spots off instead of clipping them to flat orange.
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	e.tonemap_exposure = 1.1
+	e.tonemap_white = 6.0
 	e.ssao_enabled = true
-	e.ssao_radius = 1.5
-	e.ssao_intensity = 2.5
+	e.ssao_radius = 1.2
+	e.ssao_intensity = 2.0
+	# Bounced light (Godot's signed-distance-field GI): lantern light bleeds onto the far side of the street and
+	# under awnings instead of dying at the shadow edge. GPU cost, not CPU; toggled by the "gi" setting.
+	var gi: bool = GameState.settings.get("gi", true)
+	e.sdfgi_enabled = gi
+	e.sdfgi_cascades = 4
+	e.sdfgi_min_cell_size = 0.35
+	e.sdfgi_bounce_feedback = 0.6
+	e.sdfgi_read_sky_light = true
+	e.sdfgi_energy = 1.2
+	e.ssil_enabled = gi
+	e.ssil_intensity = 1.5
+	# Screen-space reflections: the wet cobbles and lantern glass pick up the windows and lanterns.
+	e.ssr_enabled = true
+	e.ssr_max_steps = 64
+	e.ssr_fade_in = 0.15
+	e.ssr_fade_out = 2.0
 	e.glow_enabled = true
-	e.glow_intensity = 0.55
-	e.glow_bloom = 0.15
-	e.glow_hdr_threshold = 1.0
+	e.glow_intensity = 0.45
+	e.glow_bloom = 0.10
+	e.glow_hdr_threshold = 1.3
+	# Thin winter mist: volumetric so the lanterns and windows throw visible cones, plus a faint distance haze.
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.07, 0.08, 0.13)
-	e.fog_density = 0.008
+	e.fog_density = 0.004
+	e.volumetric_fog_enabled = gi
+	e.volumetric_fog_density = 0.018
+	e.volumetric_fog_albedo = Color(0.75, 0.78, 0.85)
+	e.volumetric_fog_emission = Color(0.02, 0.025, 0.04)
+	e.volumetric_fog_emission_energy = 0.4
+	e.volumetric_fog_anisotropy = 0.55
+	e.volumetric_fog_length = 80.0
+	e.volumetric_fog_sky_affect = 0.3
 	e.adjustment_enabled = true
 	e.adjustment_saturation = 1.15
 	e.adjustment_contrast = 1.08
@@ -72,12 +104,22 @@ func _environment() -> void:
 
 	# Low winter moon: cool, long shadows.
 	var moon := DirectionalLight3D.new()
-	moon.light_color = Color(0.55, 0.66, 1.0)
-	moon.light_energy = 0.22
-	moon.rotation_degrees = Vector3(-38, 40, 0)
+	moon.light_color = Color(0.62, 0.72, 1.0)
+	moon.light_energy = 0.45
+	moon.rotation_degrees = Vector3(-34, 40, 0)
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 120
+	moon.light_angular_distance = 0.5
+	moon.light_volumetric_fog_energy = 0.4
 	add_child(moon)
+	# One probe over the square so glossy surfaces reflect the lit façades, not just the black sky.
+	var probe := ReflectionProbe.new()
+	probe.position = Vector3(0, 6, 0)
+	probe.size = Vector3(64, 20, 64)
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	probe.intensity = 0.8
+	probe.max_distance = 60
+	add_child(probe)
 	var fill := DirectionalLight3D.new()
 	fill.light_color = Color(0.45, 0.5, 0.7)
 	fill.light_energy = 0.12
@@ -87,14 +129,18 @@ func _environment() -> void:
 	# Oil lanterns. Kraków had public street lighting from the 1770s, sparse: warm pools between dark stretches.
 	for p in [Vector3(-22, 0, -22), Vector3(22, 0, -22), Vector3(-22, 0, 22), Vector3(16, 0, 24),
 			Vector3(0, 0, -24), Vector3(-6, 0, 24), Vector3(-24, 0, 0), Vector3(24, 0, 4), Vector3(5, 0, 9), Vector3(-5, 0, -9)]:
-		var l := OmniLight3D.new()
+		var l := FlickerLight.new()
+		l.amount = 0.10
+		l.speed = 7.0
 		l.position = p + Vector3(0.9, 2.9, 0)
-		l.light_color = Color(1.0, 0.68, 0.36)
-		l.light_energy = 10
-		l.omni_range = 22
-		l.omni_attenuation = 1.3
+		l.light_color = Color(1.0, 0.70, 0.40)
+		l.light_energy = 9
+		l.omni_range = 24
+		l.omni_attenuation = 1.5
 		l.shadow_enabled = true
-		l.light_specular = 0.3
+		l.light_size = 0.12
+		l.light_specular = 0.7
+		l.light_volumetric_fog_energy = 1.6
 		add_child(l)
 		Assets.place(self, "lantern_post", p, 0.0)
 
@@ -108,12 +154,63 @@ func _environment() -> void:
 	add_child(cave)
 
 	# Lit windows spill a little warm light onto the square's edges.
-	for p in [Vector3(-14, 6, -27), Vector3(8, 6, -27), Vector3(-27, 6, 6), Vector3(6, 6, 27), Vector3(-12, 6, 27)]:
-		var w := OmniLight3D.new()
+	# Candle-lit windows: one or two flickering candle pools per house, just outside the façade, at the ground-floor
+	# shop window and a first-floor room. Dimmer and yellower than the lanterns, no shadows (cheap). Placed after
+	# the tenement rows are up so they follow the modules (see _candles()).
+	call_deferred("_candles")
+	# Watch braziers by the guard posts: the light the player has to skirt.
+	for p in [Vector3(-3, 1.2, -18), Vector3(19, 1.2, 12)]:
+		var b := FlickerLight.new()
+		b.amount = 0.22
+		b.speed = 9.0
+		b.position = p
+		b.light_color = Color(1.0, 0.55, 0.22)
+		b.light_energy = 4
+		b.omni_range = 12
+		b.omni_attenuation = 1.5
+		b.shadow_enabled = true
+		b.light_volumetric_fog_energy = 1.2
+		add_child(b)
+		Assets.place(self, "brazier", p - Vector3(0, 1.2, 0), 0.0)
+
+
+func _candles() -> void:
+	var i := 0
+	for por in portals:
+		var centre: Vector3 = por[1]
+		var rot: float = por[2]
+		var out := Vector3(sin(rot), 0, cos(rot))     # façade normal, toward the street
+		var face := centre + out * 4.0
+		var along := Vector3(out.z, 0, -out.x)
+		# houses alternate: a shop window low, a candle-lit room above, sometimes both
+		var spots: Array = []
+		if i % 3 != 1:
+			spots.append(face + out * 1.0 + along * 1.5 + Vector3(0, 2.0, 0))
+		if i % 3 != 2:
+			spots.append(face + out * 0.8 + along * -2.0 + Vector3(0, 5.2, 0))
+		for p in spots:
+			var w := FlickerLight.new()
+			w.amount = 0.18
+			w.speed = 4.0
+			w.position = p
+			w.light_color = Color(1.0, 0.76, 0.42)
+			w.light_energy = 3.0
+			w.omni_range = 11
+			w.omni_attenuation = 1.3
+			w.light_specular = 0.5
+			w.light_volumetric_fog_energy = 0.8
+			add_child(w)
+		i += 1
+	# lit windows in the landmark blocks: Cloth Hall arcade, Town Hall, St Mary's porch
+	for p in [Vector3(-9, 3, -6), Vector3(9, 3, 6), Vector3(-22, 4, 14), Vector3(26, 3, -14)]:
+		var w := FlickerLight.new()
+		w.amount = 0.12
 		w.position = p
-		w.light_color = Color(1.0, 0.75, 0.45)
-		w.light_energy = 2.5
-		w.omni_range = 9
+		w.light_color = Color(1.0, 0.74, 0.40)
+		w.light_energy = 3.5
+		w.omni_range = 12
+		w.omni_attenuation = 1.3
+		w.light_volumetric_fog_energy = 0.8
 		add_child(w)
 
 
@@ -226,6 +323,15 @@ func _furniture() -> void:
 		Assets.place(self, "crate_stack", c[0], c[1])
 	Assets.place(self, "well", Vector3(-12, 0, 9), 0.0)
 	Assets.place(self, "well", Vector3(14, 0, -9), PI * 0.5)
+
+
+
+## Lived-in flavour props: signs, shop fronts, the cafe and inn, benches, trees, clutter (scripts/city/dressing.gd).
+func _dressing() -> void:
+	var d := Node3D.new()
+	d.set_script(load("res://scripts/city/dressing.gd"))
+	d.set("portals", portals)
+	add_child(d)
 
 
 func _guards() -> void:

@@ -1,0 +1,425 @@
+{
+  "default": "printers_bundle",
+  "missions": {
+    "printers_bundle": {
+      "title": "The Printer's Bundle",
+      "district": "old_town",
+      "journal": {
+        "blurb": "Two hundred leaves of the Constitution must reach Pani Zofia's salon before breakfast.",
+        "reward_hint": "The salon, the boatmen and the street will remember who carried the leaves. Every alarm tightens the Austrian grip.",
+        "storylines": {
+          "underworld": {"title": "The smuggler's road", "blurb": "The smuggler at the cellar door by St Adalbert's knows where the bundle lies. After ten past nine.", "npcs": ["smuggler"]},
+          "street": {"title": "The couriers' road", "blurb": "The passage urchins will fetch anything for a coin, or a promise.", "npcs": ["urchin_a", "urchin_b"]},
+          "salon": {"title": "The salon's road", "blurb": "Pani Zofia may lend a stranger an invitation and a cloak, if he gives her reason.", "npcs": ["hostess"]},
+          "urchin_run": {"blurb": "Staś fetches the bundle from the passage while Kasia keeps watch."}
+        },
+        "people": {
+          "printer": {"name": "The Printer", "faction": "guilds"},
+          "hostess": {"name": "Pani Zofia", "faction": "salon"},
+          "smuggler": {"name": "The Smuggler", "faction": "underworld"},
+          "urchin_a": {"name": "Staś", "faction": "street"},
+          "urchin_b": {"name": "Kasia", "faction": "street"},
+          "informer": {"name": "The Informer", "faction": "austria"}
+        }
+      },
+      "uses_safe_house": false,
+      "briefing": "Kraków, the winter of 1795. The Austrian eagle hangs over the Town Hall, and the Constitution of the Third of May is a thing men whisper. Tonight a printer of the Rynek has two hundred leaves of it, fresh and damp, hidden in the Cloth Hall passage, and he dares not fetch them himself. They must go to Pani Zofia's salon behind the Town Hall door, where the right people will read them before breakfast.\n\nThree roads lie open. The smuggler at the cellar door by St Adalbert's knows where the bundle lies. The passage urchins will fetch anything for a coin, or a promise. Pani Zofia, at the Town Hall door, may lend a stranger an invitation and a cloak, if he gives her reason.\n\nMind the watch. Mind the grey-coated informer between the Cloth Hall lanterns: slip him a false leaf from behind and he will carry it to the Corporal for you. At ten the curfew bell tolls, and for some minutes after it the Austrians see twice as far.",
+      "objectives": [
+        {"id": "find_way", "text": "Find a way to the bundle: the smuggler (cellar door, SE, after 21:10), the passage urchins, or Pani Zofia (Town Hall door)"},
+        {"id": "take_bundle", "text": "Get the printer's bundle"},
+        {"id": "deliver", "text": "Bring it to Pani Zofia's salon (Town Hall door)"},
+        {"id": "decoy_informer", "text": "Slip the informer a false pamphlet, from behind", "optional": true}
+      ],
+      "approaches": {
+        "underworld": {
+          "label": "The smuggler's road: lift the bundle yourself and carry it past the watch.",
+          "objectives": [
+            {"id": "meet_smuggler", "text": "Meet the smuggler by the safe-house cellar after 21:10"},
+            {"id": "take_bundle", "text": "Take the bundle from under the sacking in the Cloth Hall passage"},
+            {"id": "deliver", "text": "Carry it to Pani Zofia in the salon (Town Hall door)"},
+            {"id": "decoy_informer", "text": "Slip the informer a false pamphlet, from behind", "optional": true}
+          ]
+        },
+        "street": {
+          "label": "The couriers' road: the passage urchins will run the bundle for you.",
+          "objectives": [
+            {"id": "hire_urchins", "text": "Engage the passage urchins"},
+            {"id": "collect_bundle", "text": "Collect the bundle from Staś at the west well"},
+            {"id": "deliver", "text": "Carry it to Pani Zofia in the salon (Town Hall door)"},
+            {"id": "decoy_informer", "text": "Slip the informer a false pamphlet, from behind", "optional": true}
+          ]
+        },
+        "salon": {
+          "label": "The salon's road: an invitation and a cloak. Walk like a guest.",
+          "objectives": [
+            {"id": "win_hostess", "text": "Win Pani Zofia's invitation at the Town Hall door"},
+            {"id": "take_bundle", "text": "Take the bundle from the Cloth Hall passage (walk, never run or skulk)"},
+            {"id": "deliver", "text": "Enter by the Town Hall door and give Pani Zofia the bundle"},
+            {"id": "decoy_informer", "text": "Slip the informer a false pamphlet, from behind", "optional": true}
+          ]
+        }
+      },
+      "npcs": [
+        {"id": "printer", "model": ["cast_printer", "npc_m_02", "figure_townsman"], "pos": [-24.4, 0, -24.0], "facing": 0.7, "behaviour": "stand", "clip": "idle", "role": "The printer, ink to the elbows, waiting in the north-west alley"},
+        {"id": "hostess", "model": ["cast_hostess_f", "figure_noble_f", "figure_townswoman"], "pos": [-17.9, 0, 17.3], "facing": -2.4, "behaviour": "stand", "clip": "idle", "role": "Pani Zofia, hostess of the salon, taking the air at the Town Hall door"}
+      ],
+      "guards": [
+        {"name": "Town Hall sentry", "wps": [[-14.3, 0, 17.0]], "facing": -2.4}
+      ],
+      "takedown": ["informer"],
+      "props": {
+        "stash": {"pos": [1.15, 0, 0.6], "facing": 0.2, "name": "Sacking"}
+      },
+      "points": {
+        "handoff": [-15.0, 0, 8.6],
+        "hostess_inside": [0.8, 0, -4.6],
+        "scatter_a": [-20.0, 0, 26.9],
+        "scatter_b": [-26.9, 0, -10.0],
+        "decoy_report": [-20.0, 0, -26.0]
+      },
+      "salon_set": "int_salon",
+      "hostess_inside_facing": 3.14159,
+      "urchin_cost": {"normal": 5, "street": 2, "street_min": 30},
+      "threaten_street_min": 30,
+      "informer_bribe": 3,
+      "curfew": {
+        "at": "22:00",
+        "minutes": 3,
+        "view_mult": 2.0,
+        "text": "The curfew bell tolls from St Mary's.\nFor three minutes the watch looks twice as far. Keep out of the lanterns.",
+        "end_text": "The bell falls silent. The watch settles back into its rounds."
+      },
+      "stash_unknown_text": "Old sacking and a broken barrel. Whatever lies beneath, someone would have to tell you it was worth the risk.",
+      "stash_taken_text": "You shoulder the bundle. It weighs like a sin: no running now.",
+      "handoff_text": "Staś is waiting at the west well with the bundle.",
+      "decoy_text": "You slip a false leaf into the informer's coat: 'Jacobins meet at the Florian Gate, midnight.'",
+      "rewards": {
+        "influence": {"salon": 10, "underworld": 5, "street": 3},
+        "decoy_crackdown": -5,
+        "alarm_crackdown": 5
+      },
+      "failure": {
+        "crackdown": 15,
+        "influence": {"salon": -5, "guilds": -5}
+      },
+      "summary": {
+        "underworld": "The smuggler's word was good. You lifted the printer's bundle from under the sacking in the Cloth Hall passage and bore it past the watch to Pani Zofia's door.",
+        "street": "Two ragged children did what a regiment could not: the bundle went from the Cloth Hall to the west well under the Austrians' noses, and from your arms to Pani Zofia's harpsichord.",
+        "salon": "In a borrowed cloak and with a borrowed smile you walked the bundle through the front door of the Town Hall, past a sentry who bowed you in.",
+        "decoy": "The informer carried your false leaf to the Corporal, and half the watch spent the small hours freezing at the Florian Gate.",
+        "owe": "The passage children will call in your promise. They always do.",
+        "informer_downed": "The grey-coated informer woke in a snowdrift with a sore head and nothing to report.",
+        "clean": "Not a whistle was blown. The boatmen and the salon alike will hear of it.",
+        "alarms": "The watch was roused {n} times; the Austrians will double their rounds in the Rynek.",
+        "close": "By morning the leaves were passing from hand to hand in the drawing rooms of the Old Town, and the Constitution of the Third of May was read aloud again. Pani Zofia sends her compliments.",
+        "fail_caught": "The {guard} laid hands on you before the bundle reached its door. A night in the cells, a magistrate's sneer, and a bribe that will be long remembered.",
+        "fail_beaten": "You fought the watch and lost. They beat you with their musket butts and dragged you to the Town Hall cellars, the very building you were bound for.",
+        "fail_other": "The night went against you: {reason}.",
+        "fail_bundle": "The printer's leaves went into an Austrian stove. The printer himself has left the city by the Florian Gate."
+      },
+      "talk": {
+        "printer": {"name": "The Printer", "rules": [
+          {"if": ["approach:none", "!carrying"], "node": "printer_hello", "prompt": "talk to the printer"},
+          {"node": "printer_after", "prompt": "talk to the printer"}
+        ]},
+        "smuggler": {"name": "The Smuggler", "rules": [
+          {"if": ["carrying"], "node": "smuggler_carrying"},
+          {"if": ["before:21:10"], "node": "smuggler_early", "prompt": "talk to the smuggler"},
+          {"if": ["approach:underworld"], "node": "smuggler_again", "prompt": "talk to the smuggler"},
+          {"if": ["approach:none"], "node": "smuggler_offer", "prompt": "talk to the smuggler"},
+          {"node": "smuggler_other", "prompt": "talk to the smuggler"}
+        ]},
+        "urchin_a": {"name": "Staś", "rules": [
+          {"if": ["flag:urchins_scattered"], "node": "urchin_scattered", "prompt": "talk to Staś"},
+          {"if": ["flag:bundle_at_well", "!flag:bundle_collected"], "node": "urchin_handoff", "prompt": "take the bundle from Staś"},
+          {"if": ["flag:bundle_collected"], "node": "urchin_done", "prompt": "talk to Staś"},
+          {"if": ["flag:urchins_hired"], "node": "urchin_busy", "prompt": "talk to Staś"},
+          {"if": ["approach:none"], "node": "urchin_offer", "prompt": "talk to the urchin"},
+          {"node": "urchin_other", "prompt": "talk to the urchin"}
+        ]},
+        "urchin_b": {"name": "Kasia", "rules": [
+          {"if": ["flag:urchins_scattered"], "node": "urchin_scattered", "prompt": "talk to Kasia"},
+          {"if": ["flag:urchins_hired"], "node": "urchin_b_busy", "prompt": "talk to Kasia"},
+          {"node": "urchin_b_hello", "prompt": "talk to the girl"}
+        ]},
+        "hostess": {"name": "Pani Zofia", "rules": [
+          {"if": ["inside", "carrying"], "node": "hostess_deliver", "prompt": "give Pani Zofia the bundle"},
+          {"if": ["inside"], "node": "hostess_inside", "prompt": "talk to Pani Zofia"},
+          {"if": ["carrying"], "node": "hostess_outside_carrying", "prompt": "talk to Pani Zofia"},
+          {"if": ["flag:hostess_refused"], "node": "hostess_cold", "prompt": "talk to Pani Zofia"},
+          {"if": ["flag:invited"], "node": "hostess_waiting", "prompt": "talk to Pani Zofia"},
+          {"if": ["approach:none"], "node": "hostess_greet", "prompt": "talk to the lady"},
+          {"node": "hostess_other", "prompt": "talk to Pani Zofia"}
+        ]},
+        "informer": {"name": "The Informer", "rules": [
+          {"if": ["downed"], "prompt": ""},
+          {"if": ["behind", "!flag:decoy_planted"], "action": "plant_decoy", "prompt": "slip a false pamphlet into his pocket"},
+          {"if": ["flag:informer_bribed"], "node": "informer_bribed_again", "prompt": "talk to the man in grey"},
+          {"if": ["flag:informer_fooled"], "node": "informer_fooled_again", "prompt": "talk to the man in grey"},
+          {"node": "informer_talk", "prompt": "talk to the man in grey"}
+        ]}
+      },
+      "dialogue": {
+        "printer_hello": {
+          "discover": ["underworld", "street", "salon"],
+          "lines": [
+            ["$npc", "You came. God be thanked. Keep your voice low: the Austrians pay for ears on every corner."],
+            ["$npc", "Two hundred leaves, fresh from my press. The Constitution of the Third of May, and what Vienna has made of it. They must reach Pani Zofia's salon tonight."],
+            ["$npc", "The smuggler's lads hid the bundle for me in the Cloth Hall; where, I was not told. Ask him at the cellar door by St Adalbert's, after ten past nine."],
+            ["$npc", "Or the passage urchins, who see everything and sell it cheap. Or Pani Zofia herself, at the Town Hall door. She may find you a better coat than that one."]
+          ],
+          "choices": [
+            {"text": "Why the salon?", "next": "printer_why"},
+            {"text": "Tell me about the informer.", "next": "printer_informer"},
+            {"text": "I'll see it done.", "action": "leave"}
+          ]
+        },
+        "printer_why": {
+          "lines": [["$npc", "Because a nobleman who reads a pamphlet over his Tokay repeats it to a bishop, and the bishop to a general. A cobbler who reads it is merely hanged."]],
+          "next": "printer_more"
+        },
+        "printer_informer": {
+          "discover": ["informer"],
+          "lines": [["$npc", "Grey coat, loiters between the Cloth Hall lanterns. He follows you, and then he runs to the Corporal. Come at him from behind and he never knows what he carries home."]],
+          "next": "printer_more"
+        },
+        "printer_more": {
+          "choices": [
+            {"text": "Why the salon?", "next": "printer_why"},
+            {"text": "Tell me about the informer.", "next": "printer_informer"},
+            {"text": "I'll see it done.", "action": "leave"}
+          ]
+        },
+        "printer_after": {
+          "lines": [["$npc", "Go on, go on. Every minute you stand with me is a minute the watch has to wonder why."]]
+        },
+
+        "smuggler_early": {
+          "discover": ["underworld", "delivery"],
+          "lines": [["$npc", "Not yet, friend. I'm watching for a boat, and so is the watch. Come back after ten past nine."]]
+        },
+        "smuggler_offer": {
+          "discover": ["underworld", "delivery"],
+          "lines": [
+            ["$npc", "Evening. You've the look of the printer's errand about you."],
+            ["$you", "He says your lads hid something for him."],
+            ["$npc", "Maybe they did. Maybe it's heavy. And maybe the Cloth Hall sentry has eyes in the back of his tricorne."]
+          ],
+          "choices": [
+            {"text": "The printer sent me. Where is it?", "action": "meet_smuggler", "next": "smuggler_where"},
+            {"text": "What about the watch?", "next": "smuggler_watch"},
+            {"text": "Another time.", "action": "leave"}
+          ]
+        },
+        "smuggler_watch": {
+          "lines": [["$npc", "Two patrols round the square, a sentry on the north side of the Cloth Hall, one at St Mary's. And a new man at the Town Hall door tonight. Someone expects company."]],
+          "next": "smuggler_offer_short"
+        },
+        "smuggler_offer_short": {
+          "choices": [
+            {"text": "The printer sent me. Where is it?", "action": "meet_smuggler", "next": "smuggler_where"},
+            {"text": "Another time.", "action": "leave"}
+          ]
+        },
+        "smuggler_where": {
+          "lines": [
+            ["$npc", "The Cloth Hall passage, by the south arch. Under a heap of sacking beside a broken barrel."],
+            ["$npc", "It weighs like a sin. You'll not run with it, so don't try."],
+            ["$npc", "And when the bell rings ten, keep out of the lanterns. For three minutes after it the Austrians look twice as far. Every night, like clockwork."]
+          ]
+        },
+        "smuggler_again": {
+          "lines": [["$npc", "The passage, under the sacking. Walk, don't run. The Austrians notice a hurry before they notice a face."]]
+        },
+        "smuggler_carrying": {
+          "lines": [["$npc", "Not here with that under your arm! The salon. Go."]]
+        },
+        "smuggler_other": {
+          "lines": [["$npc", "Found yourself other friends? Suits me. I never saw you."]]
+        },
+
+        "urchin_offer": {
+          "discover": ["street"],
+          "lines": [
+            ["$npc", "Spare a grosz for a poor orphan, sir? Or two. Orphaning is hungry work."],
+            ["$you", "There's a bundle hidden in the passage. Under sacking."],
+            ["$npc", "Might be. Kasia and me know every sack in the Cloth Hall. What's it worth to you?"]
+          ],
+          "choices": [
+            {"text": "Pay them to fetch it ({cost} złoty; you have {coins})", "action": "pay", "next": "urchins_paid", "need": ["coins>=cost"], "why": "not enough coin"},
+            {"text": "Threaten them", "action": "threaten"},
+            {"text": "Promise them a favour from the salon", "action": "promise", "next": "urchins_promised"},
+            {"text": "Never mind.", "action": "leave"}
+          ]
+        },
+        "urchins_paid": {
+          "lines": [["$npc", "Pleasure, sir! Wait by the west well, and don't look at us. Looking is how people get caught."]]
+        },
+        "urchins_promised": {
+          "lines": [
+            ["$npc", "A favour from the fine ladies? We'll hold you to it, sir. We always do."],
+            ["$npc", "West well. Don't look at us."]
+          ]
+        },
+        "urchins_threat_ok": {
+          "lines": [["$npc", "All right, all right! I know you, you're one of the Racławice lot. West well. Don't you touch Kasia."]]
+        },
+        "urchins_threat_fail": {
+          "lines": [["$npc", "Kasia, run! Tell the man in grey there's a stranger hunting children!"]]
+        },
+        "urchin_handoff": {
+          "lines": [["$npc", "Here, sir, still warm from the sacking. Nobody saw. Well, the cat saw."]],
+          "choices": [
+            {"text": "Take the bundle", "action": "collect_bundle", "next": "urchin_thanks"}
+          ]
+        },
+        "urchin_thanks": {
+          "lines": [["$npc", "Mind the Town Hall man. He's new, and he's bored."]]
+        },
+        "urchin_busy": {
+          "lines": [["$npc", "Not now! You'll get us seen. The west well, like I said."]]
+        },
+        "urchin_done": {
+          "lines": [["$npc", "Pleasure doing business, sir. Tell nobody."]]
+        },
+        "urchin_other": {
+          "lines": [["$npc", "Nothing for us tonight? Stingy."]]
+        },
+        "urchin_scattered": {
+          "lines": [["$npc", "Get away from us! We never saw you!"]]
+        },
+        "urchin_b_hello": {
+          "lines": [["$npc", "Ask my brother. He does the talking. I do the remembering, so be nice."]]
+        },
+        "urchin_b_busy": {
+          "lines": [["$npc", "Staś does the fetching. I do the watching. Go away, you're spoiling my watching."]]
+        },
+
+        "hostess_greet": {
+          "discover": ["salon"],
+          "lines": [
+            ["$npc", "Good evening. You are not, I think, on my list."],
+            ["$you", "I come from the printer."],
+            ["$npc", "Hush. Half the square is listening, and the other half is Austrian."]
+          ],
+          "choices": [
+            {"text": "We met at the Castellan's ball, Madame. You praised my French.", "if": ["influence:salon>=30"], "action": "persuade", "next": "hostess_won"},
+            {"text": "Persuade her you can be trusted", "next": "hostess_persuade"},
+            {"text": "What became of the printer?", "next": "hostess_printer"},
+            {"text": "Good night, Madame.", "action": "leave"}
+          ]
+        },
+        "hostess_greet_short": {
+          "choices": [
+            {"text": "We met at the Castellan's ball, Madame. You praised my French.", "if": ["influence:salon>=30"], "action": "persuade", "next": "hostess_won"},
+            {"text": "Persuade her you can be trusted", "next": "hostess_persuade"},
+            {"text": "Good night, Madame.", "action": "leave"}
+          ]
+        },
+        "hostess_printer": {
+          "lines": [["$npc", "Poor man. He hid his leaves, and then his nerve. I expect a delivery tonight, if anyone is brave enough to make it."]],
+          "next": "hostess_greet_short"
+        },
+        "hostess_persuade": {
+          "lines": [["$npc", "Everyone says they come from the printer. Why should I open my door to a stranger tonight?"]],
+          "choices": [
+            {"text": "For the Third of May. Someone must still read it aloud.", "action": "persuade", "next": "hostess_won"},
+            {"text": "I can pay for the privilege.", "action": "refused", "next": "hostess_refuse_money"},
+            {"text": "Because the watch would dearly like to hear your name.", "action": "refused", "next": "hostess_refuse_threat"}
+          ]
+        },
+        "hostess_won": {
+          "lines": [
+            ["$npc", "Then read it aloud in my salon, and let the Governor choke on his chocolate."],
+            ["$npc", "Take my invitation, and this cloak. The watch will see a guest late for supper, so walk like one: do not run, do not skulk, and do not stand gawping at a sentry."],
+            ["$npc", "The bundle lies in the Cloth Hall passage, under the sacking. Bring it through the front door. I shall be with my guests."]
+          ]
+        },
+        "hostess_refuse_money": {
+          "lines": [["$npc", "Money? How very Prussian of you. Good night, sir."]]
+        },
+        "hostess_refuse_threat": {
+          "lines": [["$npc", "Then go and tell them, and see which of us they believe. Good night."]]
+        },
+        "hostess_cold": {
+          "lines": [["$npc", "I believe we have said good night, sir."]]
+        },
+        "hostess_waiting": {
+          "lines": [["$npc", "Go. I shall be with my guests."]]
+        },
+        "hostess_other": {
+          "lines": [["$npc", "If you have something for my salon, bring it through the front door. Discreetly."]]
+        },
+        "hostess_outside_carrying": {
+          "enter": "hostess_in",
+          "lines": [["$npc", "Not here, under the lantern and the sentry's nose! Through the front door. I shall go ahead."]]
+        },
+        "hostess_inside": {
+          "lines": [["$npc", "My guests are hungry for reading, and all we have is the Gazette. Do not keep them waiting."]]
+        },
+        "hostess_deliver": {
+          "lines": [
+            ["$npc", "You brought it! Behind the harpsichord, quickly, before the Councillor finishes his anecdote."]
+          ],
+          "choices": [
+            {"text": "Give her the bundle", "action": "deliver"},
+            {"text": "Not yet.", "action": "leave"}
+          ]
+        },
+
+        "informer_talk": {
+          "lines": [
+            ["$npc", "Late to be out, friend. The Rynek is a cold place for honest men."],
+            ["$npc", "And where would you be going, at this hour?"]
+          ],
+          "choices": [
+            {"text": "The lamplighter sent me for oil.", "action": "lie_informer", "next": "informer_lie_ok"},
+            {"text": "Offer him 3 złoty to forget your face", "action": "bribe_informer", "next": "informer_bribed", "need": ["coins>=3"], "why": "not enough coin"},
+            {"text": "Walk on.", "action": "leave"}
+          ]
+        },
+        "informer_lie_ok": {
+          "lines": [["$npc", "Oil. Of course. Get along, then, before it freezes."]]
+        },
+        "informer_lie_fail": {
+          "lines": [
+            ["$npc", "Oil, is it? In a sack that size? Well, well."],
+            ["$npc", "Good night to you. A very good night."]
+          ]
+        },
+        "informer_bribed": {
+          "lines": [["$npc", "Three złoty. For three złoty I am struck blind till Easter. Go with God."]]
+        },
+        "informer_bribed_again": {
+          "lines": [["$npc", "I don't know you. I never did. That was the arrangement."]]
+        },
+        "informer_fooled_again": {
+          "lines": [["$npc", "Oil, was it? Get along."]]
+        }
+      },
+      "storylines": [
+        {
+          "id": "urchin_run",
+          "title": "The couriers",
+          "note": "Once hired, Staś fetches the bundle from the passage while Kasia keeps watch, then waits at the west well until the player collects it.",
+          "trigger": {"flag": "urchins_hired"},
+          "steps": [
+            {"do": "say", "actor": "urchin_a", "text": "West well. Don't look at us, mister.", "secs": 3, "wait": false},
+            {"do": "goto", "actor": "urchin_b", "pos": [3.2, 0, 5.8], "run": true, "wait": false},
+            {"do": "goto", "actor": "urchin_a", "pos": [0.5, 0, 1.4], "run": true},
+            {"do": "face", "actor": "urchin_a", "pos": [1.15, 0, 0.6]},
+            {"do": "play", "actor": "urchin_a", "clip": "idle", "secs": 1.2},
+            {"do": "event", "actor": "urchin_a", "name": "urchin_took_bundle"},
+            {"do": "say", "actor": "urchin_b", "text": "Clear!", "secs": 2, "wait": false},
+            {"do": "goto", "actor": "urchin_a", "pos": [-15.0, 0, 8.6], "run": true},
+            {"do": "face", "actor": "urchin_a", "target": "player"},
+            {"do": "event", "actor": "urchin_a", "name": "bundle_at_well"},
+            {"do": "say", "actor": "urchin_a", "text": "Psst! Over here!", "secs": 3, "wait": false},
+            {"do": "wait", "flag": "bundle_collected"},
+            {"do": "say", "actor": "urchin_a", "text": "Pleasure doing business.", "secs": 3}
+          ]
+        }
+      ]
+    }
+  }
+}

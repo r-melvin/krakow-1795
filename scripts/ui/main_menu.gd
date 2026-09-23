@@ -1,0 +1,215 @@
+extends Control
+## Main menu: New game, Continue (from user://save.json), Options, Credits, Quit.
+## Keyboard, mouse and pad navigation through focus; Esc (ui_cancel) closes Options or Credits.
+
+const Backdrop := preload("res://scripts/ui/backdrop.gd")
+const OptionsPanel := preload("res://scripts/ui/options_panel.gd")
+
+const CREDITS := """[font_size=21][color=#e6c47f]Kraków 1795[/color][/font_size]
+A prototype by the Kraków 1795 project. Code under the MIT licence; original art, generated models and documents under CC BY 4.0.
+[color=#c29a55]MakeHuman[/color]  Base mesh, targets, skins, eyes, hair and clothes by the MakeHuman community, released under CC0. [i]makehumancommunity.org[/i]
+[color=#c29a55]MPFB2[/color]  MakeHuman Plugin for Blender, GPL v3. Used as a build-time tool only, not redistributed.
+[color=#c29a55]Godot Engine 4.7[/color]  MIT licence. [i]godotengine.org[/i]
+[color=#c29a55]Blender 5.2[/color]  GPL, used as a tool. [i]blender.org[/i]
+[color=#c29a55]Noto Serif, Noto Serif Display[/color]  The Noto Project Authors, SIL Open Font License 1.1.
+Buildings, props, animals, interiors and clothing geometry are generated from primitives by the scripts in assets/blender; textures are baked procedurally. No third-party models or textures are included beyond the MakeHuman material above.
+[i]Kraków after the Third Partition, 1795. Names of real institutions and places are used as history; all characters are fictional.[/i]"""
+
+var _root_menu: VBoxContainer
+var _side: Control
+var _options: Control
+var _credits: Control
+var _continue: Button
+var _buttons: Array[Button] = []
+
+
+func _ready() -> void:
+	theme = UiTheme.get_theme()
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var bg := ColorRect.new()
+	bg.color = UiTheme.BG
+	add_child(UiTheme.full_rect(bg))
+	var back := Control.new()
+	back.set_script(Backdrop)
+	back.set("darken", 0.15)
+	add_child(back)
+
+	# Left column: a darkened band holding the title and the menu.
+	var band := ColorRect.new()
+	band.color = Color(0.02, 0.03, 0.05, 0.72)
+	band.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	band.offset_right = 560
+	add_child(band)
+	var edge := ColorRect.new()
+	edge.color = Color(UiTheme.BRASS, 0.5)
+	edge.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	edge.offset_left = 560
+	edge.offset_right = 561
+	add_child(edge)
+
+	var col := VBoxContainer.new()
+	col.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
+	col.offset_left = 80
+	col.offset_right = 520
+	col.offset_top = 110
+	col.offset_bottom = -60
+	col.add_theme_constant_override("separation", 4)
+	add_child(col)
+	col.add_child(UiTheme.kicker("Winter 1795 – 1796"))
+	col.add_child(UiTheme.label("KRAKÓW 1795", 64, UiTheme.TEXT, "display_light"))
+	col.add_child(UiTheme.label("The Commonwealth is gone. The city is not.", 20, UiTheme.TEXT_DIM, "display_italic"))
+	col.add_child(UiTheme.spacer(60))
+
+	_root_menu = VBoxContainer.new()
+	_root_menu.add_theme_constant_override("separation", 6)
+	col.add_child(_root_menu)
+	_continue = _add(UiTheme.menu_button("Continue", _on_continue))
+	var info := _save_info()
+	if info != "":
+		var l := UiTheme.label(info, 15, UiTheme.TEXT_DIM, "italic")
+		l.add_theme_constant_override("line_spacing", 0)
+		var m := MarginContainer.new()
+		m.add_theme_constant_override("margin_left", 25)
+		m.add_theme_constant_override("margin_bottom", 6)
+		m.add_child(l)
+		_root_menu.add_child(m)
+	_continue.disabled = not GameState.has_save()
+	_continue.focus_mode = Control.FOCUS_NONE if _continue.disabled else Control.FOCUS_ALL
+	_add(UiTheme.menu_button("New game", _on_new))
+	_add(UiTheme.menu_button("Options", _show_options))
+	_add(UiTheme.menu_button("Credits", _show_credits))
+	_add(UiTheme.menu_button("Quit", func() -> void: get_tree().quit()))
+
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(spacer)
+	col.add_child(UiTheme.label("Arrows / mouse to choose   Enter to confirm   Esc to go back", 15, Color(UiTheme.TEXT_DIM, 0.8), "italic"))
+
+	# Right side: Options or Credits sheet.
+	_side = CenterContainer.new()
+	_side.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_side.offset_left = 561
+	add_child(_side)
+	_options = PanelContainer.new()
+	_options.set_script(OptionsPanel)
+	_options.visible = false
+	_options.closed.connect(_back)
+	_side.add_child(_options)
+	_credits = _build_credits()
+	_credits.visible = false
+	_side.add_child(_credits)
+
+	modulate.a = 0.0
+	create_tween().tween_property(self, "modulate:a", 1.0, 0.5)
+	_focus_root()
+
+
+func _add(b: Button) -> Button:
+	_root_menu.add_child(b)
+	_buttons.append(b)
+	return b
+
+
+func _save_info() -> String:
+	if not GameState.has_save():
+		return ""
+	var d = JSON.parse_string(FileAccess.get_file_as_string(GameState.SAVE_PATH))
+	if typeof(d) != TYPE_DICTIONARY:
+		return ""
+	var o: Dictionary = GameState.origins.get(str(d.get("origin", "")), {})
+	return "Day %d  ·  %s%s" % [int(d.get("day", 1)), o.get("name", "?"), " (woman)" if d.get("gender", "m") == "f" else ""]
+
+
+func _build_credits() -> Control:
+	var p := UiTheme.panel(true)
+	p.custom_minimum_size = Vector2(780, 0)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	p.add_child(v)
+	v.add_child(UiTheme.kicker("Attribution"))
+	v.add_child(UiTheme.heading("Credits", 44))
+	v.add_child(HSeparator.new())
+	var t := RichTextLabel.new()
+	t.bbcode_enabled = true
+	t.fit_content = true
+	t.scroll_active = false
+	t.text = CREDITS
+	t.custom_minimum_size = Vector2(700, 0)
+	for k in ["normal_font_size", "italics_font_size", "bold_font_size"]:
+		t.add_theme_font_size_override(k, 17)
+	t.add_theme_constant_override("paragraph_separation", 10)
+	t.add_theme_constant_override("line_separation", 1)
+	v.add_child(t)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_END
+	var b := UiTheme.button("Back", _back, 150)
+	b.name = "Back"
+	row.add_child(b)
+	v.add_child(row)
+	p.set_meta("focus", b)
+	return p
+
+
+func _focus_root() -> void:
+	var target: Button = _buttons[1] if _continue.disabled else _continue
+	target.grab_focus.call_deferred()
+
+
+func _set_root_enabled(on: bool) -> void:
+	for b in _buttons:
+		if b != _continue or GameState.has_save():
+			b.focus_mode = Control.FOCUS_ALL if on else Control.FOCUS_NONE
+	_root_menu.modulate.a = 1.0 if on else 0.55
+
+
+func _show_options() -> void:
+	_credits.visible = false
+	_options.visible = true
+	_set_root_enabled(false)
+	_fade_in(_options)
+
+
+func _show_credits() -> void:
+	_options.visible = false
+	_credits.visible = true
+	_set_root_enabled(false)
+	_fade_in(_credits)
+	(_credits.get_meta("focus") as Button).grab_focus.call_deferred()
+
+
+func _fade_in(c: Control) -> void:
+	c.modulate.a = 0.0
+	create_tween().tween_property(c, "modulate:a", 1.0, 0.25)
+
+
+func _back() -> void:
+	_options.visible = false
+	_credits.visible = false
+	_set_root_enabled(true)
+	_focus_root()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and (_options.visible or _credits.visible):
+		get_viewport().set_input_as_handled()
+		_back()
+
+
+func _on_continue() -> void:
+	_leave(func() -> void:
+		if not GameState.continue_game():
+			_continue.disabled = true
+			modulate.a = 1.0
+			_set_root_enabled(true)
+			_focus_root())
+
+
+func _on_new() -> void:
+	_leave(GameState.new_game)
+
+
+func _leave(then: Callable) -> void:
+	_set_root_enabled(false)
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, 0.35)
+	tw.tween_callback(then)

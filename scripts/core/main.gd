@@ -1,30 +1,56 @@
 extends Node
-## Scene root. Swaps between origin select, day panel, and the night mission based on GameState.phase.
+## Scene root. Swaps between splash, main menu, origin select, day briefing, the night mission and the dawn
+## result based on GameState.phase. UI screens live on `_ui_layer`; the pause overlay and the phase fade sit
+## on layers above it.
 
+const Splash := preload("res://scripts/ui/splash.gd")
+const MainMenu := preload("res://scripts/ui/main_menu.gd")
 const OriginSelect := preload("res://scripts/ui/origin_select.gd")
 const DayPanel := preload("res://scripts/ui/day_panel.gd")
+const DawnPanel := preload("res://scripts/ui/dawn_panel.gd")
+const PauseMenu := preload("res://scripts/ui/pause_menu.gd")
 const Hud := preload("res://scripts/ui/hud.gd")
 const District := preload("res://scripts/city/greybox_district.gd")
 const PlayerScript := preload("res://scripts/stealth/player.gd")
 
 var _ui_layer: CanvasLayer
+var _top_layer: CanvasLayer      ## pause overlay
+var _fade: ColorRect             ## black veil faded out on every phase change
 var _world: Node3D
-var _pending_summary := ""
+var _screen: Control             ## current full-screen UI, if any
+var _pause: Control
 
 
 func _ready() -> void:
+	get_tree().root.theme = UiTheme.get_theme()
 	_ui_layer = CanvasLayer.new()
 	add_child(_ui_layer)
+	_top_layer = CanvasLayer.new()
+	_top_layer.layer = 20
+	_top_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_top_layer)
+	var fade_layer := CanvasLayer.new()
+	fade_layer.layer = 50
+	add_child(fade_layer)
+	_fade = ColorRect.new()
+	_fade.color = Color.BLACK
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fade_layer.add_child(_fade)
 	GameState.phase_changed.connect(_on_phase)
-	GameState.mission_ended.connect(_on_mission_ended)
 	_on_phase(GameState.phase)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke()
 
 
 func _clear() -> void:
+	get_tree().paused = false
 	for c in _ui_layer.get_children():
 		c.queue_free()
+	for c in _top_layer.get_children():
+		c.queue_free()
+	_screen = null
+	_pause = null
 	if _world:
 		_world.queue_free()
 		_world = null
@@ -34,20 +60,30 @@ func _clear() -> void:
 func _on_phase(p: GameState.Phase) -> void:
 	_clear()
 	match p:
+		GameState.Phase.SPLASH:
+			_screen = _add_screen(Splash)
+		GameState.Phase.MENU:
+			_screen = _add_screen(MainMenu)
 		GameState.Phase.ORIGIN_SELECT:
-			var s := Control.new()
-			s.set_script(OriginSelect)
-			_ui_layer.add_child(s)
-			s.chosen.connect(GameState.choose_origin)
-		GameState.Phase.DAY, GameState.Phase.DAWN:
-			var d := Control.new()
-			d.set_script(DayPanel)
-			_ui_layer.add_child(d)
-			d.set_summary(_pending_summary)
-			_pending_summary = ""
-			d.go_out.connect(GameState.begin_night)
+			_screen = _add_screen(OriginSelect)
+			_screen.chosen.connect(GameState.choose_origin)
+		GameState.Phase.DAY:
+			_screen = _add_screen(DayPanel)
+			_screen.go_out.connect(GameState.begin_night)
+		GameState.Phase.DAWN:
+			_screen = _add_screen(DawnPanel)
 		GameState.Phase.NIGHT:
 			_start_night()
+	_fade.color.a = 1.0
+	var tw := create_tween()
+	tw.tween_property(_fade, "color:a", 0.0, 0.8 if p == GameState.Phase.NIGHT else 0.35)
+
+
+func _add_screen(script: GDScript) -> Control:
+	var c := Control.new()
+	c.set_script(script)
+	_ui_layer.add_child(c)
+	return c
 
 
 func _start_night() -> void:
@@ -59,25 +95,37 @@ func _start_night() -> void:
 	player.position = _world.player_spawn()
 	_world.add_child(player)
 	player.add_child(District.avoidance_obstacle(0.45))
+	Mission.start("printers_bundle", _world)     # mission actors, props, dialogue; objectives for the HUD
 	var hud := CanvasLayer.new()
 	hud.set_script(Hud)
 	_ui_layer.add_child(hud)
-
-
-func _on_mission_ended(_success: bool, summary: String) -> void:
-	_pending_summary = summary
+	for c in hud.get_children():     # CanvasLayer breaks theme inheritance; give the HUD's roots the theme
+		if c is Control:
+			c.theme = UiTheme.get_theme()
+	_pause = Control.new()
+	_pause.set_script(PauseMenu)
+	_top_layer.add_child(_pause)
 
 
 ## Headless smoke test: `godot --headless --path . --quit-after 600 -- --smoke`
 func _smoke() -> void:
 	await get_tree().process_frame
 	print("[smoke] origins=%d factions=%d districts=%d" % [GameState.origins.size(), GameState.factions.size(), GameState.districts.size()])
+	await _ui_shot("splash", 3.0)
+	GameState.to_menu()
+	await get_tree().process_frame
+	await _ui_shots_menu()
+	GameState.new_game()
+	await get_tree().process_frame
+	await _ui_shots_origin()
 	GameState.choose_origin("veteran", "f" if "--woman" in OS.get_cmdline_user_args() else "m")
 	await get_tree().process_frame
+	await _ui_shot("day", 1.0)
 	print("[smoke] phase=%s street=%d" % [GameState.Phase.keys()[GameState.phase], GameState.get_influence("street")])
 	GameState.begin_night()
 	for i in 90:
 		await get_tree().physics_frame
+	await _ui_shots_pause()
 	var guards := get_tree().get_nodes_in_group("guards")
 	var player := get_tree().get_first_node_in_group("player") as Player
 	print("[smoke] guards=%d player=%s" % [guards.size(), player.global_position if player else "none"])
@@ -98,12 +146,20 @@ func _smoke() -> void:
 	var hit := space.intersect_ray(q)
 	print("[smoke] sentry dist=%.2f angle=%.1f fwd=%s hit=%s perceive=%.2f visibility=%.2f" % [to_p.length(), rad_to_deg((-g2.global_transform.basis.z).angle_to(to_p.normalized())), -g2.global_transform.basis.z, (str(hit.get("collider").get_path()) if not hit.is_empty() else "none"), g2._perceive(), player.visibility])
 	print("[smoke] after exposure: sentry state=%s suspicion=%.1f alarms=%d" % [Guard.State.keys()[guards[2].state], guards[2].suspicion, GameState.night_alarm_count])
+	# The mission, three times (underworld, street, salon; each a fresh night), then a combat check and a failure.
+	var mission_smoke: Node = preload("res://scripts/mission/mission_smoke.gd").new()
+	add_child(mission_smoke)
+	await mission_smoke.run_all(self)
+	mission_smoke.queue_free()
 	if GameState.phase == GameState.Phase.NIGHT:
 		var sh := _world.get_node_or_null("SafeHouse") as Node3D
 		player.global_position = (sh.global_position if sh else Vector3(26, 0, 25)) + Vector3(0, 0.5, 0)
 		for i in 10:
 			await get_tree().physics_frame
 	print("[smoke] phase=%s day=%d crackdown=%d underworld=%d" % [GameState.Phase.keys()[GameState.phase], GameState.day, GameState.crackdown, GameState.get_influence("underworld")])
+	if _ui_shot_dir() != "" and GameState.phase == GameState.Phase.NIGHT:
+		GameState.end_night(true)    # shot mode only: force a dawn so the result screen can be captured
+	await _ui_shot("dawn", 1.2)
 	get_tree().quit()
 
 
@@ -184,3 +240,63 @@ func _shots(player: Player) -> void:
 		get_viewport().get_texture().get_image().save_png(dir + "/shot_" + shot[0] + ".png")
 	cam.queue_free()
 	print("[smoke] screenshots in ", dir)
+
+
+# ------------------------------------------------------------------ UI screenshots (`-- --smoke --shot-ui=/dir`)
+
+func _ui_shot_dir() -> String:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot-ui="):
+			return a.trim_prefix("--shot-ui=")
+	return ""
+
+
+## Waits `wait` seconds of real time (so fades finish), then saves ui_<name>.png. No-op without --shot-ui.
+func _ui_shot(name: String, wait: float = 0.8) -> void:
+	var dir := _ui_shot_dir()
+	if dir == "" or DisplayServer.get_name() == "headless":
+		return
+	await get_tree().create_timer(wait, true, false, true).timeout
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(dir.path_join("ui_%s.png" % name))
+	print("[smoke] ui shot ", name)
+
+
+func _ui_shots_menu() -> void:
+	if _ui_shot_dir() == "":
+		return
+	await _ui_shot("menu", 1.0)
+	if _screen and _screen.has_method("_show_options"):
+		_screen.call("_show_options")
+		await _ui_shot("menu_options", 0.6)
+		_screen.call("_show_credits")
+		await _ui_shot("menu_credits", 0.6)
+		_screen.call("_back")
+
+
+## Waits (up to 30 s) for the threaded figure load, then shoots the man and the woman.
+func _ui_shots_origin() -> void:
+	if _ui_shot_dir() == "" or _screen == null or not _screen.has_method("preview_ready"):
+		return
+	for sex in ["m", "f"]:
+		if sex == "f":
+			_screen.call("_set_sex", "f")
+		var t := 0.0
+		while not _screen.preview_ready() and t < 30.0:
+			await get_tree().process_frame
+			t += get_process_delta_time()
+		print("[smoke] origin preview %s ready=%s after %.1fs" % [sex, _screen.preview_ready(), t])
+		await _ui_shot("origin_select" if sex == "m" else "origin_select_f", 1.2)
+	_screen.call("_set_sex", "m")
+
+
+func _ui_shots_pause() -> void:
+	if _ui_shot_dir() == "" or _pause == null:
+		return
+	await _ui_shot("night_hud", 0.5)
+	_pause.call("open")
+	await _ui_shot("pause", 0.5)
+	_pause.call("_show_options")
+	await _ui_shot("pause_options", 0.4)
+	_pause.call("resume")
+	await get_tree().process_frame

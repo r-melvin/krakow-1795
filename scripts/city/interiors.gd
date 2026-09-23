@@ -29,6 +29,8 @@ const LAMPS := {                     ## kind -> [colour, energy, range, shadow]
 
 var portals: Array = []
 
+static var _smoked := false
+
 var _sets := {}                      ## set name -> origin (Vector3, outside of its front door)
 var _doors: Array[Area3D] = []
 var _exits: Array[Area3D] = []
@@ -54,7 +56,8 @@ func _ready() -> void:
 				{"set": SETS[i], "exit": true, "auto": true}))
 	_build_doors()
 	_build_ui()
-	if "--smoke" in OS.get_cmdline_user_args():
+	if "--smoke" in OS.get_cmdline_user_args() and not _smoked:
+		_smoked = true       # only the first night's world: later nights belong to the mission smoke
 		print("[smoke] interiors=%d doors=%d" % [_sets.size(), _doors.size()])
 		_smoke.call_deferred()
 
@@ -97,20 +100,28 @@ func _trigger(id: String, pos: Vector3, size: Vector3, rot_y: float, meta: Dicti
 	a.add_child(cs)
 	for key in meta:
 		a.set_meta(key, meta[key])
-	a.body_entered.connect(func(body: Node3D) -> void:
-		if body.is_in_group("player") and not _near.has(a):
-			_near.append(a))
-	a.body_exited.connect(func(body: Node3D) -> void:
-		if body.is_in_group("player"):
-			_near.erase(a))
+	a.body_entered.connect(_on_trigger_entered.bind(a))
+	a.body_exited.connect(_on_trigger_exited.bind(a))
 	add_child(a)
 	return a
+
+
+func _on_trigger_entered(body: Node3D, a: Area3D) -> void:
+	if body.is_in_group("player") and not _near.has(a):
+		_near.append(a)
+
+
+func _on_trigger_exited(body: Node3D, a: Area3D) -> void:
+	if body.is_in_group("player"):
+		_near.erase(a)
 
 
 func _physics_process(delta: float) -> void:
 	_cooldown = maxf(0.0, _cooldown - delta)
 	var player := get_tree().get_first_node_in_group("player") as CharacterBody3D
-	if player == null or _near.is_empty():
+	# A mission interactable in reach, or a conversation, takes the `interact` key and the prompt.
+	var busy_elsewhere: bool = Mission.dialogue_blocking() or (player != null and player.get("interact_target") != null)
+	if player == null or _near.is_empty() or busy_elsewhere:
 		if _prompt:
 			_prompt.visible = false
 		return
@@ -267,6 +278,29 @@ func _smoke() -> void:
 		player.global_position = before
 		result = "%s in=%s back=%s" % ["ok" if ok else "FAIL", inside.snapped(Vector3.ONE * 0.01), back.snapped(Vector3.ONE * 0.01)]
 	print("[smoke] interiors floors=%d/%d teleport=%s" % [floors, _sets.size(), result])
+
+
+## Origin (outside of the front door) of an interior set, or Vector3.INF if it was not built.
+func interior_origin(set_name: String) -> Vector3:
+	return _sets.get(set_name, Vector3.INF)
+
+
+## Named door trigger (e.g. "door_town_hall"), or null.
+func find_door(door_name: String) -> Area3D:
+	for d in _doors:
+		if String(d.name) == door_name:
+			return d
+	return null
+
+
+## Go through a door at once, no fade (mission scripting and smoke tests).
+func enter_now(player: CharacterBody3D, door_name: String) -> bool:
+	var d := find_door(door_name)
+	if d == null:
+		return false
+	_go_in_now(player, d)
+	player.reset_physics_interpolation()
+	return true
 
 
 func _go_in_now(player: CharacterBody3D, door: Area3D) -> void:

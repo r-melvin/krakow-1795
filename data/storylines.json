@@ -1,7 +1,21 @@
 {
+  "journal": {
+    "people": {
+      "smuggler": {"name": "The Smuggler", "faction": "underworld"},
+      "boatman": {"name": "The Boatman", "faction": "underworld"},
+      "bishop": {"name": "The Bishop", "faction": "church"},
+      "bishop_chaplain": {"name": "The Chaplain", "faction": "church"},
+      "bishop_noble": {"name": "The Austrian Official", "faction": "austria"},
+      "priest": {"name": "The Vicar of St Mary's", "faction": "church"},
+      "informer": {"name": "The Informer", "faction": "austria"},
+      "urchin_a": {"name": "Staś", "faction": "street"},
+      "urchin_b": {"name": "Kasia", "faction": "street"}
+    }
+  },
   "storylines": [
     {
       "id": "delivery",
+      "journal": {"blurb": "The smuggler meets a Vistula boatman in the docks-side alley. Something heavier than salt is coming up the river."},
       "title": "The delivery",
       "note": "The smuggler leaves the safe-house door to meet a Vistula boatman at the cart in the docks-side alley. Get within 3.5 m while they talk and they break off.",
       "trigger": {"at": "21:40"},
@@ -30,6 +44,7 @@
     },
     {
       "id": "procession",
+      "journal": {"blurb": "The bishop's party walks to St Mary's for Compline, with an Austrian official at his elbow."},
       "title": "The procession",
       "note": "The bishop's party walks to St Mary's for Compline at 21:30 and comes out at 22:15. Their movement is their schedule; this adds the talk.",
       "trigger": {"at": "21:12"},
@@ -48,17 +63,21 @@
     },
     {
       "id": "informer",
+      "journal": {"blurb": "A man in a grey coat shadows strangers between the Cloth Hall lanterns, and runs to the watch."},
       "title": "The informer",
-      "note": "Pass within 8 m of the police informer and he shadows you at 6 m for two minutes, then reports you to the St Mary's post, who comes looking. Put 22 m between you and he loses you.",
-      "trigger": {"radius": 8, "actor": "informer"},
+      "note": "Pass within 8 m of the police informer, in his sight, and he shadows you at 6 m for two minutes, then reports you to the St Mary's post, who comes looking. Put 22 m between you and he loses you. If a false pamphlet was planted on him (Mission flag decoy_planted) he sends the corporal to the Florian Gate instead.",
+      "trigger": {"radius": 8, "actor": "informer", "cone": 140},
       "steps": [
         {"do": "say", "actor": "informer", "text": "Now who walks the Rynek after curfew?", "secs": 3, "wait": false},
         {"do": "goto", "actor": "informer", "target": "player", "keep": 6, "secs": 120, "lose": 22, "on_lose": "lost"},
-        {"do": "goto", "actor": "informer", "target": "guard:St Mary's post", "keep": 1.6, "run": true},
+        {"do": "goto", "actor": "informer", "target": "guard:St Mary's post", "keep": 1.6, "run": true, "label": "report"},
         {"do": "face", "actor": "informer", "target": "guard:St Mary's post"},
         {"do": "say", "actor": "informer", "text": "Corporal! A stranger, skulking about the Cloth Hall. I followed him myself.", "secs": 4,
-         "alert": {"guard": "St Mary's post", "suspicion": 65}},
-        {"do": "say", "actor": "guard:St Mary's post", "text": "Show me.", "secs": 2, "next": "end"},
+         "alert": {"guard": "St Mary's post", "suspicion": 65}, "unless": "decoy_planted"},
+        {"do": "say", "actor": "informer", "text": "Corporal! Read this: Jacobins meeting at the Florian Gate, tonight. They're there now!", "secs": 4,
+         "alert": {"guard": "St Mary's post", "suspicion": 65, "pos": [-20.0, 0, -26.0]}, "when": "decoy_planted"},
+        {"do": "say", "actor": "guard:St Mary's post", "text": "Show me.", "secs": 2, "next": "end", "unless": "decoy_planted"},
+        {"do": "say", "actor": "guard:St Mary's post", "text": "The Florian Gate? Come on, then.", "secs": 2, "next": "end", "when": "decoy_planted"},
 
         {"do": "say", "actor": "informer", "text": "Gone. Devil take him.", "secs": 3, "label": "lost"}
       ]

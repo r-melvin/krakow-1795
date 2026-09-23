@@ -1,5 +1,5 @@
 extends Area3D
-## Night objective. Reaching it ends the mission successfully.
+## Night objective for missions that list a `safe_house` objective (and for a night with no mission).
 
 func _ready() -> void:
 	var shape := CollisionShape3D.new()
@@ -31,6 +31,13 @@ func _ready() -> void:
 
 
 func _on_body_entered(body: Node3D) -> void:
-	if body is Player and not GameState.night_objective_done:
+	if not (body is Player) or GameState.night_objective_done:
+		return
+	if Mission.is_active():
+		# Only missions that list a "safe_house" objective end here; others use the cellar as a landmark.
+		if Mission.has_objective("safe_house"):
+			GameState.night_objective_done = true
+			Mission.complete_objective("safe_house")
+	elif GameState.phase == GameState.Phase.NIGHT:
 		GameState.night_objective_done = true
 		GameState.end_night(true)

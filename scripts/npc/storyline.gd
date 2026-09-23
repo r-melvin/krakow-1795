@@ -2,20 +2,30 @@ extends Node
 ## Runs one scripted sequence from data/storylines.json. Created by population.gd.
 ##
 ## {"id", "title",
-##  "trigger": {"at": "HH:MM"} | {"radius": m, "actor": id}      (time on the world clock, or player within m of actor)
+##  "trigger": {"at": "HH:MM"} | {"radius": m, "actor": id, "cone"?: deg} | {"flag": name}
+##             (time on the world clock; player within m of actor, optionally inside the actor's field of view;
+##              or a Mission flag being set)
 ##  "spooked": {"radius": m, "actors": [ids], "goto": label, "until": label}   optional: player interference
 ##  "steps": [step, ...]}
-## Step: {"do": op, "actor": id, "label"?: name, "next"?: label | "end", ...}
+## Step: {"do": op, "actor": id, "label"?: name, "next"?: label | "end", "when"?: flag, "unless"?: flag, ...}
+##   (a step whose Mission flag condition fails is skipped, its "next" ignored)
 ##   goto  pos: [x,y,z] | post: name | target: actor (+ keep: m); run?; wait? (default true);
 ##         secs?: with target+keep, tail the target that long (real seconds); lose?: m, on_lose?: label
-##   wait  secs: s | until: "HH:MM" | arrive: [ids]
+##   wait  secs: s | until: "HH:MM" | arrive: [ids] | flag: name (a Mission flag)
 ##   face  pos | target
-##   say   text, secs (default 3), wait? (default true), alert?: {guard: name, suspicion: 0..100}
+##   say   text, secs (default 3), wait? (default true), alert?: {guard: name, suspicion: 0..100, pos?: [x,y,z]}
+##         (alert sends the guard to pos, or by default to where the player stands)
+##   event name: calls Mission.story_event(story id, name, actor) for mission logic
 ##   play  clip, secs? (blocks that long if given)
 ## Actor ids: an npc id from data/npcs.json, "player", or "guard:<guard_name>".
 ## Movement steps claim an NPC from its schedule; all claimed NPCs are released when the storyline ends.
 
 enum Status { WAITING, RUNNING, DONE }
+
+## For the journal (scripts/ui/journal.gd): the sequence began, an actor spoke a line, the sequence ended.
+signal storyline_started(id: String)
+signal storyline_step(id: String, text: String)
+signal storyline_ended(id: String)
 
 var population: Node              ## population.gd, for actor and post lookup
 var data: Dictionary = {}
@@ -49,6 +59,7 @@ func _physics_process(delta: float) -> void:
 			if _triggered():
 				status = Status.RUNNING
 				print("[story] %s begins at %s" % [story_id, GameState.time_string()])
+				storyline_started.emit(story_id)
 				_enter(0)
 		Status.RUNNING:
 			_check_spooked()
@@ -70,12 +81,44 @@ func _triggered() -> bool:
 	var trig: Dictionary = data.get("trigger", {})
 	if _trigger_at >= 0.0:
 		return GameState.clock_minutes >= _trigger_at
+	if trig.has("flag"):
+		return Mission.has_flag(str(trig["flag"]))
 	if trig.has("radius"):
 		var a := _actor(str(trig.get("actor", "")))
 		var p := _player()
-		if a and p and a.visible:
-			return a.global_position.distance_to(p.global_position) < float(trig["radius"])
+		if a and p and a.visible and not (a.has_method("is_downed") and a.is_downed()):
+			if a.global_position.distance_to(p.global_position) >= float(trig["radius"]):
+				return false
+			if trig.has("cone"):
+				var to_p := p.global_position - a.global_position
+				to_p.y = 0.0
+				var fwd := -a.global_transform.basis.z
+				fwd.y = 0.0
+				return rad_to_deg(fwd.angle_to(to_p)) < float(trig["cone"]) * 0.5
+			return true
 	return false
+
+
+## Start (or jump) straight to a labelled step, whatever the trigger (mission logic: a planted decoy sends the
+## informer off to report at once).
+func start_at(label: String) -> void:
+	if status == Status.DONE or not _labels.has(label):
+		return
+	if status == Status.WAITING:
+		status = Status.RUNNING
+		print("[story] %s begins at %s (at %s)" % [story_id, GameState.time_string(), label])
+		storyline_started.emit(story_id)
+	_goto_label(label)
+
+
+## Stop now (mission logic: the actor was bribed, fooled or knocked down). Claimed NPCs are released.
+func abort() -> void:
+	if status == Status.RUNNING:
+		print("[story] %s aborted at %s" % [story_id, GameState.time_string()])
+		_finish()
+	else:
+		status = Status.DONE
+		storyline_ended.emit(story_id)
 
 
 func _check_spooked() -> void:
@@ -108,9 +151,12 @@ func _enter(i: int) -> void:
 	if i >= _steps.size():
 		_finish()
 		return
+	var s: Dictionary = _steps[i]
+	if (s.has("when") and not Mission.has_flag(str(s["when"]))) or (s.has("unless") and Mission.has_flag(str(s["unless"]))):
+		_enter(i + 1)
+		return
 	_i = i
 	_t = 0.0
-	var s: Dictionary = _steps[i]
 	var a := _actor(str(s.get("actor", "")))
 	match str(s.get("do", "")):
 		"goto":
@@ -130,8 +176,11 @@ func _enter(i: int) -> void:
 			if a:
 				var Walker := preload("res://scripts/npc/walker.gd")
 				Walker.speech(a, str(s.get("text", "...")), float(s.get("secs", 3.0)))
+				storyline_step.emit(story_id, str(s.get("text", "...")))
 			if s.has("alert"):
 				_alert(s["alert"])
+		"event":
+			Mission.story_event(story_id, str(s.get("name", "")), a)
 
 
 ## Per-frame work for the running step. Returns a label to jump to, or "".
@@ -156,6 +205,8 @@ func _done(s: Dictionary) -> bool:
 		"wait":
 			if s.has("until"):
 				return GameState.clock_minutes >= GameState.parse_clock(str(s["until"]))
+			if s.has("flag"):
+				return Mission.has_flag(str(s["flag"]))
 			if s.has("arrive"):
 				for id in s["arrive"]:
 					var n := _actor(str(id))
@@ -179,6 +230,24 @@ func _finish() -> void:
 			n.release()
 	_claimed.clear()
 	print("[story] %s ends at %s" % [story_id, GameState.time_string()])
+	storyline_ended.emit(story_id)
+
+
+## The actor of the running step (the speaker, during a `say`), or null. For the journal.
+func current_actor() -> Node3D:
+	if status != Status.RUNNING or _i < 0 or _i >= _steps.size():
+		return null
+	return _actor(str((_steps[_i] as Dictionary).get("actor", "")))
+
+
+## Every actor id the sequence uses (npc ids, "guard:<name>"; not "player"). For the journal.
+func actor_ids() -> PackedStringArray:
+	var out := PackedStringArray()
+	for st in _steps:
+		var id := str((st as Dictionary).get("actor", ""))
+		if id != "" and id != "player" and not out.has(id):
+			out.append(id)
+	return out
 
 
 func _claim(a: Node3D) -> Node3D:
@@ -223,5 +292,9 @@ func _alert(al: Dictionary) -> void:
 	var p := _player()
 	if g == null or p == null:
 		return
-	g.set("last_known", p.global_position)
+	var where: Vector3 = p.global_position
+	if al.has("pos"):
+		var ap: Array = al["pos"]
+		where = Vector3(float(ap[0]), float(ap[1]), float(ap[2]))
+	g.set("last_known", where)
 	g.set("suspicion", maxf(float(g.get("suspicion")), float(al.get("suspicion", 50.0))))
