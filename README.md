@@ -6,11 +6,12 @@ Third-person stealth / intrigue / puzzle prototype. Godot 4.7, GDScript. Design:
 ```
 godot --path .            # play
 godot -e --path .         # open editor
-godot --headless --path . --quit-after 2000 -- --smoke   # headless loop test
+godot --headless --path . --quit-after 3000 -- --smoke   # headless loop test: plays the mission three ways
 ```
 
 ## Controls
-WASD move, Shift sprint, Ctrl or C crouch, E interact, F or left mouse attack, mouse look, Esc pause.
+WASD move, Shift sprint, Ctrl or C crouch, Z prone, E interact, F or left mouse attack (from behind: silent takedown),
+1-4 dialogue replies, J or Tab journal, mouse look, Esc pause.
 
 ## Layout
 - `data/` factions, origins, districts (JSON, loaded by `GameState`)
@@ -18,7 +19,11 @@ WASD move, Shift sprint, Ctrl or C crouch, E interact, F or left mouse attack, m
 - `scripts/stealth/` player controller, guard AI (vision cone + hearing + suspicion), safe house objective
 - `scripts/city/` procedural greybox district (CSG). Swap for Blender glTF as assets land. A NavigationRegion3D is baked at runtime from the static collision.
 - `scripts/npc/` townsfolk (`npc.gd`: schedules of posts from `data/npcs.json`), animals (`animal.gd`, `follow`), shared navmesh walking with avoidance (`walker.gd`), scripted storylines from `data/storylines.json` (`storyline.gd`). World clock: `GameState.clock_minutes` / `clock_scale` (night starts 21:00, 1 s = 1 game minute).
-- `scripts/ui/` origin select, day panel, night HUD
+- `scripts/ui/` splash, main menu, options, character select with 3D preview, day briefing, sparse night HUD, pause, dawn report, journal (missions, discovered storylines, people, log)
+- `scripts/mission/` mission runner, dialogue, interactables and the mission smoke test; missions in `data/missions.json`
+- `scripts/city/dressing.gd` street dressing (trees, signs, shop fronts, café, benches, park, clutter); `flicker.gd` flame lights
+- `assets/blender/build_animations.py` shared 64-clip animation library (`anim_library.glb`), retargeted to every figure at runtime by `assets.gd`; see `docs/ANIMATION.md`
+- `docs/STEALTH.md` stealth audit and design plan; `docs/ANIMALS.md` animal model sources and licences
 - `assets/blender/` source .blend files, `assets/models/` exported .glb
 
 ## Assets (all generated, all editable)

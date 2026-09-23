@@ -50,7 +50,7 @@ def build_reference():
     rig.name = "Human_rig"
     # musket geometry in the rest pose (build_characters._musket): butt, axis +Z, belly +Y
     hand = (rig.matrix_world @ rig.data.bones["hand_r"].matrix_local).to_translation()
-    rig["musket_butt"] = (hand.x - 0.11, hand.y + 0.02, hand.z - 0.30)
+    rig["musket_butt"] = (hand.x + 0.01, hand.y + 0.02, hand.z - 0.42)   # = build_characters.MUSKET_OFFSET
     for o in list(bpy.data.objects):
         if o.type == "MESH":
             bpy.data.objects.remove(o)
@@ -165,7 +165,7 @@ class RigModel:
         self.arm = {}
         for S, s, _ in SIDES:
             self.arm[S] = ((H["lowerarm_" + s] - H["upperarm_" + s]).length, (H["hand_" + s] - H["lowerarm_" + s]).length)
-        self.musket_butt = Vector(rig.get("musket_butt", (H["hand_r"].x - 0.11, H["hand_r"].y + 0.02, H["hand_r"].z - 0.30)))
+        self.musket_butt = Vector(rig.get("musket_butt", (H["hand_r"].x + 0.01, H["hand_r"].y + 0.02, H["hand_r"].z - 0.42)))
         log("rig: %d bones, pelvis z %.3f, leg %.3f+%.3f, arm %.3f+%.3f, ankle z %.3f" % (
             len(self.order), H["pelvis"].z, self.leg["L"][0], self.leg["L"][1], self.arm["L"][0], self.arm["L"][1], H["foot_l"].z))
 
