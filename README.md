@@ -30,6 +30,22 @@ Sukiennice in its Renaissance state (attyka parapet, end loggias, no side arcade
 towers, the Town Hall still standing (demolished 1820), St Adalbert's dome, kamienice with attyka / gable /
 mansard roofs, Austrian infantry in white with tricornes, origins in kontusz, sukmana, cassock, frock coat.
 
+## Characters (MakeHuman via MPFB2)
+`assets/blender/build_characters.py` builds every person on the MakeHuman base mesh (CC0) through the MPFB2
+Blender extension: parametric body and face, skin texture, eyes, brows, lashes, teeth, hair, a game-engine
+skeleton, an arms-down rest pose, and idle / walk / sentry clips. Era clothing is cut from MakeHuman's
+body-conforming helper geometry and thickened, so it follows the skin and cannot clip. Hats come from the
+scalp faces or the pack's cocked hat. Exported as glTF with textures (2048 px), front facing +Z; the Godot
+side turns them with `Assets.character()` and drives clips with `Assets.play()`.
+
+One-time setup (already done on this machine):
+```
+blender -b --command extension install-file -r user_default -e mpfb.zip     # from extensions.blender.org
+# then extract makehuman_system_assets_cc0.zip into ~/.config/blender/5.2/extensions/.user/user_default/mpfb/data
+```
+Rebuild all or some: `blender -b --python assets/blender/build_characters.py [-- watchman figure_noble]`.
+Check renders: `render_characters.py -- <outdir> <names>` (turnaround + face) and `render_lineup.py -- <outdir>`.
+
 ## Blender pipeline
 1. Model in metres, Z up in Blender, front facing -Y; export glTF 2.0 (.glb) with "+Y up" (default). Blender -Y lands on Godot +Z.
    `blender -b --python assets/blender/build_assets.py` regenerates all placeholder assets.

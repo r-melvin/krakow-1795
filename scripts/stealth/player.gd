@@ -40,7 +40,7 @@ func _build_body() -> void:
 	_shape.position.y = 0.9
 	add_child(_shape)
 
-	_figure = Assets.instance("figure_%s" % GameState.origin_id)
+	_figure = Assets.character("figure_%s" % GameState.origin_id)
 	if _figure == null:
 		_figure = Node3D.new()
 		var mi := MeshInstance3D.new()
@@ -109,6 +109,11 @@ func _physics_process(delta: float) -> void:
 	var moving := wish.length() > 0.1
 	if moving:
 		_figure.rotation.y = lerp_angle(_figure.rotation.y, atan2(-wish.x, -wish.z), 10 * delta)
+	var planar := Vector2(velocity.x, velocity.z).length()
+	if planar > 0.3:
+		Assets.play(_figure, "walk", clampf(planar / 3.0, 0.6, 2.0))
+	else:
+		Assets.play(_figure, "idle")
 
 	# Crouch: shrink the visual and collision height so guards' rays are more likely blocked by low cover.
 	var h := 1.0 if is_crouching else 1.8

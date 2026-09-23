@@ -22,6 +22,7 @@ var _search_timer := 0.0
 var _player: Player
 var _cone: MeshInstance3D
 var _label: Label3D
+var _figure: Node3D
 var _alarm_reported := false
 
 const SUSPICION_GAIN := 45.0     ## per second at full visibility, point blank
@@ -47,7 +48,8 @@ func _build_visuals() -> void:
 	shape.position.y = 0.9
 	add_child(shape)
 
-	var fig := Assets.instance("watchman")
+	_figure = Assets.character("watchman")
+	var fig: Node3D = _figure
 	if fig == null:
 		fig = Node3D.new()
 		var mi := MeshInstance3D.new()
@@ -118,6 +120,13 @@ func _physics_process(delta: float) -> void:
 			if global_position.distance_to(_player.global_position) < CATCH_DISTANCE:
 				_catch()
 	_update_visuals()
+	var planar := Vector2(velocity.x, velocity.z).length()
+	if planar > 0.3:
+		Assets.play(_figure, "walk", clampf(planar / 1.8, 0.7, 2.2))
+	elif state == State.CALM and waypoints.size() <= 2 and waypoints[0].distance_to(waypoints[-1]) < 0.5:
+		Assets.play(_figure, "sentry")
+	else:
+		Assets.play(_figure, "idle")
 
 
 ## Returns 0..1 how well this guard currently perceives the player.

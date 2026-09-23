@@ -26,3 +26,43 @@ static func place(parent: Node, name: String, pos: Vector3, rot_y: float = 0.0, 
 	n.scale = Vector3.ONE * scale
 	parent.add_child(n)
 	return n
+
+
+## Characters come from the MakeHuman pipeline facing +Z, with an AnimationPlayer holding "idle", "walk", "sentry".
+## Returns a pivot whose forward is -Z like every other Node3D, with the figure turned inside it.
+static func character(name: String) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = name
+	var fig := instance(name)
+	if fig == null:
+		return null
+	fig.rotation.y = PI
+	pivot.add_child(fig)
+	var ap := _find_anim_player(fig)
+	if ap:
+		for anim_name in ap.get_animation_list():
+			ap.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+		pivot.set_meta("anim", ap)
+	return pivot
+
+
+static func _find_anim_player(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n
+	for c in n.get_children():
+		var r := _find_anim_player(c)
+		if r:
+			return r
+	return null
+
+
+## Play a clip on a character pivot if it has one and it is not already playing.
+static func play(pivot: Node3D, clip: String, speed: float = 1.0) -> void:
+	if pivot == null or not pivot.has_meta("anim"):
+		return
+	var ap: AnimationPlayer = pivot.get_meta("anim")
+	if not ap.has_animation(clip):
+		return
+	if ap.current_animation != clip:
+		ap.play(clip, 0.15)
+	ap.speed_scale = speed
