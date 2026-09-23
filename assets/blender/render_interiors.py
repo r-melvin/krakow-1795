@@ -1,7 +1,7 @@
-import bpy, math, os, sys
+import bpy, os, sys, math, os, sys
 from mathutils import Vector
-ROOT = "/home/richard/Projects/games/prototypes/krakow-1795/assets/models"
-OUT = "/tmp/claude-1000/-home-richard-Projects-games-prototypes/b3410009-46e2-4cf5-83a5-e84b06dd70e9/scratchpad"
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "models")
+OUT = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs", "screenshots")
 # name: (camera pos, look-at) in Blender coords
 VIEWS = {
     "int_tavern": ((0.3, 0.7, 1.8), (-0.6, 6.0, 1.6)),
