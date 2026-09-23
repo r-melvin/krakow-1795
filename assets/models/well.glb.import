@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://c7sxvigkv7wvg"
-path="res://.godot/imported/market_stall.glb-bcfb730c438e5fcce166116553696e70.scn"
+uid="uid://baskyxm5080vu"
+path="res://.godot/imported/well.glb-d6d05fda6d9dc1288dae69ca9207cf9b.scn"
 
 [deps]
 
-source_file="res://assets/models/market_stall.glb"
-dest_files=["res://.godot/imported/market_stall.glb-bcfb730c438e5fcce166116553696e70.scn"]
+source_file="res://assets/models/well.glb"
+dest_files=["res://.godot/imported/well.glb-d6d05fda6d9dc1288dae69ca9207cf9b.scn"]
 
 [params]
 

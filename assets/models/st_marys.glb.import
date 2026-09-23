@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://dn7h4p0cd1hw5"
-path="res://.godot/imported/tenement.glb-654e9de40d5dfc29791893169d2851be.scn"
+uid="uid://lj5ydmqkvydf"
+path="res://.godot/imported/st_marys.glb-d5528617b0185af20db29108d1c96ef8.scn"
 
 [deps]
 
-source_file="res://assets/models/tenement.glb"
-dest_files=["res://.godot/imported/tenement.glb-654e9de40d5dfc29791893169d2851be.scn"]
+source_file="res://assets/models/st_marys.glb"
+dest_files=["res://.godot/imported/st_marys.glb-d5528617b0185af20db29108d1c96ef8.scn"]
 
 [params]
 

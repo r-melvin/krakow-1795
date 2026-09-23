@@ -20,6 +20,16 @@ WASD move, Shift sprint, Ctrl or C crouch, mouse look, Esc release mouse.
 - `scripts/ui/` origin select, day panel, night HUD
 - `assets/blender/` source .blend files, `assets/models/` exported .glb
 
+## Assets (all generated, all editable)
+`assets/blender/build_assets.py` builds every model from primitives and exports glTF. Rerun after edits:
+```
+blender -b --python assets/blender/build_assets.py
+```
+Contact sheets in `docs/screenshots/sheet_*.png`. Era references baked into the generator:
+Sukiennice in its Renaissance state (attyka parapet, end loggias, no side arcades), St Mary's with its unequal
+towers, the Town Hall still standing (demolished 1820), St Adalbert's dome, kamienice with attyka / gable /
+mansard roofs, Austrian infantry in white with tricornes, origins in kontusz, sukmana, cassock, frock coat.
+
 ## Blender pipeline
 1. Model in metres, Z up in Blender, front facing -Y; export glTF 2.0 (.glb) with "+Y up" (default). Blender -Y lands on Godot +Z.
    `blender -b --python assets/blender/build_assets.py` regenerates all placeholder assets.

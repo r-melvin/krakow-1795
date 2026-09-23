@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://qffmh3usflj4"
-path="res://.godot/imported/arcade_segment.glb-4861dcb213ad3c8414f9905fd9afba8f.scn"
+uid="uid://bn7sd4ulaqcfn"
+path="res://.godot/imported/st_adalbert.glb-763bf3272c8a3919c186f439931779bf.scn"
 
 [deps]
 
-source_file="res://assets/models/arcade_segment.glb"
-dest_files=["res://.godot/imported/arcade_segment.glb-4861dcb213ad3c8414f9905fd9afba8f.scn"]
+source_file="res://assets/models/st_adalbert.glb"
+dest_files=["res://.godot/imported/st_adalbert.glb-763bf3272c8a3919c186f439931779bf.scn"]
 
 [params]
 

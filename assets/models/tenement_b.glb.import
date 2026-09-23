@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://m6m5i3imdiv5"
-path="res://.godot/imported/church_mass.glb-e8c5284e1db17af46fbd9481317c39e7.scn"
+uid="uid://ds023e8vuj6p1"
+path="res://.godot/imported/tenement_b.glb-09bf0f9cc686b7f0e0d5269c614c75a7.scn"
 
 [deps]
 
-source_file="res://assets/models/church_mass.glb"
-dest_files=["res://.godot/imported/church_mass.glb-e8c5284e1db17af46fbd9481317c39e7.scn"]
+source_file="res://assets/models/tenement_b.glb"
+dest_files=["res://.godot/imported/tenement_b.glb-09bf0f9cc686b7f0e0d5269c614c75a7.scn"]
 
 [params]
 

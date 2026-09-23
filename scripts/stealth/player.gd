@@ -40,7 +40,7 @@ func _build_body() -> void:
 	_shape.position.y = 0.9
 	add_child(_shape)
 
-	_figure = Assets.instance("player_figure")
+	_figure = Assets.instance("figure_%s" % GameState.origin_id)
 	if _figure == null:
 		_figure = Node3D.new()
 		var mi := MeshInstance3D.new()

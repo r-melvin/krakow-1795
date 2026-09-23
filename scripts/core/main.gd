@@ -89,7 +89,8 @@ func _smoke() -> void:
 		await get_tree().physics_frame
 	print("[smoke] after exposure: sentry state=%s suspicion=%.1f alarms=%d" % [Guard.State.keys()[guards[2].state], guards[2].suspicion, GameState.night_alarm_count])
 	if GameState.phase == GameState.Phase.NIGHT:
-		player.global_position = Vector3(24, 0.5, 24)
+		var sh := _world.get_node_or_null("SafeHouse") as Node3D
+		player.global_position = (sh.global_position if sh else Vector3(26, 0, 25)) + Vector3(0, 0.5, 0)
 		for i in 10:
 			await get_tree().physics_frame
 	print("[smoke] phase=%s day=%d crackdown=%d underworld=%d" % [GameState.Phase.keys()[GameState.phase], GameState.day, GameState.crackdown, GameState.get_influence("underworld")])
