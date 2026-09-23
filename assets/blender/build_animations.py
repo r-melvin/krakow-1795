@@ -31,7 +31,12 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, "assets", "models", "anim_library.glb")
 CACHE = os.path.join(os.environ.get("ANIM_CACHE", "/tmp"), "krakow_anim_reference.blend")
 FPS = 30
+TAKEDOWN_OFFSET = 0.22     # takedown pair: victim origin this far in front of the attacker, same facing
 REF_NAME = "watchman"
+try:
+    from build_characters import MUSKET_OFFSET       # the musket weld: butt relative to the hand_r head at rest
+except Exception:                                    # build_characters mid-edit or MPFB missing
+    MUSKET_OFFSET = (0.01, 0.02, -0.42)
 
 
 def log(*a):
@@ -50,7 +55,7 @@ def build_reference():
     rig.name = "Human_rig"
     # musket geometry in the rest pose (build_characters._musket): butt, axis +Z, belly +Y
     hand = (rig.matrix_world @ rig.data.bones["hand_r"].matrix_local).to_translation()
-    rig["musket_butt"] = (hand.x + 0.01, hand.y + 0.02, hand.z - 0.42)   # = build_characters.MUSKET_OFFSET
+    rig["musket_butt"] = (hand.x + MUSKET_OFFSET[0], hand.y + MUSKET_OFFSET[1], hand.z + MUSKET_OFFSET[2])
     for o in list(bpy.data.objects):
         if o.type == "MESH":
             bpy.data.objects.remove(o)
@@ -165,7 +170,8 @@ class RigModel:
         self.arm = {}
         for S, s, _ in SIDES:
             self.arm[S] = ((H["lowerarm_" + s] - H["upperarm_" + s]).length, (H["hand_" + s] - H["lowerarm_" + s]).length)
-        self.musket_butt = Vector(rig.get("musket_butt", (H["hand_r"].x + 0.01, H["hand_r"].y + 0.02, H["hand_r"].z - 0.42)))
+        # always from build_characters.MUSKET_OFFSET (a cached reference .blend may carry an older weld)
+        self.musket_butt = H["hand_r"] + Vector(MUSKET_OFFSET)
         log("rig: %d bones, pelvis z %.3f, leg %.3f+%.3f, arm %.3f+%.3f, ankle z %.3f" % (
             len(self.order), H["pelvis"].z, self.leg["L"][0], self.leg["L"][1], self.arm["L"][0], self.arm["L"][1], H["foot_l"].z))
 
@@ -323,7 +329,19 @@ class Solver:
             return None
         T = body(g("hx" + S, sg * 0.25), g("hy" + S, 0.1), g("hz" + S, 1.0))
         hr = None
-        if g("hra" + S, 0) > 0.5:
+        if g("wp" + S, 0) > 0.5:
+            # weapon grip: (hx, hy, hz) is the centre of the fist, (wx, wy, wz) the direction the held shaft leaves
+            # the fist on the thumb side, (kx, ky, kz) roughly where the knuckles point (all body frame)
+            d0 = (m.head["middle_01_" + s] - m.head["hand_" + s]).normalized()
+            th = m.head["thumb_02_" + s] - m.head["hand_" + s]
+            t0 = (th - d0 * th.dot(d0)).normalized()
+            wv = body(g("wx" + S, 0), g("wy" + S, 1), g("wz" + S, 0)).normalized()
+            kv = body(g("kx" + S, 0), g("ky" + S, 0), g("kz" + S, -1))
+            kv = (kv - wv * kv.dot(wv))
+            kv = kv.normalized() if kv.length > 1e-4 else Vector((0, 0, -1))
+            hr = frame_quat(wv, kv) @ frame_quat(t0, d0).inverted()
+            T = T - kv * 0.09
+        elif g("hra" + S, 0) > 0.5:
             d0 = (m.head["middle_01_" + s] - m.head["hand_" + s]).normalized()
             base = frame_quat(Vector((0, -1, 0)), Vector((0, 0, -1))) @ frame_quat(d0, Vector((-sg, 0, 0))).inverted()
             hr = rz(sg * g("hyw" + S, 0)) @ ry(-sg * g("hrl" + S, 0)) @ rx(g("hpt" + S, 0)) @ base
@@ -469,7 +487,7 @@ def ankle_z():
 
 GLOBAL_PARAMS = "hx hy hz pp pl pt sp sl st np nl nt hp hl ht gz gp gt gl fyaw mk mbx mby mbz mpitch myaw mside mroll mlh mlw".split()
 SIDE_PARAMS = ("ik fx fy fz a to fo fr fa kp tf ta tt tz k cs cp af aa ah at e pr wf wd f fs th "
-               "ikh hx hy hz hra hyw hrl hpt pw px py pz ep").split()
+               "ikh hx hy hz hra hyw hrl hpt pw px py pz ep wp wx wy wz kx ky kz").split()
 
 
 def defaults():
@@ -478,7 +496,8 @@ def defaults():
     for S, _, sg in SIDES:
         for k in SIDE_PARAMS:
             d[k + S] = 0.0
-        d.update({"fa" + S: 1.0, "f" + S: 12.0, "th" + S: 8.0, "fz" + S: ankle_z(), "kp" + S: 8.0, "fx" + S: sg * 0.11, "pz" + S: -1.0})
+        d.update({"fa" + S: 1.0, "f" + S: 12.0, "th" + S: 8.0, "fz" + S: ankle_z(), "kp" + S: 8.0, "fx" + S: sg * 0.11, "pz" + S: -1.0,
+                  "wy" + S: 1.0, "kz" + S: -1.0})
     d.update({"mpitch": 90.0, "mlh": -1.0, "mlw": 1.0})
     return d
 
@@ -655,7 +674,7 @@ def define_clips():
         return add(P, breath(t, 1.0, 0.25 + 0 * t))
 
     def musket_shoulder():
-        return {"mk": 1, "mbx": -0.30, "mby": 0.06, "mbz": 0.64, "mpitch": 97, "mside": 6, "mroll": -10, "mlh": -1,
+        return {"mk": 1, "mbx": -0.30, "mby": 0.06, "mbz": 0.54, "mpitch": 97, "mside": 6, "mroll": -10, "mlh": -1,
                 "fR": 75, "thR": 45}
 
     @clip("idle_alert", 2.4, loop=True)
@@ -865,270 +884,372 @@ def define_clips():
     ])
 
     # ---------------------------------------------------------------- lying poses, falls, deaths
+    # Lying poses rest the right hand on the ground with the knuckles along the body, so a musket welded to hand_r
+    # lies flat beside the body instead of spearing the cobbles.
     def lie_back(**kw):
         p = complete({"pp": -88, "hz": -0.83, "hy": -0.50, "sp": 4, "np": 8, "hp": 4, "ht": 22,
                       "ikL": 0, "ikR": 0, "tfL": 4, "tfR": 10, "kL": 6, "kR": 16, "aL": -38, "aR": -34, "ttL": 26, "ttR": 30, "taL": 8, "taR": 6,
-                      "aaL": 34, "aaR": 42, "eL": 24, "eR": 14, "afL": 4, "afR": 6, "prL": -30, "prR": -40, "fL": 30, "fR": 26})
+                      "aaL": 34, "eL": 24, "afL": 4, "prL": -30, "fL": 30,
+                      "ikhR": 1, "wpR": 1, "hxR": -0.36, "hyR": -0.50, "hzR": 0.06, "wxR": 0, "wyR": 0, "wzR": 1, "kxR": -0.2, "kyR": 1, "kzR": 0,
+                      "fR": 60, "thR": 40})
         p.update(kw)
         return p
 
     def lie_front(**kw):
         p = complete({"pp": 88, "hz": -0.78, "hy": 0.55, "sp": -6, "np": -10, "hp": -8, "ht": 70, "hl": 6,
                       "ikL": 0, "ikR": 0, "tfL": 6, "tfR": 8, "kL": 4, "kR": 14, "aL": -60, "aR": -55, "ttL": 30, "ttR": 20, "taL": 8, "taR": 10,
-                      "aaL": 95, "aaR": 18, "atL": 80, "eL": 70, "afL": 0, "afR": -8, "prL": 10, "prR": -30, "fL": 30, "fR": 26})
+                      "aaL": 95, "atL": 80, "eL": 70, "afL": 0, "prL": 10, "fL": 30,
+                      "ikhR": 1, "wpR": 1, "hxR": -0.34, "hyR": 0.62, "hzR": 0.06, "wxR": 0.3, "wyR": 0, "wzR": 1, "kxR": -0.2, "kyR": -1, "kzR": 0,
+                      "fR": 60, "thR": 40})
         p.update(kw)
         return p
 
-    seq("knocked_down", 1.3, [
+    def G(S, pos, w, k, **kw):
+        """Weapon hand: fist centre `pos`, shaft direction `w`, knuckles `k` (body frame)."""
+        d = {"ikh" + S: 1, "wp" + S: 1, "hx" + S: pos[0], "hy" + S: pos[1], "hz" + S: pos[2], "wx" + S: w[0], "wy" + S: w[1], "wz" + S: w[2],
+             "kx" + S: k[0], "ky" + S: k[1], "kz" + S: k[2], "f" + S: 88, "th" + S: 55}
+        d.update(kw)
+        return d
+
+    def H(S, pos, **kw):
+        """Free hand to a point (wrist target, body frame)."""
+        d = {"ikh" + S: 1, "wp" + S: 0, "hx" + S: pos[0], "hy" + S: pos[1], "hz" + S: pos[2]}
+        d.update(kw)
+        return d
+
+    def FREE(S):
+        return {"ikh" + S: 0, "wp" + S: 0}
+
+    # knocked backwards: the blow snaps the head, hips give, one step back fails, sit-down collapse, back and head
+    # land last and settle
+    seq("knocked_down", 1.4, [
         K(0.0, **STAND),
-        K(0.12, hz=-0.02, hy=-0.05, pp=-6, sp=-14, hp=-18, afL=40, afR=50, aaL=30, aaR=35, eL=40, eR=50, gz=0),
-        K(0.35, hz=-0.28, hy=-0.22, pp=-24, sp=-10, fyL=0.18, fzL=AZ + 0.12, aL=20, kL=30, afL=60, afR=70, aaL=45, aaR=50),
-        K(0.62, hz=-0.62, hy=-0.40, pp=-62, sp=6, ikL=0.6, ikR=0.6, tfL=40, tfR=25, kL=40, kR=30, aL=10, aR=0, np=18, hp=10),
-        K(0.80, **lie_back(sp=8, np=14, hp=10, tfL=18, tfR=14, kL=20, kR=24, afL=20, afR=10)),
-        K(1.3, **lie_back()),
+        K(0.08, hy=-0.03, pp=-4, sp=-16, hp=-24, np=-8, afL=40, eL=60, aaL=30, gz=0),
+        K(0.28, hy=-0.16, hz=-0.12, pp=-14, sp=-8, fyR=-0.34, fzR=AZ + 0.10, aR=15, kR=40, afL=60, aaL=45),
+        K(0.42, hy=-0.24, hz=-0.34, pp=-24, sp=8, fyR=-0.36, fzR=AZ, aR=0, kL=70, kR=80, hp=6),
+        K(0.66, hz=-0.66, hy=-0.40, pp=-58, sp=16, ikL=0.7, ikR=0.7, tfL=50, tfR=40, kL=60, kR=60, np=22, hp=14),
+        K(0.84, **lie_back(sp=10, np=20, hp=12, tfL=24, tfR=18, kL=30, kR=30, hz=-0.80)),
+        K(1.0, **lie_back(sp=6, np=10, hp=6, tfL=10, kL=14, ht=14)),
+        K(1.4, **lie_back()),
     ])
-    seq("knocked_down_forward", 1.2, [
+    seq("knocked_down_forward", 1.3, [
         K(0.0, **STAND),
-        K(0.12, hy=0.06, pp=8, sp=16, hp=14, afL=-20, afR=-24, gz=0),
-        K(0.35, hz=-0.25, hy=0.22, pp=28, sp=10, fyR=-0.25, fzR=AZ + 0.15, aR=-30, kR=50, afL=40, afR=45, eL=20, eR=20),
-        K(0.60, hz=-0.62, hy=0.45, pp=66, sp=-10, ikL=0, ikR=0, tfL=30, tfR=10, kL=50, kR=40, afL=85, afR=85, eL=40, eR=40, np=-20, hp=-20),
-        K(0.78, **lie_front(afL=70, afR=60, eL=80, eR=70, sp=-6)),
-        K(1.2, **lie_front()),
+        K(0.08, hy=0.03, pp=6, sp=18, hp=18, afL=-20, gz=0),
+        K(0.30, hz=-0.20, hy=0.20, pp=22, sp=12, fyL=0.34, fzL=AZ + 0.10, aL=-10, kL=40, afL=40, eL=30),
+        K(0.46, hz=-0.36, hy=0.28, pp=30, sp=14, fyL=0.40, fzL=AZ, aL=0, kL=70, kR=60, afL=70, eL=40),
+        K(0.66, hz=-0.62, hy=0.46, pp=64, sp=-8, ikL=0.5, ikR=0.5, fyL=0.0, fyR=-0.30, fzL=0.06, fzR=0.06, aL=-150, aR=-150,
+          tfL=30, tfR=10, kL=80, kR=80, afL=85, eL=40, np=-24, hp=-20),
+        K(0.84, **lie_front(hz=-0.74, sp=-10, afL=60, aaL=60, eL=80)),
+        K(1.3, **lie_front()),
     ])
     seq("get_up", 2.4, [
         K(0.0, **lie_back()),
         K(0.55, **complete({"pp": -32, "hz": -0.82, "hy": -0.50, "sp": 44, "np": 6, "hp": 0, "gz": 0.3, "gp": 10,
                             "ikL": 1, "ikR": 1, "fxL": 0.14, "fxR": -0.12, "fyL": -0.06, "fyR": -0.12, "fzL": AZ, "fzR": AZ, "aL": 10, "aR": 6,
-                            "ikhR": 1, "hxR": -0.30, "hyR": -0.72, "hzR": 0.05, "hraR": 1, "hywR": 150,
-                            "afL": 30, "eL": 60, "fL": 30})),
-        K(1.05, pp=6, hz=-0.60, hy=-0.28, sp=40, hxR=-0.32, hyR=-0.36, aL=0, aR=0, afL=40, eL=70, gp=16),
+                            "ikhR": 1, "wpR": 1, "hxR": -0.34, "hyR": -0.66, "hzR": 0.07, "wxR": 0, "wyR": 0, "wzR": 1, "kxR": -0.3, "kyR": 1, "kzR": -0.2,
+                            "afL": 30, "eL": 60, "fL": 30, "fR": 60})),
+        K(1.05, pp=6, hz=-0.60, hy=-0.28, sp=40, hxR=-0.34, hyR=-0.30, hzR=0.10, aL=0, aR=0, afL=40, eL=70, gp=16),
         K(1.55, **dict(CROUCH, hy=-0.14, fyL=-0.06, fyR=-0.12, hz=-0.42)),
         K(2.4, **dict(STAND, hy=-0.06, fyL=-0.04, fyR=-0.10)),
     ])
     seq("get_up_prone", 1.9, [
         K(0.0, **lie_front()),
-        K(0.35, **dict(PRONE, hy=0.4, ikL=0, ikR=0, hyL=0.72, hyR=0.70, sp=-10, ht=0, hl=0)),
+        K(0.35, **dict(PRONE, hy=0.4, ikL=0, ikR=0, hyL=0.72, hyR=0.70, sp=-10, ht=0, hl=0, wpR=0)),
         K(0.75, pp=45, hz=-0.55, hy=0.35, sp=-4, tfL=45, tfR=20, kL=100, kR=90, hyL=0.72, hyR=0.70, hp=-20, np=-10),
         K(1.15, **dict(kneel_hands, hy=0.30, hyL=0.72, hyR=0.70, fyL=0.20, fyR=-0.20)),
         K(1.55, hz=-0.22, hy=0.12, sp=20, ikhL=0, ikhR=0, afL=20, afR=20, eL=40, eR=40, fyL=0.14, fyR=-0.02, gz=0.5, gp=0),
         K(1.9, **dict(STAND, hy=0.08, fyL=0.08, fyR=0.02)),
     ])
-    seq("death_fall", 1.7, [
+    # dying backwards: jolt, knees buckle (collapse), sit-back, torso and head settle last
+    seq("death_fall", 1.8, [
         K(0.0, **STAND),
-        K(0.15, pp=-4, sp=-10, hp=-16, afL=24, afR=20, aaL=20, aaR=22, eL=50, eR=60, gz=0),
-        K(0.45, hz=-0.22, hy=-0.10, pp=-10, sp=6, hp=10, kL=40, kR=30, afL=10, afR=16, eL=30, eR=40, aaL=18, aaR=20),
-        K(0.80, hz=-0.60, hy=-0.34, pp=-48, sp=14, ikL=0.8, ikR=0.8, tfL=60, tfR=50, kL=90, kR=80, aL=0, aR=0, np=20, hp=16, afL=40, afR=50),
-        K(1.05, **lie_back(sp=10, np=16, hp=12, tfL=26, kL=40, afL=30, afR=20)),
-        K(1.25, **lie_back(sp=2, np=4, tfL=16, kL=26, ht=34)),
-        K(1.7, **lie_back(tfL=14, kL=24, ht=34)),
+        K(0.10, pp=-4, sp=-12, hp=-18, afL=24, aaL=20, eL=50, gz=0),
+        K(0.40, hz=-0.24, hy=-0.08, pp=-8, sp=8, hp=12, np=6, kL=44, kR=36, afL=10, eL=30, aaL=14),
+        K(0.66, hz=-0.46, hy=-0.20, pp=-20, sp=18, kL=90, kR=80, np=14),
+        K(0.90, hz=-0.66, hy=-0.36, pp=-52, sp=16, ikL=0.8, ikR=0.8, tfL=60, tfR=50, kL=90, kR=80, np=20, hp=16, afL=40),
+        K(1.10, **lie_back(sp=10, np=18, hp=12, tfL=30, kL=46, afL=30, hz=-0.80)),
+        K(1.30, **lie_back(sp=2, np=4, tfL=16, kL=26, ht=34)),
+        K(1.8, **lie_back(tfL=14, kL=24, ht=34)),
     ])
-    seq("death_fall_forward", 1.6, [
+    seq("death_fall_forward", 1.7, [
         K(0.0, **STAND),
-        K(0.18, sp=22, hp=14, afL=-14, afR=-8, eL=40, eR=50, prL=30, gz=0),
-        K(0.50, hz=-0.34, hy=0.06, pp=10, sp=30, kL=60, kR=70, fyL=0.02, afL=10, afR=14, eL=30, eR=40),
-        K(0.72, hz=-0.46, hy=0.10, pp=16, sp=34, ikL=0.6, ikR=0.6, fyL=-0.30, fyR=-0.34, fzL=0.08, fzR=0.08, aL=-60, aR=-60, tfL=10, tfR=10, kL=90, kR=90),
-        K(1.05, **lie_front(afL=30, afR=10, eL=50)),
-        K(1.6, **lie_front()),
+        K(0.18, sp=24, hp=16, afL=-14, eL=40, prL=30, gz=0),
+        K(0.50, hz=-0.34, hy=0.06, pp=10, sp=30, kL=60, kR=70, afL=10, eL=30),
+        K(0.74, hz=-0.46, hy=0.10, pp=16, sp=34, ikL=0.7, ikR=0.7, fyL=-0.30, fyR=-0.34, fzL=0.06, fzR=0.06, aL=-150, aR=-150, kL=90, kR=90),
+        K(1.00, **lie_front(hz=-0.72, afL=30, eL=50)),
+        K(1.20, **lie_front(hz=-0.77)),
+        K(1.7, **lie_front()),
     ])
     kneel = dict(STAND, hz=-0.41, hy=0.02, fyL=-0.42, fyR=-0.44, fzL=0.05, fzR=0.05, aL=-155, aR=-155, kpL=0, kpR=0, sp=8)
-    seq("death_kneel", 2.6, [
+    seq("death_kneel", 2.8, [
         K(0.0, **STAND),
-        K(0.25, sp=18, hp=16, afL=40, afR=36, ahL=-40, ahR=-40, eL=110, eR=110, prL=-40, prR=-40, gz=0),
-        K(0.70, **dict(kneel, sp=24, hp=20, afL=36, afR=34, ahL=-40, ahR=-40, eL=110, eR=110, gz=0)),
-        K(1.30, **dict(kneel, sp=10, sl=8, hp=6, hl=12, afL=10, afR=20, ahL=-10, ahR=-20, eL=60, eR=80, hz=-0.43, gz=0)),
-        K(1.75, pp=40, pl=20, hz=-0.62, hy=0.25, sp=10, ikL=0.4, ikR=0.4, tfL=40, tfR=40, kL=110, kR=110, afL=40, afR=40, eL=40),
-        K(2.1, **lie_front(pl=6, hy=0.45, kL=40, kR=60, tfL=20, tfR=30)),
-        K(2.6, **lie_front(hy=0.45, kL=40, kR=60, tfL=20, tfR=30)),
+        K(0.25, sp=18, hp=16, afL=36, ahL=-50, eL=110, prL=-40, gz=0),
+        K(0.75, **dict(kneel, sp=24, hp=20, afL=34, ahL=-50, eL=110, gz=0)),
+        K(1.35, **dict(kneel, sp=10, sl=8, hp=6, hl=12, afL=10, ahL=-10, eL=60, hz=-0.43, gz=0)),
+        K(1.80, pp=40, pl=16, hz=-0.62, hy=0.25, sp=10, ikL=0.4, ikR=0.4, tfL=40, tfR=40, kL=110, kR=110, afL=40, eL=40,
+          **G("R", (-0.34, 0.60, 0.12), (0.3, 0, 1), (-0.2, -1, 0), fR=60, thR=40)),
+        K(2.15, **lie_front(pl=6, hy=0.45, hz=-0.74, kL=40, kR=60, tfL=20, tfR=30)),
+        K(2.8, **lie_front(hy=0.45, kL=40, kR=60, tfL=20, tfR=30)),
     ])
-    seq("death_musket", 1.8, [
+    seq("death_musket", 1.9, [
         K(0.0, **STAND),
-        K(0.08, hy=-0.06, pp=-10, sp=-22, hp=-20, afL=34, afR=30, aaL=30, aaR=34, eL=30, eR=20, gz=0, fyL=0.02),
-        K(0.35, hy=-0.12, pp=-4, pt=18, sp=16, st=14, hp=12, afL=22, ahL=-55, eL=115, prL=-30, afR=20, aaR=30, eR=40, fyR=-0.22, fzR=AZ + 0.08, kR=30),
-        K(0.75, hz=-0.36, hy=-0.14, pt=30, pp=-6, sp=22, st=18, kL=60, kR=70, fyR=-0.10, fzR=AZ, afL=22, eL=115, afR=10, aaR=20, eR=30),
-        K(1.10, hz=-0.64, hy=-0.30, pt=40, pp=-40, pl=-20, sp=20, ikL=0.7, ikR=0.7, tfL=60, tfR=50, kL=90, kR=100, aL=0, aR=0, np=20),
-        K(1.35, **lie_back(pt=35, pl=-14, sp=8, np=10, afL=40, ahL=-40, eL=110, prL=-10, tfL=30, kL=40)),
-        K(1.8, **lie_back(pt=35, pl=-14, afL=40, ahL=-40, eL=110, prL=-10, tfL=24, kL=34)),
+        K(0.06, hy=-0.05, pp=-10, sp=-22, hp=-20, afL=34, aaL=30, eL=30, gz=0, fyL=0.02),
+        K(0.34, hy=-0.12, pp=-4, pt=18, sp=16, st=14, hp=12, afL=20, ahL=-60, eL=118, prL=-30, fyR=-0.22, fzR=AZ + 0.08, kR=30),
+        K(0.72, hz=-0.36, hy=-0.14, pt=30, pp=-6, sp=22, st=18, kL=60, kR=70, fyR=-0.10, fzR=AZ, afL=20, eL=118),
+        K(1.08, hz=-0.64, hy=-0.30, pt=40, pp=-40, pl=-20, sp=20, ikL=0.7, ikR=0.7, tfL=60, tfR=50, kL=90, kR=100, aL=0, aR=0, np=20),
+        K(1.32, **lie_back(pt=35, pl=-14, sp=8, np=10, afL=22, ahL=-55, eL=112, prL=-10, tfL=30, kL=40, hz=-0.80)),
+        K(1.9, **lie_back(pt=35, pl=-14, afL=22, ahL=-55, eL=112, prL=-10, tfL=24, kL=34)),
     ])
     seq("fall_land_roll", 1.5, [
         K(0.0, **dict(STAND, hz=0.9, ikL=0, ikR=0, tfL=20, tfR=10, kL=40, kR=30, aL=-20, aR=-20, afL=70, afR=70, aaL=40, aaR=40, eL=30, eR=30, sp=-5, gz=0.3)),
         K(0.30, **dict(STAND, hz=0.15, ikL=0, ikR=0, tfL=16, tfR=12, kL=20, kR=16, aL=-10, aR=-10, afL=40, afR=40, aaL=35, aaR=35, eL=20, eR=20, sp=5)),
         K(0.42, **dict(CROUCH, hz=-0.45, hy=0.0, sp=40, ikL=1, ikR=1, afL=40, afR=40, eL=40, eR=40)),
-        K(0.62, pp=70, hz=-0.62, hy=0.35, sp=60, np=40, hp=20, ikL=0.3, ikR=0.3, tfL=80, tfR=80, kL=120, kR=120, afL=60, afR=60, eL=60, eR=60),
-        K(0.85, pp=200, hz=-0.60, hy=0.75, sp=60, np=40, ikL=0, ikR=0, tfL=110, tfR=110, kL=130, kR=130, aL=-20, aR=-20, afL=40, afR=40, eL=90, eR=90, gz=0),
-        K(1.08, pp=330, hz=-0.45, hy=1.05, sp=40, np=20, hp=10, tfL=100, tfR=90, kL=120, kR=120, afL=40, afR=40),
-        K(1.5, **dict(CROUCH, pp=360, hy=1.2, fyL=1.3, fyR=1.06, ikL=1, ikR=1)),
+        K(0.62, pp=70, hz=-0.62, hy=0.30, sp=60, np=40, hp=20, ikL=0.3, ikR=0.3, tfL=80, tfR=80, kL=120, kR=120, afL=60, afR=60, eL=60, eR=60),
+        K(0.85, pp=200, hz=-0.60, hy=0.55, sp=60, np=40, ikL=0, ikR=0, tfL=110, tfR=110, kL=130, kR=130, aL=-20, aR=-20, afL=40, afR=40, eL=90, eR=90, gz=0),
+        K(1.08, pp=330, hz=-0.45, hy=0.72, sp=40, np=20, hp=10, tfL=100, tfR=90, kL=120, kR=120, afL=40, afR=40),
+        K(1.5, **dict(CROUCH, pp=360, hy=0.80, fyL=0.90, fyR=0.66, ikL=1, ikR=1)),
     ])
     seq("stumble", 1.1, [
         K(0.0, **STAND),
         K(0.15, fyR=-0.18, fzR=AZ + 0.06, aR=-20, sp=6, gz=0.6),
         K(0.35, hy=0.12, pp=12, sp=18, hz=-0.08, fyR=0.20, fzR=AZ + 0.10, aR=-30, kR=40, afL=50, afR=-30, aaL=40, aaR=30, eL=30, eR=20, hp=-10),
         K(0.55, hy=0.28, pp=16, sp=20, hz=-0.20, fyR=0.45, fzR=AZ, aR=0, fyL=0.02, afL=60, afR=40, aaL=50, aaR=40),
-        K(0.80, hy=0.40, pp=8, sp=10, hz=-0.12, fyL=0.62, fzL=AZ, aL=0, afL=30, afR=30, aaL=20, aaR=20),
+        K(0.70, hy=0.36, fyL=0.40, fzL=AZ + 0.08, aL=-10),
+        K(0.82, hy=0.40, pp=8, sp=10, hz=-0.12, fyL=0.62, fzL=AZ, aL=0, afL=30, afR=30, aaL=20, aaR=20),
         K(1.1, **dict(STAND, hy=0.46, fyL=0.52, fyR=0.44)),
     ])
 
     # ---------------------------------------------------------------- being hit
-    seq("hit_react", 0.55, [K(0, **STAND), K(0.08, hy=-0.03, pp=-3, sp=-14, hp=-22, np=-6, afL=24, afR=28, eL=60, eR=70, aaL=10, aaR=12, hz=-0.03, gz=0),
-                            K(0.22, hy=-0.07, sp=-6, hp=-6, fyL=-0.12, fzL=AZ, hz=-0.06), K(0.55, **dict(STAND, hy=-0.07, fyL=-0.10, fyR=-0.06))])
-    seq("hit_react_back", 0.55, [K(0, **STAND), K(0.08, hy=0.04, pp=6, sp=18, hp=18, afL=-18, afR=-18, aaL=16, aaR=18, eL=30, eR=30, hz=-0.04, gz=0),
-                                 K(0.24, hy=0.10, sp=8, fyR=0.16, fzR=AZ, hz=-0.06), K(0.55, **dict(STAND, hy=0.10, fyL=0.08, fyR=0.12))])
-    seq("stagger", 1.3, [
+    # upper body first (head snaps, shoulders turn with the blow), hips follow, then a clear step to catch the weight
+    seq("hit_react", 0.6, [
         K(0, **STAND),
-        K(0.10, hy=-0.05, sp=-16, hp=-20, afL=40, afR=46, aaL=30, aaR=40, eL=40, eR=50, gz=0),
-        K(0.35, hy=-0.20, hz=-0.08, pl=6, sl=-8, fyR=-0.36, fzR=AZ + 0.06, aR=-10, sp=-8),
-        K(0.55, hy=-0.32, hz=-0.10, pl=-6, sl=8, fyR=-0.40, fzR=AZ, aR=0, fyL=-0.20, fzL=AZ + 0.08),
-        K(0.80, hy=-0.44, hz=-0.12, pl=4, sl=-4, fyL=-0.56, fzL=AZ, sp=10, hp=6, afL=30, afR=30),
-        K(1.3, **dict(STAND, hy=-0.44, fyL=-0.50, fyR=-0.40, hz=-0.04, sp=6)),
+        K(0.06, hy=-0.02, pt=8, st=12, sp=-14, hp=-24, np=-8, afL=40, eL=80, aaL=16, afR=6, aaR=18, eR=22, hz=-0.02, gz=0),
+        K(0.16, hy=-0.07, pt=10, st=8, sp=-8, hp=-10, fyR=-0.16, fzR=AZ + 0.06, aR=10, hz=-0.05),
+        K(0.28, hy=-0.10, pt=6, st=4, sp=-2, hp=-4, fyR=-0.24, fzR=AZ, aR=0, hz=-0.06, afL=20, eL=50),
+        K(0.6, **dict(STAND, hy=-0.09, fyL=-0.02, fyR=-0.24, fxR=-0.13)),
     ])
-    seq("shoved", 0.9, [K(0, **STAND), K(0.10, hy=-0.06, sp=-10, cpL=-10, cpR=-10, afL=30, afR=30, aaL=20, aaR=20, eL=40, eR=40, gz=0),
-                        K(0.30, hy=-0.20, hz=-0.07, fyR=-0.34, fzR=AZ + 0.06, sp=-6),
-                        K(0.50, hy=-0.28, fyR=-0.34, fzR=AZ, sp=4), K(0.9, **dict(STAND, hy=-0.28, fyL=-0.18, fyR=-0.34, sp=4))])
-    guard_up = dict(STAND, hz=-0.07, fyL=0.12, fyR=-0.10, fxL=0.15, fxR=-0.15, foR=20, sp=8, pt=-10, st=-6,
-                    afL=62, afR=70, ahL=-30, ahR=-26, eL=120, eR=110, prL=-40, prR=-30, fL=80, fR=80, thL=50, thR=50, csL=10, csR=10,
-                    gz=0.8, gp=6, hp=10)
-    seq("block", 0.9, [K(0, **STAND), K(0.18, **guard_up), K(0.30, **dict(guard_up, hy=-0.04, sp=4, hp=14)), K(0.9, **guard_up)])
-    seq("grabbed", 1.5, [
+    seq("hit_react_back", 0.6, [
         K(0, **STAND),
-        K(0.10, hy=0.05, sp=12, csL=16, csR=16, cpL=10, cpR=10, gz=0.5),
-        K(0.35, hy=0.04, pt=18, st=16, sp=8, afL=50, afR=40, ahL=-40, ahR=-30, eL=90, eR=100, fL=80, fR=80, fyL=0.10),
-        K(0.70, pt=-20, st=-18, sp=6, afL=60, afR=55, eL=70, eR=80, fyR=-0.12),
-        K(1.05, pt=14, st=12, sp=14, hp=10, afL=50, afR=60, eL=90, eR=90),
-        K(1.5, pt=-6, st=-6, sp=10, afL=45, afR=45, eL=95, eR=95),
+        K(0.06, hy=0.03, pt=-6, sp=18, hp=20, np=6, afL=-16, aaL=18, eL=30, afR=-10, aaR=16, hz=-0.03, gz=0),
+        K(0.18, hy=0.08, sp=12, hp=10, fyL=0.18, fzL=AZ + 0.07, aL=-10, hz=-0.06),
+        K(0.30, hy=0.11, sp=6, hp=4, fyL=0.24, fzL=AZ, aL=0, hz=-0.06),
+        K(0.6, **dict(STAND, hy=0.10, fyL=0.24, fyR=0.02)),
+    ])
+    seq("stagger", 1.4, [
+        K(0, **STAND),
+        K(0.08, hy=-0.03, sp=-18, hp=-22, pt=6, afL=40, afR=8, aaL=40, aaR=45, eL=40, eR=20, gz=0),
+        K(0.24, hy=-0.14, hz=-0.07, pl=5, sl=-8, fyR=-0.30, fzR=AZ + 0.08, aR=10, sp=-10),
+        K(0.36, hy=-0.22, fyR=-0.36, fzR=AZ, aR=0, aaL=55, aaR=50),
+        K(0.52, hy=-0.34, hz=-0.10, pl=-5, sl=8, fyL=-0.26, fzL=AZ + 0.08, aL=10),
+        K(0.64, hy=-0.44, fyL=-0.56, fzL=AZ, aL=0),
+        K(0.80, hy=-0.54, hz=-0.12, pl=4, sl=-4, fyR=-0.40, fzR=AZ + 0.06, sp=6, hp=4),
+        K(0.92, hy=-0.60, fyR=-0.70, fzR=AZ, afL=30, afR=6, aaL=20, aaR=20),
+        K(1.4, **dict(STAND, hy=-0.62, fyL=-0.56, fyR=-0.70, hz=-0.04, sp=6)),
+    ])
+    seq("shoved", 1.0, [
+        K(0, **STAND),
+        K(0.06, sp=-14, cpL=-14, cpR=-14, hp=-10, afL=34, afR=8, aaL=24, aaR=34, eL=40, eR=20, gz=0),
+        K(0.16, hy=-0.10, hz=-0.05, sp=-8, fyR=-0.22, fzR=AZ + 0.08, aR=12),
+        K(0.30, hy=-0.20, hz=-0.08, fyR=-0.36, fzR=AZ, aR=0),
+        K(0.44, hy=-0.26, fyL=-0.14, fzL=AZ + 0.05, sp=4),
+        K(0.56, fyL=-0.20, fzL=AZ),
+        K(1.0, **dict(STAND, hy=-0.28, fyL=-0.20, fyR=-0.36, sp=4)),
+    ])
+    # seized by the collar from the front: yanked forward, hands clamp the grabber's wrists, twisting to break free
+    seq("grabbed", 1.6, [
+        K(0, **STAND),
+        K(0.10, hy=0.06, sp=14, hp=8, csL=14, csR=14, gz=0.4, fyL=0.08, fzL=AZ + 0.04),
+        K(0.22, fyL=0.10, fzL=AZ, **H("L", (0.07, 0.24, 1.30), fL=85), **G("R", (-0.07, 0.25, 1.26), (1, 0, 0.1), (0.6, 0.3, -1))),
+        K(0.55, pt=18, st=16, sp=8, ht=-18, hxL=0.10, hxR=-0.02, fyR=-0.14, fzR=AZ),
+        K(0.90, pt=-20, st=-18, sp=6, ht=16, hxL=0.02, hxR=-0.10, fyR=-0.08),
+        K(1.25, pt=14, st=12, sp=14, hp=12, ht=-8, hyL=0.28, hyR=0.29),
+        K(1.6, pt=-4, st=-4, sp=10, ht=0, hyL=0.25, hyR=0.26),
     ])
 
-    # ---------------------------------------------------------------- player weapons
-    fight = dict(STAND, hz=-0.06, fyL=0.14, fyR=-0.12, fxL=0.14, fxR=-0.15, foR=22, sp=6, pt=-8, st=-6,
-                 afL=30, eL=60, aaL=12, fL=45, afR=20, eR=50, aaR=12, fR=85, thR=55, gz=0.8, gp=4)
-    seq("attack_swing", 0.85, [
+    # ---------------------------------------------------------------- player weapons (stand-ins in the review sheets)
+    # guard stance: left foot forward, pelvis bladed, left hand up as a guard, head on the target
+    fight = dict(STAND, hz=-0.07, fxL=0.12, fyL=0.17, fxR=-0.15, fyR=-0.15, foR=28, foL=8, pt=-14, st=-6, sp=6, gz=0.9, gp=2, gt=0,
+                 **H("L", (0.08, 0.30, 1.24), fL=35, thL=20), **G("R", (-0.22, 0.24, 1.10), (0.05, 0.45, 1), (0, 1, -0.35)))
+    # forehand cudgel blow: anticipation behind the head, step and hips first, shoulders and arm whip through,
+    # contact at head height a pace ahead, follow-through low across the body, off hand chambers to the hip
+    seq("attack_swing", 0.95, [
         K(0.0, **fight),
-        K(0.25, pt=-22, st=-26, sp=0, sl=6, afR=110, aaR=40, ahR=10, eR=100, atR=30, wfR=-30, afL=40, eL=80, hz=-0.05, fyL=0.14),
-        K(0.40, pt=10, st=18, sp=16, sl=-6, afR=60, aaR=20, ahR=-40, eR=20, atR=0, wfR=20, fyL=0.30, hz=-0.10, hy=0.06),
-        K(0.52, pt=16, st=28, sp=22, afR=10, aaR=10, ahR=-60, eR=30, wfR=30, afL=10, eL=40),
-        K(0.85, **dict(fight, hy=0.06, fyL=0.28)),
+        K(0.22, pt=-30, st=-28, sp=2, hy=-0.05, **G("R", (-0.30, -0.04, 1.64), (-0.25, -0.55, 0.8), (0, -0.2, 1)), **H("L", (0.10, 0.46, 1.38))),
+        K(0.30, pt=-18, st=-26, hy=0.04, fyL=0.34, fzL=AZ + 0.07, aL=8, hxR=-0.30, hyR=0.06, hzR=1.70),
+        K(0.37, pt=-2, st=-16, hy=0.18, fyL=0.52, fzL=AZ, aL=0, **G("R", (-0.28, 0.22, 1.72), (-0.1, 0.1, 1), (0, 0.6, 0.8))),
+        K(0.44, pt=14, st=20, sp=18, hy=0.32, hz=-0.15, **G("R", (-0.04, 0.70, 1.46), (0.3, 0.9, 0.1), (0, 0.15, -1)),
+          **H("L", (0.12, 0.10, 1.18))),
+        K(0.55, pt=20, st=30, sp=22, **G("R", (0.20, 0.44, 0.94), (0.55, 0.25, -0.8), (-0.2, 0.7, 0.3)), **H("L", (0.20, 0.10, 1.02))),
+        K(0.72, **dict(fight, hy=0.16, fyL=0.40)),
+        K(0.95, **fight),
     ])
-    seq("attack_thrust", 0.6, [
+    seq("attack_thrust", 0.65, [
         K(0.0, **fight),
-        K(0.18, pt=-16, st=-10, afR=30, eR=110, ahR=-10, wfR=-10, hy=-0.03),
-        K(0.30, pt=12, st=10, sp=14, afR=85, eR=8, ahR=-10, hz=-0.10, hy=0.10, fyL=0.36, afL=10, eL=40),
-        K(0.6, **dict(fight, hy=0.08, fyL=0.30)),
+        K(0.17, pt=-22, st=-12, hy=-0.03, **G("R", (-0.24, -0.02, 1.16), (0, 0.75, 0.65), (0, 0.65, -0.75))),
+        K(0.24, fyL=0.28, fzL=AZ + 0.05),
+        K(0.31, pt=10, st=12, sp=14, hy=0.18, hz=-0.12, fyL=0.38, fzL=AZ, **G("R", (-0.06, 0.58, 1.36), (0.05, 0.9, 0.4), (0, 0.4, -0.9)),
+          **H("L", (0.12, 0.08, 1.22))),
+        K(0.65, **fight),
     ])
-    sabre_guard = dict(fight, afR=45, eR=60, aaR=10, ahR=-12, prR=-20, wfR=-10, fR=90)
-    seq("sabre_draw", 0.9, [
-        K(0.0, **STAND),
-        K(0.25, **dict(STAND, st=12, afR=35, ahR=-70, eR=80, aaR=10, prR=30, fR=40, afL=5, gz=0.6, gp=10)),
-        K(0.40, **dict(STAND, st=14, afR=38, ahR=-74, eR=90, fR=90, thR=50, gz=0.6)),
-        K(0.62, **dict(fight, afR=120, aaR=30, ahR=-10, eR=40, prR=0, fR=90, thR=50)),
-        K(0.9, **sabre_guard),
-    ])
-    seq("sabre_slash", 0.7, [
-        K(0.0, **sabre_guard),
-        K(0.18, pt=-18, st=-22, afR=130, aaR=40, ahR=10, eR=70, atR=30, wfR=-20),
-        K(0.32, pt=14, st=22, sp=18, afR=50, aaR=10, ahR=-60, eR=10, wfR=20, fyL=0.30, hy=0.06, hz=-0.10),
-        K(0.42, pt=18, st=26, sp=20, afR=20, ahR=-70, eR=15),
-        K(0.7, **dict(sabre_guard, hy=0.05, fyL=0.26)),
-    ])
-    seq("sabre_parry", 0.55, [
-        K(0.0, **sabre_guard),
-        K(0.16, afR=150, aaR=20, ahR=-30, eR=60, prR=-60, wfR=-30, st=-4, hy=-0.03, hp=-6),
-        K(0.30, afR=150, aaR=20, ahR=-30, eR=64, hy=-0.05, sp=2),
-        K(0.55, **sabre_guard),
-    ])
-    seq("knife_stab", 0.55, [
-        K(0.0, **dict(fight, afR=15, eR=70, prR=40, afL=40, eL=70)),
-        K(0.14, pt=-14, st=-10, afR=-10, eR=90, aaR=10, afL=60, eL=40, ahL=-10),
-        K(0.26, pt=14, st=14, sp=16, afR=55, eR=35, ahR=-15, wfR=-20, afL=40, eL=90, hy=0.10, hz=-0.10, fyL=0.32),
-        K(0.55, **dict(fight, hy=0.08, fyL=0.28, afR=15, eR=70)),
-    ])
-    aim_pistol = dict(STAND, fxL=0.14, fxR=-0.12, fyL=0.04, fyR=-0.04, foL=20, pt=-25, st=-15,
-                      afR=88, ahR=18, eR=4, aaR=0, fR=80, thR=40, wfR=0, afL=0, eL=20, aaL=8,
-                      gz=1.0, gt=0, gp=0, ht=28, hl=-8, csR=4)
-    seq("pistol_draw", 0.8, [
-        K(0.0, **STAND),
-        K(0.25, **dict(STAND, afR=20, ahR=-50, eR=90, prR=20, fR=30, st=6, gz=0.6, gp=12)),
-        K(0.38, **dict(STAND, afR=24, ahR=-54, eR=95, fR=85, st=6)),
-        K(0.8, **aim_pistol),
-    ])
-    CLIPS["pistol_aim"] = (2.0, lambda t: add(aim_pistol, {"afR": 1.2 * math.sin(t * math.tau * 0.5), "ahR": 0.8 * math.sin(t * math.tau * 0.37),
-                                                           "sp": 0.8 * math.sin(t * math.tau * 0.5)}), True)
-    seq("pistol_fire", 0.6, [K(0.0, **aim_pistol), K(0.05, **dict(aim_pistol, afR=110, eR=24, wfR=20, sp=-3, hy=-0.02, hp=-6)),
-                             K(0.22, **dict(aim_pistol, afR=100, eR=14, wfR=8, hy=-0.02)), K(0.6, **aim_pistol)])
+    blk = dict(fight, hy=-0.02, sp=2, hp=10, **G("R", (-0.22, 0.28, 1.66), (1, 0.1, 0.05), (0, 0.2, 1)), **H("L", (0.26, 0.26, 1.62), fL=80))
+    seq("block", 0.9, [K(0, **fight), K(0.16, **blk), K(0.28, **dict(blk, hy=-0.07, sp=-2, hzR=1.60, hzL=1.56)), K(0.9, **blk)])
 
-    # ---------------------------------------------------------------- musket (guards)
-    aim_musket = dict(STAND, hz=-0.04, fxL=0.10, fxR=-0.14, fyL=0.20, fyR=-0.12, foL=10, foR=40, pt=-28, st=-12, sp=4,
-                      mk=1, mbx=-0.12, mby=0.12, mbz=1.40, mpitch=2, myaw=0, mroll=240, mlh=0.66, mlw=1.0,
-                      fL=60, fR=75, thL=30, thR=40, gz=1.0, gp=4, gt=6, gl=-14, csR=6)
+    sabre_guard = dict(fight, **G("R", (-0.18, 0.34, 1.20), (0.05, 0.8, 0.6), (0, 0.6, -0.8)), **H("L", (0.22, -0.06, 1.02), epL=40))
+    seq("sabre_draw", 0.95, [
+        K(0.0, **dict(STAND, **H("L", (0.17, 0.02, 0.93)))),
+        K(0.24, st=14, gz=0.8, gp=24, **G("R", (0.12, 0.14, 0.98), (0.15, -0.8, -0.55), (0.1, 0.5, -0.7))),
+        K(0.44, st=8, gp=14, **G("R", (0.02, 0.42, 1.22), (0.2, -0.75, -0.5), (0, 0.6, -0.8))),
+        K(0.60, st=-4, gp=2, **G("R", (-0.12, 0.34, 1.60), (-0.15, 0.1, 1), (0, 0.9, 0.2))),
+        K(0.95, **sabre_guard),
+    ])
+    # moulinet: the point drops past the left side, circles up behind the right shoulder, the cut comes from the
+    # shoulder diagonally down through the target with a lunge
+    seq("sabre_slash", 0.75, [
+        K(0.0, **sabre_guard),
+        K(0.10, **G("R", (-0.10, 0.36, 1.26), (0.35, 0.45, -0.8), (-0.1, 0.85, 0.5))),
+        K(0.22, pt=-10, st=-8, **G("R", (0.0, 0.26, 1.30), (0.25, -0.85, -0.45), (-0.1, 0.45, -0.9))),
+        K(0.34, pt=-26, st=-26, hy=-0.03, **G("R", (-0.30, 0.04, 1.64), (-0.3, -0.55, 0.78), (-0.1, 0.8, 0.55))),
+        K(0.40, fyL=0.28, fzL=AZ + 0.05),
+        K(0.46, pt=12, st=22, sp=16, hy=0.18, hz=-0.12, fyL=0.38, fzL=AZ, **G("R", (-0.04, 0.56, 1.44), (0.40, 0.85, 0.2), (0.1, -0.2, -1)),
+          **H("L", (0.25, -0.16, 1.05))),
+        K(0.55, pt=18, st=28, sp=20, **G("R", (0.20, 0.34, 0.95), (0.65, 0.2, -0.72), (-0.3, 0.9, -0.2))),
+        K(0.75, **sabre_guard),
+    ])
+    parry = dict(sabre_guard, hy=-0.03, hp=-6, **G("R", (-0.30, 0.24, 1.74), (1, 0.15, 0.08), (0, 0.25, 1)))
+    seq("sabre_parry", 0.55, [K(0.0, **sabre_guard), K(0.15, **parry), K(0.27, **dict(parry, hzR=1.70, hy=-0.05)), K(0.55, **sabre_guard)])
+    knife = dict(fight, **G("R", (-0.20, 0.12, 1.02), (0, 0.8, 0.6), (0, 0.6, -0.8)), **H("L", (0.10, 0.36, 1.26)))
+    seq("knife_stab", 0.6, [
+        K(0.0, **knife),
+        K(0.14, pt=-20, **H("L", (0.02, 0.56, 1.38), fL=85), **G("R", (-0.24, -0.06, 1.00), (0, 0.85, 0.5), (0, 0.5, -0.85))),
+        K(0.21, fyL=0.28, fzL=AZ + 0.05),
+        K(0.28, pt=14, st=14, sp=14, hy=0.16, hz=-0.12, fyL=0.36, fzL=AZ, hyL=0.46, **G("R", (-0.03, 0.56, 1.12), (0.05, 0.9, 0.45), (0, 0.45, -0.9))),
+        K(0.6, **knife),
+    ])
+    # pistol: duelling line, right shoulder to the target, arm straight at shoulder height, off hand on the back
+    aim_pistol = dict(STAND, fxL=0.14, fyL=-0.20, foL=55, fxR=-0.05, fyR=0.14, foR=4, pt=52, st=24, gz=1.0, gt=0, gp=0, csR=4,
+                      **G("R", (-0.03, 0.70, 1.45), (0, 0, 1), (0, 1, 0), fR=80, thR=30), **H("L", (0.12, -0.18, 1.00), epL=30))
+    seq("pistol_draw", 0.85, [
+        K(0.0, **STAND),
+        K(0.24, st=8, gz=0.8, gp=20, **G("R", (0.06, 0.16, 1.02), (-0.3, 0.2, 0.93), (0.6, 0.6, -0.4), fR=30)),
+        K(0.36, fR=85),
+        K(0.56, pt=30, st=14, fyL=-0.12, fzL=AZ + 0.04, gp=0, **G("R", (-0.10, 0.36, 1.50), (0, -0.3, 0.95), (0, 0.95, 0.3))),
+        K(0.85, **aim_pistol),
+    ])
+    CLIPS["pistol_aim"] = (2.0, lambda t: add(aim_pistol, {"hzR": 0.006 * math.sin(t * math.tau * 0.5), "hxR": 0.004 * math.sin(t * math.tau * 0.37),
+                                                           "sp": 0.6 * math.sin(t * math.tau * 0.5)}), True)
+    seq("pistol_fire", 0.65, [K(0.0, **aim_pistol),
+                              K(0.04, **dict(aim_pistol, hzR=1.53, hyR=0.64, wyR=-0.75, wzR=0.65, kyR=0.65, kzR=0.75, sp=-4, st=28, hy=-0.03, hp=-6)),
+                              K(0.22, **dict(aim_pistol, hzR=1.47, hyR=0.68, wyR=-0.15, kzR=0.15, hy=-0.02)), K(0.65, **aim_pistol)])
+
+    # ---------------------------------------------------------------- musket (guards; the musket is welded to hand_r)
+    # Austrian 1790s manual order: shoulder, make ready (musket upright before the right shoulder, cock), present,
+    # fire, recover to the priming position at the right hip, prime and load, ram at the muzzle.
+    aim_musket = dict(STAND, hz=-0.04, fxL=0.10, fxR=-0.14, fyL=0.20, fyR=-0.12, foL=10, foR=40, pt=-30, st=-12,
+                      mk=1, mbx=-0.13, mby=0.08, mbz=1.40, mpitch=1, myaw=0, mroll=240, mlh=0.58, mlw=1.0,
+                      fL=60, fR=75, thL=30, thR=40, gz=0.5, gp=10, gt=6, gl=-22, hp=8, hl=-16, sp=8, csR=6)
+    make_ready = dict(STAND, hz=-0.03, fxL=0.12, fxR=-0.14, fyL=0.08, fyR=-0.10, foR=30, pt=-14, st=-6,
+                      mk=1, mbx=-0.16, mby=0.20, mbz=0.78, mpitch=88, mside=4, myaw=0, mroll=180, mlh=0.62, mlw=1.0, fL=70, fR=75, gz=1.0, gp=2)
+    prime = dict(STAND, hz=-0.05, fxL=0.13, fxR=-0.14, fyL=0.10, fyR=-0.12, foR=34, pt=-24, st=-10, sp=6,
+                 mk=1, mbx=-0.22, mby=-0.20, mbz=1.00, mpitch=24, myaw=12, mroll=250, mlh=0.52, mlw=1.0, fL=70, fR=75, gz=0.9, gp=14)
     CLIPS["musket_aim"] = (2.0, lambda t: add(aim_musket, {"mpitch": 0.6 * math.sin(t * math.tau * 0.5), "myaw": 0.5 * math.sin(t * math.tau * 0.31),
                                                           "sp": 0.6 * math.sin(t * math.tau * 0.5)}), True)
-    seq("musket_fire", 0.9, [K(0.0, **aim_musket),
-                             K(0.05, **dict(aim_musket, mpitch=12, mby=0.06, mbz=1.42, hy=-0.04, sp=-3, pt=-32, gp=-2)),
-                             K(0.30, **dict(aim_musket, mpitch=6, mby=0.09, hy=-0.03)), K(0.9, **aim_musket)])
-    port = dict(STAND, hz=-0.03, fxL=0.13, fxR=-0.13, foR=16, mk=1, mbx=-0.16, mby=0.12, mbz=0.84, mpitch=75, myaw=0, mside=35, mroll=-40,
-                mlh=0.50, mlw=1.0, fL=70, fR=75, gz=0.8, gp=4)
-    # the musket is welded 0.30 m above the butt, so ramming happens with the butt at the thigh and the rod hand
-    # working along the upper barrel
-    load = dict(port, mbx=-0.20, mby=0.16, mbz=0.50, mpitch=72, myaw=0, mside=18, mroll=-10, mlw=0.0, gp=24, sp=8)
-    ram_hi = dict(load, ikhL=1, hxL=0.02, hyL=0.46, hzL=1.50, hp=-6, gp=-6)
-    ram_lo = dict(ram_hi, hzL=1.30, hyL=0.42)
-    seq("musket_reload", 4.2, [
-        K(0.0, **aim_musket), K(0.45, **port), K(0.85, **load),
-        K(1.15, **dict(load, ikhL=1, hxL=0.02, hyL=0.18, hzL=1.52, gp=10, hp=6)),      # bite the cartridge
-        K(1.45, **dict(load, ikhL=1, hxL=0.02, hyL=0.18, hzL=1.52, gp=10, hp=6)),
-        K(1.75, **dict(load, ikhL=1, hxL=0.0, hyL=0.46, hzL=1.52, gp=-10)),            # pour into the barrel
-        K(2.05, **ram_hi), K(2.35, **ram_lo), K(2.6, **ram_hi), K(2.85, **ram_lo), K(3.1, **ram_hi),
-        K(3.5, **port), K(4.2, **aim_musket),
+    seq("musket_present", 1.5, [K(0.0, **dict(STAND, **musket_shoulder())), K(0.55, **make_ready), K(0.8, **dict(make_ready, mbz=0.80, hp=4)),
+                                K(1.5, **aim_musket)])
+    seq("musket_fire", 1.2, [K(0.0, **aim_musket),
+                             K(0.05, **dict(aim_musket, mpitch=12, mby=0.03, mbz=1.43, hy=-0.04, sp=-3, pt=-34, gp=-2)),
+                             K(0.30, **dict(aim_musket, mpitch=6, mby=0.06, hy=-0.03)),
+                             K(0.55, **aim_musket),
+                             K(1.2, **prime)])
+    # the weld (hand at the stock wrist, butt 0.42 m below) forces the load into a low squat with the muzzle leaning
+    # to the left shoulder, so the rammer hand works at the muzzle
+    load = dict(STAND, hz=-0.22, hy=-0.02, fxL=0.17, fxR=-0.17, fyL=0.10, fyR=-0.06, foL=14, foR=20, kpL=18, kpR=18, sp=12, pt=-6,
+                mk=1, mbx=-0.10, mby=0.36, mbz=0.30, mpitch=97, mside=10, myaw=0, mroll=180, mlw=0.0, mlh=-1, fL=70, fR=75, gz=0.8, gp=-20)
+    a_up = Vector((0.0, -math.cos(math.radians(97)), math.sin(math.radians(97))))
+    a_up = ry(10) @ a_up
+    muzzle = body(-0.10, 0.36, 0.30) + a_up * 1.5          # world, from the load pose above
+
+    def at_muzzle(off):
+        p = muzzle - a_up * off
+        return H("L", (p.x, -p.y, p.z), hraL=1, hptL=-80, hywL=10, fL=70, thL=40)
+    seq("musket_reload", 4.4, [
+        K(0.0, **prime),
+        K(0.35, mlw=0.0, **H("L", (-0.14, -0.10, 0.98), fL=40)),                     # left hand to the cartridge pouch
+        K(0.55, fL=85),
+        K(0.85, hp=10, **H("L", (0.03, 0.16, 1.55))),                              # bite the cartridge
+        K(1.05, hp=10),
+        K(1.30, hp=0, gp=20, **H("L", (-0.10, 0.12, 1.08))),                       # prime the pan
+        K(1.85, **dict(load, **at_muzzle(0.14))),                                  # cast about: musket upright, pour
+        K(2.10, **at_muzzle(0.14)),
+        K(2.35, **H("L", (0.06, 0.40, 1.10), hraL=0)),                              # draw the rammer from the pipe
+        K(2.60, **at_muzzle(0.06)),
+        K(2.78, **at_muzzle(0.20)), K(2.96, **at_muzzle(0.08)), K(3.14, **at_muzzle(0.20)), K(3.32, **at_muzzle(0.08)),
+        K(3.60, **H("L", (0.06, 0.40, 1.10), hraL=0)),                              # return the rammer
+        K(4.4, **dict(make_ready)),
     ])
-    bay_guard = dict(STAND, hz=-0.10, fxL=0.13, fxR=-0.14, fyL=0.22, fyR=-0.18, foR=30, pt=-20, st=-8, sp=8,
-                     mk=1, mbx=-0.20, mby=-0.02, mbz=0.92, mpitch=10, myaw=4, mroll=240, mlh=0.62, mlw=1.0, fL=70, fR=75, gz=1.0, gp=2)
+    # charge-bayonet guard (fighting idle): bladed, butt at the right hip, left hand on the fore-end, point at the chest
+    bay_guard = dict(STAND, hz=-0.10, fxL=0.12, fxR=-0.16, fyL=0.24, fyR=-0.16, foR=35, pt=-32, st=-12, sp=8,
+                     mk=1, mbx=-0.16, mby=0.04, mbz=1.00, mpitch=8, myaw=6, mroll=240, mlh=0.50, mlw=1.0, fL=70, fR=75, gz=1.0, gp=2)
     CLIPS["musket_ready"] = (2.4, lambda t: add(bay_guard, add(breath(t, 1.5, 0.42), {"hx": 0.012 * math.sin(t * math.tau / 2.4),
                                                                                     "mby": 0.02 * math.sin(t * math.tau / 2.4 + 0.5)})), True)
     seq("bayonet_thrust", 1.0, [
         K(0.0, **bay_guard),
-        K(0.25, **dict(bay_guard, mby=-0.12, mbz=0.94, hy=-0.05, pt=-26)),
-        K(0.45, **dict(bay_guard, mby=0.40, mbz=1.02, mpitch=6, hy=0.14, hz=-0.16, fyL=0.44, pt=-8, st=0, sp=16)),
-        K(0.60, **dict(bay_guard, mby=0.42, mbz=1.02, mpitch=6, hy=0.14, hz=-0.16, fyL=0.44, pt=-8, sp=16)),
-        K(1.0, **dict(bay_guard, hy=0.10, fyL=0.38)),
+        K(0.25, **dict(bay_guard, mby=-0.10, mbz=1.02, hy=-0.05, pt=-38)),
+        K(0.36, **dict(bay_guard, mby=0.10, fyL=0.36, fzL=AZ + 0.06, hy=0.04)),
+        K(0.46, **dict(bay_guard, mby=0.42, mbz=1.06, mpitch=5, hy=0.20, hz=-0.16, fyL=0.46, pt=-16, st=-2, sp=16)),
+        K(0.60, **dict(bay_guard, mby=0.44, mbz=1.06, mpitch=5, hy=0.20, hz=-0.16, fyL=0.46, pt=-16, st=-2, sp=16)),
+        K(1.0, **bay_guard),
+    ])
+    # rising butt stroke: muzzle drops back past the hip, the butt comes up through the target's jaw with a step,
+    # the left hand drives the barrel down as the lever
+    # butt smash: the butt is drawn back past the right hip (anticipation), the step and the hips turn first, then the
+    # musket swings round level so the butt plate lands at head height; the left hand on the barrel is the lever
+    seq("musket_butt", 0.95, [
+        K(0.0, **bay_guard),
+        K(0.22, **dict(bay_guard, mbx=-0.26, mby=-0.14, mbz=1.05, myaw=-12, mpitch=10, pt=-40, st=-22, hy=-0.04)),
+        K(0.32, **dict(bay_guard, mbx=-0.22, mby=0.18, mbz=1.26, myaw=60, mpitch=2, fyL=0.36, fzL=AZ + 0.06, pt=-12, st=-6, hy=0.06)),
+        K(0.42, **dict(bay_guard, mbx=-0.04, mby=0.56, mbz=1.46, myaw=150, mpitch=-8, mlh=0.60, fyL=0.46, fzL=AZ, pt=18, st=24, sp=12,
+                       hy=0.18, hz=-0.12)),
+        K(0.55, **dict(bay_guard, mbx=0.06, mby=0.50, mbz=1.40, myaw=165, mpitch=-10, mlh=0.60, fyL=0.46, pt=22, st=28, sp=14, hy=0.18, hz=-0.12)),
+        K(0.72, **dict(bay_guard, mbx=-0.10, mby=0.30, mbz=1.20, myaw=80, hy=0.10, fyL=0.36)),
+        K(0.95, **bay_guard),
     ])
     shoulder = dict(STAND, **musket_shoulder())
-    seq("musket_butt", 0.9, [
-        K(0.0, **port),
-        K(0.25, **dict(port, mbx=-0.28, mby=-0.10, mbz=0.95, mpitch=110, myaw=10, mside=20, pt=-24, st=-18, hy=-0.03)),
-        K(0.42, **dict(port, mbx=-0.06, mby=0.38, mbz=1.25, mpitch=120, myaw=-20, mside=-10, pt=18, st=16, sp=14, hy=0.10, hz=-0.10, fyL=0.34)),
-        K(0.55, **dict(port, mbx=0.0, mby=0.40, mbz=1.22, mpitch=125, myaw=-26, mside=-14, pt=22, st=18, sp=16, hy=0.12, hz=-0.10, fyL=0.34)),
-        K(0.9, **dict(port, hy=0.10, fyL=0.30)),
-    ])
+    # two-handed seize at chest height: the right fist keeps the musket upright while it grabs the lapel
     seq("guard_seize", 1.2, [
         K(0.0, **shoulder),
-        K(0.25, **dict(shoulder, mbx=-0.32, mby=0.02, mbz=0.48, mpitch=70, mside=10, hy=0.04, sp=8, afL=60, eL=40, fL=20)),
-        K(0.50, **dict(shoulder, mbx=-0.34, mby=0.10, mbz=0.46, mpitch=62, mside=10, hy=0.22, hz=-0.10, sp=20, fyL=0.42, pt=-10,
-                       ikhL=1, hxL=0.05, hyL=0.72, hzL=1.28, fL=40, thL=20)),
-        K(0.70, **dict(shoulder, mbx=-0.34, mby=0.10, mbz=0.46, mpitch=62, mside=10, hy=0.18, hz=-0.10, sp=14, fyL=0.42, pt=-4,
-                       ikhL=1, hxL=0.04, hyL=0.56, hzL=1.24, fL=85, thL=50)),
-        K(1.2, **dict(shoulder, mbx=-0.32, mby=0.08, mbz=0.50, mpitch=70, mside=10, hy=0.14, hz=-0.06, sp=8, fyL=0.34,
-                      ikhL=1, hxL=0.03, hyL=0.48, hzL=1.22, fL=85, thL=50)),
+        K(0.22, **dict(shoulder, mk=0, hy=0.04, sp=8, gz=1.0, **G("R", (-0.18, 0.30, 1.16), (1, 0.1, 0.25), (0.6, 0.3, -1)), **H("L", (0.16, 0.30, 1.22), fL=20))),
+        K(0.34, fyL=0.30, fzL=AZ + 0.06),
+        K(0.48, hy=0.20, hz=-0.10, sp=16, fyL=0.40, fzL=AZ, pt=-4, hxR=-0.12, hyR=0.62, hzR=1.32, hxL=0.12, hyL=0.60, hzL=1.34, fL=40),
+        K(0.62, fL=88, thL=55),
+        K(0.80, hy=0.12, sp=-4, hz=-0.08, hyR=0.46, hyL=0.44, hzR=1.28, hzL=1.30),
+        K(1.2, hy=0.12, sp=-2, hyR=0.44, hyL=0.42),
     ])
 
     # ---------------------------------------------------------------- takedown (rear choke) and its victim
+    # The pair is authored for the victim standing TAKEDOWN_OFFSET m in front of the attacker, same facing: the
+    # right forearm goes across the throat with the crook of the elbow at the front of the neck, the left hand
+    # clamps behind the head, the attacker leans back, then lowers the victim and steps away.
+    TO = TAKEDOWN_OFFSET
+    stalk = dict(STAND, hz=-0.12, sp=14, fyL=0.08, fyR=-0.14, afL=40, afR=40, eL=70, eR=70, gz=0.9, gp=6)
+    choke_arms = {**H("R", (0.20, TO + 0.03, 1.50), pwR=1, pxR=0.0, pyR=1.0, pzR=0.1, fR=80), **H("L", (0.15, TO - 0.07, 1.60), fL=70)}
     seq("takedown", 2.0, [
-        K(0.0, **fight),
-        K(0.25, **dict(fight, hy=0.12, fyL=0.34, fyR=-0.02, sp=10, afR=70, afL=70, eR=90, eL=90)),
-        K(0.45, **dict(fight, hy=0.18, fyL=0.34, fyR=-0.02, sp=6, pt=0, st=0, ikhR=1, hxR=0.10, hyR=0.46, hzR=1.40,
-                       ikhL=1, hxL=0.16, hyL=0.40, hzL=1.48, fR=80, fL=70, csL=12, csR=12)),
-        K(0.9, **dict(fight, hy=0.08, fyL=0.34, fyR=-0.10, sp=-6, pp=-6, ikhR=1, hxR=0.06, hyR=0.34, hzR=1.36,
-                      ikhL=1, hxL=0.14, hyL=0.30, hzL=1.44, hp=-8, csL=14, csR=14, cpL=-8, cpR=-8)),
-        K(1.3, **dict(fight, hy=0.04, fyL=0.34, fyR=-0.10, sp=-4, pp=-4, pt=8, ikhR=1, hxR=0.08, hyR=0.34, hzR=1.30,
-                      ikhL=1, hxL=0.16, hyL=0.30, hzL=1.38)),
-        K(1.7, **dict(CROUCH, hz=-0.32, hy=0.06, sp=24, ikhR=1, hxR=0.10, hyR=0.46, hzR=0.80, ikhL=1, hxL=0.18, hyL=0.44, hzL=0.86)),
-        K(2.0, **dict(CROUCH, hy=0.06)),
+        K(0.0, **stalk),
+        K(0.18, **dict(stalk, hy=0.06, fyL=0.18, fzL=AZ + 0.05, afL=70, afR=80, eL=90, eR=100)),
+        K(0.32, **dict(STAND, hy=0.08, hz=-0.04, sp=10, fyL=0.20, fyR=-0.10, gz=0.9, gp=10, **choke_arms)),
+        K(0.60, sp=4, hp=4),
+        K(0.95, hy=0.0, sp=-8, pp=-6, hz=-0.06, csL=10, csR=10, cpL=-8, cpR=-8, hyR=TO - 0.02, hyL=TO - 0.12, hzR=1.46, hzL=1.56),
+        K(1.35, hy=-0.12, hz=-0.28, sp=12, pp=0, fyR=-0.34, fzR=AZ, hyR=TO - 0.12, hzR=1.08, hyL=TO - 0.18, hzL=1.12),
+        K(1.65, **dict(CROUCH, hy=-0.26, fyL=-0.10, fyR=-0.42, ikhR=0.4, ikhL=0.4)),
+        K(2.0, **dict(CROUCH, hy=-0.30, fyL=-0.14, fyR=-0.44)),
     ])
     seq("takedown_victim", 2.0, [
         K(0.0, **STAND),
-        K(0.35, **dict(STAND, hp=-24, np=-10, sp=-8, csL=14, csR=14, gz=0)),
-        K(0.55, **dict(STAND, hp=-26, np=-12, sp=-10, hy=-0.05, ikhL=1, ikhR=1, hxL=0.06, hxR=-0.06, hyL=0.02, hyR=0.02, hzL=1.42, hzR=1.42, fL=80, fR=80)),
-        K(0.95, **dict(STAND, hp=-20, np=-10, sp=-14, pp=-8, hy=-0.10, hz=-0.06, ikhL=1, ikhR=1, hxL=0.08, hxR=-0.04, hyL=0.04, hyR=0.00, hzL=1.36, hzR=1.40,
-                       fyL=0.06, fzL=AZ + 0.05, aL=20)),
-        K(1.35, **dict(STAND, hp=-6, np=0, sp=6, pp=-10, hy=-0.14, hz=-0.24, kL=40, afL=10, afR=16, eL=30, eR=40, ikhL=0.4, ikhR=0.4, hzL=1.1, hzR=1.1)),
-        K(1.7, **dict(kneel, hy=-0.14, sp=-10, pp=-20, hp=10, afL=0, afR=10, eL=20, eR=20)),
-        K(2.0, **lie_back(hy=-0.55)),
+        K(0.32, **dict(STAND, hp=-22, np=-10, sp=-6, csL=14, csR=10, gz=0, **H("L", (0.06, 0.12, 1.42), fL=80))),
+        K(0.60, hp=-18, pt=8, st=10, hxL=0.04),
+        K(0.95, hp=-20, np=-12, sp=-12, pp=-8, hy=-0.05, hz=-0.05, kL=20, fyL=0.04, fzL=AZ + 0.04, aL=15, hyL=0.10),
+        K(1.35, hp=-4, np=0, sp=4, pp=-14, hy=-0.12, hz=-0.34, kL=60, kR=60, fyL=0.08, fzL=AZ, aL=0, ikhL=0.3, afL=10, eL=30),
+        K(1.65, **dict(kneel, hy=-0.10, sp=-10, pp=-22, hp=10, afL=0, eL=20)),
+        K(2.0, **lie_back(hy=0.12, pt=70, ht=30)),
     ])
 
     # ---------------------------------------------------------------- townsfolk life
@@ -1197,6 +1318,88 @@ def define_clips():
             P.update({"ikh" + S: 1, "hx" + S: x, "hy" + S: y, "hz" + S: zz + 0.03 * math.sin(2 * math.pi * ph)})
         return P
     CLIPS["sweep"] = (1.6, _sweep, True)
+
+    # ---------------------------------------------------------------- window life (scripts/city/window_life.gd)
+    # A figure stands in the room behind an open street window, the sill top 1.02 m above its feet (window_life
+    # sets the figure that far below the sill). Only what crosses the window plane shows: the leans put the head,
+    # shoulders and forearms out over the sill. Hand targets are absolute (feet frame); poles push the elbows out.
+    SILL = 1.02
+    lean = stand(hy=-0.10, hz=-0.03, pp=16, sp=36, np=-4, gz=0.7, gp=26,
+                 ikhL=1, ikhR=1, hxL=0.10, hxR=-0.12, hyL=0.60, hyR=0.58, hzL=SILL + 0.03, hzR=SILL + 0.03,
+                 pwL=1, pwR=1, pxL=0.9, pxR=-0.9, pyL=0.1, pyR=0.1, pzL=-0.35, pzR=-0.35, fL=45, fR=45, thL=20, thR=20,
+                 wdL=-10, wdR=-10)
+
+    def _window_lean(t):
+        w = math.sin(t * math.tau / 6.0)
+        P = dict(lean)
+        P["gt"] = 28 * math.sin(t * math.tau / 6.0 + 0.4) * ss(0.5 + 0.6 * math.sin(t * math.tau / 3.0 + 1.1))
+        P["gp"] = 26 + 8 * math.sin(t * math.tau / 3.0)
+        P["st"] = 4 * w
+        P["hyR"] = lean["hyR"] + 0.02 * math.sin(t * math.tau / 2.0)
+        return add(P, breath(t, 1.0, 0.25))
+    CLIPS["window_lean"] = (6.0, _window_lean, True)
+
+    # tipping a bucket over the sill: lift it from the chest onto the sill (0.8 s), tip it (1.3 s), pour, set it back
+    hold = stand(hy=-0.06, pp=6, sp=14, gz=0.6, gp=20, ikhL=1, ikhR=1, hxL=0.17, hxR=-0.17, hyL=0.36, hyR=0.36,
+                 hzL=1.12, hzR=1.12, pwL=1, pwR=1, pxL=0.8, pxR=-0.8, pyL=0.3, pyR=0.3, pzL=-0.6, pzR=-0.6,
+                 fL=70, fR=70, thL=40, thR=40)
+    on_sill = dict(hold, pp=12, sp=26, hyL=0.56, hyR=0.56, hzL=SILL + 0.22, hzR=SILL + 0.22, gp=30)
+    tipped = dict(on_sill, pp=16, sp=34, hxL=0.14, hxR=-0.18, hyL=0.54, hyR=0.70, hzL=SILL + 0.38, hzR=SILL + 0.22, gp=38)
+    seq("window_pour", 3.2, [
+        K(0.0, **hold), K(0.8, **on_sill), K(1.3, **tipped), K(2.4, **dict(tipped, hzL=SILL + 0.42, sp=35)),
+        K(2.8, **on_sill), K(3.2, **hold)])
+
+    # an underarm-then-over toss out of the window with the right hand: wind up (0.5 s), release at 0.78 s
+    base_t = stand(hy=-0.06, pp=8, sp=18, gz=0.7, gp=22, ikhL=1, hxL=0.16, hyL=0.50, hzL=SILL + 0.04, fL=40,
+                   pwL=1, pxL=0.9, pyL=0.1, pzL=-0.3,
+                   ikhR=1, hxR=-0.18, hyR=0.30, hzR=1.18, fR=70, thR=40)
+    seq("window_throw", 1.6, [
+        K(0.0, **base_t),
+        K(0.5, **dict(base_t, hxR=-0.30, hyR=0.02, hzR=1.62, st=-22, pt=-6, sp=10, pp=4)),
+        K(0.78, **dict(base_t, hxR=-0.12, hyR=0.78, hzR=1.40, st=10, pt=4, sp=30, pp=14, fR=10, thR=5)),
+        K(1.05, **dict(base_t, hxR=-0.08, hyR=0.66, hzR=1.08, st=6, sp=32, pp=14, fR=12, thR=6)),
+        K(1.6, **base_t)])
+
+    # shaking a duster out of the window: both hands out over the sill, quick up-down snaps
+    shake = stand(hy=-0.08, pp=14, sp=30, gz=0.6, gp=30, ikhL=1, ikhR=1, hxL=0.16, hxR=-0.16, hyL=0.66, hyR=0.66,
+                  pwL=1, pwR=1, pxL=0.9, pxR=-0.9, pyL=0.0, pyR=0.0, pzL=-0.4, pzR=-0.4, fL=80, fR=80, thL=50, thR=50)
+
+    def _shake(t):
+        ph = (t / 1.0) % 1.0
+        snap = math.sin(ph * math.tau * 2) ** 3
+        P = dict(shake)
+        P["hzL"] = SILL + 0.26 + 0.13 * snap
+        P["hzR"] = SILL + 0.26 + 0.13 * math.sin(ph * math.tau * 2 + 0.3) ** 3
+        P["sp"] = shake["sp"] + 2.5 * snap
+        return P
+    CLIPS["window_shake_cloth"] = (1.0, _shake, True)
+
+    # cooking: standing at a pot on the sill (or a cauldron), left hand on the rim, right hand stirring round
+    cook = stand(hy=-0.03, pp=6, sp=16, gz=0.7, gp=34, ikhL=1, hxL=0.16, hyL=0.44, hzL=1.06, fL=70, thL=40,
+                 pwL=1, pxL=0.9, pyL=0.3, pzL=-0.8, ikhR=1, fR=85, thR=50, pwR=1, pxR=-0.9, pyR=0.3, pzR=-0.8)
+
+    def _stir(t):
+        a = t * math.tau / 2.4
+        P = dict(cook)
+        P["hxR"] = -0.04 + 0.08 * math.cos(a)
+        P["hyR"] = 0.46 + 0.07 * math.sin(a)
+        P["hzR"] = 1.16 + 0.015 * math.sin(2 * a)
+        P["st"] = 3 * math.cos(a)
+        P["gt"] = 6 * math.sin(a * 0.5)
+        return add(P, breath(t, 0.8, 0.25))
+    CLIPS["cook_stir"] = (2.4, _stir, True)
+
+    def _chop(t):
+        ph = (t / 0.8) % 1.0
+        down = ss(ph / 0.25) if ph < 0.25 else 1.0 - ss((ph - 0.25) / 0.75)
+        P = dict(cook, hxL=0.12, hyL=0.42, hzL=1.00, fL=60)
+        P["hxR"] = -0.10
+        P["hyR"] = 0.44
+        P["hzR"] = 1.22 - 0.18 * down
+        P["sp"] = cook["sp"] + 2 * down
+        P["gp"] = 40
+        return P
+    CLIPS["cook_chop"] = (0.8, _chop, True)
 
 
 # ------------------------------------------------------------------ baking & export

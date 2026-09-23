@@ -70,8 +70,10 @@ rendered on `figure_noble`, `figure_veteran_f` and `watchman`:
   pitches down hard (`bow`, `death_kneel`).
 - Also expected, not rendered: the rigid sash on `spine_02` will intersect the coat when the torso bends forward
   (`sneak`, `bow`).
-- The musket welded to `hand_r` rotates with the wrist. Its grip is 0.11 m to the side of the wrist and 0.30 m
-  above the butt, so order arms (butt on the ground) is impossible and two-handed holds need a roll.
+- The musket welded to `hand_r` rotates with the wrist. Since `MUSKET_OFFSET` = (0.01, 0.02, -0.42) the stock
+  wrist sits at the hand (the butt 0.42 m below it) and `build_animations.py` reads the same constant. Order arms
+  (butt on the ground) and ramming at the muzzle with the left hand are still geometrically impossible for this
+  rig's 0.51 m arm while the right hand stays on the stock wrist; see section 6.
 
 ### Fixes needed in `assets/blender/build_characters.py` (not applied here)
 
@@ -89,11 +91,9 @@ rendered on `figure_noble`, `figure_veteran_f` and `watchman`:
    - `waist_belt()`: weight `belt`/`sash`/`sash_knot` 50/50 to `pelvis` and `spine_01` instead of `spine_02`
      alone.
    - `sash_tail`: `pelvis` 0.6 + `thigh_l` 0.4 instead of all `thigh_l`.
-4. **`_musket()`: move the grip into the palm or detach the musket.**
-   - Best: export the musket as its own `musket.glb` and let Godot hang it on a `BoneAttachment3D` for `hand_r`,
-     so it can be dropped when a guard is knocked down, and so order arms works.
-   - Minimum: centre the stock wrist on the palm (`x = hand.x + 0.01`, not `hand.x - 0.11`). If you change this,
-     re-tune `musket_hand()` in `build_animations.py`, which models the current offset.
+4. **`_musket()`: grip centred on the stock wrist (done, `MUSKET_OFFSET`).** Still recommended: export the musket
+   as its own `musket.glb` on a `BoneAttachment3D` that can switch to `hand_l` for loading and be dropped when a
+   guard is downed (needed for a true order-arms and muzzle ramming).
 5. **Canonical bone rolls (optional).** After `add_builtin_rig()`, in edit mode align the rolls of `ball_*`,
    `foot_*` and `spine_*` to fixed world axes (`eb.align_roll(...)`). Rests then differ only by real anatomy.
    Runtime retargeting stays in place for the thigh and pelvis angles.
@@ -253,3 +253,25 @@ In shot mode (`--smoke --shot=`), the player walks in place (`walk_fast`) whenev
 - Prone crawling uses the crouch collision rules. There is no crawl-under-obstacle gameplay, so `crouch_crawl`
   is unused.
 - The HUD's key hints (`scripts/ui/hud.gd`) do not mention Z for prone yet.
+
+## 6. Fight review (four-view sheets)
+
+`render_animations.py -- --review --out DIR [clip ...]` renders every weapon, fight, hit, fall and death clip in
+five rows (front, left side, right side, 3/4 front, back) × 8 frames, on a 0.25 m ground grid. Colours are flat:
+the veteran is orange, the watchman blue.
+- Player clips play on `figure_veteran` with a stand-in cudgel, sabre, knife or pistol parented to `hand_r`.
+- Guard and reaction clips play on the watchman with his welded musket.
+- `takedown` plays as a pair: the victim stands `TAKEDOWN_OFFSET` = 0.22 m in front of the attacker, same facing.
+
+In game, `-- --smoke --fight-shot=DIR` (in `player.gd`) poses the player next to a temporary guard and saves a
+side and a front shot of each moment:
+- takedown grab and lower;
+- cudgel contact against `musket_ready`;
+- hit_react against `musket_butt`;
+- knocked_down.
+
+It uses a temporary Camera3D and restores the player's camera and physics after each shot.
+
+The weld still limits the musket. The right hand holds the stock wrist 0.42 m above the butt, and the rig's arm
+is 0.51 m long. So the reload loads in a squat with the musket upright in front, the left hand working at the
+muzzle. There is no true order arms: that needs the musket as a separate prop.

@@ -135,6 +135,7 @@ func _smoke() -> void:
 	print("[smoke] guards=%d player=%s" % [guards.size(), player.global_position if player else "none"])
 	print("[smoke] npcs=%d animals=%d" % [get_tree().get_nodes_in_group("npcs").size(), get_tree().get_nodes_in_group("animals").size()])
 	await _smoke_schedules(player)
+	await _perf_report()
 	await _shots(player)
 	for g in guards:
 		print("[smoke]   %-16s state=%s suspicion=%.1f pos=%s" % [g.guard_name, Guard.State.keys()[g.state], g.suspicion, g.global_position])
@@ -213,6 +214,26 @@ func _smoke_schedules(player: Player) -> void:
 
 
 ## With `-- --smoke --shot=/dir`, saves player-view and overhead PNGs (needs a real window, not --headless).
+## Frame-time and scene-size figures for the optimisation pass: averaged over 120 frames of the player's view.
+## Headless runs report the scene counts only (no frames are rendered there).
+func _perf_report() -> void:
+	var t0 := Time.get_ticks_usec()
+	var frames := 120
+	for i in frames:
+		await get_tree().process_frame
+	var ms := (Time.get_ticks_usec() - t0) / 1000.0 / frames
+	var objs := Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
+	var prims := Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
+	var draws := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+	var vram := Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0
+	var tex := Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0
+	var nodes := Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+	var lights := get_tree().get_nodes_in_group("flame_lights").size()
+	var mem := Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
+	print("[smoke] perf frame_ms=%.2f fps=%.0f objects=%d primitives=%d draw_calls=%d vram_mb=%.0f tex_mb=%.0f nodes=%d lights=%d ram_mb=%.0f load_s=%.1f" % [
+		ms, 1000.0 / maxf(ms, 0.01), objs, prims, draws, vram, tex, nodes, lights, mem, Time.get_ticks_msec() / 1000.0])
+
+
 func _shots(player: Player) -> void:
 	var dir := ""
 	for a in OS.get_cmdline_user_args():
