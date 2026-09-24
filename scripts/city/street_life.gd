@@ -56,6 +56,13 @@ const FRONT := 4.0
 ## `soft`: the swing only shoves (drunks). `on_felled(self)` runs either way.
 class Tough extends "res://scripts/npc/npc.gd":
 	var fair := false
+
+	func _get_up() -> void:
+		super()
+		if has_meta("layer_up"):
+			collision_layer = int(get_meta("layer_up"))
+			remove_meta("layer_up")
+
 	var soft := false
 	var on_felled: Callable
 
@@ -76,6 +83,26 @@ class Tough extends "res://scripts/npc/npc.gd":
 				on_felled.call(self)
 			return
 		super(secs)
+		# npc.gd drops the capsule while down, and with no collider gravity pulls the body through the cobbles
+		# (the "vanished into thin air" thugs): keep it standing on the floor, just out of everyone's way
+		if not has_meta("layer_up"):
+			set_meta("layer_up", collision_layer)
+		collision_layer = 0
+		_shape.disabled = false
+		velocity = Vector3.ZERO
+		var p := get_tree().get_first_node_in_group("player")
+		var kit: Object = p.get("kit") if p else null
+		if kit and str(kit.get("last_takedown")) == "lethal":
+			# a knife in the dark: he stays where he fell, a body for the watch to find (group "body"), until dawn
+			set_meta("dead", true)
+			_down_left = 1.0e9
+			add_to_group("body")
+			if is_in_group("takedown"):
+				remove_from_group("takedown")
+			Assets.play_action(_figure, "death_fall_forward", 1.0, true)
+		else:
+			_down_left = randf_range(20.0, 40.0)
+			Assets.play_action(_figure, "knocked_down", 1.0, true)
 		if on_felled.is_valid():
 			on_felled.call(self)
 
@@ -614,6 +641,9 @@ func _actor(models: Array, pos: Vector3, yaw: float, tough := false):
 			return null
 		a.claim()
 	a.set_meta("sl_key", key)
+	for m in ["walking_off", "dead"]:
+		if a.has_meta(m):
+			a.remove_meta(m)
 	a.speed = 1.1
 	a.add_to_group("street_life")
 	if a is Tough:
@@ -629,8 +659,77 @@ func _actor(models: Array, pos: Vector3, yaw: float, tough := false):
 	return a
 
 
-func _park(a) -> void:
-	if not _ok(a):
+## Nobody vanishes in view: a parked actor must be > 40 m from the player and outside the camera, or stepping
+## through a door (going indoors is walking off). Otherwise he walks (or limps) off to an exit first.
+func _out_of_sight(a) -> bool:
+	var p := _player()
+	var pos: Vector3 = (a as Node3D).global_position
+	if p and _flat(p.global_position, pos) <= 40.0:
+		return false
+	var cam := get_viewport().get_camera_3d()
+	return cam == null or not cam.is_position_in_frustum(pos + Vector3(0, 1.0, 0))
+
+
+func _at_door(a) -> bool:
+	var pos: Vector3 = (a as Node3D).global_position
+	for i in portals.size():
+		if _flat(_door_of(i, 1.0), pos) < 1.6:
+			return true
+	return _flat(pos, Vector3(-16, 0, 17.0)) < 1.8      # the Town Hall door
+
+
+func _walk_off(a, limp := false) -> void:
+	if not _ok(a) or a.has_meta("walking_off") or a.has_meta("dead"):
+		return
+	a.set_meta("walking_off", true)
+	var p := _player()
+	var here: Vector3 = a.global_position
+	var ex: Array = []
+	for e in D["crime"]["exits"]:
+		ex.append(_v(e))
+	ex.sort_custom(func(x, y): return _flat(x, here) < _flat(y, here))
+	var goal: Vector3 = ex[0]
+	var best_far := -1.0
+	for e in ex:
+		var fp := _flat(e, p.global_position) if p else 99.0
+		if fp > 40.0:
+			goal = e
+			break
+		if fp > best_far:
+			best_far = fp
+			goal = e
+	if limp:
+		a.speed = 0.6
+	a.script_goto(goal, 0.0, not limp and a.speed > 1.5)
+	var t := 0.0
+	var st := randf_range(3.0, 6.0)
+	while _ok(a) and not a.script_arrived and t < 120.0 and not _out_of_sight(a):
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		if limp and t > st:
+			st = t + randf_range(4.0, 7.0)
+			_act(a, "stumble")
+	while _ok(a) and not _out_of_sight(a) and t < 600.0:
+		await get_tree().create_timer(1.0, false).timeout
+		t += 1.0
+	if _ok(a):
+		a.remove_meta("walking_off")
+		_park(a, true)
+
+
+## After a blow: he lies there (20-40 s), gets up and limps off to an alley, out of sight before he is gone.
+func _after_down(a) -> void:
+	while _ok(a) and a.is_downed():
+		await get_tree().create_timer(0.5, false).timeout
+	if _ok(a) and not a.has_meta("dead"):
+		_walk_off(a, true)
+
+
+func _park(a, force := false) -> void:
+	if not _ok(a) or a.has_meta("dead"):
+		return
+	if not force and not _at_door(a) and not _out_of_sight(a):
+		_walk_off(a, a.speed < 0.8)
 		return
 	if a.is_downed():
 		a._get_up()
@@ -763,6 +862,11 @@ func _reachable(p: Vector3, from := Vector3(0, 0, -20)) -> bool:
 
 func _leave(a, run := false) -> void:
 	if not _ok(a):
+		return
+	if a is Tough or a.has_meta("soldier"):     # thugs, drunks, soldiers: off to an alley or the barracks road
+		if run:
+			a.speed = 2.0
+		await _walk_off(a)
 		return
 	var home := _nearest(_entries(), (a as Node3D).global_position, 4.0)
 	await _goto(a, home, run, 40.0, true)
@@ -1795,7 +1899,7 @@ func riot(centre: Vector3, intensity: float = 0.5, cause: String = "bread") -> v
 	_msg("riot", {"cause": cause}, 4.0)
 	_flag("riot_on", true)
 	riot_started.emit(centre, intensity, cause)
-	_anchors["riot"] = [centre, Vector3(6.0, 2.6, 5.0), 1.2]
+	_anchors["riot"] = [leader if leader else centre, Vector3(5.0, 2.4, 4.5), 1.2]
 	_riot_loop()
 
 
@@ -1993,6 +2097,7 @@ func _riot_volley(c: Vector3, mob: Array) -> void:
 	var rioters: Array = (riot_state["rioters"] as Array).filter(func(r): return _ok(r) and r != riot_state.get("leader"))
 	for r in rioters.slice(0, dead_n):
 		r.set_meta("dead", true)
+		r.add_to_group("body")
 		_halt(r)
 		_act(r, "death_fall" if _rng.randf() < 0.6 else "death_fall_forward", true)
 		r.remove_from_group("crowd")
@@ -2734,8 +2839,9 @@ func _ev_cutpurse(o: Dictionary) -> void:
 		await get_tree().physics_frame
 		run_t += get_physics_process_delta_time()
 	if _ok(thief) and thief.is_downed():
-		await get_tree().create_timer(6.0, false).timeout
-	_park(thief)
+		await _after_down(thief)
+	elif _ok(thief):
+		_park(thief)       # arrived at the alley: gone only once out of sight
 
 
 func _thief_felled(thief) -> void:
@@ -2978,9 +3084,8 @@ func _mug_fight(p: Node3D, t1, t2) -> String:
 		t += get_physics_process_delta_time()
 	if down[0] >= 2:
 		_msg("mug_fought", {}, 4.0)
-		await get_tree().create_timer(8.0, false).timeout
-		_park(t1)
-		_park(t2)
+		_after_down(t1)
+		_after_down(t2)
 		return "fought"
 	var n := mini(int(D["crime"]["mug_cost"]), GameState.coins)
 	GameState.coins -= n
@@ -3032,8 +3137,8 @@ func _ev_burglar(o: Dictionary) -> void:
 		b.fair = true
 		b.add_to_group("takedown")
 		await _goto(b, _exit_near(pos), true, 20.0, true)
-	else:
-		b._set_hidden(true)          # in through the shutter
+	elif _out_of_sight(b):
+		b._set_hidden(true)          # in through the shutter, with nobody looking
 		await get_tree().create_timer(4.0, false).timeout
 	_park(b)
 
@@ -3629,6 +3734,7 @@ func _smoke_main() -> void:
 		p.reset_physics_interpolation()
 		_room_left = 0.0
 		_flag("brothel_room", false)
+	await _burst_check(shots)
 	var rt := 0.0
 	while (riot_state.get("on", false) or not fire.burning.is_empty()) and rt < 10.0:
 		await get_tree().physics_frame
@@ -3723,6 +3829,53 @@ func _clear_cam(look: Vector3, pref: Vector3) -> Vector3:
 				and Perception.clear_line(space, cp, cp + off.normalized() * 0.4, [], null, true):
 			return cp
 	return Vector3(look.x + pref.x, pref.y, look.z + pref.z)
+
+
+## After a mugging fight both thugs are felled by the player; for six frames they must still be there (on the
+## cobbles), and they may only be parked once out of sight. Windowed: six captures street_burst_<n>.png.
+func _burst_check(shots: bool) -> void:
+	var p := _player()
+	if p == null:
+		return
+	var c := _nav_point(p.global_position + Vector3(2.0, 0, 0))
+	var t1 = _actor(D["crime"]["thugs"][0], c, 0.0, true)
+	var t2 = _actor(D["crime"]["thugs"][1], c + Vector3(1.2, 0, 0.4), 0.0, true)
+	if t1 == null or t2 == null:
+		return
+	for t in [t1, t2]:
+		t.fair = true
+		t.knock_down(60.0)
+		_after_down(t)
+	var cam: Camera3D = null
+	var layers: Array = []
+	if shots:
+		cam = Camera3D.new()
+		cam.fov = 58
+		add_child(cam)
+		for cl in get_tree().root.find_children("*", "CanvasLayer", true, false):
+			if (cl as CanvasLayer).visible:
+				(cl as CanvasLayer).visible = false
+				layers.append(cl)
+	var seen := PackedStringArray()
+	for f in 6:
+		if cam:
+			var mid: Vector3 = (t1.global_position + t2.global_position) * 0.5
+			cam.look_at_from_position(_clear_cam(mid + Vector3(0, 0.4, 0), Vector3(2.6, 1.6, 2.6)), mid + Vector3(0, 0.3, 0))
+			cam.current = true
+		await get_tree().process_frame
+		seen.append("%d%d" % [int(t1.visible and t1.process_mode != Node.PROCESS_MODE_DISABLED), int(t2.visible and t2.process_mode != Node.PROCESS_MODE_DISABLED)])
+		if cam:
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("%s/street_burst_%d.png" % [_shot_dir, f])
+	if cam:
+		cam.queue_free()
+		for cl in layers:
+			if is_instance_valid(cl):
+				(cl as CanvasLayer).visible = true
+	# and asking to park them in plain view must refuse (they walk off instead)
+	_park(t1)
+	print("[smoke] street_life burst frames=%s y=%.2f,%.2f downed=%s,%s clip=%s park_in_view_refused=%s" % [",".join(seen), t1.global_position.y, t2.global_position.y, t1.is_downed(), t2.is_downed(),
+			Assets.action_clip(t1._figure), t1.visible and t1.process_mode != Node.PROCESS_MODE_DISABLED])
 
 
 func _prop_state(key: String) -> String:
