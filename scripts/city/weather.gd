@@ -67,12 +67,13 @@ var roof_rate := 0.0              ## roof cover change per game hour right now (
 var frozen := false               ## shots / tests: hold the state still
 var time_override := -1.0
 var daylight := 0.0
+var sun_elevation := -30.0     ## degrees, from the January arc in _apply_sky (sky.gd draws the disc)
+var sun_azimuth := 0.0
 var visibility := 1.0
 var precip_scale := 1.0
 var fx: Node3D                    ## weather_fx.gd: fog volumes, breath, drips, sheds, tracks
 
 var _env: Environment
-var _sky: ProceduralSkyMaterial
 var _moon: DirectionalLight3D
 var _probe: ReflectionProbe
 var _probe_daylight := -1.0
@@ -245,8 +246,6 @@ func _find_refs() -> void:
 		for n in get_parent().get_children():
 			if n is WorldEnvironment:
 				_env = n.environment
-	if _env and _env.sky and _env.sky.sky_material is ProceduralSkyMaterial:
-		_sky = _env.sky.sky_material
 	for n in get_tree().get_nodes_in_group("moon_light"):
 		if n is DirectionalLight3D and (n as Node3D).get_world_3d() == world:
 			_moon = n
@@ -338,7 +337,7 @@ func _update_state() -> void:
 		"temperature": temperature, "snow_cover": snow_cover, "roof_cover": snow_cover, "ground_cover": ground_cover,
 		"ground_snow": ground_cover, "wetness": wetness, "puddles": puddles, "crust": crust, "fresh": fresh,
 		"icicles": icicles, "mist": _mist_now(), "roof_rate": roof_rate, "time_of_day": _time_of_day(),
-		"daylight": daylight, "visibility": visibility, "precipitation": _precip_amount(),
+		"daylight": daylight, "sun_elevation": sun_elevation, "sun_azimuth": sun_azimuth, "visibility": visibility, "precipitation": _precip_amount(),
 		"particles": particle_count(), "sounds": preset.get("sounds", []), "under_cover": _under_cover,
 	}
 
@@ -501,32 +500,27 @@ func _c(key: String, fallback: Color) -> Color:
 
 func _apply_sky() -> void:
 	var tod := _time_of_day()
-	# December in Kraków: the sun clears the roofs only a little (about 18-20 degrees at noon).
-	var elev := 20.0 * sin(PI * (tod - 6.0) / 12.0)
+	# Mid-January in Kraków: sunrise 07:36, sunset 16:00, the sun clearing the roofs only a little (17.5 degrees at
+	# noon, 11:48). Outside those hours it sinks about 9 degrees an hour, so it is fully dark by ~17:20.
+	var day_t := (tod - 7.6) / 8.4
+	var elev: float
+	if day_t >= 0.0 and day_t <= 1.0:
+		elev = 17.5 * sin(PI * day_t)
+	else:
+		var out := minf(absf(day_t), absf(day_t - 1.0)) * 8.4
+		elev = -minf(out * 9.0, 40.0)
+	var az := -(tod - 11.8) * 15.0
+	sun_elevation = elev
+	sun_azimuth = az
 	daylight = smoothstep(-5.0, 8.0, elev)
 	var ov := float(preset.get("overcast", 0.0))
 	var moon_k := 1.0 - smoothstep(-8.0, -3.0, elev)
 	var sun_k := smoothstep(-3.0, 6.0, elev)
-	var night_top := _c("sky_top", Color(0.02, 0.025, 0.06))
-	var night_hor := _c("sky_horizon", Color(0.10, 0.09, 0.14))
-	var day_top := _c("day_top", Color(0.2, 0.38, 0.72))
 	var day_hor := _c("day_horizon", Color(0.62, 0.70, 0.80))
-	var top := night_top.lerp(day_top, daylight)
-	var hor := night_hor.lerp(day_hor, daylight)
-	# dawn / dusk: a warm band on the horizon while the sun is low
-	var low := smoothstep(-4.0, 2.0, elev) * (1.0 - smoothstep(4.0, 12.0, elev)) * (1.0 - ov * 0.8)
-	hor = hor.lerp(Color(0.95, 0.62, 0.42), low * 0.45)
-	if _sky:
-		_sky.sky_top_color = top
-		_sky.sky_horizon_color = hor
-		var snow_ground := lerpf(0.3, 0.8, snow_cover) * daylight
-		_sky.ground_horizon_color = hor.darkened(0.25).lerp(Color(0.75, 0.77, 0.82), snow_ground * 0.4)
-		_sky.ground_bottom_color = top.darkened(0.6).lerp(Color(0.5, 0.52, 0.56), snow_ground * 0.5)
-		_sky.sun_angle_max = lerpf(1.6, 8.0, sun_k)
-		_sky.sun_curve = lerpf(0.12, 0.08, sun_k)
+	# The sky itself (colours, sun and moon discs, clouds, stars, the dawn band) is scripts/city/sky.gd: it polls this
+	# state and the directional light. Only the ambient, fog and exposure are set here.
 	if _moon:
 		if elev > -3.0:
-			var az := -(tod - 12.0) * 14.0
 			_moon.rotation_degrees = Vector3(-maxf(elev, 3.0), az, 0)
 			var warm := Color(1.0, 0.70, 0.48).lerp(Color(1.0, 0.93, 0.84), smoothstep(3.0, 18.0, elev))
 			_moon.light_color = warm.lerp(Color(0.86, 0.9, 0.97), ov)
@@ -539,7 +533,6 @@ func _apply_sky() -> void:
 			_moon.light_energy = float(preset.get("moon_energy", 0.45)) * moon_k
 			_moon.light_angular_distance = lerpf(0.5, 3.0, ov)
 			_moon.light_volumetric_fog_energy = 0.4
-		_moon.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY if ov > 0.5 else DirectionalLight3D.SKY_MODE_LIGHT_AND_SKY
 	if _env:
 		var amb_night := Color(0.18, 0.21, 0.34)
 		# daylight ambient stays near neutral: the blue sky already comes in through GI and reflections

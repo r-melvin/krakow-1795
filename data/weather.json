@@ -5,16 +5,35 @@
     "clear_frost": {
       "kind": "clear",
       "intensity": 0.0,
-      "wind": [0.6, 0.2],
+      "wind": [
+        0.6,
+        0.2
+      ],
       "temperature": -8,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
       "start_wetness": 0.0,
       "precip": {},
-      "sky_top": [0.02, 0.025, 0.06],
-      "sky_horizon": [0.1, 0.09, 0.14],
-      "day_top": [0.3, 0.42, 0.6],
-      "day_horizon": [0.68, 0.72, 0.78],
+      "sky_top": [
+        0.02,
+        0.025,
+        0.06
+      ],
+      "sky_horizon": [
+        0.1,
+        0.09,
+        0.14
+      ],
+      "day_top": [
+        0.3,
+        0.42,
+        0.6
+      ],
+      "day_horizon": [
+        0.68,
+        0.72,
+        0.78
+      ],
       "moon_energy": 0.45,
       "sun_energy": 1.2,
       "overcast": 0.0,
@@ -23,14 +42,20 @@
       "volumetric_density": 0.018,
       "exposure": 1.1,
       "visibility": 1.0,
-      "sounds": ["frost_still", "distant_dogs"],
+      "sounds": [
+        "frost_still",
+        "distant_dogs"
+      ],
       "mist": 0.35,
       "start_ground_cover": 0.75
     },
     "light_snow": {
       "kind": "snow",
       "intensity": 0.45,
-      "wind": [1.4, 0.5],
+      "wind": [
+        1.4,
+        0.5
+      ],
       "temperature": -3,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
@@ -42,10 +67,26 @@
         "fall": 1.0,
         "turbulence": 0.9
       },
-      "sky_top": [0.035, 0.035, 0.055],
-      "sky_horizon": [0.13, 0.12, 0.15],
-      "day_top": [0.42, 0.46, 0.54],
-      "day_horizon": [0.66, 0.68, 0.72],
+      "sky_top": [
+        0.035,
+        0.035,
+        0.055
+      ],
+      "sky_horizon": [
+        0.13,
+        0.12,
+        0.15
+      ],
+      "day_top": [
+        0.42,
+        0.46,
+        0.54
+      ],
+      "day_horizon": [
+        0.66,
+        0.68,
+        0.72
+      ],
       "moon_energy": 0.35,
       "sun_energy": 0.45,
       "overcast": 0.7,
@@ -54,15 +95,29 @@
       "volumetric_density": 0.03,
       "exposure": 1.25,
       "visibility": 0.9,
-      "sounds": ["snow_hush", "wind_soft"],
-      "fog_color": [0.1, 0.105, 0.13],
-      "fog_emission": [0.025, 0.028, 0.036],
+      "sounds": [
+        "snow_hush",
+        "wind_soft"
+      ],
+      "fog_color": [
+        0.1,
+        0.105,
+        0.13
+      ],
+      "fog_emission": [
+        0.025,
+        0.028,
+        0.036
+      ],
       "mist": 0.2
     },
     "blizzard": {
       "kind": "blizzard",
       "intensity": 1.0,
-      "wind": [7.5, 2.5],
+      "wind": [
+        7.5,
+        2.5
+      ],
       "temperature": -12,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
@@ -77,12 +132,33 @@
         "far_streaks": 900,
         "streak_len": 0.35,
         "streak_fall": 3.0,
-        "streak_color": [0.9, 0.93, 1.0, 0.35]
+        "streak_color": [
+          0.9,
+          0.93,
+          1.0,
+          0.35
+        ]
       },
-      "sky_top": [0.04, 0.042, 0.055],
-      "sky_horizon": [0.14, 0.14, 0.16],
-      "day_top": [0.55, 0.57, 0.62],
-      "day_horizon": [0.72, 0.73, 0.76],
+      "sky_top": [
+        0.04,
+        0.042,
+        0.055
+      ],
+      "sky_horizon": [
+        0.14,
+        0.14,
+        0.16
+      ],
+      "day_top": [
+        0.55,
+        0.57,
+        0.62
+      ],
+      "day_horizon": [
+        0.72,
+        0.73,
+        0.76
+      ],
       "moon_energy": 0.3,
       "sun_energy": 0.25,
       "overcast": 0.95,
@@ -91,15 +167,29 @@
       "volumetric_density": 0.045,
       "exposure": 1.3,
       "visibility": 0.55,
-      "sounds": ["wind_howl", "shutters_bang"],
-      "fog_color": [0.16, 0.17, 0.2],
-      "fog_emission": [0.045, 0.048, 0.058],
+      "sounds": [
+        "wind_howl",
+        "shutters_bang"
+      ],
+      "fog_color": [
+        0.16,
+        0.17,
+        0.2
+      ],
+      "fog_emission": [
+        0.045,
+        0.048,
+        0.058
+      ],
       "mist": 0.05
     },
     "sleet": {
       "kind": "sleet",
       "intensity": 0.6,
-      "wind": [2.5, 1.0],
+      "wind": [
+        2.5,
+        1.0
+      ],
       "temperature": 1,
       "time_of_day": -1,
       "start_snow_cover": 0.9,
@@ -114,13 +204,34 @@
         "far_streaks": 1600,
         "streak_len": 0.4,
         "streak_fall": 5.5,
-        "streak_color": [0.78, 0.82, 0.9, 0.25],
+        "streak_color": [
+          0.78,
+          0.82,
+          0.9,
+          0.25
+        ],
         "splash": 500
       },
-      "sky_top": [0.03, 0.033, 0.045],
-      "sky_horizon": [0.11, 0.11, 0.13],
-      "day_top": [0.4, 0.43, 0.48],
-      "day_horizon": [0.58, 0.6, 0.63],
+      "sky_top": [
+        0.03,
+        0.033,
+        0.045
+      ],
+      "sky_horizon": [
+        0.11,
+        0.11,
+        0.13
+      ],
+      "day_top": [
+        0.4,
+        0.43,
+        0.48
+      ],
+      "day_horizon": [
+        0.58,
+        0.6,
+        0.63
+      ],
       "moon_energy": 0.3,
       "sun_energy": 0.35,
       "overcast": 0.9,
@@ -129,15 +240,29 @@
       "volumetric_density": 0.032,
       "exposure": 1.3,
       "visibility": 0.85,
-      "sounds": ["sleet_patter", "gutter_drip"],
-      "fog_color": [0.09, 0.095, 0.11],
-      "fog_emission": [0.022, 0.024, 0.03],
+      "sounds": [
+        "sleet_patter",
+        "gutter_drip"
+      ],
+      "fog_color": [
+        0.09,
+        0.095,
+        0.11
+      ],
+      "fog_emission": [
+        0.022,
+        0.024,
+        0.03
+      ],
       "mist": 0.3
     },
     "rain_thaw": {
       "kind": "rain",
       "intensity": 0.8,
-      "wind": [1.8, 0.8],
+      "wind": [
+        1.8,
+        0.8
+      ],
       "temperature": 4,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
@@ -147,13 +272,34 @@
         "far_streaks": 4200,
         "streak_len": 0.6,
         "streak_fall": 8.0,
-        "streak_color": [0.72, 0.76, 0.85, 0.25],
+        "streak_color": [
+          0.72,
+          0.76,
+          0.85,
+          0.25
+        ],
         "splash": 1400
       },
-      "sky_top": [0.025, 0.028, 0.04],
-      "sky_horizon": [0.09, 0.09, 0.11],
-      "day_top": [0.34, 0.37, 0.42],
-      "day_horizon": [0.52, 0.54, 0.57],
+      "sky_top": [
+        0.025,
+        0.028,
+        0.04
+      ],
+      "sky_horizon": [
+        0.09,
+        0.09,
+        0.11
+      ],
+      "day_top": [
+        0.34,
+        0.37,
+        0.42
+      ],
+      "day_horizon": [
+        0.52,
+        0.54,
+        0.57
+      ],
       "moon_energy": 0.3,
       "sun_energy": 0.3,
       "overcast": 0.95,
@@ -162,24 +308,55 @@
       "volumetric_density": 0.028,
       "exposure": 1.3,
       "visibility": 0.9,
-      "sounds": ["rain_steady", "gutter_rush", "roof_drip"],
-      "fog_color": [0.08, 0.085, 0.1],
-      "fog_emission": [0.02, 0.022, 0.028],
+      "sounds": [
+        "rain_steady",
+        "gutter_rush",
+        "roof_drip"
+      ],
+      "fog_color": [
+        0.08,
+        0.085,
+        0.1
+      ],
+      "fog_emission": [
+        0.02,
+        0.022,
+        0.028
+      ],
       "mist": 0.3
     },
     "fog": {
       "kind": "fog",
       "intensity": 0.8,
-      "wind": [0.2, 0.1],
+      "wind": [
+        0.2,
+        0.1
+      ],
       "temperature": -1,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
       "start_wetness": 0.2,
       "precip": {},
-      "sky_top": [0.05, 0.05, 0.065],
-      "sky_horizon": [0.12, 0.12, 0.14],
-      "day_top": [0.6, 0.62, 0.65],
-      "day_horizon": [0.75, 0.76, 0.78],
+      "sky_top": [
+        0.05,
+        0.05,
+        0.065
+      ],
+      "sky_horizon": [
+        0.12,
+        0.12,
+        0.14
+      ],
+      "day_top": [
+        0.6,
+        0.62,
+        0.65
+      ],
+      "day_horizon": [
+        0.75,
+        0.76,
+        0.78
+      ],
       "moon_energy": 0.28,
       "sun_energy": 0.3,
       "overcast": 0.85,
@@ -188,24 +365,54 @@
       "volumetric_density": 0.06,
       "exposure": 1.25,
       "visibility": 0.6,
-      "sounds": ["fog_muffle", "foghorn_vistula"],
-      "fog_color": [0.13, 0.135, 0.15],
-      "fog_emission": [0.04, 0.042, 0.05],
+      "sounds": [
+        "fog_muffle",
+        "foghorn_vistula"
+      ],
+      "fog_color": [
+        0.13,
+        0.135,
+        0.15
+      ],
+      "fog_emission": [
+        0.04,
+        0.042,
+        0.05
+      ],
       "mist": 1.0
     },
     "overcast": {
       "kind": "overcast",
       "intensity": 0.3,
-      "wind": [1.2, 0.4],
+      "wind": [
+        1.2,
+        0.4
+      ],
       "temperature": -2,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
       "start_wetness": 0.0,
       "precip": {},
-      "sky_top": [0.03, 0.032, 0.045],
-      "sky_horizon": [0.11, 0.105, 0.13],
-      "day_top": [0.46, 0.49, 0.54],
-      "day_horizon": [0.66, 0.67, 0.7],
+      "sky_top": [
+        0.03,
+        0.032,
+        0.045
+      ],
+      "sky_horizon": [
+        0.11,
+        0.105,
+        0.13
+      ],
+      "day_top": [
+        0.46,
+        0.49,
+        0.54
+      ],
+      "day_horizon": [
+        0.66,
+        0.67,
+        0.7
+      ],
       "moon_energy": 0.32,
       "sun_energy": 0.4,
       "overcast": 0.85,
@@ -214,23 +421,48 @@
       "volumetric_density": 0.022,
       "exposure": 1.25,
       "visibility": 0.95,
-      "sounds": ["wind_soft"],
-      "fog_color": [0.09, 0.095, 0.115],
+      "sounds": [
+        "wind_soft"
+      ],
+      "fog_color": [
+        0.09,
+        0.095,
+        0.115
+      ],
       "mist": 0.3
     },
     "clear_day": {
       "kind": "clear",
       "intensity": 0.0,
-      "wind": [1.0, 0.3],
+      "wind": [
+        1.0,
+        0.3
+      ],
       "temperature": 3,
       "time_of_day": 12.0,
       "start_snow_cover": 0.0,
       "start_wetness": 0.0,
       "precip": {},
-      "sky_top": [0.02, 0.025, 0.06],
-      "sky_horizon": [0.1, 0.09, 0.14],
-      "day_top": [0.3, 0.42, 0.6],
-      "day_horizon": [0.68, 0.72, 0.78],
+      "sky_top": [
+        0.02,
+        0.025,
+        0.06
+      ],
+      "sky_horizon": [
+        0.1,
+        0.09,
+        0.14
+      ],
+      "day_top": [
+        0.3,
+        0.42,
+        0.6
+      ],
+      "day_horizon": [
+        0.68,
+        0.72,
+        0.78
+      ],
       "moon_energy": 0.45,
       "sun_energy": 1.2,
       "overcast": 0.0,
@@ -239,7 +471,10 @@
       "volumetric_density": 0.004,
       "exposure": 1.0,
       "visibility": 1.0,
-      "sounds": ["market_bustle", "church_bells"],
+      "sounds": [
+        "market_bustle",
+        "church_bells"
+      ],
       "mist": 0.05,
       "reset": true,
       "start_icicles": 0.0
@@ -247,16 +482,35 @@
     "snow_day": {
       "kind": "clear",
       "intensity": 0.0,
-      "wind": [0.8, 0.2],
+      "wind": [
+        0.8,
+        0.2
+      ],
       "temperature": -6,
       "time_of_day": 12.0,
       "start_snow_cover": 1.0,
       "start_wetness": 0.0,
       "precip": {},
-      "sky_top": [0.02, 0.025, 0.06],
-      "sky_horizon": [0.1, 0.09, 0.14],
-      "day_top": [0.3, 0.42, 0.6],
-      "day_horizon": [0.68, 0.72, 0.78],
+      "sky_top": [
+        0.02,
+        0.025,
+        0.06
+      ],
+      "sky_horizon": [
+        0.1,
+        0.09,
+        0.14
+      ],
+      "day_top": [
+        0.3,
+        0.42,
+        0.6
+      ],
+      "day_horizon": [
+        0.68,
+        0.72,
+        0.78
+      ],
       "moon_energy": 0.45,
       "sun_energy": 1.15,
       "overcast": 0.0,
@@ -265,9 +519,76 @@
       "volumetric_density": 0.005,
       "exposure": 0.95,
       "visibility": 1.0,
-      "sounds": ["snow_crunch", "church_bells"],
+      "sounds": [
+        "snow_crunch",
+        "church_bells"
+      ],
       "mist": 0.1,
       "reset": true
+    },
+    "storm": {
+      "kind": "rain",
+      "intensity": 1.0,
+      "wind": [
+        6.0,
+        2.5
+      ],
+      "temperature": 3,
+      "time_of_day": -1,
+      "start_snow_cover": 1.0,
+      "start_wetness": 0.5,
+      "precip": {
+        "streaks": 6500,
+        "far_streaks": 6500,
+        "streak_len": 6500,
+        "streak_fall": 6500,
+        "streak_color": 6500,
+        "splash": 1400
+      },
+      "sky_top": [
+        0.025,
+        0.028,
+        0.04
+      ],
+      "sky_horizon": [
+        0.09,
+        0.09,
+        0.11
+      ],
+      "day_top": [
+        0.34,
+        0.37,
+        0.42
+      ],
+      "day_horizon": [
+        0.52,
+        0.54,
+        0.57
+      ],
+      "moon_energy": 0.3,
+      "sun_energy": 0.3,
+      "overcast": 1.0,
+      "ambient_energy": 1.0,
+      "fog_density": 0.005,
+      "volumetric_density": 0.028,
+      "exposure": 1.3,
+      "visibility": 0.9,
+      "sounds": [
+        "rain_steady",
+        "wind_howl"
+      ],
+      "fog_color": [
+        0.08,
+        0.085,
+        0.1
+      ],
+      "fog_emission": [
+        0.02,
+        0.022,
+        0.028
+      ],
+      "mist": 0.3,
+      "_note": "A thunderstorm: data/sky.json maps it to the storm look (towering cloud, lightning, thunder via CitySky.lightning)."
     }
   },
   "accumulation": {

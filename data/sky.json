@@ -1,0 +1,107 @@
+{
+  "_doc": "Sky presets for scripts/city/sky.gd (docs/SKY.md). 'types' are cloud looks (uniforms of assets/shaders/sky.gdshader: coverage, softness, scale, altitude, density, base_dark, detail, sheet, ragged, tower, cirrus, cirrus_streak, plus haze, haze_height, halo22, moon_halo, star_strength, meteors = meteor-rate multiplier, storm = lightning rate 0..1). 'presets' map a weather preset name (data/weather.json) to a type with overrides; 'kinds' is the fallback by weather kind. Parameters cross-fade over transition_s. The night and day gradient colours are NOT here: sky.gd reads sky_top / sky_horizon / day_top / day_horizon / fog_color from the weather preset so the SDFGI ambient stays what the weather agent tuned.",
+  "transition_s": 18.0,
+  "moon": {
+    "phase_night1": 0.62,
+    "phase_per_night": 0.034,
+    "size_deg": 1.1
+  },
+  "stars": {
+    "latitude_deg": 50.06,
+    "lst_hours_at_21": 5.0,
+    "milky_way": 0.6,
+    "twinkle": 0.6,
+    "planets": 1.0
+  },
+  "comet": {
+    "enabled": true,
+    "strength": 0.5,
+    "from_night": 3,
+    "ra_hours": 1.5,
+    "dec_deg": 42.0,
+    "sun_ra_hours": 20.0,
+    "sun_dec_deg": -21.0
+  },
+  "meteors": {
+    "mean_interval_s": 40.0,
+    "fireball_chance": 0.04,
+    "radiant_ra_hours": 15.3,
+    "radiant_dec_deg": 49.5,
+    "radiant_share": 0.5
+  },
+  "lightning": {
+    "min_gap_s": 3.5,
+    "max_gap_s": 13.0,
+    "min_km": 0.6,
+    "max_km": 9.0,
+    "bolt_max_km": 4.5,
+    "light_energy": 0.9,
+    "thunder": true,
+    "thunder_db": -8.0
+  },
+  "types": {
+    "clear": {
+      "coverage": 0.04, "softness": 0.2, "scale": 1.0, "altitude": 0.9, "density": 0.8, "base_dark": 0.4, "detail": 0.6,
+      "sheet": 0.0, "ragged": 0.0, "tower": 0.0, "cirrus": 0.06, "cirrus_streak": 2.2,
+      "haze": 0.3, "haze_height": 0.10, "halo22": 0.0, "moon_halo": 0.25, "star_strength": 1.0, "meteors": 1.0, "storm": 0.0
+    },
+    "fair": {
+      "coverage": 0.42, "softness": 0.16, "scale": 1.0, "altitude": 0.8, "density": 1.0, "base_dark": 0.5, "detail": 0.75,
+      "sheet": 0.0, "ragged": 0.0, "tower": 0.15, "cirrus": 0.2, "cirrus_streak": 2.2,
+      "haze": 0.3, "haze_height": 0.12, "halo22": 0.0, "moon_halo": 0.4, "star_strength": 1.0, "meteors": 0.6, "storm": 0.0
+    },
+    "cirrus": {
+      "coverage": 0.10, "softness": 0.25, "scale": 1.2, "altitude": 0.9, "density": 0.7, "base_dark": 0.3, "detail": 0.5,
+      "sheet": 0.0, "ragged": 0.0, "tower": 0.0, "cirrus": 0.85, "cirrus_streak": 2.2,
+      "haze": 0.35, "haze_height": 0.14, "halo22": 0.6, "moon_halo": 0.8, "star_strength": 0.8, "meteors": 0.6, "storm": 0.0
+    },
+    "overcast": {
+      "coverage": 0.97, "softness": 0.32, "scale": 1.1, "altitude": 0.7, "density": 1.0, "base_dark": 0.35, "detail": 0.4,
+      "sheet": 0.8, "ragged": 0.0, "tower": 0.0, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 0.5, "haze_height": 0.16, "halo22": 0.0, "moon_halo": 0.5, "star_strength": 0.0, "meteors": 0.0, "storm": 0.0
+    },
+    "snow": {
+      "coverage": 0.96, "softness": 0.35, "scale": 1.0, "altitude": 0.6, "density": 1.0, "base_dark": 0.28, "detail": 0.35,
+      "sheet": 0.7, "ragged": 0.2, "tower": 0.0, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 0.6, "haze_height": 0.25, "halo22": 0.0, "moon_halo": 0.5, "star_strength": 0.0, "meteors": 0.0, "storm": 0.0
+    },
+    "blizzard": {
+      "coverage": 1.0, "softness": 0.4, "scale": 1.0, "altitude": 0.5, "density": 1.0, "base_dark": 0.3, "detail": 0.3,
+      "sheet": 1.0, "ragged": 0.4, "tower": 0.0, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 1.0, "haze_height": 0.6, "halo22": 0.0, "moon_halo": 0.0, "star_strength": 0.0, "meteors": 0.0, "storm": 0.0
+    },
+    "rain": {
+      "coverage": 1.0, "softness": 0.3, "scale": 0.9, "altitude": 0.5, "density": 1.0, "base_dark": 0.7, "detail": 0.5,
+      "sheet": 0.5, "ragged": 0.8, "tower": 0.2, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 0.55, "haze_height": 0.2, "halo22": 0.0, "moon_halo": 0.3, "star_strength": 0.0, "meteors": 0.0, "storm": 0.0
+    },
+    "storm": {
+      "coverage": 1.0, "softness": 0.34, "scale": 0.8, "altitude": 0.45, "density": 1.0, "base_dark": 0.9, "detail": 0.7,
+      "sheet": 0.2, "ragged": 0.9, "tower": 1.0, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 0.5, "haze_height": 0.18, "halo22": 0.0, "moon_halo": 0.2, "star_strength": 0.0, "meteors": 0.0, "storm": 1.0
+    },
+    "fog": {
+      "coverage": 1.0, "softness": 0.4, "scale": 1.0, "altitude": 0.5, "density": 1.0, "base_dark": 0.15, "detail": 0.2,
+      "sheet": 1.0, "ragged": 0.0, "tower": 0.0, "cirrus": 0.0, "cirrus_streak": 2.2,
+      "haze": 1.0, "haze_height": 0.9, "halo22": 0.5, "moon_halo": 0.6, "star_strength": 0.0, "meteors": 0.0, "storm": 0.0
+    }
+  },
+  "presets": {
+    "clear_frost": {"type": "clear", "halo22": 0.12, "comet": true},
+    "light_snow": {"type": "snow"},
+    "blizzard": {"type": "blizzard"},
+    "sleet": {"type": "rain", "base_dark": 0.55, "ragged": 0.5},
+    "rain_thaw": {"type": "rain"},
+    "fog": {"type": "fog"},
+    "overcast": {"type": "overcast"},
+    "clear_day": {"type": "clear", "haze": 0.22, "cirrus": 0.12},
+    "snow_day": {"type": "cirrus", "coverage": 0.22, "haze": 0.4, "cirrus": 0.5},
+    "storm": {
+      "type": "storm",
+      "_note": "needs a matching weather.json preset named 'storm' (kind rain, intensity 1.0, wind ~[6, 2.5], temperature 3, streaks like rain_thaw, sounds rain_steady + wind_howl, sky_top/horizon like rain_thaw, overcast 1.0). Until it exists, Weather.set_conditions({\"preset\": \"rain_thaw\", \"wind\": [6, 2.5]}) plus CitySky.set_look(\"storm\") gives the same sky."
+    }
+  },
+  "kinds": {
+    "clear": "clear", "snow": "snow", "blizzard": "blizzard", "sleet": "rain", "rain": "rain", "fog": "fog", "overcast": "overcast"
+  }
+}
