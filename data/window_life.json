@@ -1,0 +1,34 @@
+{
+  "_doc": "Window life tunables (scripts/city/window_life.gd): chimney smoke, window events, street cooking. Times in real seconds unless noted; clock hours are GameState.clock_minutes / 60 mod 24.",
+  "wind": [0.55, 0.0, 0.25],
+  "smoke": {
+    "max_emitters": 40, "particles": 24, "cull_distance": 60.0, "unlit_fraction": 0.2, "lifetime": 9.0,
+    "rise_speed": [0.4, 0.7], "buoyancy": 0.10, "scale": [2.6, 4.2], "grow": 4.0,
+    "colour": [0.70, 0.71, 0.74, 0.5], "emission": 0.35, "backlight": [0.55, 0.45, 0.38],
+    "cooking_hours": [18, 22], "cooking_ratio": 1.0, "evening_ratio": 0.75, "late_ratio": 0.3, "late_hours": [0, 5]
+  },
+  "wisp": {"particles": 12, "lifetime": 4.5, "scale": [0.4, 0.9], "colour": [0.78, 0.76, 0.74, 0.2]},
+  "steam": {"particles": 24, "lifetime": 3.5, "scale": [0.8, 1.6], "colour": [0.92, 0.92, 0.95, 0.5]},
+  "scheduler": {
+    "interval": [20.0, 60.0], "radius": 40.0, "min_distance": 6.0, "smoke_interval_frames": 25,
+    "weights": {"lean": 3, "pour": 2, "throw": 2, "shake": 2, "cook": 2, "cat": 1}
+  },
+  "lean": {"secs": [6.0, 12.0]},
+  "pour": {
+    "loudness": 0.6, "puddle_secs": 60.0, "startle_radius": 2.0,
+    "barks": ["Uwaga! Woda!", "Achtung!", "Uwaga, leci!", "Achtung, Wasser!"],
+    "vessels": ["bucket", "chamber_pot", "basin"]
+  },
+  "throw": {"loudness": 0.4, "stay_secs": 90.0, "props": ["cabbage", "bone", "bottle", "rag"], "speed": [2.2, 3.4]},
+  "shake": {"secs": [5.0, 8.0]},
+  "cook": {"secs": [20.0, 40.0], "light_energy": 1.6, "light_range": 3.2, "light_colour": [1.0, 0.52, 0.22]},
+  "cat": {"secs": [25.0, 50.0]},
+  "street_cooks": [
+    {"id": "cafe_brazier", "prop": "cauldron", "portal": 5, "lx": 5.7, "out": 2.7, "cook_offset": [0.0, 0.0, -1.15], "steam_y": 1.62,
+     "models": ["town_tavern_maid_f", "npc_f_03", "npc_f_01"], "on_secs": 45.0, "off_secs": 25.0, "hours": [17, 24]},
+    {"id": "inn_yard", "prop": "cauldron_fire", "pos": [30.9, 0.0, -5.7], "cook_offset": [0.0, 0.0, 0.9], "steam_y": 0.6,
+     "models": ["town_innkeeper", "npc_m_01", "npc_m_03"], "on_secs": 50.0, "off_secs": 20.0, "hours": [17, 26], "light": true}
+  ],
+  "wisp_windows": [[14, -2.0, 1], [14, 2.0, 1], [10, 0.0, 1], [0, 0.0, 1]],
+  "sparks": {"particles": 30, "lifetime": 1.6}
+}

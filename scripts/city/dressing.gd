@@ -51,6 +51,9 @@ func _ready() -> void:
 	_clutter()
 	_weeds()
 	_feather_slush(self)
+	add_child(preload("res://scripts/city/vendors.gd").new())     # street sellers and hawkers (data/vendors.json)
+	add_child(preload("res://scripts/city/window_life.gd").create(portals, _boards))   # windows, chimneys (data/window_life.json)
+	add_child(preload("res://scripts/city/street_life.gd").new())   # night life and crime (data/street_life.json)
 	var dir := _shot_dir()
 	if dir != "" and not _shot_done:
 		_shot_done = true

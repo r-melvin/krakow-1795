@@ -1,0 +1,2832 @@
+{
+ "_doc": "Night life and crime on the Rynek (scripts/city/street_life.gd). Every line shown in the world is {text, gloss}: the bubble shows the original with the English gloss beneath. Hours are clock hours (21..23, 0..6). 'every' is in game minutes (1 real second = 1 game minute at clock_scale 1). Crackdown tables are [[threshold, value], ...]: the last row whose threshold <= GameState.crackdown applies.",
+ "max_events": 2,
+ "lane_clearance": 3.0,
+ "lantern_dark_dist": 12.0,
+ "near_player": 45.0,
+ "events": {
+  "fight": {
+   "every": [
+    2,
+    4
+   ],
+   "hours": {
+    "21": 0.25,
+    "22": 0.35,
+    "23": 0.45,
+    "0": 0.5,
+    "1": 0.45,
+    "2": 0.35,
+    "3": 0.2,
+    "4": 0.1,
+    "*": 0.05
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     40,
+     0.7
+    ],
+    [
+     70,
+     0.45
+    ]
+   ],
+   "alley_share": [
+    [
+     0,
+     0.1
+    ],
+    [
+     40,
+     0.45
+    ],
+    [
+     70,
+     0.7
+    ]
+   ],
+   "tavern_weight": 2.5
+  },
+  "cutpurse": {
+   "every": [
+    4,
+    7
+   ],
+   "hours": {
+    "21": 0.35,
+    "22": 0.3,
+    "23": 0.25,
+    "0": 0.2,
+    "1": 0.15,
+    "*": 0.08
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     40,
+     0.8
+    ],
+    [
+     70,
+     0.6
+    ]
+   ],
+   "player_chance": 0.45
+  },
+  "mugging": {
+   "every": [
+    6,
+    10
+   ],
+   "hours": {
+    "22": 0.15,
+    "23": 0.3,
+    "0": 0.4,
+    "1": 0.45,
+    "2": 0.4,
+    "3": 0.3,
+    "*": 0.05
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     40,
+     1.2
+    ],
+    [
+     70,
+     1.4
+    ]
+   ]
+  },
+  "burglar": {
+   "every": [
+    15,
+    25
+   ],
+   "hours": {
+    "0": 0.35,
+    "1": 0.45,
+    "2": 0.45,
+    "3": 0.35,
+    "*": 0.0
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     70,
+     0.7
+    ]
+   ]
+  },
+  "fence": {
+   "every": [
+    20,
+    30
+   ],
+   "hours": {
+    "0": 0.5,
+    "1": 0.5,
+    "2": 0.4,
+    "3": 0.3,
+    "*": 0.0
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     40,
+     0.8
+    ],
+    [
+     70,
+     0.5
+    ]
+   ]
+  },
+  "arrest": {
+   "every": [
+    12,
+    20
+   ],
+   "hours": {
+    "*": 0.2
+   },
+   "crackdown": [
+    [
+     0,
+     0.5
+    ],
+    [
+     40,
+     1.2
+    ],
+    [
+     70,
+     2.0
+    ]
+   ]
+  },
+  "pressgang": {
+   "every": [
+    30,
+    45
+   ],
+   "hours": {
+    "21": 0.3,
+    "22": 0.3,
+    "23": 0.2,
+    "*": 0.0
+   },
+   "crackdown": [
+    [
+     0,
+     0.4
+    ],
+    [
+     40,
+     1.0
+    ],
+    [
+     70,
+     1.6
+    ]
+   ]
+  },
+  "harass": {
+   "every": [
+    12,
+    18
+   ],
+   "hours": {
+    "21": 0.35,
+    "22": 0.3,
+    "23": 0.25,
+    "0": 0.15,
+    "*": 0.05
+   },
+   "crackdown": [
+    [
+     0,
+     0.6
+    ],
+    [
+     40,
+     1.1
+    ],
+    [
+     70,
+     1.6
+    ]
+   ]
+  },
+  "requisition": {
+   "every": [
+    30,
+    45
+   ],
+   "hours": {
+    "21": 0.35,
+    "22": 0.25,
+    "*": 0.0
+   },
+   "crackdown": [
+    [
+     0,
+     0.5
+    ],
+    [
+     40,
+     1.0
+    ],
+    [
+     70,
+     1.5
+    ]
+   ]
+  },
+  "poster": {
+   "every": [
+    25,
+    40
+   ],
+   "hours": {
+    "21": 0.3,
+    "22": 0.35,
+    "23": 0.3,
+    "0": 0.2,
+    "*": 0.05
+   },
+   "crackdown": [
+    [
+     0,
+     0.6
+    ],
+    [
+     40,
+     1.0
+    ],
+    [
+     70,
+     1.4
+    ]
+   ]
+  },
+  "bill_fight": {
+   "every": [
+    15,
+    25
+   ],
+   "hours": {
+    "22": 0.2,
+    "23": 0.3,
+    "0": 0.35,
+    "1": 0.3,
+    "2": 0.2,
+    "*": 0.05
+   },
+   "crackdown": [
+    [
+     0,
+     1.0
+    ],
+    [
+     70,
+     0.6
+    ]
+   ]
+  }
+ },
+ "drunks": {
+  "from": "22:00",
+  "until": "05:00",
+  "count_by_hour": {
+   "22": 3,
+   "23": 4,
+   "0": 5,
+   "1": 5,
+   "2": 4,
+   "3": 3,
+   "4": 3,
+   "*": 0
+  },
+  "alley_share": [
+   [
+    0,
+    0.2
+   ],
+   [
+    40,
+    0.5
+   ],
+   [
+    70,
+    0.75
+   ]
+  ],
+  "guard_move_on_dist": 6.0,
+  "accost_dist": 4.0,
+  "accost_cooldown": 40.0,
+  "models": [
+   [
+    "npc_m_04",
+    "figure_townsman"
+   ],
+   [
+    "town_innkeeper",
+    "npc_m_01"
+   ],
+   [
+    "dist_raftsman",
+    "npc_m_05"
+   ],
+   [
+    "dist_journeyman",
+    "npc_m_06"
+   ],
+   [
+    "town_coachman",
+    "npc_m_02"
+   ],
+   [
+    "dist_porter",
+    "npc_m_00"
+   ]
+  ],
+  "square_points": [
+   [
+    -6,
+    0,
+    -20
+   ],
+   [
+    8,
+    0,
+    -20
+   ],
+   [
+    16,
+    0,
+    -16
+   ],
+   [
+    -16,
+    0,
+    6
+   ],
+   [
+    -8,
+    0,
+    20
+   ],
+   [
+    6,
+    0,
+    19
+   ],
+   [
+    12,
+    0,
+    4
+   ],
+   [
+    -12,
+    0,
+    -4
+   ],
+   [
+    2,
+    0,
+    12
+   ],
+   [
+    -2,
+    0,
+    -12
+   ]
+  ],
+  "alley_points": [
+   [
+    -38.5,
+    0,
+    -12
+   ],
+   [
+    -38.5,
+    0,
+    0
+   ],
+   [
+    -38.5,
+    0,
+    10
+   ],
+   [
+    -30,
+    0,
+    -30
+   ],
+   [
+    -12,
+    0,
+    -39
+   ],
+   [
+    4,
+    0,
+    -39
+   ],
+   [
+    -30,
+    0,
+    24
+   ],
+   [
+    -26,
+    0,
+    34
+   ]
+  ]
+ },
+ "brothel": {
+  "portal": 12,
+  "door_lx": 0.0,
+  "lantern_lx": 0.78,
+  "lantern_y": 2.95,
+  "bench_lx": -2.1,
+  "bench_out": 0.45,
+  "women": [
+   {
+    "lx": -0.95,
+    "out": 0.75,
+    "models": [
+     "npc_f_03",
+     "town_tavern_maid_f",
+     "figure_townswoman"
+    ],
+    "clip": "talk_gesture_a"
+   },
+   {
+    "lx": 1.05,
+    "out": 0.8,
+    "models": [
+     "npc_f_05",
+     "town_washerwoman_f",
+     "figure_townswoman"
+    ],
+    "clip": "wave",
+    "pox": true
+   }
+  ],
+  "madam": {
+   "lx": 0.1,
+   "out": 0.4,
+   "models": [
+    "town_market_woman_f",
+    "dist_market_woman_f",
+    "figure_townswoman"
+   ],
+   "name": "Matka Weronika"
+  },
+  "doorman": {
+   "models": [
+    "town_blacksmith",
+    "npc_m_03",
+    "figure_townsman"
+   ]
+  },
+  "pimp": {
+   "lx": 3.2,
+   "out": 2.6,
+   "models": [
+    "dist_horse_dealer",
+    "npc_m_06",
+    "figure_townsman"
+   ],
+   "every": [
+    35,
+    60
+   ]
+  },
+  "customers": {
+   "every": [
+    3,
+    6
+   ],
+   "max": 3,
+   "soldier_share": 0.4,
+   "drunk_share": 0.3,
+   "inside": [
+    6,
+    14
+   ],
+   "models": [
+    [
+     "npc_m_02",
+     "figure_townsman"
+    ],
+    [
+     "dist_journeyman",
+     "npc_m_05"
+    ],
+    [
+     "town_coachman",
+     "npc_m_01"
+    ],
+    [
+     "dist_raftsman",
+     "npc_m_04"
+    ]
+   ],
+   "soldier_models": [
+    [
+     "watchman"
+    ]
+   ]
+  },
+  "cry_every": [
+   20,
+   35
+  ],
+  "cough_every": [
+   35,
+   55
+  ],
+  "room_cost": 2,
+  "gossip_cost": 1,
+  "room_secs": 20,
+  "raid": {
+   "crackdown_min": 40,
+   "at": [
+    "23:10",
+    "01:40"
+   ],
+   "secs": 18
+  }
+ },
+ "punishment": {
+  "pillory": {
+   "pos": [
+    -21.2,
+    0,
+    20.4
+   ],
+   "rot": 1.5708,
+   "placard": {
+    "text": "ZŁODZIEJ CHLEBA",
+    "gloss": "Bread thief"
+   },
+   "models": [
+    "dist_peasant",
+    "npc_m_03",
+    "figure_townsman"
+   ]
+  },
+  "stocks": {
+   "pos": [
+    -19.4,
+    0,
+    22.4
+   ],
+   "rot": 1.2708,
+   "placard": {
+    "text": "ZA BUNTOWNICZE PISMA",
+    "gloss": "For seditious writings"
+   },
+   "models": [
+    "town_scholar",
+    "cast_student",
+    "npc_m_07"
+   ]
+  },
+  "guard": {
+   "pos": [
+    -19.8,
+    0,
+    18.9
+   ],
+   "rot": 2.6,
+   "models": [
+    "watchman"
+   ]
+  },
+  "jeer_every": [
+   30,
+   55
+  ],
+  "kind_share": 0.35,
+  "flogging": {
+   "at": "23:20",
+   "post": [
+    -11.5,
+    0,
+    22.2
+   ],
+   "rot": 3.1416,
+   "strokes": 25,
+   "stroke_secs": 1.35,
+   "crowd": 6,
+   "models": {
+    "victim": [
+     "cast_jacobin",
+     "npc_m_02"
+    ],
+    "soldier": [
+     "watchman"
+    ],
+    "sergeant": [
+     "town_swiss_sergeant",
+     "watchman"
+    ],
+    "drummer": [
+     "watchman"
+    ],
+    "crowd": [
+     [
+      "npc_m_00",
+      "figure_townsman"
+     ],
+     [
+      "npc_f_01",
+      "figure_townswoman"
+     ],
+     [
+      "npc_m_04",
+      "figure_townsman"
+     ],
+     [
+      "npc_f_04",
+      "figure_townswoman"
+     ],
+     [
+      "dist_journeyman",
+      "npc_m_05"
+     ],
+     [
+      "npc_f_06",
+      "figure_townswoman"
+     ],
+     [
+      "dist_peasant_f",
+      "npc_f_02"
+     ]
+    ]
+   }
+  },
+  "gallows": {
+   "pos": [
+    -33.5,
+    0,
+    23.0
+   ],
+   "rot": 1.5708,
+   "placard": {
+    "text": "JAKOBINER",
+    "gloss": "Jacobin"
+   },
+   "models": [
+    "npc_m_07",
+    "figure_artist"
+   ]
+  }
+ },
+ "poverty": {
+  "beggars": [
+   {
+    "pos": [
+     -6.5,
+     0,
+     5.3
+    ],
+    "rot": 3.1416,
+    "models": [
+     "cast_beggar",
+     "figure_veteran",
+     "npc_m_03"
+    ]
+   },
+   {
+    "pos": [
+     7.5,
+     0,
+     -5.3
+    ],
+    "rot": 0.0,
+    "models": [
+     "figure_veteran",
+     "cast_beggar",
+     "npc_m_05"
+    ]
+   }
+  ],
+  "freezing": {
+   "portal": 3,
+   "lx": 0.95,
+   "out": 0.35,
+   "models": [
+    "cast_beggar_f",
+    "npc_f_06",
+    "figure_townswoman"
+   ],
+   "freeze_at": "02:30",
+   "collect_at": "05:10",
+   "collectors": [
+    [
+     "dist_carter",
+     "npc_m_01"
+    ],
+    [
+     "dist_porter",
+     "npc_m_04"
+    ]
+   ]
+  },
+  "scavengers": {
+   "from": "21:00",
+   "until": "23:40",
+   "models": [
+    [
+     "npc_m_07",
+     "cast_urchin"
+    ],
+    [
+     "npc_f_07",
+     "cast_urchin_f"
+    ]
+   ],
+   "points": [
+    [
+     -14.2,
+     0,
+     -15.7
+    ],
+    [
+     -10.2,
+     0,
+     -15.7
+    ],
+    [
+     -6.6,
+     0,
+     -17.6
+    ],
+    [
+     20.9,
+     0,
+     -10.2
+    ],
+    [
+     20.9,
+     0,
+     -6.0
+    ]
+   ],
+   "flee_guard": 7.0
+  },
+  "soup": {
+   "from": "21:00",
+   "until": "22:40",
+   "server": [
+    15.6,
+    0,
+    22.4
+   ],
+   "server_rot": 1.5708,
+   "line_dir": [
+    -1,
+    0,
+    0
+   ],
+   "gap": 0.95,
+   "size": 4,
+   "models": {
+    "server": [
+     "figure_priest",
+     "cast_priest",
+     "npc_m_05"
+    ],
+    "poor": [
+     [
+      "cast_beggar_f",
+      "npc_f_06"
+     ],
+     [
+      "dist_peasant",
+      "npc_m_03"
+     ],
+     [
+      "npc_f_02",
+      "figure_townswoman"
+     ],
+     [
+      "cast_beggar",
+      "npc_m_00"
+     ],
+     [
+      "dist_peasant_f",
+      "npc_f_04"
+     ],
+     [
+      "npc_m_07",
+      "figure_townsman"
+     ]
+    ]
+   },
+   "serve_secs": 16
+  }
+ },
+ "occupation": {
+  "soldier": [
+   "watchman"
+  ],
+  "corporal": [
+   "town_swiss_sergeant",
+   "watchman"
+  ],
+  "barracks_exit": [
+   -30,
+   0,
+   -30
+  ],
+  "pedlar": [
+   "figure_kazimierz",
+   "dist_rabbi",
+   "npc_m_06"
+  ],
+  "uniate_priest": [
+   "figure_priest",
+   "cast_priest",
+   "npc_m_05"
+  ],
+  "youth": [
+   "cast_student",
+   "npc_m_07",
+   "figure_townsman"
+  ],
+  "mother": [
+   "town_market_woman_f",
+   "npc_f_04",
+   "figure_townswoman"
+  ],
+  "peasant": [
+   "dist_peasant",
+   "npc_m_03",
+   "figure_townsman"
+  ],
+  "victim": [
+   [
+    "npc_m_02",
+    "figure_townsman"
+   ],
+   [
+    "dist_journeyman",
+    "npc_m_05"
+   ],
+   [
+    "town_bookseller",
+    "npc_m_01"
+   ]
+  ],
+  "notice_board": [
+   29.4,
+   0,
+   -4.25
+  ],
+  "brazier": [
+   19.0,
+   0,
+   12.0
+  ]
+ },
+ "crime": {
+  "thief": [
+   "figure_artist",
+   "npc_m_06",
+   "figure_townsman"
+  ],
+  "thugs": [
+   [
+    "town_blacksmith",
+    "npc_m_04"
+   ],
+   [
+    "dist_tanner",
+    "npc_m_00"
+   ]
+  ],
+  "burglar": [
+   "figure_artist",
+   "npc_m_07",
+   "figure_townsman"
+  ],
+  "fence": [
+   "dist_cellarman",
+   "npc_m_04",
+   "figure_townsman"
+  ],
+  "mug_victim": [
+   [
+    "npc_m_01",
+    "figure_townsman"
+   ],
+   [
+    "dist_german_master",
+    "npc_m_02"
+   ],
+   [
+    "town_notary",
+    "npc_m_05"
+   ]
+  ],
+  "mug_spots": [
+   [
+    -38.5,
+    0,
+    -8.0
+   ],
+   [
+    -38.5,
+    0,
+    6.0
+   ],
+   [
+    -12.0,
+    0,
+    -39.0
+   ],
+   [
+    6.0,
+    0,
+    -39.0
+   ],
+   [
+    -39.0,
+    0,
+    -32.0
+   ]
+  ],
+  "burglar_spots": [
+   {
+    "pos": [
+     -36.35,
+     0,
+     -2.0
+    ],
+    "rot": -1.5708
+   },
+   {
+    "pos": [
+     -4.0,
+     0,
+     -36.35
+    ],
+    "rot": 3.1416
+   }
+  ],
+  "fence_spot": [
+   -15.6,
+   0,
+   -27.0
+  ],
+  "exits": [
+   [
+    -40.5,
+    0,
+    -36.0
+   ],
+   [
+    -40.0,
+    0,
+    16.0
+   ],
+   [
+    -20.0,
+    0,
+    -41.0
+   ],
+   [
+    12.0,
+    0,
+    -41.0
+   ],
+   [
+    -34.0,
+    0,
+    36.0
+   ]
+  ],
+  "player_mug_after": "23:00",
+  "player_mug_check": 5,
+  "player_mug_cooldown": 40,
+  "underworld_pass": 30,
+  "cutpurse_take": [
+   1,
+   3
+  ],
+  "mug_cost": 3,
+  "mugging_dialogue": {
+   "demand": {
+    "lines": [
+     [
+      "$thug",
+      "Sakiewka albo życie. (Your purse or your life.)"
+     ],
+     [
+      "$thug2",
+      "Geld oder Leben! (Money or your life!) Quick, before the watch comes round."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Pay them ({cost} złoty)",
+      "action": "pay",
+      "tone": "bribe",
+      "need": "coins>=cost",
+      "why": "not enough coin"
+     },
+     {
+      "text": "Talk your way out",
+      "next": "talk"
+     },
+     {
+      "text": "Fight",
+      "action": "fight"
+     },
+     {
+      "text": "Run",
+      "action": "run"
+     }
+    ]
+   },
+   "paid": {
+    "lines": [
+     [
+      "$thug",
+      "Mądry człowiek. (A wise man.) Now walk, and do not look back."
+     ]
+    ]
+   },
+   "fight": {
+    "lines": [
+     [
+      "$thug2",
+      "No to masz! (Then have it!)"
+     ]
+    ]
+   },
+   "run": {
+    "lines": [
+     [
+      "$thug",
+      "Łap go! (Grab him!)"
+     ]
+    ]
+   },
+   "talk": {
+    "lines": [
+     [
+      "$thug",
+      "Well? Say something clever."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Joke that you have only lice to give",
+      "tone": "joke",
+      "next": "demand"
+     },
+     {
+      "text": "Tell them who your friends are",
+      "tone": "threat",
+      "next": "demand"
+     },
+     {
+      "text": "Plead: you have children",
+      "tone": "humble",
+      "next": "demand"
+     },
+     {
+      "text": "Back",
+      "next": "demand"
+     }
+    ]
+   }
+  }
+ },
+ "tone": "Period-accurate and unsentimental. Violence, punishment, poverty and occupation are shown plainly and without relish; sexual matters stay behind the door (no nudity, no depicted acts).",
+ "madam": {
+  "greet": {
+   "lines": [
+    [
+     "$madam",
+     "Dobry wieczór, kawalerze. (Good evening, young sir.) Warm rooms, discreet girls, and I hear every word said in them."
+    ]
+   ],
+   "choices": [
+    {
+     "text": "A room upstairs ({room} złoty)",
+     "action": "room",
+     "need": "coins>=room",
+     "why": "not enough coin"
+    },
+    {
+     "text": "What is the talk tonight? ({gossip} złoty)",
+     "action": "gossip",
+     "need": "coins>=gossip",
+     "why": "not enough coin"
+    },
+    {
+     "text": "Ask if the roof is warmer than the rooms",
+     "tone": "joke",
+     "next": "greet"
+    },
+    {
+     "text": "Nothing. Dobranoc. (Good night.)",
+     "action": "leave"
+    }
+   ]
+  },
+  "room": {
+   "lines": [
+    [
+     "$madam",
+     "Pokój na górze. (A room upstairs.) Nobody asks, nobody tells. The watch does not climb my stairs unless it pays like everyone else."
+    ]
+   ]
+  },
+  "gossip_officer": {
+   "lines": [
+    [
+     "$madam",
+     "Oberleutnant {officer} is upstairs with Hanka. (Lieutenant.) He left his sabre with my doorman and his wits on the stairs. His men stamp their feet at the corner until he comes down."
+    ]
+   ]
+  },
+  "gossip_rota": {
+   "lines": [
+    [
+     "$madam",
+     "{patrol_a} walks the north stalls and back; {patrol_b} does the Town Hall side. They change at the bell, and for a quarter of an hour after it they are too cold to look up. Straż, pff. (The watch.)"
+    ]
+   ]
+  },
+  "gossip_informer": {
+   "lines": [
+    [
+     "$madam",
+     "The thin one in the brown coat who drinks alone? Donosiciel. (An informer.) He reports to the Corporal at the north-west corner before midnight, every night. The Kapral pays him in Kreuzer and contempt."
+    ]
+   ]
+  },
+  "gossip_done": {
+   "lines": [
+    [
+     "$madam",
+     "That is all I know tonight, and more than is healthy. Come back tomorrow, when the soldiers have talked in their sleep."
+    ]
+   ]
+  },
+  "raid_closed": {
+   "lines": [
+    [
+     "$madam",
+     "Nie teraz! (Not now!) Die Visitation (the inspection) is at my door. Walk on and look at the moon."
+    ]
+   ]
+  },
+  "room_taken": {
+   "lines": [
+    [
+     "$madam",
+     "Your room is paid until the candle burns down. Go up, go up."
+    ]
+   ]
+  }
+ },
+ "officers": [
+  "von Kessel",
+  "Graf Wallis",
+  "Hauptmann Strasser's nephew",
+  "von Rauch"
+ ],
+ "lines": {
+  "cry": [
+   {
+    "text": "Chodź, żołnierzyku, zimno na dworze!",
+    "gloss": "Come, little soldier, it's cold outside!"
+   },
+   {
+    "text": "Komm, Soldat, es ist kalt!",
+    "gloss": "Come, soldier, it's cold!"
+   },
+   {
+    "text": "Ogrzejesz się u nas, panie!",
+    "gloss": "You'll warm up with us, sir!"
+   },
+   {
+    "text": "Komm herein, Schatz, nur zwanzig Kreuzer!",
+    "gloss": "Come in, sweetheart, only twenty kreuzer!"
+   },
+   {
+    "text": "Paniczu, nie wstydź się!",
+    "gloss": "Young master, don't be shy!"
+   },
+   {
+    "text": "Ciepłe łóżko i gorzałka!",
+    "gloss": "A warm bed and vodka!"
+   }
+  ],
+  "cry_soldier": [
+   {
+    "text": "He, Tiroler, komm zu mir!",
+    "gloss": "Hey, Tyrolean, come to me!"
+   },
+   {
+    "text": "Chodź, żołnierzyku, zimno na dworze!",
+    "gloss": "Come, little soldier, it's cold outside!"
+   },
+   {
+    "text": "Schöner Soldat, dein Sold ist bei mir gut aufgehoben!",
+    "gloss": "Handsome soldier, your pay is safe with me!"
+   }
+  ],
+  "cough": [
+   {
+    "text": "Khe... khe-khe...",
+    "gloss": "(a wet, rattling cough)"
+   },
+   {
+    "text": "To nic, to tylko mróz.",
+    "gloss": "It's nothing, only the frost."
+   }
+  ],
+  "pimp_demand": [
+   {
+    "text": "Dawaj, co zarobiłaś.",
+    "gloss": "Hand over what you've earned."
+   },
+   {
+    "text": "Kłamiesz, masz więcej.",
+    "gloss": "You're lying, you have more."
+   }
+  ],
+  "pimp_reply": [
+   {
+    "text": "Weź, weź, tylko nie bij.",
+    "gloss": "Take it, take it, just don't hit me."
+   },
+   {
+    "text": "Więcej nie ma, przysięgam.",
+    "gloss": "There's no more, I swear."
+   }
+  ],
+  "doorman": [
+   {
+    "text": "Broń zostawiasz u mnie.",
+    "gloss": "You leave your weapons with me."
+   },
+   {
+    "text": "Tylko z pieniędzmi, kawalerze.",
+    "gloss": "Only with money, young sir."
+   }
+  ],
+  "customer": [
+   {
+    "text": "Ile dziś?",
+    "gloss": "How much tonight?"
+   },
+   {
+    "text": "Tylko na chwilę, żona czeka.",
+    "gloss": "Just a moment, my wife is waiting."
+   }
+  ],
+  "customer_soldier": [
+   {
+    "text": "Was kostet's, Mädel?",
+    "gloss": "What does it cost, girl?"
+   },
+   {
+    "text": "Heut' zahlt der Kaiser!",
+    "gloss": "Tonight the Emperor pays!"
+   }
+  ],
+  "bill_doorman": [
+   {
+    "text": "Płać albo wylatujesz!",
+    "gloss": "Pay or you're out!"
+   },
+   {
+    "text": "Za wino też się płaci, kawalerze!",
+    "gloss": "The wine is paid for too, young sir!"
+   }
+  ],
+  "bill_customer": [
+   {
+    "text": "Toż to rozbój!",
+    "gloss": "That's robbery!"
+   },
+   {
+    "text": "Oszuści i rozbójnicy!",
+    "gloss": "Cheats and robbers!"
+   }
+  ],
+  "raid_soldier": [
+   {
+    "text": "Visitation, alle heraus!",
+    "gloss": "Inspection, everybody out!"
+   },
+   {
+    "text": "Im Namen der Polizeidirektion!",
+    "gloss": "In the name of the Police Directorate!"
+   }
+  ],
+  "raid_women": [
+   {
+    "text": "Straż, do środka!",
+    "gloss": "The watch, inside!"
+   }
+  ],
+  "raid_madam": [
+   {
+    "text": "Panowie, panowie... może kieliszek na mrozie?",
+    "gloss": "Gentlemen, gentlemen... perhaps a glass against the frost?"
+   },
+   {
+    "text": "Meine Herren, hier wohnen nur ehrliche Witwen.",
+    "gloss": "Gentlemen, only honest widows live here."
+   }
+  ],
+  "song": [
+   {
+    "text": "Pije Kuba do Jakuba, Jakub do Michała...",
+    "gloss": "Kuba drinks to Jakub, Jakub to Michał..."
+   },
+   {
+    "text": "Gorzałeczko, ty kochanie moje!",
+    "gloss": "Little vodka, you are my darling!"
+   },
+   {
+    "text": "Hej, szynkareczko, nalej jeszcze raz!",
+    "gloss": "Hey, little barmaid, pour once more!"
+   },
+   {
+    "text": "Wein her, Wein her, der Kaiser zahlt!",
+    "gloss": "Wine here, wine here, the Emperor pays!"
+   },
+   {
+    "text": "Kto nie pije, ten nie żyje!",
+    "gloss": "He who doesn't drink doesn't live!"
+   }
+  ],
+  "relieve": [
+   {
+    "text": "Ach... lepiej.",
+    "gloss": "Ah... better."
+   },
+   {
+    "text": "Nie patrz się, kolego.",
+    "gloss": "Don't look, friend."
+   },
+   {
+    "text": "Święty Florianie, wybacz...",
+    "gloss": "Saint Florian, forgive me..."
+   }
+  ],
+  "snore": [
+   {
+    "text": "zzz...",
+    "gloss": ""
+   },
+   {
+    "text": "chrrr... zzz...",
+    "gloss": ""
+   }
+  ],
+  "accost": [
+   {
+    "text": "Bracie! Napij się!",
+    "gloss": "Brother! Have a drink!"
+   },
+   {
+    "text": "Ty mnie szanujesz?",
+    "gloss": "Do you respect me?"
+   },
+   {
+    "text": "Bruder, trink mit mir!",
+    "gloss": "Brother, drink with me!"
+   }
+  ],
+  "accost_leave": [
+   {
+    "text": "Eee... nie to nie.",
+    "gloss": "Eh... suit yourself."
+   },
+   {
+    "text": "Smutny z ciebie człowiek.",
+    "gloss": "You're a sad man."
+   }
+  ],
+  "shoved": [
+   {
+    "text": "Ej, co ty?!",
+    "gloss": "Hey, what are you doing?!"
+   },
+   {
+    "text": "Za co, bracie?",
+    "gloss": "What for, brother?"
+   }
+  ],
+  "guard_move_on": [
+   {
+    "text": "Weg da, du Saufkopf!",
+    "gloss": "Get lost, you drunkard!"
+   },
+   {
+    "text": "Nach Hause, marsch!",
+    "gloss": "Home, march!"
+   }
+  ],
+  "drunk_reply": [
+   {
+    "text": "Już idę, panie władzo...",
+    "gloss": "I'm going, officer, sir..."
+   },
+   {
+    "text": "Idę, idę... hep!",
+    "gloss": "Going, going... hic!"
+   }
+  ],
+  "insult": [
+   {
+    "text": "Ty psie!",
+    "gloss": "You dog!"
+   },
+   {
+    "text": "Oszukałeś mnie w karty, łajdaku!",
+    "gloss": "You cheated me at cards, scoundrel!"
+   },
+   {
+    "text": "Powtórz to, chamie!",
+    "gloss": "Say that again, you lout!"
+   },
+   {
+    "text": "Du Hundsfott!",
+    "gloss": "You scoundrel!"
+   },
+   {
+    "text": "Moja żona? Moja żona?!",
+    "gloss": "My wife? My wife?!"
+   },
+   {
+    "text": "Ja ci dam!",
+    "gloss": "I'll give you what for!"
+   },
+   {
+    "text": "Oddawaj moje pieniądze!",
+    "gloss": "Give me back my money!"
+   }
+  ],
+  "cheer": [
+   {
+    "text": "Daj mu! Daj mu!",
+    "gloss": "Hit him! Hit him!"
+   },
+   {
+    "text": "Bij go!",
+    "gloss": "Beat him!"
+   },
+   {
+    "text": "Straż idzie!",
+    "gloss": "The watch is coming!"
+   },
+   {
+    "text": "Zakład o grosz!",
+    "gloss": "A grosz on it!"
+   }
+  ],
+  "fight_down": [
+   {
+    "text": "Dość... dość...",
+    "gloss": "Enough... enough..."
+   },
+   {
+    "text": "Zabiłeś mi ząb, psie.",
+    "gloss": "You've knocked my tooth out, dog."
+   }
+  ],
+  "thief_cry": [
+   {
+    "text": "Złodziej!",
+    "gloss": "Thief!"
+   },
+   {
+    "text": "Haltet den Dieb!",
+    "gloss": "Stop the thief!"
+   },
+   {
+    "text": "Moja sakiewka!",
+    "gloss": "My purse!"
+   }
+  ],
+  "guard_chase": [
+   {
+    "text": "Halt, stehenbleiben!",
+    "gloss": "Halt, stand still!"
+   },
+   {
+    "text": "Hab dich, Lump!",
+    "gloss": "Got you, rogue!"
+   }
+  ],
+  "thief_caught": [
+   {
+    "text": "Litości, panie, masz!",
+    "gloss": "Mercy, sir, take it!"
+   }
+  ],
+  "mug_victim": [
+   {
+    "text": "Ratunku!",
+    "gloss": "Help!"
+   },
+   {
+    "text": "Weźcie wszystko, nie bijcie!",
+    "gloss": "Take everything, don't hit me!"
+   }
+  ],
+  "mug_thug": [
+   {
+    "text": "Sakiewka albo życie.",
+    "gloss": "Your purse or your life."
+   },
+   {
+    "text": "Geld oder Leben!",
+    "gloss": "Money or your life!"
+   },
+   {
+    "text": "Cicho bądź, to przeżyjesz.",
+    "gloss": "Keep quiet and you'll live."
+   }
+  ],
+  "mug_pass": [
+   {
+    "text": "Przyjaciel flisaków? Idź.",
+    "gloss": "A friend of the boatmen? Go on."
+   },
+   {
+    "text": "Nasz człowiek, idź z Bogiem.",
+    "gloss": "One of ours, go with God."
+   }
+  ],
+  "mug_fled": [
+   {
+    "text": "Uciekaj, zając!",
+    "gloss": "Run, hare!"
+   }
+  ],
+  "burglar": [
+   {
+    "text": "Cicho...",
+    "gloss": "Quiet..."
+   },
+   {
+    "text": "Psiakrew!",
+    "gloss": "Dog's blood! (Damn!)"
+   }
+  ],
+  "fence": [
+   {
+    "text": "Pokaż to srebro.",
+    "gloss": "Show me the silver."
+   },
+   {
+    "text": "Trzy złote, nie więcej.",
+    "gloss": "Three złoty, no more."
+   },
+   {
+    "text": "Z kościoła? Nikt nie zapyta.",
+    "gloss": "From a church? Nobody will ask."
+   },
+   {
+    "text": "Jutro, o tej samej godzinie.",
+    "gloss": "Tomorrow, same hour."
+   }
+  ],
+  "jeer": [
+   {
+    "text": "Masz za swoje, złodzieju!",
+    "gloss": "You got what you deserve, thief!"
+   },
+   {
+    "text": "Jakobin! Jakobin!",
+    "gloss": "Jacobin! Jacobin!"
+   },
+   {
+    "text": "Tfu!",
+    "gloss": "(spits)"
+   }
+  ],
+  "kind": [
+   {
+    "text": "Masz, zjedz, biedaku.",
+    "gloss": "Here, eat, poor soul."
+   },
+   {
+    "text": "Bóg z tobą.",
+    "gloss": "God be with you."
+   }
+  ],
+  "prisoner": [
+   {
+    "text": "Zimno... tak zimno...",
+    "gloss": "Cold... so cold..."
+   },
+   {
+    "text": "Dzieci były głodne!",
+    "gloss": "The children were hungry!"
+   }
+  ],
+  "sentence": [
+   {
+    "text": "Im Namen Seiner Majestät des Kaisers!",
+    "gloss": "In the name of His Majesty the Emperor!"
+   },
+   {
+    "text": "Wegen Aufruhr: fünfundzwanzig Stockschläge!",
+    "gloss": "For sedition: twenty-five strokes!"
+   }
+  ],
+  "drum": [
+   {
+    "text": "Trrrr-rum!",
+    "gloss": "(drum roll)"
+   }
+  ],
+  "flog_cry": [
+   {
+    "text": "Jezus Maria!",
+    "gloss": "Jesus, Mary!"
+   },
+   {
+    "text": "Aaach!",
+    "gloss": ""
+   },
+   {
+    "text": "Za Polskę!",
+    "gloss": "For Poland!"
+   }
+  ],
+  "flog_crowd": [
+   {
+    "text": "Boże, zmiłuj się...",
+    "gloss": "God have mercy..."
+   },
+   {
+    "text": "Psy austriackie...",
+    "gloss": "Austrian dogs..."
+   },
+   {
+    "text": "Nie patrz, dziecko.",
+    "gloss": "Don't look, child."
+   }
+  ],
+  "count": [
+   {
+    "text": "Eins!",
+    "gloss": "One!"
+   },
+   {
+    "text": "Zwei!",
+    "gloss": "Two!"
+   },
+   {
+    "text": "Drei!",
+    "gloss": "Three!"
+   },
+   {
+    "text": "Vier!",
+    "gloss": "Four!"
+   },
+   {
+    "text": "Fünf!",
+    "gloss": "Five!"
+   },
+   {
+    "text": "Sechs!",
+    "gloss": "Six!"
+   },
+   {
+    "text": "Sieben!",
+    "gloss": "Seven!"
+   },
+   {
+    "text": "Acht!",
+    "gloss": "Eight!"
+   },
+   {
+    "text": "Neun!",
+    "gloss": "Nine!"
+   },
+   {
+    "text": "Zehn!",
+    "gloss": "Ten!"
+   },
+   {
+    "text": "Elf!",
+    "gloss": "Eleven!"
+   },
+   {
+    "text": "Zwölf!",
+    "gloss": "Twelve!"
+   },
+   {
+    "text": "Dreizehn!",
+    "gloss": "Thirteen!"
+   },
+   {
+    "text": "Vierzehn!",
+    "gloss": "Fourteen!"
+   },
+   {
+    "text": "Fünfzehn!",
+    "gloss": "Fifteen!"
+   },
+   {
+    "text": "Sechzehn!",
+    "gloss": "Sixteen!"
+   },
+   {
+    "text": "Siebzehn!",
+    "gloss": "Seventeen!"
+   },
+   {
+    "text": "Achtzehn!",
+    "gloss": "Eighteen!"
+   },
+   {
+    "text": "Neunzehn!",
+    "gloss": "Nineteen!"
+   },
+   {
+    "text": "Zwanzig!",
+    "gloss": "Twenty!"
+   },
+   {
+    "text": "Einundzwanzig!",
+    "gloss": "Twenty-one!"
+   },
+   {
+    "text": "Zweiundzwanzig!",
+    "gloss": "Twenty-two!"
+   },
+   {
+    "text": "Dreiundzwanzig!",
+    "gloss": "Twenty-three!"
+   },
+   {
+    "text": "Vierundzwanzig!",
+    "gloss": "Twenty-four!"
+   },
+   {
+    "text": "Fünfundzwanzig!",
+    "gloss": "Twenty-five!"
+   }
+  ],
+  "beggar": [
+   {
+    "text": "Dla inwalidy spod Maciejowic, panie...",
+    "gloss": "For a cripple from Maciejowice, sir..."
+   },
+   {
+    "text": "Grosik dla żołnierza Kościuszki!",
+    "gloss": "A grosz for a soldier of Kościuszko!"
+   },
+   {
+    "text": "Bóg zapłać.",
+    "gloss": "May God repay you."
+   }
+  ],
+  "freezing": [
+   {
+    "text": "Zimno...",
+    "gloss": "Cold..."
+   },
+   {
+    "text": "Matko Boska, jak zimno...",
+    "gloss": "Mother of God, how cold..."
+   }
+  ],
+  "collectors": [
+   {
+    "text": "Trzecia tej zimy na tej ulicy.",
+    "gloss": "The third this winter on this street."
+   },
+   {
+    "text": "Bierz za nogi.",
+    "gloss": "Take her legs."
+   }
+  ],
+  "scavenge": [
+   {
+    "text": "Tu, kapusta!",
+    "gloss": "Here, cabbage!"
+   },
+   {
+    "text": "Cicho, stróż!",
+    "gloss": "Quiet, the watchman!"
+   },
+   {
+    "text": "Moje, ja pierwszy!",
+    "gloss": "Mine, I was first!"
+   }
+  ],
+  "soup_server": [
+   {
+    "text": "Po jednej misce, bracia.",
+    "gloss": "One bowl each, brothers."
+   },
+   {
+    "text": "Nie pchajcie się, starczy dla wszystkich.",
+    "gloss": "Don't push, there's enough for everyone."
+   }
+  ],
+  "soup_poor": [
+   {
+    "text": "Na wieki wieków.",
+    "gloss": "For ever and ever."
+   },
+   {
+    "text": "Bóg zapłać, ojcze.",
+    "gloss": "God repay you, Father."
+   },
+   {
+    "text": "Nie pchaj się!",
+    "gloss": "Don't push!"
+   }
+  ],
+  "arrest_soldier": [
+   {
+    "text": "Papiere, sofort!",
+    "gloss": "Papers, at once!"
+   },
+   {
+    "text": "Im Namen des Kaisers, mitkommen!",
+    "gloss": "In the Emperor's name, come with us!"
+   }
+  ],
+  "arrest_victim": [
+   {
+    "text": "Ja nic nie zrobiłem!",
+    "gloss": "I've done nothing!"
+   },
+   {
+    "text": "Puśćcie, mam dzieci!",
+    "gloss": "Let go, I have children!"
+   }
+  ],
+  "press_corporal": [
+   {
+    "text": "Der Kaiser braucht kräftige Burschen.",
+    "gloss": "The Emperor needs sturdy lads."
+   },
+   {
+    "text": "Vierzehn Jahre Dienst, gratuliere.",
+    "gloss": "Fourteen years' service, congratulations."
+   }
+  ],
+  "press_mother": [
+   {
+    "text": "Nie zabierajcie mi syna!",
+    "gloss": "Don't take my son!"
+   },
+   {
+    "text": "On jest jedyny, kto nas żywi!",
+    "gloss": "He's the only one who feeds us!"
+   }
+  ],
+  "press_youth": [
+   {
+    "text": "Mamo!",
+    "gloss": "Mother!"
+   }
+  ],
+  "harass_soldier": [
+   {
+    "text": "He, Jud, Pass zeigen!",
+    "gloss": "Hey, Jew, show your pass!"
+   },
+   {
+    "text": "Was hast du da im Sack?",
+    "gloss": "What have you got in the sack?"
+   },
+   {
+    "text": "Schon besser, verschwinde.",
+    "gloss": "That's better, get lost."
+   }
+  ],
+  "harass_pedlar": [
+   {
+    "text": "Ikh hob a pas, Herr, ot iz er...",
+    "gloss": "I have a pass, sir, here it is..."
+   },
+   {
+    "text": "Nemt, nemt, un lozt mikh geyn.",
+    "gloss": "Take it, take it, and let me go."
+   }
+  ],
+  "harass_soldier_priest": [
+   {
+    "text": "Pope, wo ist dein Erlaubnisschein?",
+    "gloss": "Priest, where's your permit?"
+   },
+   {
+    "text": "Zahl und geh, Unierter.",
+    "gloss": "Pay and go, Uniate."
+   }
+  ],
+  "harass_priest": [
+   {
+    "text": "Hospody pomyłuj...",
+    "gloss": "Lord have mercy..."
+   },
+   {
+    "text": "Macie, idźcie z Bogiem.",
+    "gloss": "Take it, go with God."
+   }
+  ],
+  "requisition_soldier": [
+   {
+    "text": "Das Holz ist für die Kaserne beschlagnahmt.",
+    "gloss": "The wood is requisitioned for the barracks."
+   },
+   {
+    "text": "Quittung gibt's morgen, vielleicht.",
+    "gloss": "A receipt tomorrow, maybe."
+   }
+  ],
+  "requisition_peasant": [
+   {
+    "text": "A czym ja dzieci ogrzeję?!",
+    "gloss": "And what will I warm my children with?!"
+   },
+   {
+    "text": "To moje drewno, uczciwie ścięte!",
+    "gloss": "That's my wood, honestly cut!"
+   }
+  ],
+  "poster_corporal": [
+   {
+    "text": "Ins Feuer mit dem Geschmier!",
+    "gloss": "Into the fire with this scribble!"
+   },
+   {
+    "text": "Wer das klebt, hängt.",
+    "gloss": "Whoever posts this, hangs."
+   }
+  ],
+  "poster_onlooker": [
+   {
+    "text": "Trzeci Maja nie spłonie.",
+    "gloss": "The Third of May won't burn."
+   }
+  ],
+  "curfew_soldier": [
+   {
+    "text": "Hast du die Glocke nicht gehört, Schwein?",
+    "gloss": "Didn't you hear the bell, pig?"
+   },
+   {
+    "text": "Polizeistunde, heim mit dir!",
+    "gloss": "Curfew, get home!"
+   }
+  ],
+  "curfew_drunk": [
+   {
+    "text": "Litości, już idę!",
+    "gloss": "Mercy, I'm going!"
+   }
+  ],
+  "verse": [
+   {
+    "text": "Śpiewam o mrozie i o pustej kiesie.",
+    "gloss": "I sing of frost and of an empty purse."
+   },
+   {
+    "text": "Był raz rycerz siwy jak zima...",
+    "gloss": "There was a knight as white as winter..."
+   },
+   {
+    "text": "Dwa miecze nosił, a litość w kieszeni.",
+    "gloss": "He wore two swords, and kept his mercy in his pocket."
+   },
+   {
+    "text": "Panienko w oknie, nie zamykaj okiennic!",
+    "gloss": "Miss at the window, don't close your shutters!"
+   },
+   {
+    "text": "Austriak liczy, a Polak pije; kto z nich dłużej żyje?",
+    "gloss": "The Austrian counts, the Pole drinks; which lives longer?"
+   }
+  ],
+  "chant": [
+   {
+    "text": "Precz z Niemcami!",
+    "gloss": "Out with the Germans!"
+   },
+   {
+    "text": "Chleba i wolności!",
+    "gloss": "Bread and freedom!"
+   },
+   {
+    "text": "Niech żyje Kościuszko!",
+    "gloss": "Long live Kościuszko!"
+   },
+   {
+    "text": "Na ratusz!",
+    "gloss": "To the Town Hall!"
+   }
+  ],
+  "volley": [
+   {
+    "text": "Legt an!",
+    "gloss": "Take aim!"
+   },
+   {
+    "text": "Feuer!",
+    "gloss": "Fire!"
+   }
+  ],
+  "scatter": [
+   {
+    "text": "Strzelają! Uciekać!",
+    "gloss": "They're shooting! Run!"
+   }
+  ]
+ },
+ "messages": {
+  "cutpurse_player": "A rzezimieszek (cutpurse) brushed past you in the crowd. Your purse is {n} złoty lighter. He is running for the alley.",
+  "cutpurse_dropped": "The cutpurse drops your coins on the cobbles.",
+  "cutpurse_recovered": "You pick up your {n} złoty.",
+  "mug_paid": "You pay {n} złoty. The thugs melt back into the dark.",
+  "mug_fought": "Both thugs lie in the snow. Nobody in this alley will say they saw anything.",
+  "mug_ran": "You run. Their laughter follows you out of the alley.",
+  "mug_passed": "The thugs know you for a friend of the boatmen and let you pass.",
+  "saw_burglar": "You saw a man prising a shutter behind the row. A word to the watch might be worth something, or a word to the underworld.",
+  "room": "Matka Weronika takes {n} złoty. A back stair, a room with a candle: no watchman will look for you here for a while.",
+  "gossip": "Gossip from the red lantern: {what}",
+  "posters": "A corporal tears a printed leaf from the notice board and feeds a sheaf of them to the brazier. Somebody's leaves; not yet yours.",
+  "flogging": "A drum at the Town Hall. The Austrians are flogging a man for seditious print. The crowd watches in silence.",
+  "raid": "Soldiers at the red lantern: a Visitation. The women vanish inside.",
+  "frozen": "The old woman in the doorway of the lodging house has stopped shivering.",
+  "drink": "The gorzałka burns all the way down. You are warmer; he is wiser.",
+  "warm": "You stand by the madam's stove. For a minute nobody wants anything from you.",
+  "slap": "A slap across the face, open-handed and practised. ({h} of {max})",
+  "knife": "The pimp's knife opens your sleeve and the arm under it. ({h} of {max})",
+  "free_room": "The doorman looks at his boots. The back stair is yours for a while.",
+  "cowed": "The leader looks at your face, at your friends in it, and steps aside.",
+  "kind": "You press a coin into the prisoner's hand. The guard pretends not to see.",
+  "riot": "A riot on the Rynek: {cause}. The watch will not stand for it long.",
+  "riot_calm": "The crowd's shouting drops a note. Some of them are looking for the way home.",
+  "riot_rile": "The crowd roars. Somebody throws the first stone.",
+  "riot_crushed": "A volley. The smoke clears on the dead in the snow, and the square empties.",
+  "riot_dispersed": "The crowd breaks up into men going home, as if nothing happened."
+ },
+ "_speech": "Bubbles go through Walker.speech (range, count and gloss budget). Scripts keep chatter sparse: one insult exchange per fight, a drunk sings at most one line per 20 s.",
+ "_personality": "Speakers carry a `personality` (wry, gallows-humour, stern, vengeful, fearful, cynical, tender, drunk-philosopher); the player's choices carry a `tone` (joke, blunt, humble, threat, flatter, bribe). A toned choice is answered from responses[personality][tone] (falling back to responses[personality]['*']): its lines, then its `effect`, then its `next` (or the choice's). Same field names as the missions' people.",
+ "people": {
+  "madam": {
+   "name": "Matka Weronika",
+   "personality": "wry"
+  },
+  "doorman": {
+   "name": "Bartek the doorman",
+   "personality": "fearful"
+  },
+  "pimp": {
+   "name": "Kuba Nożyk",
+   "personality": "vengeful"
+  },
+  "thug": {
+   "name": "Thug",
+   "personality": [
+    "vengeful",
+    "stern",
+    "cynical"
+   ]
+  },
+  "drunk": {
+   "name": "A drunk",
+   "personality": "drunk-philosopher"
+  },
+  "prisoner": {
+   "name": "The man in the pillory",
+   "personality": "gallows-humour"
+  },
+  "sergeant": {
+   "name": "The sergeant",
+   "personality": "stern"
+  },
+  "bard": {
+   "name": "Cyprian the lute-player",
+   "personality": "wry"
+  },
+  "ringleader": {
+   "name": "The ringleader",
+   "personality": "vengeful"
+  }
+ },
+ "responses": {
+  "wry": {
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Ha! Śmieszny. (A funny one.) Laughter is free in this house; it is the only thing that is. Your next question costs nothing."
+     ]
+    ],
+    "effect": "gossip_free"
+   },
+   "flatter": {
+    "lines": [
+     [
+      "$them",
+      "Men pay me in flattery all night, and still I cannot buy firewood with it."
+     ]
+    ]
+   },
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Try it. The Oberleutnant upstairs likes his nights quiet, and his men like mine."
+     ]
+    ]
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "Humble, in here? Stand by the stove a minute, then. That much is on the house."
+     ]
+    ],
+    "effect": "warm"
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "Good. Plain talk saves candles."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "Mm."
+     ]
+    ]
+   }
+  },
+  "fearful": {
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Dobrze, dobrze! (All right, all right!) Back stair, second door. I never saw you."
+     ]
+    ],
+    "effect": "free_room"
+   },
+   "bribe": {
+    "lines": [
+     [
+      "$them",
+      "An officer is upstairs. A Tyrolean, with a sabre. You did not hear it from me."
+     ]
+    ],
+    "effect": "gossip_officer"
+   },
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Heh. Heh. You will not tell Matka I laughed?"
+     ]
+    ]
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "I only sit here. I only sit."
+     ]
+    ]
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "You too, eh? We all sit where we are put."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "I only sit here."
+     ]
+    ]
+   }
+  },
+  "vengeful": {
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "The knife is out before you finish. Say it again. Slower."
+     ]
+    ],
+    "effect": "knife"
+   },
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Laugh at me again and you will laugh through a second mouth."
+     ]
+    ],
+    "effect": "slap"
+   },
+   "bribe": {
+    "lines": [
+     [
+      "$them",
+      "Coin is coin. The Hauptmann's nephew pays for two and sleeps for one. Now walk."
+     ]
+    ],
+    "effect": "gossip_officer"
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "Begging suits you. Keep practising."
+     ]
+    ]
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "I remember faces. I will remember yours."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "I remember faces."
+     ]
+    ]
+   }
+  },
+  "stern": {
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Nie. (No.) The purse."
+     ]
+    ]
+   },
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Brave words. Let us see who is behind them."
+     ]
+    ],
+    "effect": "cowed_if_strong"
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "Everyone has children. The purse."
+     ]
+    ]
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "Good. Then we understand each other."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "The purse."
+     ]
+    ]
+   }
+  },
+  "cynical": {
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Funny. Funny men pay double."
+     ]
+    ],
+    "effect": "cost_up"
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "The humble get robbed first. It is a law of nature, like frost."
+     ]
+    ]
+   },
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Everybody threatens. Nobody pays. You will pay."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "Everybody says that."
+     ]
+    ]
+   }
+  },
+  "drunk-philosopher": {
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Ha! You understand, brother! Pij! (Drink!) The Emperor pays for this one; he does not know it yet."
+     ]
+    ],
+    "effect": "drink"
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "Truth? Truth is a cold bench and a warm bottle. The Austrians have the bench."
+     ]
+    ]
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "We are all in the gutter, brother. Some look at the stars. I look at the gutter; it is closer."
+     ]
+    ]
+   },
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Hit me, then. My wife does it better, and she loves me."
+     ]
+    ],
+    "effect": "leave"
+   },
+   "flatter": {
+    "lines": [
+     [
+      "$them",
+      "A philosopher, he says! Kant is in Königsberg. I am in the rynsztok. (the gutter)"
+     ]
+    ]
+   },
+   "bribe": {
+    "lines": [
+     [
+      "$them",
+      "A grosz? I will drink your health, then mine, then the King's, God rest the poor devil."
+     ]
+    ],
+    "effect": "drink"
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "Hep."
+     ]
+    ]
+   }
+  },
+  "gallows-humour": {
+   "joke": {
+    "lines": [
+     [
+      "$them",
+      "Ha! At least they set the board at the right height. Listen: the watch changes at the bell, and the new man never looks at this corner."
+     ]
+    ],
+    "effect": "gossip_rota"
+   },
+   "blunt": {
+    "lines": [
+     [
+      "$them",
+      "A loaf. Two days of this for a loaf. Next time I steal the bakery; it is the same price."
+     ]
+    ]
+   },
+   "humble": {
+    "lines": [
+     [
+      "$them",
+      "Bread, if you have it. Otherwise the crows get my breakfast, and they have not earned it."
+     ]
+    ]
+   },
+   "bribe": {
+    "lines": [
+     [
+      "$them",
+      "A coin! Put it under my tongue, friend. I may need it for the ferryman."
+     ]
+    ],
+    "effect": "kind"
+   },
+   "threat": {
+    "lines": [
+     [
+      "$them",
+      "Or what? You will put me in the pillory?"
+     ]
+    ]
+   },
+   "flatter": {
+    "lines": [
+     [
+      "$them",
+      "Handsome, am I? The ladies do stop to spit."
+     ]
+    ]
+   },
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "Mind the board."
+     ]
+    ]
+   }
+  },
+  "tender": {
+   "*": {
+    "lines": [
+     [
+      "$them",
+      "Bóg z tobą. (God be with you.)"
+     ]
+    ]
+   }
+  }
+ },
+ "dialogues": {
+  "doorman": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "Matka is at the door. I only sit here."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Lean on him",
+      "tone": "threat"
+     },
+     {
+      "text": "Slip him a coin (1 złoty)",
+      "tone": "bribe",
+      "cost": 1,
+      "need": "coins>=1",
+      "why": "no coin"
+     },
+     {
+      "text": "Joke about the cold",
+      "tone": "joke"
+     },
+     {
+      "text": "Leave him be",
+      "action": "leave"
+     }
+    ]
+   }
+  },
+  "pimp": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "Looking, or buying? Either way, not talking."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Tell him to leave the girls their coins",
+      "tone": "threat"
+     },
+     {
+      "text": "Pay for a word (1 złoty)",
+      "tone": "bribe",
+      "cost": 1,
+      "need": "coins>=1",
+      "why": "no coin"
+     },
+     {
+      "text": "Ask what his mother would say",
+      "tone": "joke"
+     },
+     {
+      "text": "Walk on",
+      "action": "leave"
+     }
+    ]
+   }
+  },
+  "drunk": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "Bracie! (Brother!) Sit, sit. The bench is cold but the company is excellent."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Drink to the Emperor's health",
+      "tone": "joke"
+     },
+     {
+      "text": "Ask him how things really are",
+      "tone": "blunt"
+     },
+     {
+      "text": "Sit with him a moment",
+      "tone": "humble"
+     },
+     {
+      "text": "Leave him to it",
+      "action": "leave"
+     }
+    ]
+   }
+  },
+  "prisoner": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "Forgive me for not bowing. They have my neck."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Ask how the view is",
+      "tone": "joke"
+     },
+     {
+      "text": "Give him a coin (1 złoty)",
+      "tone": "bribe",
+      "cost": 1,
+      "need": "coins>=1",
+      "why": "no coin"
+     },
+     {
+      "text": "Ask what he did",
+      "tone": "blunt"
+     },
+     {
+      "text": "Walk on",
+      "action": "leave"
+     }
+    ]
+   }
+  },
+  "bard": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "Wieczór, panie. (Evening, sir.) A verse for a coin, or a rumour for a verse. The coin is simpler; the rumour is warmer."
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Ask who taught him to play",
+      "tone": "humble"
+     },
+     {
+      "text": "Ask for his best ballad",
+      "tone": "flatter"
+     },
+     {
+      "text": "Give him a coin (1 złoty)",
+      "tone": "bribe",
+      "cost": 1,
+      "need": "coins>=1",
+      "why": "no coin"
+     },
+     {
+      "text": "Walk on",
+      "action": "leave"
+     }
+    ]
+   },
+   "responses": {
+    "humble": {
+     "lines": [
+      [
+       "$them",
+       "A wandering master taught me, Jaskier by name. Buttercup, if you like; he did. Three chords, forty lies, and which husbands to avoid."
+      ]
+     ],
+     "next": "start"
+    },
+    "flatter": {
+     "lines": [
+      [
+       "$them",
+       "Then hear of the white-haired one with two swords and a wolf's head on a chain. He never took coin from the poor, only from those who could not tell a strzyga from a duchess."
+      ],
+      [
+       "$them",
+       "Nobody believes it. Everybody pays to hear it."
+      ]
+     ],
+     "next": "start"
+    },
+    "bribe": {
+     "lines": [
+      [
+       "$them",
+       "In the old ballads the hero gets the coin and the singer gets the blame. Tonight let us be modern."
+      ],
+      [
+       "$them",
+       "And for your coin, a rumour: the informer drinks with the Corporal's clerk, and pays in other men's names."
+      ]
+     ],
+     "effect": "gossip_informer"
+    },
+    "joke": {
+     "lines": [
+      [
+       "$them",
+       "Ha. I will steal that for a song, and you will never see a grosz of it. Such is art."
+      ]
+     ],
+     "next": "start"
+    }
+   }
+  },
+  "ringleader": {
+   "start": {
+    "lines": [
+     [
+      "$them",
+      "You! Are you with us, or are you with them?"
+     ]
+    ],
+    "choices": [
+     {
+      "text": "Joke that the Austrians will die of the cold first",
+      "tone": "joke"
+     },
+     {
+      "text": "Tell him to stand his men down, or else",
+      "tone": "threat"
+     },
+     {
+      "text": "Appeal to him: not tonight, not like this",
+      "tone": "appeal"
+     },
+     {
+      "text": "Step back",
+      "action": "leave"
+     }
+    ]
+   },
+   "responses": {
+    "joke": {
+     "lines": [
+      [
+       "$them",
+       "Ha! Even now he jokes. All right. Nobody burns anything yet."
+      ]
+     ],
+     "effect": "calm"
+    },
+    "threat": {
+     "lines": [
+      [
+       "$them",
+       "Threaten me? The Austrians do it better, and we are still here. Lads!"
+      ]
+     ],
+     "effect": "rile"
+    },
+    "appeal": {
+     "lines": [
+      [
+       "$them",
+       "Not tonight... You may be right. And you may be a coward. We will see which."
+      ]
+     ],
+     "effect": "appeal"
+    }
+   }
+  }
+ },
+ "bard": {
+  "portal": 5,
+  "lx": 4.7,
+  "out": 3.4,
+  "models": [
+   "dist_french_emigre",
+   "dist_flemish_journeyman",
+   "figure_artist"
+  ],
+  "clip": "talk_gesture_b",
+  "verse_every": [
+   28,
+   45
+  ],
+  "from": "21:00",
+  "until": "02:00"
+ },
+ "riot": {
+  "radius": 30.0,
+  "volley_after": 60.0,
+  "max_secs": 240.0,
+  "crackdown_per_min": 1,
+  "deaths": [
+   2,
+   3
+  ],
+  "rioters": 3,
+  "torches": 2,
+  "rioter_models": [
+   [
+    "dist_journeyman",
+    "npc_m_05"
+   ],
+   [
+    "dist_porter",
+    "npc_m_00"
+   ],
+   [
+    "npc_m_04",
+    "figure_townsman"
+   ],
+   [
+    "dist_tanner",
+    "npc_m_06"
+   ]
+  ],
+  "ringleader_models": [
+   "cast_student",
+   "town_blacksmith",
+   "npc_m_07"
+  ],
+  "calm_street": 40,
+  "turn_on_allies_below": 20
+ }
+}
