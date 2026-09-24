@@ -6,7 +6,7 @@ faction politics and the occasional knife. Godot 4.7, GDScript; everything visib
 scripts (Blender 5.2 + MakeHuman for people, procedural bakes for buildings, numpy for sound).
 
 Design: `docs/GDD.md`. Stealth systems: `docs/STEALTH.md`. Animation: `docs/ANIMATION.md`. Audio: `docs/AUDIO.md`.
-Animals and their sources: `docs/ANIMALS.md`. Historical people and sources: `docs/HISTORY.md`.
+Animals and their sources: `docs/ANIMALS.md`. Historical people and sources: `docs/HISTORY.md`. Folklore, omens and superstition as the town tells them: `docs/FOLKLORE.md`. The sky: `docs/SKY.md`.
 
 The game does not soften its period: occupation, public punishment, poverty, drink, prostitution, disease and the
 bigotries of the age are shown, and some options are closed to a character by sex, origin, faith or inclination.

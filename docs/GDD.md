@@ -69,7 +69,8 @@ from a list.
    the walls, talk in the street, a changed patrol, a letter at the safe house, a keeper's greeting, a dawn page in
    the journal. Sleeping at the bed (the safe house) saves and passes time; waiting on a bench passes an hour.
 The seven institutions of the occupier remain the spine; taking one still changes the city for good.
-5. **Milestones and penalties.** The winter has a calendar (12 January to Candlemas, 2 February 1795) with
+5. **Milestones and penalties.** The winter has a calendar (Austria enters the city on 5 January 1796; play runs from the 12th to
+   Candlemas, Tuesday 2 February 1796; the title keeps 1795, the partition year) with
    milestones the keepers and the street talk about: an institution before the Commissioner's levy, an invitation
    before the ball, the kingpin before Candlemas. Missing one has teeth: the crackdown jumps, a faction steps back to
    arm's length, a person is arrested or leaves the city with their lever, a bureau is raided and shut for two days,
