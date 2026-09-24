@@ -513,8 +513,9 @@ static func weathered_material(src: BaseMaterial3D) -> ShaderMaterial:
 	if "--no-weather-layer" in OS.get_cmdline_user_args():
 		return null
 	var nm := src.resource_name.to_lower()
+	var words := nm.replace("~", "_").replace(".", "_").replace(" ", "_").split("_", false)
 	for k in WEATHER_SKIP:
-		if k in nm:
+		if (k in words) or ("-" in k and k in nm) or (k == "human" and nm.begins_with("human")):
 			return null
 	if not (src is StandardMaterial3D) or src.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED \
 			or src.emission_enabled or src.heightmap_enabled or src.subsurf_scatter_enabled or src.uv1_triplanar \

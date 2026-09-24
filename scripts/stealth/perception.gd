@@ -155,7 +155,7 @@ static func surface_at(node: Node3D, pos: Vector3, exclude: Array = []) -> Strin
 			best_r = r
 			best = str(pn.get_meta("surface", ""))
 	if best != "":
-		return best
+		return weather_surface(best, pos)
 	var q := PhysicsRayQueryParameters3D.create(pos + Vector3(0, 0.3, 0), pos - Vector3(0, 1.2, 0))
 	var ex: Array[RID] = []
 	for e in exclude:
@@ -167,13 +167,29 @@ static func surface_at(node: Node3D, pos: Vector3, exclude: Array = []) -> Strin
 		var n: Node = hit.get("collider") as Node
 		while n != null and n != node.get_tree().root:
 			if n.has_meta("surface"):
-				return str(n.get_meta("surface"))
+				return weather_surface(str(n.get_meta("surface")), pos)
 			n = n.get_parent()
-	return "planks" if indoors else "cobbles"
+	return "planks" if indoors else weather_surface("cobbles", pos)
 
 
 static func surface_noise(s: String) -> float:
+	if s == "sleet":
+		return float(tg("surfaces.sleet", 1.3))     # a crunching crust (weather.gd); stealth.json may tune it
 	return float(tg("surfaces." + s, 1.0))
+
+
+## Outdoor ground under accumulated weather: a sleet crust crunches ("sleet"); deep fresh powder muffles ("snow").
+static func weather_surface(s: String, pos: Vector3) -> String:
+	if pos.y < float(tg("light.interior_below_y", -50.0)) or s in ["planks", "straw", "mud"]:
+		return s
+	var w := weather_state()
+	if w.is_empty():
+		return s
+	if float(w.get("crust", 0.0)) > 0.35:
+		return "sleet"
+	if s != "snow" and float(w.get("fresh", 0.0)) > 0.5 and float(w.get("ground_cover", 0.0)) > 0.6:
+		return "snow"
+	return s
 
 
 # ------------------------------------------------------------------ weather (scripts/city/weather.gd)

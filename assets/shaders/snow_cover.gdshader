@@ -4,11 +4,17 @@
 // parts go first (lower-facing and thin bits a little earlier); the blanket sinks into the tiles near the
 // melt line and the rim turns grey, dark and glossy (melt water) before the fragment is cut away with a
 // crumbly, grainy edge instead of a clean contour.
+// Accumulation (weather.gd): `fresh_snow` lays a bright, soft, slightly thicker powder cap over it; `crust` greys it
+// with a sleet grain; icicles (is_ice) follow the global `icicles` instead of the cover, the tips going first.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 global uniform float snow_cover;
 global uniform float wetness;
+global uniform float fresh_snow;
+global uniform float crust;
+global uniform float icicles;
+uniform bool is_ice = false;
 
 uniform vec4 albedo : source_color = vec4(1.0);
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable, hint_default_white;
@@ -64,14 +70,19 @@ float melt_order(vec3 p, float up) {
 }
 
 float threshold() {
+	float c = is_ice ? icicles : snow_cover;
 	// full cover renders the baked look untouched (the melt terms below never reach it)
-	return snow_cover >= 0.999 ? 4.0 : snow_cover * 1.3 - 0.15;
+	return c >= 0.999 ? 4.0 : c * 1.3 - 0.15;
 }
 
 void vertex() {
 	w_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec3 wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 	w_up = wn.y;
+	if (!is_ice && wn.y > 0.3) {
+		// fresh powder sits a little proud of the old blanket
+		VERTEX += inverse(mat3(MODEL_MATRIX)) * vec3(0.0, fresh_snow * 0.025 * snow_cover, 0.0);
+	}
 	float edge = threshold() - melt_order(w_pos, w_up);
 	float thin = clamp(edge / 0.4, 0.0, 1.0);
 	if (thin < 1.0) {
@@ -99,11 +110,23 @@ void fragment() {
 	rim = rim * rim * (3.0 - 2.0 * rim);
 	float slush = clamp(max(rim, wetness * 0.4 + (1.0 - snow_cover) * 0.18), 0.0, 1.0);
 	vec3 slush_col = base.rgb * mix(vec3(0.62, 0.65, 0.70), vec3(0.34, 0.36, 0.40), rim);
-	ALBEDO = mix(base.rgb, slush_col, slush);
-	ROUGHNESS = mix(r, 0.12, slush);
+	vec3 col = mix(base.rgb, slush_col, slush);
+	float rr = mix(r, 0.12, slush);
+	if (!is_ice) {
+		// sleet crust: a grey, granular skin; fresh powder: bright, soft and matte over everything
+		float cr = crust * (0.75 + grain * 0.5) * (1.0 - fresh_snow);
+		col = mix(col, base.rgb * vec3(0.66, 0.67, 0.70), clamp(cr, 0.0, 1.0));
+		rr = mix(rr, 0.55, cr);
+		float fr = fresh_snow * smoothstep(0.2, 0.6, w_up) * (1.0 - rim);
+		col = mix(col, vec3(0.97, 0.98, 1.0), fr * 0.8);
+		rr = mix(rr, 0.95, fr);
+		slush *= 1.0 - fr * 0.7;
+	}
+	ALBEDO = col;
+	ROUGHNESS = rr;
 	SPECULAR = mix(specular, 0.7, slush);
 	if (use_normal) {
 		NORMAL_MAP = texture(normal_tex, uv).rgb;
-		NORMAL_MAP_DEPTH = normal_scale * (1.0 - slush * 0.6);
+		NORMAL_MAP_DEPTH = normal_scale * (1.0 - slush * 0.6) * (1.0 - fresh_snow * 0.5);
 	}
 }

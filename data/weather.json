@@ -1,5 +1,5 @@
 {
-  "_doc": "Weather presets (scripts/city/weather.gd). time_of_day: hour 0..24, or -1 to follow GameState.clock_minutes (the sun rises after 06:00). snow_cover / wetness: the value set when the preset is applied (start_*) and the value it drifts toward (target) at rate per game hour. precip: particle counts for the near box and the far ring around the camera (flakes = drifting snow billboards, streaks = rain / sleet / blizzard streaks, splash = ground rings within 12 m). visibility: guard far-cone range multiplier (perception.gd); hearing is scaled by rain (x0.6) and wind (x0.8) in perception.gd. Colours are linear RGB. sky_* / fog_* night values are blended toward the day_* values by the sun's height. fog_color / fog_emission: night distance-fog colour and volumetric self-glow (snow haze). ground_cover_max: caps the snow on the paving (global ground_snow) below the roof cover.",
+  "_doc": "Weather presets (scripts/city/weather.gd). A preset sets what is happening (kind, intensity, wind, temperature, time_of_day: hour or -1 to follow GameState.clock_minutes, the sun rising after 06:00) and the look (sky_* night and day_* day colours, moon/sun energy, overcast, ambient, fog_* and volumetric density, exposure, mist = ground-mist strength). The state ACCUMULATES: roof and ground snow cover, wetness, puddles, sleet crust, fresh powder and icicles drift at the per-game-hour rates in \"accumulation\" (rain_melt_roof 0.145 x intensity 0.8 takes the roofs from 1.0 to about 0.3 in 6 h) and carry over between nights (GameState.campaign.weather_state). start_* values apply only on the first night, or always for presets with \"reset\" (the fixed day looks). precip: particle counts for the near box and far ring around the camera (flakes, streaks, splash rings within 12 m). visibility: guard far-cone multiplier (perception.gd); hearing is scaled by rain (x0.6) and wind (x0.8). Colours are linear RGB.",
   "default": "clear_frost",
   "presets": {
     "clear_frost": {
@@ -9,11 +9,7 @@
       "temperature": -8,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.0,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.08,
       "precip": {},
       "sky_top": [0.02, 0.025, 0.06],
       "sky_horizon": [0.1, 0.09, 0.14],
@@ -28,7 +24,8 @@
       "exposure": 1.1,
       "visibility": 1.0,
       "sounds": ["frost_still", "distant_dogs"],
-      "ground_cover_max": 0.75
+      "mist": 0.35,
+      "start_ground_cover": 0.75
     },
     "light_snow": {
       "kind": "snow",
@@ -37,11 +34,7 @@
       "temperature": -3,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.15,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.05,
       "precip": {
         "flakes": 4500,
         "far_flakes": 3000,
@@ -63,7 +56,8 @@
       "visibility": 0.9,
       "sounds": ["snow_hush", "wind_soft"],
       "fog_color": [0.1, 0.105, 0.13],
-      "fog_emission": [0.025, 0.028, 0.036]
+      "fog_emission": [0.025, 0.028, 0.036],
+      "mist": 0.2
     },
     "blizzard": {
       "kind": "blizzard",
@@ -72,11 +66,7 @@
       "temperature": -12,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.3,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.05,
       "precip": {
         "flakes": 6000,
         "far_flakes": 4000,
@@ -103,7 +93,8 @@
       "visibility": 0.55,
       "sounds": ["wind_howl", "shutters_bang"],
       "fog_color": [0.16, 0.17, 0.2],
-      "fog_emission": [0.045, 0.048, 0.058]
+      "fog_emission": [0.045, 0.048, 0.058],
+      "mist": 0.05
     },
     "sleet": {
       "kind": "sleet",
@@ -112,11 +103,7 @@
       "temperature": 1,
       "time_of_day": -1,
       "start_snow_cover": 0.9,
-      "snow_target": 0.6,
-      "snow_rate": 0.06,
       "start_wetness": 0.4,
-      "wet_target": 0.85,
-      "wet_rate": 0.4,
       "precip": {
         "flakes": 900,
         "far_flakes": 700,
@@ -144,7 +131,8 @@
       "visibility": 0.85,
       "sounds": ["sleet_patter", "gutter_drip"],
       "fog_color": [0.09, 0.095, 0.11],
-      "fog_emission": [0.022, 0.024, 0.03]
+      "fog_emission": [0.022, 0.024, 0.03],
+      "mist": 0.3
     },
     "rain_thaw": {
       "kind": "rain",
@@ -153,11 +141,7 @@
       "temperature": 4,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 0.3,
-      "snow_rate": 0.12,
       "start_wetness": 0.5,
-      "wet_target": 1.0,
-      "wet_rate": 0.6,
       "precip": {
         "streaks": 5200,
         "far_streaks": 4200,
@@ -180,7 +164,8 @@
       "visibility": 0.9,
       "sounds": ["rain_steady", "gutter_rush", "roof_drip"],
       "fog_color": [0.08, 0.085, 0.1],
-      "fog_emission": [0.02, 0.022, 0.028]
+      "fog_emission": [0.02, 0.022, 0.028],
+      "mist": 0.3
     },
     "fog": {
       "kind": "fog",
@@ -189,11 +174,7 @@
       "temperature": -1,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.0,
       "start_wetness": 0.2,
-      "wet_target": 0.3,
-      "wet_rate": 0.1,
       "precip": {},
       "sky_top": [0.05, 0.05, 0.065],
       "sky_horizon": [0.12, 0.12, 0.14],
@@ -209,7 +190,8 @@
       "visibility": 0.6,
       "sounds": ["fog_muffle", "foghorn_vistula"],
       "fog_color": [0.13, 0.135, 0.15],
-      "fog_emission": [0.04, 0.042, 0.05]
+      "fog_emission": [0.04, 0.042, 0.05],
+      "mist": 1.0
     },
     "overcast": {
       "kind": "overcast",
@@ -218,11 +200,7 @@
       "temperature": -2,
       "time_of_day": -1,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.0,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.08,
       "precip": {},
       "sky_top": [0.03, 0.032, 0.045],
       "sky_horizon": [0.11, 0.105, 0.13],
@@ -237,7 +215,8 @@
       "exposure": 1.25,
       "visibility": 0.95,
       "sounds": ["wind_soft"],
-      "fog_color": [0.09, 0.095, 0.115]
+      "fog_color": [0.09, 0.095, 0.115],
+      "mist": 0.3
     },
     "clear_day": {
       "kind": "clear",
@@ -246,11 +225,7 @@
       "temperature": 3,
       "time_of_day": 12.0,
       "start_snow_cover": 0.0,
-      "snow_target": 0.0,
-      "snow_rate": 0.2,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.15,
       "precip": {},
       "sky_top": [0.02, 0.025, 0.06],
       "sky_horizon": [0.1, 0.09, 0.14],
@@ -264,7 +239,10 @@
       "volumetric_density": 0.004,
       "exposure": 1.0,
       "visibility": 1.0,
-      "sounds": ["market_bustle", "church_bells"]
+      "sounds": ["market_bustle", "church_bells"],
+      "mist": 0.05,
+      "reset": true,
+      "start_icicles": 0.0
     },
     "snow_day": {
       "kind": "clear",
@@ -273,11 +251,7 @@
       "temperature": -6,
       "time_of_day": 12.0,
       "start_snow_cover": 1.0,
-      "snow_target": 1.0,
-      "snow_rate": 0.0,
       "start_wetness": 0.0,
-      "wet_target": 0.0,
-      "wet_rate": 0.1,
       "precip": {},
       "sky_top": [0.02, 0.025, 0.06],
       "sky_horizon": [0.1, 0.09, 0.14],
@@ -291,7 +265,35 @@
       "volumetric_density": 0.005,
       "exposure": 0.95,
       "visibility": 1.0,
-      "sounds": ["snow_crunch", "church_bells"]
+      "sounds": ["snow_crunch", "church_bells"],
+      "mist": 0.1,
+      "reset": true
     }
+  },
+  "accumulation": {
+    "snow_roof": 0.18,
+    "snow_ground": 0.22,
+    "fresh_gain": 1.2,
+    "fresh_decay": 0.15,
+    "crust_bury": 0.4,
+    "sleet_crust": 0.35,
+    "sleet_ground": 0.04,
+    "sleet_wet": 0.3,
+    "rain_melt_roof": 0.145,
+    "rain_melt_ground": 0.2,
+    "rain_wet": 0.7,
+    "crust_melt": 0.3,
+    "thaw_per_degree": 0.02,
+    "sun_melt": 0.05,
+    "melt_wet_factor": 1.2,
+    "thaw_memory_decay": 0.1,
+    "crust_thaw": 0.1,
+    "dry": 0.06,
+    "dry_frost": 0.03,
+    "puddle_follow": 0.5,
+    "icicle_grow": 0.25,
+    "icicle_drop": 0.6,
+    "shed_rate": 0.06,
+    "drip_rate": 0.02
   }
 }

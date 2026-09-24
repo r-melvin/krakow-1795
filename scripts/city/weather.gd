@@ -27,6 +27,8 @@ extends Node3D
 ## `--weather-shot=<dir>` saves <preset>_door.png / <preset>_overhead.png for every preset plus a rain_thaw pair.
 
 signal changed(state: Dictionary)
+## Sound / gameplay hooks: "roof_slide" (snow sheet off an eave, weather_fx.gd) with its world position.
+signal event(kind: String, pos: Vector3)
 
 const DATA := "res://data/weather.json"
 const INTERIOR_Y := -50.0
@@ -41,6 +43,7 @@ static var _active: Weather = null
 static var _pending: Variant = null
 static var _state: Dictionary = {}
 static var _runner_started := false
+static var shot_camera: Camera3D = null   ## captures render from their own SubViewport camera (follow that one)
 
 var preset_name := ""
 var preset: Dictionary = {}
@@ -48,17 +51,25 @@ var kind := "clear"
 var intensity := 0.0
 var wind := Vector2.ZERO
 var temperature := 0.0
+## Accumulated state (drifts every frame from the conditions; persisted between nights in
+## GameState.campaign["weather_state"]). snow_cover is the roof cover (global `snow_cover`).
 var snow_cover := 1.0
+var ground_cover := 0.75
 var wetness := 0.0
-var snow_target := 1.0
-var snow_rate := 0.0
-var wet_target := 0.0
-var wet_rate := 0.1
+var puddles := 0.0
+var crust := 0.0
+var fresh := 0.0
+var icicles := 1.0
+var snowfall_total := 0.0         ## snow-hours fallen (monotonic): fills old tracks (weather_fx.gd)
+var thaw_memory := 0.0            ## recent melt water: refreezes into icicles in frost
+var mist := 0.3
+var roof_rate := 0.0              ## roof cover change per game hour right now (< 0: melting; drips, sheds)
+var frozen := false               ## shots / tests: hold the state still
 var time_override := -1.0
 var daylight := 0.0
 var visibility := 1.0
 var precip_scale := 1.0
-var ground_max := 1.0
+var fx: Node3D                    ## weather_fx.gd: fog volumes, breath, drips, sheds, tracks
 
 var _env: Environment
 var _sky: ProceduralSkyMaterial
@@ -76,6 +87,8 @@ var _t_sky := 0.0
 var _t_guards := 0.0
 var _sent_cover := -1.0
 var _last_follow := Vector3(0, -1000, 0)
+var _t_push := 0.0
+var _t_save := 5.0
 
 
 # ------------------------------------------------------------------ static API
@@ -125,7 +138,13 @@ func _ready() -> void:
 				start = a.trim_prefix("--weather=")
 	if start == null:
 		start = str(data().get("default", "clear_frost"))
+	_restore_state()
 	apply(start)
+	if not ("--no-weather-fx" in OS.get_cmdline_user_args()):
+		fx = Node3D.new()
+		fx.set_script(load("res://scripts/city/weather_fx.gd"))
+		fx.set("weather", self)
+		add_child(fx)
 	_late_init.call_deferred()
 	var args := OS.get_cmdline_user_args()
 	if "--smoke" in args and not _runner_started:
@@ -168,8 +187,53 @@ func _register_paving() -> void:
 
 
 func _exit_tree() -> void:
+	_save_state()
 	if _active == self:
 		_active = null
+
+
+# ------------------------------------------------------------------ persistence
+
+const STATE_KEYS := ["snow_cover", "ground_cover", "wetness", "puddles", "crust", "fresh", "icicles", "snowfall_total",
+		"thaw_memory"]
+static var _carried: Dictionary = {}    ## the last district's state, for the next night in this session
+var _has_state := false
+
+
+## The accumulated weather for the campaign save (GameState.campaign["weather_state"], written by save_game()).
+func state_snapshot() -> Dictionary:
+	var d := {}
+	for k in STATE_KEYS:
+		d[k] = snappedf(float(get(k)), 0.001)
+	d["preset"] = preset_name
+	d["clock"] = GameState.clock_minutes
+	return d
+
+
+func _save_state() -> void:
+	if frozen:
+		return
+	_carried = state_snapshot()
+	if GameState.campaign is Dictionary:
+		GameState.campaign["weather_state"] = _carried
+
+
+func _restore_state() -> void:
+	var src: Dictionary = {}
+	if GameState.campaign is Dictionary and GameState.campaign.get("weather_state") is Dictionary:
+		src = GameState.campaign["weather_state"]
+	elif not _carried.is_empty():
+		src = _carried
+	if src.is_empty():
+		return
+	for k in STATE_KEYS:
+		if src.has(k):
+			set(k, float(src[k]))
+	# a day passes between nights: the wet dries a little, loose fresh powder settles
+	wetness *= 0.6
+	puddles *= 0.7
+	fresh *= 0.3
+	_has_state = true
 
 
 func _find_refs() -> void:
@@ -199,15 +263,15 @@ func apply(c: Variant) -> void:
 	var ps := presets()
 	var over: Dictionary = {}
 	var pname := ""
-	var fresh := false
+	var named := false
 	if c is String or c is StringName:
 		pname = str(c)
-		fresh = true
+		named = true
 	elif c is Dictionary:
 		over = c
 		if over.has("preset"):
 			pname = str(over["preset"])
-			fresh = true
+			named = true
 		elif over.has("kind"):
 			pname = str(KIND_PRESET.get(str(over["kind"]), preset_name))
 			if str(over["kind"]) == "clear" and float(over.get("time_of_day", -1.0)) >= 7.0 and float(over.get("time_of_day", -1.0)) <= 17.0:
@@ -228,18 +292,25 @@ func apply(c: Variant) -> void:
 	temperature = float(over.get("temperature", preset.get("temperature", 0.0)))
 	time_override = float(over.get("time_of_day", preset.get("time_of_day", -1.0)))
 	visibility = float(over.get("visibility", preset.get("visibility", 1.0)))
-	ground_max = float(over.get("ground_cover_max", preset.get("ground_cover_max", 1.0)))
-	snow_target = float(over.get("snow_target", preset.get("snow_target", 1.0)))
-	snow_rate = float(over.get("snow_rate", preset.get("snow_rate", 0.0)))
-	wet_target = float(over.get("wet_target", preset.get("wet_target", 0.0)))
-	wet_rate = float(over.get("wet_rate", preset.get("wet_rate", 0.1)))
-	if fresh:
+	mist = float(over.get("mist", preset.get("mist", 0.3)))
+	frozen = bool(over.get("freeze", false))
+	# Start values only when there is nothing accumulated yet (the first night), or for the fixed day looks
+	# ("reset": clear_day, snow_day). Otherwise a preset only changes what falls from now on.
+	if named and (not _has_state or bool(preset.get("reset", false)) or bool(over.get("reset", false))):
 		snow_cover = float(preset.get("start_snow_cover", snow_cover))
+		ground_cover = float(preset.get("start_ground_cover", preset.get("start_snow_cover", ground_cover)))
 		wetness = float(preset.get("start_wetness", wetness))
+		puddles = float(preset.get("start_puddles", wetness * 0.6))
+		crust = float(preset.get("start_crust", 0.0))
+		fresh = float(preset.get("start_fresh", 0.0))
+		icicles = float(preset.get("start_icicles", 1.0 if temperature < 0.0 else 0.4))
+		_has_state = true
 	if over.has("snow_cover"):
 		snow_cover = clampf(float(over["snow_cover"]), 0.0, 1.0)
-	if over.has("wetness"):
-		wetness = clampf(float(over["wetness"]), 0.0, 1.0)
+		ground_cover = snow_cover
+	for k in ["roof_cover", "ground_cover", "wetness", "puddles", "crust", "fresh", "icicles"]:
+		if over.has(k):
+			set("snow_cover" if k == "roof_cover" else k, clampf(float(over[k]), 0.0, 1.0))
 	_sent_cover = -1.0
 	_push_globals()
 	_apply_sky()
@@ -264,7 +335,9 @@ func _vec2(v: Variant) -> Vector2:
 func _update_state() -> void:
 	_state = {
 		"preset": preset_name, "kind": kind, "intensity": intensity, "wind": wind, "wind_speed": wind.length(),
-		"temperature": temperature, "snow_cover": snow_cover, "ground_snow": ground_snow(), "wetness": wetness, "time_of_day": _time_of_day(),
+		"temperature": temperature, "snow_cover": snow_cover, "roof_cover": snow_cover, "ground_cover": ground_cover,
+		"ground_snow": ground_cover, "wetness": wetness, "puddles": puddles, "crust": crust, "fresh": fresh,
+		"icicles": icicles, "mist": _mist_now(), "roof_rate": roof_rate, "time_of_day": _time_of_day(),
 		"daylight": daylight, "visibility": visibility, "precipitation": _precip_amount(),
 		"particles": particle_count(), "sounds": preset.get("sounds", []), "under_cover": _under_cover,
 	}
@@ -274,10 +347,15 @@ func _precip_amount() -> float:
 	return intensity if kind in ["snow", "blizzard", "sleet", "rain"] else 0.0
 
 
-## Snow on the paving: the cover, capped by the preset's ground_cover_max (a frosty night keeps the joints white
-## and the stone tops showing even while the roofs stay fully covered).
 func ground_snow() -> float:
-	return minf(snow_cover, ground_max)
+	return ground_cover
+
+
+## Ground mist: the preset's, thickening from 03:00 toward dawn and burning off in daylight.
+func _mist_now() -> float:
+	var tod := _time_of_day()
+	var dawn := smoothstep(2.5, 5.5, tod) * (1.0 - smoothstep(7.0, 9.0, tod)) if tod < 12.0 else 0.0
+	return clampf(mist + dawn * 0.45 - daylight * 0.35 - maxf(wind.length() - 4.0, 0.0) * 0.08, 0.0, 1.5)
 
 
 func _push_globals() -> void:
@@ -286,18 +364,35 @@ func _push_globals() -> void:
 	RenderingServer.global_shader_parameter_set("wetness", wetness)
 	RenderingServer.global_shader_parameter_set("wind", wind)
 	RenderingServer.global_shader_parameter_set("precipitation", _precip_amount())
+	RenderingServer.global_shader_parameter_set("rain", intensity if kind in ["rain", "sleet"] else 0.0)
+	RenderingServer.global_shader_parameter_set("puddles", puddles)
+	RenderingServer.global_shader_parameter_set("crust", crust)
+	RenderingServer.global_shader_parameter_set("fresh_snow", fresh)
+	RenderingServer.global_shader_parameter_set("icicles", icicles)
+	RenderingServer.global_shader_parameter_set("frost", clampf(-temperature / 4.0, 0.0, 1.0))
+	RenderingServer.global_shader_parameter_set("mist", _mist_now())
+	RenderingServer.global_shader_parameter_set("snowfall_total", snowfall_total)
 	Assets.apply_wetness(wetness, ground_snow() > 0.02 or wetness > 0.02)
 	_sent_cover = snow_cover
 
 
 func _process(delta: float) -> void:
 	var hours := delta * GameState.clock_scale / 60.0
-	snow_cover = move_toward(snow_cover, snow_target, snow_rate * hours)
-	wetness = move_toward(wetness, wet_target, wet_rate * hours)
-	if absf(snow_cover - _sent_cover) > 0.001 or absf(wetness - float(_state.get("wetness", 0.0))) > 0.002:
+	if not frozen:
+		_accumulate(hours)
+	_t_push -= delta
+	if _t_push <= 0.0:
+		_t_push = 0.25
 		_push_globals()
-		_state["snow_cover"] = snow_cover
-		_state["wetness"] = wetness
+		for k in ["snow_cover", "ground_cover", "wetness", "puddles", "crust", "fresh", "icicles", "roof_rate"]:
+			_state[k] = get(k)
+		_state["roof_cover"] = snow_cover
+		_state["ground_snow"] = ground_cover
+		_state["mist"] = _mist_now()
+	_t_save -= delta
+	if _t_save <= 0.0:
+		_t_save = 5.0
+		_save_state()
 	_follow()
 	_t_cover -= delta
 	if _t_cover <= 0.0:
@@ -317,6 +412,73 @@ func _process(delta: float) -> void:
 		_probe_reset -= 1
 		if _probe_reset == 0 and _probe:
 			_probe.update_mode = ReflectionProbe.UPDATE_ONCE
+
+
+## One step of the night's weather: what falls, what melts, what dries, what freezes (rates: data/weather.json
+## "accumulation", per game hour).
+func _accumulate(hours: float) -> void:
+	if hours <= 0.0:
+		return
+	var a: Dictionary = data().get("accumulation", {})
+	var r := func(k: String, d: float) -> float: return float(a.get(k, d)) * hours
+	var before := snow_cover
+	var snowing := kind in ["snow", "blizzard"]
+	var raining := kind == "rain"
+	var sleeting := kind == "sleet"
+	var warm := maxf(temperature, 0.0)
+	# snowfall: fresh powder first, the cover rises (roofs a little slower: wind scours them)
+	if snowing:
+		snow_cover += r.call("snow_roof", 0.18) * intensity
+		ground_cover += r.call("snow_ground", 0.22) * intensity
+		fresh += r.call("fresh_gain", 1.2) * intensity
+		snowfall_total += hours * intensity
+		crust -= r.call("crust_bury", 0.4) * intensity
+	else:
+		fresh -= r.call("fresh_decay", 0.15) * (1.0 + warm * 0.5 + wetness)
+	if sleeting:
+		crust += r.call("sleet_crust", 0.35) * intensity
+		ground_cover += r.call("sleet_ground", 0.04) * intensity
+		wetness += r.call("sleet_wet", 0.3) * intensity
+		snowfall_total += hours * intensity * 0.3
+	# rain and thaw melt; melt water wets the ground
+	var melt_roof := 0.0
+	var melt_ground := 0.0
+	if raining:
+		melt_roof += r.call("rain_melt_roof", 0.145) * intensity
+		melt_ground += r.call("rain_melt_ground", 0.2) * intensity
+		wetness += r.call("rain_wet", 0.7) * intensity
+		crust -= r.call("crust_melt", 0.3) * intensity
+	melt_roof += r.call("thaw_per_degree", 0.02) * warm
+	melt_ground += r.call("thaw_per_degree", 0.02) * warm * 1.3
+	if daylight > 0.3 and temperature > -3.0:
+		melt_roof += r.call("sun_melt", 0.05) * daylight
+		melt_ground += r.call("sun_melt", 0.05) * daylight * 0.6
+	melt_roof = minf(melt_roof, snow_cover)
+	melt_ground = minf(melt_ground, ground_cover)
+	snow_cover -= melt_roof
+	ground_cover -= melt_ground
+	wetness += (melt_roof + melt_ground) * float(a.get("melt_wet_factor", 1.2))
+	thaw_memory += (melt_roof + melt_ground) * 2.0
+	thaw_memory -= r.call("thaw_memory_decay", 0.1)
+	crust -= r.call("crust_thaw", 0.1) * warm
+	# drying: slow, slower in frost; puddles follow the wetness with a lag and freeze in place
+	if not (raining or sleeting):
+		wetness -= r.call("dry_frost" if temperature < 0.0 else "dry", 0.03 if temperature < 0.0 else 0.06)
+	puddles += (clampf(wetness, 0.0, 1.0) - puddles) * minf(1.0, float(a.get("puddle_follow", 0.5)) * hours)
+	# icicles: melt water refreezing at the eaves in frost after a thaw; they drop in sun and rain
+	if temperature < 0.0 and thaw_memory > 0.05:
+		icicles += r.call("icicle_grow", 0.25)
+	if (daylight > 0.4 and temperature >= 0.0) or raining:
+		icicles -= r.call("icicle_drop", 0.6) * maxf(daylight, 0.5 if raining else 0.0)
+	snow_cover = clampf(snow_cover, 0.0, 1.0)
+	ground_cover = clampf(ground_cover, 0.0, 1.0)
+	wetness = clampf(wetness, 0.0, 1.0)
+	puddles = clampf(puddles, 0.0, 1.0)
+	crust = clampf(crust, 0.0, 1.0)
+	fresh = clampf(fresh, 0.0, 1.0)
+	icicles = clampf(icicles, 0.0, 1.0)
+	thaw_memory = clampf(thaw_memory, 0.0, 1.0)
+	roof_rate = lerpf(roof_rate, (snow_cover - before) / hours, 0.1)
 
 
 func _apply_guards() -> void:
@@ -639,13 +801,20 @@ func particle_count() -> int:
 	return n
 
 
+## The camera the weather dresses around: a capture's camera, else the viewport's.
+func view_camera() -> Camera3D:
+	if shot_camera != null and is_instance_valid(shot_camera) and shot_camera.is_inside_tree():
+		return shot_camera
+	return get_viewport().get_camera_3d()
+
+
 func _player() -> Node3D:
 	return get_tree().get_first_node_in_group("player") as Node3D
 
 
 ## The camera, or for a high camera (overhead) the point it looks at a little above the ground.
 func _follow_point() -> Vector3:
-	var cam := get_viewport().get_camera_3d()
+	var cam := view_camera()
 	var pl := _player()
 	var ground := pl.global_position.y if pl else 0.0
 	if cam == null:
@@ -684,7 +853,7 @@ func _follow() -> void:
 
 
 func _check_cover() -> void:
-	var cam := get_viewport().get_camera_3d()
+	var cam := view_camera()
 	var pl := _player()
 	var probe: Vector3
 	var exclude: Array[RID] = []
@@ -758,54 +927,133 @@ class _Runner extends Node3D:
 	func _smoke() -> void:
 		await _frames(20)
 		var c := Assets.weather_counts()
-		print("[smoke] weather materials snow_swapped=%d wet=%d ground_overlay=%d" % [c["snow"], c["wet"], c["ground"]])
+		print("[smoke] weather materials snow_swapped=%d weathered=%d wet=%d ground_overlay=%d" % [c["snow"], c["weathered"], c["wet"], c["ground"]])
+		var w := Weather.instance()
+		var keep: Dictionary = w.state_snapshot() if w else {}
 		for p in Weather.SMOKE_PRESETS:
 			await _hold(p, 60)
 			_line()
-		Weather.set_conditions(str(Weather.data().get("default", "clear_frost")))
+		# accumulation: one game hour of each (60 one-minute steps) from the same start
+		for p in ["light_snow", "rain_thaw", "sleet"]:
+			await _hold({"preset": p, "roof_cover": 0.6, "ground_cover": 0.4, "wetness": 0.2, "puddles": 0.1, "crust": 0.0,
+					"fresh": 0.0}, 2)
+			var wi := Weather.instance()
+			if wi == null:
+				continue
+			for i in 60:
+				wi._accumulate(1.0 / 60.0)
+			wi._push_globals()
+			wi._update_state()
+			await _frames(3)
+			var s := Weather.current()
+			var fxn: Node = Weather.instance().fx if Weather.instance() else null
+			print("[smoke] weather accumulate %s 1h: roof=%.2f ground=%.2f wet=%.2f puddles=%.2f crust=%.2f fresh=%.2f fx=%s" % [
+				p, float(s.get("roof_cover", 0)), float(s.get("ground_cover", 0)), float(s.get("wetness", 0)),
+				float(s.get("puddles", 0)), float(s.get("crust", 0)), float(s.get("fresh", 0)), fxn.counts() if fxn else {}])
+		keep["preset"] = str(Weather.data().get("default", "clear_frost"))
+		Weather.set_conditions(keep)
 
 	func _shots() -> void:
 		DirAccess.make_dir_recursive_absolute(shot_dir)
 		await _frames(120)
+		# own SubViewport on the same World3D: the player's camera (and the HUD) cannot take the shot over
+		var sub := SubViewport.new()
+		sub.size = Vector2i(get_viewport().get_visible_rect().size)
+		sub.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		sub.msaa_3d = get_viewport().msaa_3d
+		sub.use_taa = get_viewport().use_taa
+		add_child(sub)
+		sub.world_3d = get_viewport().world_3d
 		var cam := Camera3D.new()
 		cam.far = 400.0
-		add_child(cam)
+		sub.add_child(cam)
+		cam.current = true
+		Weather.shot_camera = cam
 		var views := [["door", Vector3(30, 2.2, -8), Vector3(31, 1.4, -15)], ["overhead", Vector3(0, 70, 45), Vector3.ZERO]]
+		var low := ["cobbles", Vector3(-8, 0.9, -16.5), Vector3(-5, 0.0, -21.5)]
 		var runs: Array = []
 		var only := ""
 		for a in OS.get_cmdline_user_args():
 			if a.begins_with("--weather-shot-set="):
 				only = a.trim_prefix("--weather-shot-set=")
-		if only == "ground":
+		var sets := only.split(",", false)
+		if "ground" in sets:
 			# the paving snow at three covers: the St Mary's door and a low look along a trampled line
-			var low := ["cobbles", Vector3(-8, 0.9, -16.5), Vector3(-5, 0.0, -21.5)]
 			for c in [1.0, 0.75, 0.3]:
-				runs.append(["ground%d" % int(c * 100), {"preset": "clear_frost", "snow_cover": c, "ground_cover_max": 1.0,
-						"snow_rate": 0.0, "wetness": 0.0}, [views[0], low]])
+				runs.append(["ground%d" % int(c * 100), {"preset": "clear_frost", "snow_cover": c, "freeze": true,
+						"wetness": 0.0, "fresh": 0.0, "crust": 0.0, "puddles": 0.0}, [views[0], low]])
+		if "weathered" in sets:
+			var door := ["door_close", Vector3(30.5, 1.9, -11.2), Vector3(31.0, 1.7, -16.0)]
+			var sill := ["balcony", Vector3(3, 11.8, -22.5), Vector3(0, 11.3, -27.4)]
+			for c in [1.0, 0.4]:
+				runs.append(["weathered%d" % int(c * 100), {"preset": "clear_frost", "snow_cover": c, "freeze": true,
+						"wetness": 0.0 if c > 0.5 else 0.5, "fresh": 0.0, "crust": 0.0, "puddles": 0.0}, [door, sill]])
+		if "accum" in sets:
+			var eave := ["eave", Vector3(-4, 9.0, -21), Vector3(-4, 12.5, -28.5)]
+			var river := ["river", Vector3(40, 4, 116), Vector3(40, 0.5, 140)]
+			runs.append(["puddles", {"preset": "rain_thaw", "roof_cover": 0.5, "ground_cover": 0.08, "wetness": 1.0, "puddles": 1.0,
+					"crust": 0.0, "fresh": 0.0, "freeze": true}, [low, views[0]]])
+			runs.append(["melt_drips", {"preset": "rain_thaw", "roof_cover": 0.6, "ground_cover": 0.3, "wetness": 0.8,
+					"puddles": 0.6, "freeze": true}, [eave], "shed"])
+			runs.append(["sleet_crust", {"preset": "sleet", "roof_cover": 0.8, "ground_cover": 0.5, "wetness": 0.3, "puddles": 0.2,
+					"crust": 1.0, "fresh": 0.0, "freeze": true}, [low, views[0]]])
+			runs.append(["fresh_track", {"preset": "light_snow", "roof_cover": 1.0, "ground_cover": 1.0, "wetness": 0.0,
+					"puddles": 0.0, "crust": 0.0, "fresh": 1.0, "freeze": true}, [low], "track"])
+			runs.append(["river_mist", {"preset": "clear_frost", "mist": 0.9, "freeze": true}, [river]])
+			runs.append(["breath", {"preset": "clear_frost", "freeze": true}, [["player", Vector3.ZERO, Vector3.ZERO]], "breath"])
+		if not sets.is_empty():
 			await _run(cam, runs)
 			return
 		for p in ["clear_frost", "light_snow", "blizzard", "sleet", "rain_thaw", "fog", "overcast", "clear_day", "snow_day"]:
 			runs.append([p, p, views])
 		var roofs := ["roofs", Vector3(-6, 16, 10), Vector3(-6, 9, -32)]
-		runs.append(["rain_thaw_cover100", {"preset": "rain_thaw", "snow_cover": 1.0, "snow_rate": 0.0, "wetness": 0.6},
+		runs.append(["rain_thaw_cover100", {"preset": "rain_thaw", "snow_cover": 1.0, "freeze": true, "wetness": 0.6},
 				views + [roofs]])
-		runs.append(["rain_thaw_cover30", {"preset": "rain_thaw", "snow_cover": 0.3, "snow_rate": 0.0, "wetness": 1.0},
+		runs.append(["rain_thaw_cover30", {"preset": "rain_thaw", "snow_cover": 0.3, "freeze": true, "wetness": 1.0},
 				views + [roofs]])
-		runs.append(["clear_frost_cover50", {"preset": "clear_frost", "snow_cover": 0.5, "wetness": 0.3}, views + [roofs]])
+		runs.append(["clear_frost_cover50", {"preset": "clear_frost", "snow_cover": 0.5, "wetness": 0.3, "freeze": true},
+				views + [roofs]])
 		await _run(cam, runs)
 
 	func _run(cam: Camera3D, runs: Array) -> void:
+		var sub := cam.get_parent() as SubViewport
 		for r in runs:
+			var hook: String = r[3] if r.size() > 3 else ""
 			for v in r[2]:
-				cam.look_at_from_position(v[1], v[2])
-				cam.current = true
+				if v[0] == "player":
+					# a character near the camera's usual haunt: the Cloth Hall sentry (stands still), else the player
+					var pl := get_tree().get_first_node_in_group("player") as Node3D
+					for g in get_tree().get_nodes_in_group("guards"):
+						if "Cloth" in str(g.get("guard_name")):
+							pl = g
+							break
+					if pl:
+						var head: Vector3 = pl.call("head_position") if pl.has_method("head_position") else pl.global_position + Vector3(0, 1.6, 0)
+						var fwd := -pl.global_transform.basis.z
+						fwd.y = 0.0
+						fwd = fwd.normalized()
+						var side := fwd.cross(Vector3.UP)
+						cam.look_at_from_position(head + fwd * 1.3 + side * 0.7 + Vector3(0, 0.05, 0), head + fwd * 0.3)
+				else:
+					cam.look_at_from_position(v[1], v[2])
 				await _hold(r[1], 24)
-				if not cam.current:          # a new night's player camera took over during the hold
-					cam.current = true
-					await _frames(4)
+				var wi := Weather.instance()
+				var fxn: Node = wi.fx if wi else null
+				if fxn and hook == "track":
+					fxn.stamp_line(Vector3(-10.5, 0, -17.5), Vector3(-3.5, 0, -23.5))
+					fxn.stamp_line(Vector3(-9.0, 0, -22.5), Vector3(-5.5, 0, -17.0))
+					await _frames(40)
+				elif fxn and hook == "shed":
+					fxn.shed(cam.global_position)
+					await _frames(22)
+				elif fxn and hook == "breath":
+					fxn.puff_now()
+					await _frames(36)
+				if Weather.instance() != wi:        # a night change during the hook: take it again on the new one
+					await _hold(r[1], 24)
 				var path: String = shot_dir.path_join("%s_%s.png" % [r[0], v[0]])
-				get_viewport().get_texture().get_image().save_png(path)
+				sub.get_texture().get_image().save_png(path)
 			_line()
 		print("[smoke] weather shots in ", shot_dir)
-		cam.current = false
+		Weather.shot_camera = null
 		Weather.set_conditions(str(Weather.data().get("default", "clear_frost")))
