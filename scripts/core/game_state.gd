@@ -11,7 +11,7 @@ signal settings_changed
 const NIGHT_START_MINUTES := 21 * 60   ## night missions begin at 21:00
 const SETTINGS_PATH := "user://settings.json"
 const SAVE_PATH := "user://save.json"
-const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true, "ambience": false, "bells": true, "hejnal": false}
+const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true, "ambience": false, "bells": true, "hejnal": false, "look": true}
 
 enum Phase { SPLASH, MENU, ORIGIN_SELECT, DAY, NIGHT, DAWN }
 
@@ -314,6 +314,8 @@ func apply_settings() -> void:
 		vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED if bool(settings.get("msaa", true)) else Viewport.SCREEN_SPACE_AA_FXAA
 		vp.use_debanding = true
 		vp.anisotropic_filtering_level = Viewport.ANISOTROPY_16X
+	for n in get_tree().get_nodes_in_group("look"):
+		n.call("apply")
 	settings_changed.emit()
 
 

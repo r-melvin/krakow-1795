@@ -32,6 +32,7 @@ func _ready() -> void:
 	_toggle_row(grid, "Invert vertical look", "invert_y")
 	_toggle_row(grid, "Fullscreen", "fullscreen")
 	_toggle_row(grid, "Vertical sync", "vsync")
+	_toggle_row(grid, "Painted look", "look")
 	_toggle_row(grid, "Bounced light and mist (GPU)", "gi")
 	_toggle_row(grid, "Multisample anti-aliasing (4x)", "msaa")
 	_toggle_row(grid, "Temporal anti-aliasing", "taa")

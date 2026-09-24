@@ -8,8 +8,12 @@ uniform float brush_px = 4.0;        // coarse brush radius (px)
 uniform float detail_px = 1.6;       // fine brush radius kept where the image is busy (faces, hands)
 uniform float bands = 5.0;           // cel bands on luminance
 uniform float band_mix = 0.32;       // how hard the banding reads (0 = painterly only)
-uniform float ink = 0.55;            // edge darkening
-uniform float ink_width = 1.2;       // sobel step in px
+uniform float ink = 0.45;            // edge darkening
+uniform float ink_width = 1.7;       // sobel step in px
+uniform float ink_lo = 0.34;         // edge strength below this gets no ink (mortar lines, brick courses, fine cloth weave)
+uniform float ink_hi = 0.80;
+uniform float glow = 0.55;           // warm lamp glow: bright pixels and their surroundings pull toward oil-lamp orange
+uniform vec3 glow_tint = vec3(1.0, 0.72, 0.36);
 uniform float saturation = 0.62;     // muted tones
 uniform float lift = 0.035;          // lifted blacks (oil ground showing through)
 uniform float weave = 0.045;         // canvas texture
@@ -67,8 +71,20 @@ void fragment() {
 	float lq = (floor(l * bands) + 0.5) / bands;
 	float k = mix(1.0, lq / max(l, 0.02), band_mix);
 	col *= clamp(k, 0.6, 1.4);
-	// Ink: thin, broken along the stroke by a little noise so it feels drawn not traced.
-	float e = clamp(sobel(uv, px * ink_width) * 2.0, 0.0, 1.0);
+	// Lamp glow: the hot pixels warm toward oil-lamp orange, and a wide four-tap bleed carries a little of that warmth
+	// into the dark around each lantern and lit window.
+	float hot = smoothstep(0.55, 0.95, l);
+	vec3 warm_col = col * vec3(1.10, 0.92, 0.62) + glow_tint * 0.08;
+	col = mix(col, warm_col, hot * glow);
+	float bleed = 0.0;
+	for (int t = 0; t < 4; t++) {
+		vec2 o = vec2(t < 2 ? 1.0 : -1.0, (t == 0 || t == 2) ? 1.0 : -1.0) * px * 14.0;
+		bleed += smoothstep(0.6, 1.0, luma(texture(screen_tex, uv + o).rgb));
+	}
+	col += glow_tint * bleed * 0.015 * glow;
+	// Ink: only at real edges (silhouettes, window frames, folds), thresholded so brick courses and mortar lines stay
+	// paint; broken along the stroke by a little noise so it feels drawn not traced.
+	float e = smoothstep(ink_lo, ink_hi, sobel(uv, px * ink_width));
 	e *= 0.75 + 0.25 * hash21(floor(uv / px / 3.0));
 	col *= 1.0 - e * ink;
 	// Canvas weave and grain.

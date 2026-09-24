@@ -563,7 +563,7 @@ func _street_lights() -> void:
 					l.amount = 0.10
 					l.speed = 7.0
 					l.position = p + Vector3(0.9, 2.9, 0).rotated(Vector3.UP, atan2(-right.x * side, -right.z * side))
-					l.light_color = Color(1.0, 0.70, 0.40)
+					l.light_color = Color(1.0, 0.62, 0.27)
 					l.light_energy = 7 if surf in ["cobbles", "rough"] else 5
 					l.omni_range = 20
 					l.omni_attenuation = 1.5
@@ -591,7 +591,7 @@ func _street_lights() -> void:
 		var c := FlickerLight.new()
 		c.amount = 0.18
 		c.speed = 4.0
-		c.light_color = Color(1.0, 0.76, 0.42)
+		c.light_color = Color(1.0, 0.68, 0.33)
 		c.light_energy = 2.6
 		c.omni_range = 9
 		c.omni_attenuation = 1.3

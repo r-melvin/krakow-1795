@@ -19,9 +19,10 @@ godot -e --path .                                           # open the editor
 godot --headless --path . --quit-after 3000 -- --smoke      # headless test: missions, stealth, kit, city, weather, audio
 godot --headless --path . --quit-after 6000 -- --smoke      # ... plus the seven-night campaign smoke
 godot --path . -- --smoke --shot=/dir                       # windowed: in-engine screenshots
+godot --path . -- --smoke --shot=/dir --look=off           # the same without the painted look (or --look=<name> from assets/shaders/looks/canvas/)
 godot --path . -- --smoke --shot-ui=/dir                    # windowed: every UI screen
 ```
-Options: 4x MSAA and temporal AA, bounced light and volumetric mist, fullscreen, VSync, volume, mouse.
+Options: the painted look, 4x MSAA and temporal AA, bounced light and volumetric mist, fullscreen, VSync, volume, mouse.
 The UI fits 1600x900 and 1920x1080.
 
 ## Controls
@@ -87,7 +88,7 @@ volumetric mist, all systems on) on a 32-core machine with a 16 GB GPU:
 | RAM / VRAM | 2.4 GB / 3.9 GB (3.2 GB textures, VRAM-compressed) |
 | Headless CPU frame | ~7 ms (4.5 ms physics) |
 
-Levers if a machine needs them: Options (bounced light and mist, MSAA, TAA), `data/stealth.json` and
+Levers if a machine needs them: Options (painted look, bounced light and mist, MSAA, TAA), `data/stealth.json` and
 `data/window_life.json` budgets, the shadow budget (`scripts/city/shadow_budget.gd`), and the texture caps in
 `tools/import_settings.py`.
 

@@ -98,6 +98,17 @@ Old Town (Rynek), Wawel (garrison), Kazimierz, Stradom, Kleparz, Kanonicza/Churc
 - Assets: Blender → glTF 2.0 (.glb) into `assets/models/`. Greybox uses CSG until then.
 - Data: factions/origins/districts as JSON in `data/`, loaded at boot.
 
+## Look (the painted frame)
+The game is drawn as an oil painting with muted tones: a screen-space pass (`assets/shaders/looks/canvas/oil.gdshader`,
+`scripts/core/look.gd`) over the finished 3D frame, under every UI layer. Brush-smoothed surfaces (coarse strokes on
+flat areas, finer where the image is busy so faces and hands stay readable), saturation cut to about 60 % with warm
+lights and cool shadows, lifted blacks like an oil ground showing through, a soft five-band luminance banding for the
+cel read, thin broken ink only at strong edges (brick courses and mortar stay paint), a canvas weave and a light
+vignette. Lamps pull toward oil-lamp orange, the sodium glow of its day, and bleed a little warmth into the dark
+around them. The look gives the prototype's rough edges somewhere to hide and sits with the period; it is a toggle
+in Options ("Painted look") and `--look=<name>` swaps in another shader from the same folder for review
+(`docs/screenshots/looks/`: painterly, ink_wash, cel, puppet, grime were the rejected candidates).
+
 ## Economy lever: propination (beer and spirits)
 Propination (propinacja) was the magnates' and towns' legal monopoly on brewing, distilling and selling drink;
 tenants were obliged to buy from the lord's tavern. In 1795 it was one of the largest incomes of the great families

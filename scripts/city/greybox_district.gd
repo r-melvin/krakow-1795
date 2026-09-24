@@ -50,17 +50,9 @@ func _ready() -> void:
 func _environment() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.02, 0.025, 0.06)
-	sm.sky_horizon_color = Color(0.10, 0.09, 0.14)
-	sm.ground_bottom_color = Color(0.02, 0.02, 0.03)
-	sm.ground_horizon_color = Color(0.08, 0.07, 0.10)
-	sm.sun_angle_max = 1.6              # the moon's disc, drawn by the sky from the directional light
-	sm.sun_curve = 0.12
-	sky.sky_material = sm
+	# The sky itself (atmosphere, sun, moon, stars, clouds, storms) is scripts/city/sky.gd, added after Weather in
+	# _weather(): it puts its ShaderMaterial Sky on this environment.
 	e.background_mode = Environment.BG_SKY
-	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.18, 0.21, 0.34)
 	e.ambient_light_energy = 0.6
@@ -89,9 +81,9 @@ func _environment() -> void:
 	e.ssr_fade_in = 0.15
 	e.ssr_fade_out = 2.0
 	e.glow_enabled = true
-	e.glow_intensity = 0.45
-	e.glow_bloom = 0.10
-	e.glow_hdr_threshold = 1.3
+	e.glow_intensity = 0.6
+	e.glow_bloom = 0.16
+	e.glow_hdr_threshold = 1.15
 	# Thin winter mist: volumetric so the lanterns and windows throw visible cones, plus a faint distance haze.
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.07, 0.08, 0.13)
@@ -148,7 +140,7 @@ func _environment() -> void:
 		l.amount = 0.10
 		l.speed = 7.0
 		l.position = p + Vector3(0.9, 2.9, 0)
-		l.light_color = Color(1.0, 0.70, 0.40)
+		l.light_color = Color(1.0, 0.62, 0.27)      # oil-lamp orange, the sodium glow of its day
 		l.light_energy = 9
 		l.omni_range = 24
 		l.omni_attenuation = 1.5
@@ -219,7 +211,7 @@ func _candles() -> void:
 			w.amount = 0.18
 			w.speed = 4.0
 			w.position = p
-			w.light_color = Color(1.0, 0.76, 0.42)
+			w.light_color = Color(1.0, 0.68, 0.33)
 			w.light_energy = 3.0
 			w.omni_range = 11
 			w.omni_attenuation = 1.3
@@ -233,7 +225,7 @@ func _candles() -> void:
 		var w := FlickerLight.new()
 		w.amount = 0.12
 		w.position = p
-		w.light_color = Color(1.0, 0.74, 0.40)
+		w.light_color = Color(1.0, 0.66, 0.31)
 		w.light_energy = 3.5
 		w.omni_range = 12
 		w.omni_attenuation = 1.3
@@ -617,3 +609,6 @@ func _weather() -> void:
 	var w := Node3D.new()
 	w.set_script(load("res://scripts/city/weather.gd"))
 	add_child(w)
+	var sky := Node3D.new()
+	sky.set_script(load("res://scripts/city/sky.gd"))
+	add_child(sky)
