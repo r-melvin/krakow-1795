@@ -391,6 +391,8 @@ class Solver:
 
 # ------------------------------------------------------------------ clip containers
 CLIPS = {}      # name -> (frames, fn(t_seconds) -> params, loop)
+GAIT_SPEED = {}  # locomotion clip -> authored ground speed (m/s), for Assets.CLIP_SPEED
+CURRENT_CLIP = [""]
 
 
 def clip(name, length, loop=False):
@@ -530,9 +532,12 @@ def define_clips():
     # ---------------------------------------------------------------- locomotion
     def gait(t, T, af, ab, duty, lift, hz0, bob, sway=0.02, twist=5.0, roll=3.0, arm=18.0, elbow=14.0,
              lean=3.0, width=0.095, run=False, lag=0.05, toe_off=24.0, strike=12.0, arm_abd=6.0, knee_out=6.0,
-             gaze=4.0, arms=True, feet_y=0.0):
+             gaze=4.0, arms=True, feet_y=0.0, load=0.012, head_hold=0.6, elbow_swing=None):
+        if elbow_swing is None:
+            elbow_swing = 16.0 if not run else 30.0
         ph = (t / T) % 1.0
         v_rel = (af + ab) / (duty * T)
+        GAIT_SPEED[CURRENT_CLIP[0]] = v_rel
         P = {"gz": 0.9, "gp": gaze, "hz": hz0}
         for S, s, sg in SIDES:
             f = (ph + (0.0 if S == "L" else 0.5)) % 1.0
@@ -577,48 +582,76 @@ def define_clips():
             P["kp" + S] = knee_out
         c2 = math.cos(2 * math.pi * ph)
         s2 = math.sin(2 * math.pi * ph)
+
+        def wave(x):          # smooth periodic pulse 0..1..0 over the cycle, eased at both ends
+            return 0.5 - 0.5 * math.cos(2 * math.pi * (x % 1.0))
+        # pelvis height: lowest just after each heel strike (loading response bends the knee), highest over the
+        # stance foot; a run is lowest at mid-stance and highest in flight
         if run:
             P["hz"] = hz0 - bob * math.cos(4 * math.pi * (ph - duty / 2))
         else:
-            P["hz"] = hz0 - bob * math.cos(4 * math.pi * ph)
-        P["hx"] = sway * s2
+            P["hz"] = hz0 - bob * math.cos(4 * math.pi * (ph - 0.07))
+            for off in (0.0, 0.5):
+                q = (ph - off) % 1.0
+                if q < 0.22:
+                    P["hz"] -= load * math.sin(math.pi * q / 0.22) ** 2
+        # weight over the stance foot (lags the step a touch), hip drop on the swing side, pelvis yaw with the
+        # swinging leg; the spine counter-rotates and counter-tilts so the shoulders ride level and turn against it
+        P["hx"] = sway * math.sin(2 * math.pi * (ph - 0.04))
         P["pt"] = -twist * c2
-        P["pl"] = -roll * s2
-        P["st"] = twist * 1.4 * math.cos(2 * math.pi * (ph - 0.03))
-        P["sl"] = roll * 0.8 * s2
-        P["sp"] = lean + (0.8 if not run else 2.0) * math.cos(4 * math.pi * ph)
+        P["pl"] = -roll * math.sin(2 * math.pi * (ph - 0.02))
+        P["st"] = twist * 1.7 * math.cos(2 * math.pi * (ph - 0.02))
+        P["sl"] = roll * 0.85 * math.sin(2 * math.pi * (ph - 0.06)) - sway * 25 * math.sin(2 * math.pi * (ph - 0.1))
+        P["sp"] = lean + (0.8 if not run else 2.0) * math.cos(4 * math.pi * (ph - 0.1))
+        # head: stabilised but free to bob and nod a little against the pelvis
+        P["gz"] = head_hold
+        P["hp"] = -0.5 * P["sp"] + (1.2 if not run else 2.0) * math.cos(4 * math.pi * (ph - 0.12))
         if arms:
-            ca = math.cos(2 * math.pi * (ph - lag))
             for S, sg2 in (("L", -1.0), ("R", 1.0)):
-                afv = sg2 * arm * ca
-                P["af" + S] = afv + (arm * 0.2)
-                P["e" + S] = elbow + max(0.0, afv) * (0.7 if not run else 0.9)
-                P["aa" + S] = arm_abd
-                P["at" + S] = -4
-                P["pr" + S] = 12
-                P["wf" + S] = 4 + 0.15 * afv
-                P["cp" + S] = 0.12 * afv
-                P["f" + S] = 22 if not run else 60
-                P["th" + S] = 12 if not run else 40
+                # shoulders lead, the upper arm follows, the forearm and wrist trail (successive phase lags)
+                sh = sg2 * math.cos(2 * math.pi * (ph - lag + 0.06))
+                up = sg2 * math.cos(2 * math.pi * (ph - lag))
+                fore = wave(ph - lag - 0.08 + (0.0 if sg2 > 0 else 0.5))   # 1 when this arm is furthest forward
+                P["cp" + S] = 5 * sh
+                P["cs" + S] = 1.5 + 1.5 * math.cos(4 * math.pi * (ph - 0.07))
+                P["af" + S] = arm * up + arm * 0.25
+                P["ah" + S] = -4 * max(0.0, up)                         # forward swing crosses slightly inward
+                P["e" + S] = elbow + elbow_swing * fore                  # elbow opens behind, closes in front
+                P["aa" + S] = arm_abd + 2 * max(0.0, -up)
+                P["at" + S] = -6
+                P["pr" + S] = 18 + 8 * fore
+                P["wf" + S] = 6 - 10 * sg2 * math.cos(2 * math.pi * (ph - lag - 0.16))   # wrist drags behind
+                P["f" + S] = 24 if not run else 62
+                P["th" + S] = 14 if not run else 40
         return P
 
-    @clip("walk", 1.0, loop=True)
+    # townsfolk: relaxed, unhurried (1.08 m/s, 112 steps/min)
+    @clip("walk", 1.07, loop=True)
     def _walk(t):
-        return gait(t, 1.0, 0.27, 0.40, 0.62, 0.075, -0.035, 0.016)
+        return gait(t, 1.07, 0.25, 0.37, 0.62, 0.075, -0.045, 0.014, sway=0.028, twist=6, roll=5, arm=16, elbow=16,
+                    elbow_swing=18, lean=2, lag=0.06, toe_off=24, strike=12, load=0.014, head_hold=0.55)
 
-    @clip("walk_fast", 0.74, loop=True)
+    # the player at walking pace: same kind of speed, longer stride, quicker cadence, more drive (1.45 m/s, 124 spm)
+    @clip("walk_player", 0.97, loop=True)
+    def _walk_player(t):
+        return gait(t, 0.97, 0.30, 0.44, 0.60, 0.082, -0.06, 0.016, sway=0.024, twist=8, roll=4.5, arm=22, elbow=18,
+                    elbow_swing=22, lean=4, lag=0.055, toe_off=30, strike=15, load=0.016, head_hold=0.6)
+
+    # brisk walk (2.35 m/s, 150 spm): long reaching stride, strong pelvis turn, bent elbows pumping, forward lean
+    @clip("walk_fast", 0.80, loop=True)
     def _walk_fast(t):
-        return gait(t, 0.74, 0.33, 0.47, 0.57, 0.085, -0.075, 0.02, twist=7, roll=3.5, arm=26, elbow=20, lean=6, toe_off=32, strike=14)
+        return gait(t, 0.80, 0.38, 0.58, 0.55, 0.095, -0.085, 0.018, sway=0.018, twist=11, roll=4, arm=32, elbow=48,
+                    elbow_swing=30, lean=7, lag=0.05, toe_off=36, strike=16, load=0.018, head_hold=0.65, arm_abd=8)
 
     @clip("jog", 0.70, loop=True)
     def _jog(t):
         return gait(t, 0.70, 0.30, 0.42, 0.40, 0.16, -0.075, 0.03, sway=0.012, twist=8, roll=3, arm=30, elbow=70, lean=8,
-                    run=True, toe_off=34, strike=8, gaze=2)
+                    run=True, toe_off=34, strike=8, gaze=2, head_hold=0.7)
 
     @clip("run", 0.62, loop=True)
     def _run(t):
-        return gait(t, 0.62, 0.38, 0.55, 0.31, 0.26, -0.085, 0.04, sway=0.01, twist=10, roll=3, arm=45, elbow=78, lean=13,
-                    run=True, toe_off=40, strike=6, gaze=0, knee_out=4)
+        return gait(t, 0.62, 0.38, 0.55, 0.31, 0.26, -0.085, 0.045, sway=0.014, twist=12, roll=4, arm=48, elbow=74,
+                    elbow_swing=26, lean=13, run=True, toe_off=40, strike=6, gaze=0, knee_out=4, head_hold=0.75)
 
     @clip("walk_carry", 1.1, loop=True)
     def _walk_carry(t):
@@ -638,12 +671,13 @@ def define_clips():
                   "sl": P["sl"] - 4, "pl": P["pl"] - 1})
         return P
 
-    @clip("sneak", 0.9, loop=True)
+    # sneak: low and rolling, the foot placed heel-first softly, weight sliding over it, arms loose and forward
+    @clip("sneak", 0.95, loop=True)
     def _sneak(t):
-        P = gait(t, 0.9, 0.36, 0.44, 0.64, 0.09, -0.33, 0.02, sway=0.035, twist=6, roll=2, arm=10, elbow=55, lean=30,
-                 toe_off=26, strike=6, width=0.12, gaze=-18, knee_out=12)
+        P = gait(t, 0.95, 0.36, 0.44, 0.66, 0.09, -0.33, 0.016, sway=0.045, twist=8, roll=4, arm=12, elbow=55, elbow_swing=14,
+                 lean=30, toe_off=26, strike=8, width=0.12, gaze=-18, knee_out=12, load=0.02, head_hold=0.8, lag=0.07)
         for S in "LR":
-            P["af" + S] += 18
+            P["af" + S] += 16
             P["aa" + S] = 14
             P["f" + S] = 35
         P["hy"] = -0.06
@@ -1528,6 +1562,7 @@ def bake(rig, solver, name, length, fn, loop):
     pbs = rig.pose.bones
     for pb in pbs:
         pb.rotation_mode = "QUATERNION"
+    CURRENT_CLIP[0] = name
     for f in range(0, frames + 1):          # a loop's last frame equals its first
         t = f / FPS
         P = fn(t % length if loop else min(t, length))
@@ -1582,6 +1617,9 @@ def main():
         length, fn, loop = CLIPS[n]
         bake(rig, solver, n, length, fn, loop)
     log("baked %d clips: %s" % (len(names), " ".join(names)))
+    for n in ("walk", "walk_player", "walk_fast", "jog", "run", "sneak", "walk_carry", "carry_basket", "guard_march"):
+        if n in GAIT_SPEED:
+            log("speed %s %.2f m/s" % (n, GAIT_SPEED[n]))
     for pb in rig.pose.bones:
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.location = (0, 0, 0)

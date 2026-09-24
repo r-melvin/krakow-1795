@@ -65,6 +65,10 @@ var _cone: Node3D
 var _cone_near: MeshInstance3D
 var _cone_far: MeshInstance3D
 var _label: Label3D
+var _ring: MeshInstance3D          ## the suspicion ring over the head (fills while he takes the player in)
+var _ring_mat: ShaderMaterial
+var _vis_now := 0.0                ## this tick's perception score of the player
+var _ring_alpha := 0.0
 var _figure: Node3D
 var _drag_ia: Area3D
 
@@ -171,6 +175,17 @@ func _build_visuals() -> void:
 	_cone.add_child(_cone_far)
 	_rebuild_cone()
 
+	_ring = MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2(0.42, 0.42)
+	_ring.mesh = q
+	_ring_mat = ShaderMaterial.new()
+	_ring_mat.shader = preload("res://assets/shaders/suspicion_ring.gdshader")
+	_ring.material_override = _ring_mat
+	_ring.position.y = 2.45
+	_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ring.visible = false
+	add_child(_ring)
 	_label = Label3D.new()
 	_label.position.y = 2.2
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -478,6 +493,8 @@ func saw_player_within(secs: float) -> bool:
 
 
 func _update_suspicion(vis: float, delta: float) -> void:
+	_vis_now = vis
+	_update_ring(delta)
 	if global_position.distance_to(_player.global_position) < LINGER_DIST:
 		_linger += delta
 	else:
@@ -1240,6 +1257,29 @@ func _catch() -> void:
 
 
 ## Cone: the near zone is always drawn; the far zone fades in as suspicion rises (hidden when calm).
+## The stealth meter lives on the watcher: the ring shows while he is taking the player in (or still suspicious),
+## fills with his suspicion, and colours calm green -> amber -> red. Enforcers' rings are red-edged.
+func _update_ring(delta: float) -> void:
+	if _ring == null or _ring_mat == null:
+		return
+	var want := 1.0 if (_vis_now > 0.001 or suspicion > 2.0) and downed_left <= 0.0 else 0.0
+	_ring_alpha = lerpf(_ring_alpha, want, clampf(delta * (10.0 if want > _ring_alpha else 3.0), 0.0, 1.0))
+	_ring.visible = _ring_alpha > 0.02
+	if not _ring.visible:
+		return
+	var k := clampf(suspicion / 100.0, 0.0, 1.0)
+	var col := Color(0.62, 0.78, 0.45)
+	if k > 0.6:
+		col = Color(0.95, 0.45, 0.2).lerp(Color(0.95, 0.15, 0.1), (k - 0.6) / 0.4)
+	elif k > 0.2:
+		col = Color(0.62, 0.78, 0.45).lerp(Color(0.95, 0.75, 0.3), (k - 0.2) / 0.4)
+	if enforcer:
+		col = col.lerp(Color(0.9, 0.1, 0.1), 0.35)
+	_ring_mat.set_shader_parameter("fill", k)
+	_ring_mat.set_shader_parameter("color", col)
+	_ring_mat.set_shader_parameter("alpha", _ring_alpha)
+
+
 func _update_visuals() -> void:
 	if downed_left > 0.0:
 		return

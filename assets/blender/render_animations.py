@@ -47,7 +47,8 @@ os.makedirs(os.path.join(OUTDIR, "tiles"), exist_ok=True)
 
 PLAYER_CLIPS = {"attack_swing": "cudgel", "attack_thrust": "cudgel", "block": "cudgel", "sabre_draw": "sabre", "sabre_slash": "sabre",
                 "sabre_parry": "sabre", "knife_stab": "knife", "pistol_draw": "pistol", "pistol_aim": "pistol", "pistol_fire": "pistol",
-                "takedown": None, "fall_land_roll": None, "stumble": None}
+                "takedown": None, "fall_land_roll": None, "stumble": None,
+                "walk": None, "walk_player": None, "walk_fast": None, "run": None, "sneak": None, "carry_basket": None}
 GUARD_CLIPS = ["musket_ready", "musket_present", "musket_aim", "musket_fire", "musket_reload", "bayonet_thrust", "musket_butt", "guard_seize",
                "hit_react", "hit_react_back", "stagger", "shoved", "grabbed", "knocked_down", "knocked_down_forward", "death_fall",
                "death_fall_forward", "death_kneel", "death_musket", "get_up", "get_up_prone"]

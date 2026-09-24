@@ -170,21 +170,11 @@ class StealthCues extends Control:
 		if player == null or not is_instance_valid(player) or not player.is_inside_tree():
 			return
 		var vp := get_viewport_rect().size
-		# The third-person camera centres on the player's shoulders, so the arc sits lower, under the figure's feet.
-		var c := Vector2(vp.x * 0.5, vp.y * 0.775 - ARC_RADIUS)
-		var mid := PI * 0.5                     # bottom of the circle: the arc opens upward like a cradle
-		var a0 := mid - ARC_SPAN * 0.5
-		var a1 := mid + ARC_SPAN * 0.5
-		draw_arc(c, ARC_RADIUS, a0, a1, 48, Color(0, 0, 0, 0.38), 6.0, true)
-		draw_arc(c, ARC_RADIUS, a0, a1, 48, Color(1, 1, 1, 0.13), 1.5, true)
-		var len := ARC_SPAN * clampf(_vis, 0.0, 1.0)
-		if len > 0.01:
-			var quiet := Color(0.93, 0.91, 0.86, 0.9)
-			var loud := Color(1.0, 0.6, 0.16, 1.0)
-			var col := quiet.lerp(loud, clampf(_noise, 0.0, 1.0))
-			draw_arc(c, ARC_RADIUS, mid - len * 0.5, mid + len * 0.5, 40, col, 3.0, true)
+		# The visibility meter moved onto the watchers (a ring over each guard's head fills as he takes the player
+		# in). Here only the hidden dot and the off-screen chevron remain.
+		var c := Vector2(vp.x * 0.5, vp.y * 0.775)
 		if player.get("hidden_spot") != null and player.hidden_spot.get("hides_player"):
-			draw_circle(c + Vector2(0, ARC_RADIUS), 3.0, Color(0.6, 0.75, 0.95, 0.8))
+			draw_circle(c, 3.0, Color(0.6, 0.75, 0.95, 0.8))
 		_draw_chevron(vp)
 
 	func _draw_chevron(vp: Vector2) -> void:

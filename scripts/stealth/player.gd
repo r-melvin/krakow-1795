@@ -158,6 +158,9 @@ func _ready() -> void:
 		if a.begins_with("--fight-shot=") and not sandbox and not _fight_started:
 			_fight_started = true
 			Player._fight_shots(a.trim_prefix("--fight-shot="))
+		if a.begins_with("--walk-shot=") and not sandbox and not _fight_started:
+			_fight_started = true
+			Player._walk_shots(a.trim_prefix("--walk-shot="))
 	if not sandbox:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		get_tree().create_timer(2.0, false).timeout.connect(_dress_world)
@@ -598,7 +601,7 @@ func _animate(planar: float, moving: bool, delta: float) -> void:
 		elif is_sprinting:
 			Assets.play_move(_figure, "run", planar)
 		elif planar < 1.6:
-			Assets.play_move(_figure, "walk", planar)
+			Assets.play_move(_figure, "walk_player", planar)
 		else:
 			Assets.play_move(_figure, "walk_fast", planar)
 		return
@@ -1602,3 +1605,84 @@ func _freeze_clip(pivot: Node3D, clip: String, t: float) -> void:
 	ap.seek(t, true)
 	ap.pause()
 
+
+## Capture mode (`-- --smoke --walk-shot=/dir`): the player's figure and two townsfolk figures (the models of the two
+## nearest NPCs) walk in place in a private SubViewport stage (own World3D, so the running smoke test cannot disturb
+## it) with walk, walk_fast, run and sneak, frozen at two stride phases, shot from the side and from 3/4 front.
+static func _walk_shots(dir: String) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	for i in 150:
+		await tree.process_frame
+	DirAccess.make_dir_recursive_absolute(dir)
+	var p := tree.get_first_node_in_group("player") as Player
+	while p == null or not p.is_inside_tree():
+		await tree.process_frame
+		p = tree.get_first_node_in_group("player") as Player
+	var models: Array = [GameState.figure_name()]
+	var npcs: Array = []
+	for n in tree.get_nodes_in_group("npcs"):
+		var mn: Variant = n.get("model_name")
+		if mn is String and mn != "" and not n.is_in_group("animals") and not (mn in models) and not "watch" in (mn as String) and not n.is_in_group("guards"):
+			npcs.append(n)
+	npcs.sort_custom(func(a: Node3D, b: Node3D) -> bool: return a.global_position.distance_to(p.global_position) < b.global_position.distance_to(p.global_position))
+	for n in npcs.slice(0, 2):
+		models.append(n.get("model_name"))
+	var vp := SubViewport.new()
+	vp.size = Vector2i(1280, 720)
+	vp.own_world_3d = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	tree.root.add_child(vp)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.62, 0.66, 0.72)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(0.55, 0.55, 0.58)
+	vp.add_child(env)
+	var sun := DirectionalLight3D.new()
+	sun.rotation = Vector3(-0.9, 0.5, 0)
+	sun.shadow_enabled = true
+	vp.add_child(sun)
+	var ground := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(30, 30)
+	ground.mesh = pm
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.38, 0.38, 0.36)
+	ground.material_override = gm
+	vp.add_child(ground)
+	var figs: Array = []
+	for i in models.size():
+		var f := Assets.character(models[i])
+		if f == null:
+			continue
+		f.position = Vector3(1.8 * i, 0, 0)      # in a row, all facing -X, so the +Z camera sees profiles
+		f.rotation.y = PI * 0.5
+		vp.add_child(f)
+		figs.append(f)
+	var cam := Camera3D.new()
+	cam.fov = 34
+	vp.add_child(cam)
+	cam.current = true
+	var mid := Vector3(1.8 * (figs.size() - 1) * 0.5, 0.9, 0)
+	var shots := 0
+	for clip in ["walk", "walk_fast", "run", "sneak"]:
+		for phase in [0.1, 0.35]:
+			for i in figs.size():
+				var c: String = "walk_player" if (i == 0 and clip == "walk") else clip
+				var name := Assets.resolve(figs[i], c)
+				if name == "":
+					continue
+				var ap: AnimationPlayer = figs[i].get_meta("anim")
+				Assets.play_action(figs[i], c, 1.0, true, 0.0)
+				ap.seek(ap.get_animation(name).length * phase, true)
+				ap.pause()
+			for view in [["side", mid + Vector3(0, 0.1, 8.0)], ["q34", mid + Vector3(-4.6, 0.9, 4.6)]]:
+				cam.position = view[1]
+				cam.look_at(mid)
+				for k in 4:
+					await tree.process_frame
+				vp.get_texture().get_image().save_png("%s/walk_%s_%02d_%s.png" % [dir, clip, int(phase * 100), view[0]])
+				shots += 1
+	vp.queue_free()
+	print("[smoke] walk shots=%d models=%s in %s" % [shots, models, dir])
