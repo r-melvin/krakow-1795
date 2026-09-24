@@ -141,8 +141,7 @@ static func omni_attenuation(d: float, rng: float, decay: float) -> float:
 
 
 static func surface_at(node: Node3D, pos: Vector3, exclude: Array = []) -> String:
-	if pos.y < float(tg("light.interior_below_y", -50.0)):
-		return "planks"
+	var indoors := pos.y < float(tg("light.interior_below_y", -50.0))
 	var world := node.get_world_3d()
 	var best := ""
 	var best_r := INF
@@ -170,7 +169,7 @@ static func surface_at(node: Node3D, pos: Vector3, exclude: Array = []) -> Strin
 			if n.has_meta("surface"):
 				return str(n.get_meta("surface"))
 			n = n.get_parent()
-	return "cobbles"
+	return "planks" if indoors else "cobbles"
 
 
 static func surface_noise(s: String) -> float:

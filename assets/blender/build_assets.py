@@ -70,6 +70,12 @@ PAL = {
     "plaster_grey": (0.74, 0.72, 0.68), "cobble": (1.0, 1.0, 1.0), "thatch": (1.0, 1.0, 1.0), "log": (1.0, 1.0, 1.0),
     "log_lime": (0.95, 0.96, 1.0), "field": (1.0, 1.0, 1.0), "water": (0.05, 0.08, 0.10), "hay": (0.72, 0.60, 0.36),
     "salt": (0.86, 0.85, 0.82), "straw": (0.80, 0.70, 0.45),
+    # building pass 2: painted shutters per district, stained glass, copper patina, wooden shingles
+    "shutter_red": (0.52, 0.17, 0.13), "shutter_blue": (0.26, 0.38, 0.52), "shutter_ochre": (0.70, 0.52, 0.24),
+    "shutter_grey": (0.46, 0.48, 0.46), "shutter_brown": (0.36, 0.24, 0.15),
+    "glass_stained": (1.0, 1.0, 1.0), "patina": (1.0, 1.0, 1.0), "shingle": (1.0, 1.0, 1.0), "shingle_dark": (1.0, 1.0, 1.0),
+    "plaster_pink": (0.90, 0.68, 0.62), "plaster_straw": (0.92, 0.80, 0.52), "plaster_mint": (0.72, 0.82, 0.70),
+    "plaster_oxblood": (0.60, 0.30, 0.24), "plaster_umber": (0.72, 0.58, 0.42),
 }
 _mats = {}
 
@@ -78,24 +84,30 @@ TEXSPEC = {
     "plaster": (2048, 4.0), "plaster_damp": (2048, 4.0), "tile": (2048, 4.0), "cobbles": (2048, 4.0), "field": (2048, 4.0),
     "brick": (1024, 2.0), "sandstone": (1024, 2.0), "oak": (1024, 2.0), "iron": (1024, 2.0), "metal": (1024, 2.0),
     "glass": (1024, 2.0), "snow": (1024, 2.0), "cloth": (1024, 2.0), "thatch": (1024, 2.0), "log": (1024, 2.0),
+    "stained": (1024, 2.0), "patina": (1024, 2.0), "shingle": (2048, 4.0),
 }
+# bump a kind's revision to force a rebake of just that kind (a <kind>.rev sidecar in assets/textures records it)
+TEX_REV = {"snow": 2, "brick": 2, "stained": 1, "patina": 1, "shingle": 1, "flags": 2, "mud": 3}
 TEX_OF = {}
 for _k in ("plaster_ochre", "plaster_rose", "plaster_cream", "plaster_sage", "plaster_blue", "plaster_white",
-           "plaster_lime", "plaster_limeblue", "plaster_grey"):
+           "plaster_lime", "plaster_limeblue", "plaster_grey", "plaster_pink", "plaster_straw", "plaster_mint",
+           "plaster_oxblood", "plaster_umber", "shutter_red", "shutter_blue", "shutter_ochre", "shutter_grey", "shutter_brown"):
     TEX_OF[_k] = "plaster"
 TEX_OF.update({"stone": "sandstone", "stone_dark": "sandstone", "stone_pale": "sandstone", "brick": "brick",
                "brick_dark": "brick", "tile": "tile", "tile_dark": "tile", "tile_moss": "tile", "wood": "oak",
                "wood_dark": "oak", "timber": "oak", "shutter": "oak", "iron": "iron", "lead": "metal",
                "copper": "metal", "glass": "glass", "glass_warm": "glass", "snow": "snow", "canvas": "cloth",
                "canvas_stripe": "cloth", "cobble": "cobbles", "thatch": "thatch", "log": "log", "log_lime": "log",
-               "field": "field", "hay": "thatch", "straw": "thatch", "salt": "snow"})
+               "field": "field", "hay": "thatch", "straw": "thatch", "salt": "snow", "glass_stained": "stained",
+               "patina": "patina", "shingle": "shingle", "shingle_dark": "shingle"})
 # tint = glTF baseColorFactor over the bake. Neutral bakes (plaster, metal, glass, cloth) take the palette colour.
 TINT = {"brick": (1, 1, 1), "brick_dark": (0.70, 0.64, 0.62), "tile": (1, 1, 1), "tile_dark": (0.74, 0.68, 0.66),
         "tile_moss": (0.86, 0.86, 0.72), "stone": (0.92, 0.91, 0.90), "stone_dark": (0.64, 0.63, 0.62),
         "stone_pale": (1, 1, 1), "wood": (1, 1, 1), "wood_dark": (0.56, 0.52, 0.50), "timber": (0.70, 0.66, 0.62),
         "shutter": (0.60, 0.82, 0.74), "iron": (1, 1, 1), "snow": (1, 1, 1), "cobble": (1, 1, 1), "thatch": (0.85, 0.8, 0.74),
         "log": (0.78, 0.70, 0.62), "log_lime": (1, 1, 1), "field": (1, 1, 1), "hay": (1.0, 1.0, 1.0),
-        "straw": (1.0, 1.0, 1.0), "salt": (0.95, 0.93, 0.90)}
+        "straw": (1.0, 1.0, 1.0), "salt": (0.95, 0.93, 0.90), "glass_stained": (1, 1, 1), "patina": (1, 1, 1),
+        "shingle": (1, 1, 1), "shingle_dark": (0.66, 0.64, 0.64)}
 METALLIC = {"iron": 0.55, "metal": 0.25}
 _tex_rep = {}        # material name -> metres per repeat (read by auto_uv)
 
@@ -109,6 +121,14 @@ def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _mats.clear()
     _tex_rep.clear()
+    _MARKS.clear()
+    _CLIMB.clear()
+    _EXTRA.clear()
+
+
+_EXTRA = []          # (name, object): separate child nodes kept out of the joined visual (runtime-tagged parts)
+_CLIMB = []          # (kind, object): climbable colliders exported as climb_<kind>_<n>-colonly
+_MARKS = []          # [kind, location, rot_z]: named empties (Chimney_n, Window_n, Furnace_n) exported with the asset
 
 
 # ------------------------------------------------------------------ procedural texture graphs
@@ -319,6 +339,9 @@ def _tx_brick(g):
     mort = g.mix(g.noise(60, 60, 3, seed=13), (0.50, 0.47, 0.42), (0.66, 0.63, 0.57))
     mort = g.mix(g.mul(soot, 0.4), mort, (0.30, 0.28, 0.25))
     col = g.mix(bm, mort, bc)
+    # old lime-wash surviving in patches, thin enough that the bond shows through
+    lw = g.mul(g.smooth(g.noise(3, 3, 5, 0.6, seed=90), 0.60, 0.66), g.smooth(g.noise(40, 40, 3, seed=91), 0.25, 0.55))
+    col = g.mix(g.mul(lw, 0.55), col, (0.78, 0.76, 0.70))
     h = g.add(g.mul(bm, g.add(0.55, g.mul(hb, 0.35))), g.mul(fine, 0.12))
     rough = g.lerp(bm, 0.95, g.sub(0.86, g.mul(glaze, 0.45)))
     return col, rough, h, 0.012
@@ -450,14 +473,93 @@ def _tx_glass(g):
 
 
 def _tx_snow(g):
+    # settled snow: soft wind ripples, a grain of little crystals, cold blue in the hollows (the subsurface tint
+    # of real snow), and sparse glints: tiny facets with low roughness that catch lantern light
     lumps = g.noise(6, 6, 5, 0.55, seed=37)
+    ripple = g.noise(3, 14, 3, 0.5, dist=0.8, seed=41)
     fine = g.noise(140, 140, 2, seed=38)
-    col = g.mix(lumps, (0.80, 0.83, 0.90), (0.95, 0.96, 0.99))
-    sp = g.smooth(fine, 0.72, 0.76)
-    col = g.mix(g.mul(sp, 0.4), col, (1.0, 1.0, 1.0))
-    h = g.add(g.mul(lumps, 0.7), g.mul(fine, 0.12))
-    rough = g.add(0.62, g.mul(fine, 0.2))
+    grain = g.noise(420, 420, 1, seed=42)
+    hol = g.one_minus(g.smooth(g.add(g.mul(lumps, 0.7), g.mul(ripple, 0.3)), 0.30, 0.62))
+    col = g.mix(hol, (0.95, 0.965, 0.99), (0.70, 0.78, 0.93))
+    col = g.mix(g.mul(g.smooth(fine, 0.2, 0.5), 0.25), (0.86, 0.89, 0.95), col)
+    glint = g.mul(g.smooth(g.white(g.fl(g.mul(g.u, 360.0)), g.fl(g.mul(g.v, 360.0)), 9.0), 0.985, 0.992),
+                  g.smooth(grain, 0.45, 0.6))
+    col = g.mix(g.mul(glint, 0.9), col, (1.0, 1.0, 1.0))
+    col = g.mix(g.mul(g.sub(grain, 0.4), 0.12), col, (0.80, 0.84, 0.92))
+    h = g.add(g.add(g.mul(lumps, 0.6), g.mul(ripple, 0.25)), g.add(g.mul(fine, 0.1), g.mul(grain, 0.05)))
+    rough = g.sub(g.add(0.70, g.mul(fine, 0.14)), g.mul(glint, 0.6))
     return col, rough, h, 0.03
+
+
+def _tx_stained(g):
+    """Leaded stained glass: diamond quarries in ruby, cobalt, amber, green and a pale grisaille, lead cames, a
+    roundel of deeper colour every half repeat and a faint painted wash. Used as both colour and emission."""
+    a = g.add(g.u, g.v)
+    b = g.sub(g.u, g.v)
+    ra, rb = g.mul(a, 6.0), g.mul(b, 6.0)
+    ia, ib = g.fl(ra), g.fl(rb)
+    ca, cb = g.fr(ra), g.fr(rb)
+    d = g.mn(g.edge(ca), g.edge(cb))
+    came = g.one_minus(g.smooth(d, 0.025, 0.06))
+    k1, k2 = g.mod(g.sub(ia, ib), 12.0), g.mod(g.add(ia, ib), 12.0)
+    r = g.white(k1, k2, 7.0)
+    col = g.ramp(r, [(0.0, (0.62, 0.05, 0.05)), (0.22, (0.05, 0.12, 0.55)), (0.42, (0.85, 0.55, 0.08)),
+                     (0.58, (0.10, 0.42, 0.14)), (0.74, (0.45, 0.08, 0.42)), (1.0, (0.85, 0.80, 0.60))])
+    cu, cv = g.fr(g.mul(g.u, 2.0)), g.fr(g.mul(g.v, 2.0))
+    rr = g.m("SQRT", g.add(g.mul(g.sub(cu, 0.5), g.sub(cu, 0.5)), g.mul(g.sub(cv, 0.5), g.sub(cv, 0.5))))
+    disc = g.one_minus(g.smooth(rr, 0.26, 0.27))
+    ring = g.mul(g.smooth(rr, 0.25, 0.265), g.one_minus(g.smooth(rr, 0.285, 0.30)))
+    petal = g.smooth(g.m("SINE", g.mul(g.m("ARCTAN2", g.sub(cv, 0.5), g.sub(cu, 0.5)), 6.0)), 0.2, 0.5)
+    inner = g.mix(g.mul(petal, g.one_minus(g.smooth(rr, 0.1, 0.2))), (0.70, 0.06, 0.08), (0.95, 0.72, 0.18))
+    col = g.mix(disc, col, inner)
+    came = g.mx(g.mul(came, g.one_minus(disc)), ring)
+    wash = g.noise(12, 12, 4, seed=43)
+    col = g.mix(g.mul(g.sub(wash, 0.35), 0.5), col, (0.20, 0.16, 0.10))
+    col = g.mix(came, col, (0.03, 0.03, 0.03))
+    h = g.add(g.mul(came, 1.0), g.mul(wash, 0.1))
+    rough = g.lerp(came, 0.12, 0.6)
+    return col, rough, h, 0.004
+
+
+def _tx_patina(g):
+    """Old copper sheet: verdigris over brown copper, standing seams (4 per 2 m) and staggered cross seams,
+    darker streaks washed down from each seam, pale salt blooms."""
+    iu = g.fl(g.mul(g.u, 4.0))
+    cu = g.fr(g.mul(g.u, 4.0))
+    seam = g.one_minus(g.smooth(g.mul(g.edge(cu), 0.5), 0.003, 0.012))
+    cv = g.fr(g.add(g.mul(g.v, 3.0), g.mul(g.mod(iu, 2.0), 0.5)))
+    cross = g.one_minus(g.smooth(g.mul(g.edge(cv), 0.66), 0.002, 0.006))
+    streak = g.noise(40, 1.5, 4, 0.6, dist=0.4, seed=44)
+    big = g.noise(3, 3, 4, seed=45)
+    col = g.ramp(big, [(0.2, (0.22, 0.46, 0.40)), (0.6, (0.33, 0.60, 0.52)), (0.9, (0.45, 0.68, 0.60))])
+    brown = g.smooth(g.mul(streak, g.add(0.6, g.mul(big, 0.5))), 0.52, 0.66)
+    col = g.mix(g.mul(brown, 0.8), col, (0.26, 0.17, 0.10))
+    bloom = g.smooth(g.noise(18, 18, 3, seed=46), 0.66, 0.74)
+    col = g.mix(g.mul(bloom, 0.5), col, (0.72, 0.80, 0.74))
+    col = g.mix(g.mul(g.add(seam, cross), 0.35), col, (0.12, 0.22, 0.18))
+    h = g.add(g.add(seam, g.mul(cross, 0.4)), g.mul(g.noise(8, 8, 2, seed=47), 0.25))
+    rough = g.add(0.55, g.mul(bloom, 0.2))
+    return col, rough, h, 0.01
+
+
+def _tx_shingle(g):
+    """Split-oak shingles (gont): 32 courses per 4 m, 36 shingles across with a random width jitter, silver-grey
+    weathering, darker butts, moss in the lower courses of shaded patches. v runs up the slope."""
+    cu, cv, iu, iv, par = g.cells(36.0, 32.0, 0.5)
+    r = g.white(iu, iv, 5.0)
+    jog = g.mul(g.sub(g.white(iu, iv, 6.0), 0.5), 0.08)
+    gap = g.smooth(g.mul(g.edge(g.fr(g.add(cu, jog))), 1.0 / 9.0), 0.002, 0.006)
+    butt = g.smooth(cv, 0.0, 0.10)
+    grain = g.noise(260, 8, 3, dist=0.4, seed=48)
+    col = g.ramp(r, [(0.0, (0.30, 0.27, 0.24)), (0.4, (0.42, 0.38, 0.33)), (0.8, (0.52, 0.48, 0.42)), (1.0, (0.40, 0.31, 0.22))])
+    col = g.mix(g.mul(g.sub(grain, 0.3), 0.4), col, (0.62, 0.60, 0.56))
+    col = g.mix(g.mul(g.one_minus(butt), 0.55), col, (0.10, 0.09, 0.08))
+    moss = g.mul(g.smooth(g.noise(5, 5, 4, seed=49), 0.58, 0.7), g.smooth(g.noise(60, 60, 2, seed=50), 0.4, 0.6))
+    col = g.mix(g.mul(moss, 0.7), col, (0.26, 0.30, 0.14))
+    col = g.mix(g.mul(g.one_minus(gap), 0.8), col, (0.05, 0.045, 0.04))
+    h = g.add(g.mul(g.sub(1.0, g.mul(cv, 0.5)), gap), g.mul(grain, 0.15))
+    rough = g.add(0.78, g.mul(grain, 0.12))
+    return col, rough, h, 0.02
 
 
 def _tx_cloth(g):
@@ -640,7 +742,7 @@ def _tx_field(g):
 RECIPES = {"plaster": _tx_plaster, "plaster_damp": lambda g: _tx_plaster(g, damp=True), "brick": _tx_brick,
            "sandstone": _tx_sandstone, "tile": _tx_tile, "oak": _tx_oak, "iron": _tx_iron, "metal": _tx_metal,
            "glass": _tx_glass, "snow": _tx_snow, "cloth": _tx_cloth, "cobbles": _tx_cobbles, "thatch": _tx_thatch,
-           "log": _tx_log, "field": _tx_field}
+           "log": _tx_log, "field": _tx_field, "stained": _tx_stained, "patina": _tx_patina, "shingle": _tx_shingle}
 
 
 def _tex_paths(kind):
@@ -658,7 +760,9 @@ def bake_texture(kind):
     """Bake one texture kind to assets/textures/<kind>_{col,rough,nrm}.png (cached). Runs in a scratch scene, so it
     is safe to call in the middle of building an asset."""
     paths = _tex_paths(kind)
-    if all(os.path.exists(p) for p in paths.values()) and (not REBAKE or kind in _baked_this_run):
+    revf = os.path.join(TEX, "%s.rev" % kind)
+    rev_ok = TEX_REV.get(kind, 1) == 1 or (os.path.exists(revf) and open(revf).read().strip() == str(TEX_REV[kind]))
+    if all(os.path.exists(p) for p in paths.values()) and (not REBAKE or kind in _baked_this_run) and (rev_ok or kind in _baked_this_run):
         return paths
     t0 = time.time()
     res, rep = TEXSPEC[kind]
@@ -738,6 +842,8 @@ def bake_texture(kind):
     bpy.data.materials.remove(mat)
     bpy.data.scenes.remove(sc)
     _baked_this_run.add(kind)
+    with open(revf, "w") as fh:
+        fh.write(str(TEX_REV.get(kind, 1)))
     print("[tex] baked %s %dpx in %.1fs" % (kind, res, time.time() - t0))
     return paths
 
@@ -748,8 +854,26 @@ def _img(path, colour):
     return im
 
 
+TEX_HALF = False     # set per asset by the build loop: the outer-town sets embed half-resolution copies of the bakes
+
+
+def _half(path):
+    """A cached half-resolution copy of a baked texture (assets/textures/<kind>_<pass>_half.png)."""
+    hp = path[:-4] + "_half.png"
+    if not os.path.exists(hp) or os.path.getmtime(hp) < os.path.getmtime(path):
+        im = bpy.data.images.load(path)
+        im.scale(max(64, im.size[0] // 2), max(64, im.size[1] // 2))
+        im.filepath_raw = hp
+        im.file_format = "PNG"
+        im.save()
+        bpy.data.images.remove(im)
+    return hp
+
+
 def _tex_material(key, kind, tint):
     paths = bake_texture(kind)
+    if TEX_HALF:
+        paths = {p: _half(v) for p, v in paths.items()}
     m = bpy.data.materials.new(key)
     nt = m.node_tree
     bsdf = nt.nodes["Principled BSDF"]
@@ -793,6 +917,11 @@ def M(key, rough=0.85, emit=None, emit_strength=0.0):
             bsdf = m.node_tree.nodes["Principled BSDF"]
             bsdf.inputs["Emission Color"].default_value = (1.0, 0.64, 0.30, 1.0)
             bsdf.inputs["Emission Strength"].default_value = 1.5
+        if kind == "stained":             # candles inside: the glass colours glow faintly at night
+            bsdf = m.node_tree.nodes["Principled BSDF"]
+            ic = [n for n in m.node_tree.nodes if n.type == "TEX_IMAGE"][0]
+            m.node_tree.links.new(ic.outputs["Color"], bsdf.inputs["Emission Color"])
+            bsdf.inputs["Emission Strength"].default_value = 1.2 if key == "glass_stained" else 0.6
     else:
         m = bpy.data.materials.new(key)
         bsdf = m.node_tree.nodes["Principled BSDF"]
@@ -1218,6 +1347,24 @@ def export(name, visual, col=None):
         col.display_type = "WIRE"
     visual.name = name
     auto_uv(visual)
+    counts = {}
+    for kind, loc, rz in _MARKS:
+        n = counts.get(kind, 0)
+        counts[kind] = n + 1
+        e = bpy.data.objects.new(kind[1:] if kind.startswith("!") else "%s_%d" % (kind, n), None)
+        bpy.context.collection.objects.link(e)
+        e.empty_display_size = 0.3
+        e.location = loc
+        e.rotation_euler = (0.0, 0.0, rz)
+        e.parent = visual
+    for (nm, o) in _EXTRA:
+        auto_uv(o)
+        o.parent = visual
+        o.name = nm
+    for i, (kind, o) in enumerate(_CLIMB):
+        o.name = "climb_%s_%d-colonly" % (kind, i)
+        o.parent = visual
+        o.display_type = "WIRE"
     path = os.path.join(OUT, name + ".glb")
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, export_apply=True, export_yup=True,
@@ -1418,14 +1565,34 @@ def voussoirs(parts, face, plane, ac, zs, w, t, mat, shape="round", n=9, proud=0
 
 
 def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters=False, surround="stone_pale",
-             sill=True, head="lintel", cross=True, bars=False, snow=True):
+             sill=True, head="lintel", cross=True, bars=False, snow=True, mark=False, shutter_col="shutter",
+             shutter_open=(180, 180), glass=None, drip=True, louvre=False, tracery=False):
     """Glazed window set into a facade() opening (a, zb, w, h, shape) with its REV-deep reveal: glass and a
     timber frame at the back of the reveal, a stone sill and lintel (or an arch of voussoirs), a raised
     surround, optional open shutters and iron bars."""
     fr = M("wood_dark")
     ol = outline(a, zb, w, h, shape)
     zs = zb + h - rise_of(shape, w)
-    parts.append(slab("glass", ol, face, plane, -REV + 0.005, -REV + 0.025, M("glass_warm" if warm else "glass")))
+    if louvre:                                    # belfry opening: dark void behind slanted oak boards
+        parts.append(slab("void", ol, face, plane, -REV + 0.005, -REV + 0.02, M("void")))
+        zs_ = zb + h - rise_of(shape, w)
+        for k in range(int((zs_ - zb) / 0.3)):
+            parts.append(fbox("louvre", face, plane, a, -REV + 0.08, zb + 0.1 + k * 0.3, w - 0.04, 0.03, 0.2, M("wood_dark")))
+    else:
+        parts.append(slab("glass", ol, face, plane, -REV + 0.005, -REV + 0.025, M(glass or ("glass_warm" if warm else "glass"))))
+    if tracery and shape == "pointed":            # two lights under an oculus, in stone
+        zs_ = zb + h - rise_of(shape, w)
+        rot = (math.pi / 2, 0, 0) if face in ("-Y", "+Y") else (0, math.pi / 2, 0)
+        c = _wp(face, plane, a, zs_ + w * 0.32, -REV + 0.07)
+        parts.append(torus("trac_ring", w * 0.24, 0.045, tuple(c), M("stone_pale"), rot=rot, seg=12, mseg=4))
+        parts.append(fbox("trac_mull", face, plane, a, -REV + 0.07, zb, 0.1, 0.1, zs_ - zb + w * 0.08, M("stone_pale")))
+        cross = False
+    if mark:
+        mark_window(face, plane, a, zb)
+        if zb > 3.0 and sill:
+            c = _wp(face, plane, a, zb - 0.06, 0.1)
+            A, N = _FACES[face]
+            climb("ledge", (w + 0.3, 0.3, 0.12) if abs(A.x) > 0.5 else (0.3, w + 0.3, 0.12), (c.x, c.y, zb - 0.06))
     t = 0.07
     fz = zs - zb
     parts.append(fbox("frame", face, plane, a - w / 2 + t / 2, -REV + 0.06, zb, t, 0.07, fz, fr))
@@ -1441,9 +1608,11 @@ def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters
             parts.append(fbox("bar", face, plane, a - w / 3 + w / 3 * k, -0.04, zb, 0.03, 0.03, fz, M("iron")))
         parts.append(fbox("bar", face, plane, a, -0.04, zb + fz * 0.5, w, 0.03, 0.03, M("iron")))
     if sill:
-        parts.append(fbox("sill", face, plane, a, (0.12 - REV) / 2, zb - 0.12, w + 0.3, 0.12 + REV, 0.12, M("stone"), bevel=0.02, seg=1))
+        parts.append(fbox("sill", face, plane, a, (0.12 - REV) / 2, zb - 0.12, w + 0.3, 0.12 + REV, 0.12, M("stone")))
+        if drip:                                  # throated drip under the sill nose
+            parts.append(fbox("drip", face, plane, a, 0.1, zb - 0.16, w + 0.24, 0.04, 0.04, M("stone_dark")))
         if snow:
-            parts.append(fbox("sill_snow", face, plane, a, (0.1 - REV) / 2 + 0.01, zb, w + 0.2, 0.08 + REV, 0.03, M("snow"), bevel=0.01, seg=1))
+            parts.append(fbox("sill_snow", face, plane, a, (0.1 - REV) / 2 + 0.01, zb, w + 0.2, 0.08 + REV, 0.03, M("snow")))
     if surround:
         sm = M(surround)
         bw = 0.13
@@ -1451,13 +1620,16 @@ def win_unit(parts, face, plane, a, zb, w, h, shape="rect", warm=False, shutters
         parts.append(fbox("sur", face, plane, a + w / 2 + bw / 2, 0.025, zb - 0.02, bw, 0.05, zs - zb + 0.02, sm))
     if shape == "rect":
         if head == "lintel":
-            parts.append(fbox("lintel", face, plane, a, 0.04, zs, w + 0.42, 0.08, 0.24, M("stone"), bevel=0.02, seg=1))
+            parts.append(fbox("lintel", face, plane, a, 0.04, zs, w + 0.42, 0.08, 0.24, M("stone")))
+            parts.append(fbox("key", face, plane, a, 0.07, zs - 0.02, 0.22, 0.1, 0.3, M("stone_pale")))
             parts.append(fbox("hood", face, plane, a, 0.08, zs + 0.24, w + 0.56, 0.16, 0.08, M("stone"), bevel=0.02, seg=1))
             if snow:
-                parts.append(fbox("hood_snow", face, plane, a, 0.08, zs + 0.32, w + 0.5, 0.14, 0.025, M("snow"), bevel=0.01, seg=1))
+                parts.append(fbox("hood_snow", face, plane, a, 0.08, zs + 0.32, w + 0.5, 0.14, 0.025, M("snow")))
     else:
         voussoirs(parts, face, plane, a, zs, w, 0.16, M("stone"), shape=shape, n=7 if shape == "round" else 8)
-    if shutters:
+    if shutters in ("board", "louvre"):
+        shutter_pair(parts, face, plane, a, zb, w, fz, style=shutters, colour=shutter_col, open_deg=shutter_open)
+    elif shutters:
         sw = w / 2 + 0.04
         for sx in (-1, 1):
             parts.append(fbox("shutter", face, plane, a + sx * (w / 2 + 0.16 + sw / 2), 0.04, zb, sw, 0.05, fz, M("shutter"), bevel=0.01, seg=1))
@@ -1480,8 +1652,8 @@ def door_unit(parts, face, plane, a, w=2.0, h=3.0, portal=True, fanlight=True, s
             parts.append(fbox("panel", face, plane, lx, -REV + 0.095, pz, lw - 0.24, 0.03, ph, wd, bevel=0.012, seg=1))
         for zz in (0.45, h * 0.5, h - 0.45):
             parts.append(fbox("strap", face, plane, lx - sx * 0.04, -REV + 0.12, zz, lw - 0.1, 0.012, 0.07, iron))
-            for k in range(4):
-                parts.append(fbox("stud", face, plane, lx - lw / 2 + 0.12 + k * (lw - 0.24) / 3, -REV + 0.13, zz + 0.02, 0.035, 0.02, 0.035, iron))
+            for k in range(2):
+                parts.append(fbox("stud", face, plane, lx - lw / 2 + 0.12 + k * (lw - 0.24), -REV + 0.13, zz + 0.02, 0.035, 0.02, 0.035, iron))
     parts.append(torus("ring", 0.09, 0.015, tuple(_wp(face, plane, a + 0.22, 1.25, -REV + 0.14)), iron,
                        rot=(math.pi / 2, 0, 0) if face in ("-Y", "+Y") else (0, math.pi / 2, 0), seg=12, mseg=6))
     parts.append(fbox("transom", face, plane, a, -REV + 0.07, h, w, 0.1, 0.12, wd))
@@ -1502,6 +1674,7 @@ def door_unit(parts, face, plane, a, w=2.0, h=3.0, portal=True, fanlight=True, s
             parts.append(fbox("jamb_base", face, plane, a + sx * (w / 2 + 0.2), 0.11, 0.0, 0.5, 0.22, 0.45, M("stone_dark"), bevel=0.03, seg=1))
             parts.append(fbox("impost", face, plane, a + sx * (w / 2 + 0.2), 0.12, h - 0.02, 0.52, 0.24, 0.16, st, bevel=0.02, seg=1))
         voussoirs(parts, face, plane, a, h + 0.12, w, 0.4, st, n=9, proud=0.14, key=0.18)
+        mascaron(parts, face, plane, a, h + 0.12 + w / 2 + 0.5, s=0.26, mat=st)
         parts.append(fbox("cornice", face, plane, a, 0.18, h + 0.12 + w / 2 + 0.58, w + 1.3, 0.36, 0.14, st, bevel=0.03, seg=1))
         parts.append(fbox("corn_snow", face, plane, a, 0.18, h + 0.12 + w / 2 + 0.72, w + 1.2, 0.32, 0.05, M("snow"), bevel=0.02, seg=1))
     parts.append(fbox("step", face, plane, a, 0.3, 0.0, w + 0.9, 0.6, 0.16, M("stone_dark"), bevel=0.03, seg=1))
@@ -1541,6 +1714,7 @@ def drainpipe(parts, x, y, z_top, walls, r=0.055):
     (z, wall_y) for the brackets that tie it back to each storey's face."""
     lead = M("lead")
     parts.append(cyl("pipe", r, z_top - 0.25, (x, y, 0.25), lead, verts=8))
+    climb("pipe", (0.3, 0.3, z_top), (x, y, z_top / 2))
     parts.append(taper_box("hopper", (0.26, 0.24, 0.32), (x, y, z_top - 0.05), lead, top=1.35))
     parts.append(box("gutter_link", (0.1, abs(walls[-1][1] - y) + 0.2, 0.1), (x, (y + walls[-1][1]) / 2, z_top + 0.15), lead))
     parts.append(cyl("shoe", r, 0.3, (x, y - 0.1, 0.16), lead, verts=8, rot=(math.radians(60), 0, 0), center=True))
@@ -1572,7 +1746,7 @@ def quoins(parts, width, depth, z0, z1, face, cx=0.0):
         hgt = min(0.5, z1 - z - 0.06)
         for sx in (-1, 1):
             w = 0.9 if i % 2 == 0 else 0.6
-            parts.append(box("quoin", (w, 0.12, hgt), (cx + sx * (width / 2 - w / 2 + 0.02), face - 0.05, z), M("stone_pale"), bevel=0.03, seg=1, wonk=0.02))
+            parts.append(box("quoin", (w, 0.12, hgt), (cx + sx * (width / 2 - w / 2 + 0.02), face - 0.05, z), M("stone_pale"), bevel=0, wonk=0.02))
         z += 0.56
         i += 1
 
@@ -1596,8 +1770,15 @@ def chimney(parts, x, y, z, h=2.6):
     parts.append(box("band", (1.0, 1.0, 0.12), (x + (h - 0.5) * lean_x, y + (h - 0.5) * lean_y, z + h - 0.5), M("brick_dark"), bevel=0.02, seg=1))
     parts.append(box("cap", (1.1, 1.1, 0.16), (tx, ty, z + h - 0.02), M("stone_dark"), bevel=0.03, seg=1))
     for k, dx in enumerate((-0.2, 0.2)):
-        parts.append(cyl("pot", 0.14, 0.45, (tx + dx, ty, z + h + 0.14), M("brick_dark"), verts=10, r2=0.11))
-    parts.append(box("snow", (1.0, 1.0, 0.08), (tx, ty, z + h + 0.14), M("snow"), bevel=0.03, seg=1))
+        parts.append(cyl("pot", 0.14, 0.45, (tx + dx, ty, z + h + 0.14), M("terracotta" if k else "brick_dark"), verts=10, r2=0.11))
+        mark("Chimney", (tx + dx, ty, z + h + 0.62))
+    parts.append(box("snow", (0.98, 0.98, 0.05), (tx, ty, z + h + 0.14), M("snow"), bevel=0.02, seg=1))
+    rl = []
+    rime(rl, "-X", x - 0.45, -y, z + 0.3, 0.8, h - 0.9, seed=int(abs(x * 10)))
+    for o in rl:
+        shear(o, lean_x, lean_y, z0=z)
+    parts += rl
+    return (x, y)
 
 
 def plinth(parts, x0, x1, y_face, h=0.5, proud=0.08, mat=None, skip=()):
@@ -1624,15 +1805,540 @@ def dormer(parts, x, y_front, zb, w, h, wall, roofmat, depth=1.6, warm=False, sn
     parts.append(box("dormer_board", (w + 0.12, 0.08, 0.12), (x, y_front - 0.03, zb + h - 0.06), M("wood_dark")))
     parts.append(roof("dormer_r", depth + 0.35, w + 0.4, h * 0.55, (x, y_front + depth / 2 - 0.15, zb + h), roofmat, sag=0.03, flare=0.1, cuts=3, along_x=False, bevel=0.03))
     if snow:
-        parts.append(roof("dormer_snow", depth + 0.3, w + 0.44, h * 0.55 + 0.06, (x, y_front + depth / 2 - 0.15, zb + h + 0.02), M("snow"), sag=0.03, flare=0.1, cuts=3, along_x=False, top_w=0.2, bevel=0.03))
+        sn = roof_snow("dormer_snow", depth + 0.35, w + 0.4, h * 0.55, (x, y_front + depth / 2 - 0.15, zb + h), sag=0.03, flare=0.1,
+                       cuts=3, along_x=False, thick=0.05, cell=0.8, bare=0.2, slide=0.0, seed=int(x * 7) + 3, lip=0.04)
+        if sn:
+            parts.append(sn)
+        icicles(parts, (x - w / 2 - 0.2, y_front - 0.25), (x - w / 2 - 0.2, y_front + depth - 0.4), zb + h - 0.02, maxlen=0.25, seed=int(x * 5), density=3)
+        icicles(parts, (x + w / 2 + 0.2, y_front - 0.25), (x + w / 2 + 0.2, y_front + depth - 0.4), zb + h - 0.02, maxlen=0.25, seed=int(x * 5) + 1, density=3)
+
+
+# ------------------------------------------------------------------ DETAIL PASS: markers, snow blankets, ice, shutters, iron
+# Named empties for the runtime (smoke from chimneys, people at windows, forge light): `mark()` records one, export()
+# writes it as a child node of the asset root (Chimney_<n>, Window_<n>, Furnace_<n>, numbered from 0 per asset).
+FACE_ROT = {"-Y": 0.0, "+Y": math.pi, "+X": math.pi / 2, "-X": -math.pi / 2}
+
+
+def mark(kind, loc, rot_z=0.0):
+    _MARKS.append([kind, Vector(loc), rot_z])
+
+
+def mark_window(face, plane, a, zb):
+    """Window_<n> on the sill centre of an openable window, its -Y (Blender front) pointing out of the facade."""
+    mark("Window", _wp(face, plane, a, zb, 0.02), FACE_ROT[face])
+
+
+def shear_marks(kx, ky, z0=0.0):
+    for m in _MARKS:
+        m[1].x += (m[1].z - z0) * kx
+        m[1].y += (m[1].z - z0) * ky
+
+
+from mathutils import noise as _mnoise
+
+
+def _n01(p, f, seed):
+    return 0.5 + 0.5 * _mnoise.noise(Vector((p.x * f + seed * 17.31, p.y * f - seed * 5.13, p.z * f + seed * 2.97)))
+
+
+def snow_shell(src, name="snow", thick=0.07, minz=0.35, bare=0.23, lee=(0.25, 1.0), lee_k=0.8, drifts=(), seed=0,
+               cell=0.75, slide=0.28, lip=0.07, keep_src=False, flat_k=1.0, maxz=1.01):
+    """A conformal snow blanket over the upward faces of `src` (consumed unless keep_src): the faces are subdivided
+    to ~`cell` metres, some are dropped where the snow slid off (random bare patches, more of them low on the
+    slope, and downslope slide strips on steep faces that show the tiles), then the rest is lifted a centimetre
+    and solidified outward with a per-vertex thickness: noise, thicker on the lee slopes (lee = the downwind
+    direction in asset space), thinner along a scoured ridge, piled up in `drifts` (x, y, radius, extra metres)
+    against chimneys and dormers, and a lip that curls a few cm over the eaves. Thin (thick ~ 5-9 cm): no blocks."""
+    bm = bmesh.new()
+    bm.from_mesh(src.data)
+    if not keep_src:
+        bpy.data.objects.remove(src, do_unlink=True)
+    bm.normal_update()
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z < minz or f.normal.z > maxz], context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    for _ in range(6):
+        long = [e for e in bm.edges if e.calc_length() > cell]
+        if not long:
+            break
+        bmesh.ops.subdivide_edges(bm, edges=long, cuts=1, use_grid_fill=True)
+    bm.normal_update()
+    if not bm.verts:
+        bm.free()
+        return None
+    # ragged outlines: triangulate with mixed diagonals and jitter the interior vertices in the surface plane, so
+    # bare patches and slide strips read as torn snow rather than grid squares
+    jr = random.Random(seed + 77)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="ALTERNATE")
+    outer = bm.verts.layers.int.new("outer")
+    for v in bm.verts:
+        v[outer] = 1 if v.is_boundary else 0
+    for v in bm.verts:
+        if v.is_boundary:
+            continue
+        n = v.normal
+        j = Vector((jr.uniform(-1, 1), jr.uniform(-1, 1), jr.uniform(-1, 1))) * cell * 0.15
+        v.co += j - n * j.dot(n)
+    bm.normal_update()
+    zs = [v.co.z for v in bm.verts]
+    z0, z1 = min(zs), max(zs)
+    zr = max(0.01, z1 - z0)
+    rng = random.Random(seed)
+    band_r = {}
+    dead = []
+    for f in bm.faces:
+        c = f.calc_center_median()
+        n = f.normal
+        zf = (c.z - z0) / zr
+        if _n01(c, 0.55, seed) + 0.08 * (jr.random() - 0.5) < bare + 0.12 * (1.0 - zf) - (0.25 if n.z > 0.97 else 0.0):
+            dead.append(f)
+            continue
+        if n.z < 0.92 and slide > 0:
+            t = Vector((-n.y, n.x, 0.0))
+            if t.length > 1e-4:
+                t.normalize()
+                key = (int(math.floor((c.dot(t) + 0.25 * _mnoise.noise(c * 1.7)) / 0.8)), round(n.x * 2), round(n.y * 2))
+                if key not in band_r:
+                    band_r[key] = (rng.random(), rng.uniform(0.2, 0.75))
+                pr, ln = band_r[key]
+                if pr < slide and zf < ln:
+                    dead.append(f)
+    bmesh.ops.delete(bm, geom=list(set(dead)), context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    if not bm.faces:
+        bm.free()
+        return None
+    # round off the torn edges of the bare patches: relax the new boundary loops (not the roof's own outline)
+    for _ in range(4):
+        moves = {}
+        for v in bm.verts:
+            if not v.is_boundary or v[outer]:
+                continue
+            nb = [e.other_vert(v) for e in v.link_edges if e.is_boundary]
+            if len(nb) == 2:
+                moves[v] = (nb[0].co + nb[1].co) * 0.5
+        for v, p in moves.items():
+            v.co = v.co * 0.4 + p * 0.6
+    bm.normal_update()
+    L = Vector((lee[0], lee[1], 0.0))
+    L = L.normalized() if L.length > 1e-4 else L
+    ws = {}
+    for v in bm.verts:
+        n = v.normal
+        t = 0.55 + 0.9 * _n01(v.co, 1.4, seed + 3)
+        h = Vector((n.x, n.y, 0.0))
+        if h.length > 0.05:
+            d = h.normalized().dot(L)
+            t *= 1.0 + lee_k * max(0.0, d) - 0.35 * max(0.0, -d)
+        else:
+            t *= flat_k
+        if (v.co.z - z0) / zr > 0.93 and n.z < 0.95:
+            t *= 0.6
+        for (dx, dy, r, extra) in drifts:
+            dd = math.hypot(v.co.x - dx, v.co.y - dy)
+            if dd < r:
+                t += (extra / thick) * (1.0 - dd / r) ** 2
+        ws[v.index] = t
+        v.co += n * 0.012
+    for v in {v for e in bm.edges if e.is_boundary for v in e.verts}:
+        if v.co.z < z0 + 0.1 and v.normal.z < 0.97:
+            h = Vector((v.normal.x, v.normal.y, 0.0))
+            if h.length > 0.05:
+                v.co += h.normalized() * lip
+                v.co.z -= lip * 0.3
+    tmax = max(ws.values())
+    o = _mesh_obj(name, bm, M("snow"))
+    vg = o.vertex_groups.new(name="th")
+    for i, t in ws.items():
+        vg.add([i], max(0.05, t / tmax), "REPLACE")
+    bpy.ops.object.select_all(action="DESELECT")
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    m = o.modifiers.new("solid", "SOLIDIFY")
+    m.thickness = thick * tmax
+    m.offset = 1.0
+    m.use_rim = True
+    m.use_even_offset = False
+    m.use_quality_normals = True
+    m.vertex_group = "th"
+    m.thickness_vertex_group = 0.05
+    bpy.ops.object.modifier_apply(modifier="solid")
+    o.vertex_groups.clear()
+    _tag(o, mat=M("snow"))
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(70))
+    return o
+
+
+def roof_snow(name, L, W, H, loc, sag=0.25, flare=0.30, cuts=6, top_w=0.0, along_x=True, **kw):
+    """snow_shell() over a clean (unbevelled) copy of the same roof() solid."""
+    kw.setdefault("cell", 1.0)
+    base = roof(name + "_base", L, W, H, loc, None, sag=sag, flare=flare, cuts=cuts, top_w=top_w, along_x=along_x, bevel=0)
+    return snow_shell(base, name, **kw)
+
+
+def cap_snow(name, obj_fn, **kw):
+    """snow_shell() over a throwaway primitive built by obj_fn() (domes, spires, pinnacle caps)."""
+    kw.setdefault("slide", 0.0)
+    return snow_shell(obj_fn(), name, **kw)
+
+
+def icicles(parts, p0, p1, z, maxlen=0.45, seed=0, r=0.03, density=2.4, gap=0.3):
+    """A row of thin tapered icicles hanging from z along p0-p1 (four-sided cones in one mesh, ~4 tris each),
+    lengths skewed short with the odd long spear, clustered where the drip is."""
+    rng = random.Random(seed)
+    p0, p1 = Vector((p0[0], p0[1], z)), Vector((p1[0], p1[1], z))
+    n = max(2, int((p1 - p0).length * density))
+    bm = bmesh.new()
+    for i in range(n):
+        if rng.random() < gap:
+            continue
+        t = (i + rng.uniform(0.15, 0.85)) / n
+        p = p0.lerp(p1, t)
+        ln = 0.05 + maxlen * rng.random() ** 2.4
+        rr = r * (0.55 + 0.7 * rng.random()) * (0.6 + ln / maxlen * 0.6)
+        _tube(bm, p + Vector((0, 0, 0.01)), p + Vector((rng.uniform(-0.02, 0.02), rng.uniform(-0.02, 0.02), -ln)), rr, 0.0, n=4)
+    if not bm.verts:
+        bm.free()
+        return
+    o = _mesh_obj("icicles", bm, M("ice", 0.08))
+    for f in o.data.polygons:
+        f.use_smooth = True
+    parts.append(o)
+
+
+def eave_icicles(parts, L, W, z, loc=(0.0, 0.0), along_x=True, sides=(-1, 1), seed=0, **kw):
+    """Icicles under both eaves of a roof(L, W, ..., loc) at eave height z."""
+    x, y = loc[0], loc[1]
+    for k, s in enumerate(sides):
+        if along_x:
+            icicles(parts, (x - L / 2 + 0.2, y + s * W / 2), (x + L / 2 - 0.2, y + s * W / 2), z, seed=seed + k, **kw)
+        else:
+            icicles(parts, (x + s * W / 2, y - L / 2 + 0.2), (x + s * W / 2, y + L / 2 - 0.2), z, seed=seed + k, **kw)
+
+
+def snow_cap(parts, x, y, z, r, h=None, seg=10):
+    """A little dome of snow on a finial, ball, post or pinnacle top."""
+    h = h if h is not None else r * 0.45
+    o = sphere("cap_snow", r, (x, y, z), M("snow"), seg=seg, rings=5, zscale=h / r)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < z - 0.001], context="VERTS")
+    bm.to_mesh(o.data)
+    bm.free()
+    parts.append(o)
+
+
+def rime(parts, face, plane, a, zb, w, h, seed=0):
+    """Thin frost crust on a windward face: a few irregular white scabs a few mm proud of the wall."""
+    rng = random.Random(seed)
+    for k in range(int(max(1, w * h / 4.0))):
+        aa = a + rng.uniform(-w / 2, w / 2)
+        zz = zb + rng.uniform(0.2, 1.0) ** 0.5 * h
+        sw, sh = rng.uniform(0.2, 0.6), rng.uniform(0.08, 0.3)
+        pts = [(aa - sw / 2, zz), (aa + sw / 2, zz + rng.uniform(-0.04, 0.04)), (aa + sw * 0.3, zz + sh), (aa - sw * 0.4, zz + sh * 0.8)]
+        parts.append(slab("rime", pts, face, plane, 0.0, 0.006, M("snow")))
+
+
+def _swing(o, hinge, ang):
+    c, s = math.cos(ang), math.sin(ang)
+    def f(co):
+        dx, dy = co.x - hinge.x, co.y - hinge.y
+        co.x, co.y = hinge.x + dx * c - dy * s, hinge.y + dx * s + dy * c
+    return edit_verts(o, f)
+
+
+def shutter_pair(parts, face, plane, a, zb, w, h, style="board", colour="shutter", open_deg=(180, 180), snow=True):
+    """Two shutter leaves hinged on the window's outer jambs. style "board" (ledged planks with a Z brace) or
+    "louvre" (stiles, rails and slanted slats). open_deg per leaf: 180 = folded back flat against the wall,
+    ~100 = standing out half-open, 0 = closed over the window."""
+    A, N = _FACES[face]
+    mat = M(colour)
+    iron = M("iron")
+    sw = w / 2 + 0.03
+    for k, sx in enumerate((-1, 1)):
+        hinge_a = a + sx * (w / 2 + 0.02)
+        hinge = _wp(face, plane, hinge_a, 0.0, 0.05)
+        ac = hinge_a - sx * sw / 2                      # closed position: spanning into the opening
+        leaf = []
+        if style == "louvre":
+            for aa in (ac - sw / 2 + 0.035, ac + sw / 2 - 0.035):
+                leaf.append(fbox("stile", face, plane, aa, 0.05, zb, 0.07, 0.04, h, mat))
+            for zz in (zb, zb + h / 2 - 0.035, zb + h - 0.07):
+                leaf.append(fbox("rail", face, plane, ac, 0.05, zz, sw - 0.1, 0.035, 0.07, mat))
+            ns = max(4, int(h / 0.3))
+            for j in range(ns):
+                zz = zb + 0.09 + (h - 0.18) * (j + 0.5) / ns - 0.03
+                if abs(zz - (zb + h / 2)) < 0.06:
+                    continue
+                sl = fbox("slat", face, plane, ac, 0.05, zz, sw - 0.12, 0.012, 0.075, mat)
+                o = _wp(face, plane, ac, zz + 0.04, 0.05)
+                ax = A
+                def tilt(co, o=o, ax=ax):
+                    rel = co - o
+                    along = rel.dot(ax)
+                    perp = rel - ax * along
+                    zc, nc = perp.z, perp - Vector((0, 0, perp.z))
+                    ang = math.radians(35)
+                    nn = nc.length * (1 if nc.dot(N) >= 0 else -1)
+                    z2 = zc * math.cos(ang) - nn * math.sin(ang)
+                    n2 = zc * math.sin(ang) + nn * math.cos(ang)
+                    co.xyz = o + ax * along + N * n2 + Vector((0, 0, z2))
+                edit_verts(sl, tilt)
+                leaf.append(sl)
+        else:
+            leaf.append(fbox("leaf", face, plane, ac, 0.05, zb, sw, 0.04, h, mat))
+            for zz in (zb + 0.18, zb + h - 0.3):
+                leaf.append(fbox("ledge", face, plane, ac, 0.085, zz, sw - 0.06, 0.03, 0.1, mat))
+            leaf.append(fbox("plank", face, plane, ac - sw / 6, 0.072, zb, 0.012, 0.01, h, M("wood_dark")))
+            leaf.append(fbox("plank", face, plane, ac + sw / 6, 0.072, zb, 0.012, 0.01, h, M("wood_dark")))
+        for zz in ((zb + 0.2, zb + h - 0.26) if style != "louvre" else ()):
+            leaf.append(fbox("strap", face, plane, hinge_a - sx * sw * 0.35, 0.09, zz, sw * 0.7, 0.01, 0.035, iron))
+        lo = join(leaf, "shutter")
+        dirv = A * (-sx)
+        sgn = 1.0 if dirv.cross(N).z > 0 else -1.0
+        _swing(lo, hinge, math.radians(open_deg[k]) * sgn)
+        parts.append(lo)
+        if 60 < open_deg[k] < 170 and snow:
+            pass
+    # the iron catches (holdbacks) on the wall
+    for sx in (-1, 1):
+        parts.append(fbox("catch", face, plane, a + sx * (w / 2 + sw + 0.05), 0.04, zb + 0.35, 0.03, 0.08, 0.03, iron))
+
+
+def wall_anchor(parts, face, plane, a, z, kind="S"):
+    """Wrought-iron tie-rod anchor (kotwa) on a facade at a floor line: an S, an X or a plain bar."""
+    iron = M("iron")
+    if kind == "X":
+        for ang in (0.6, -0.6):
+            b = fbox("anchor", face, plane, a, 0.02, z - 0.35, 0.05, 0.03, 0.7, iron)
+            c = _wp(face, plane, a, z, 0.02)
+            A, N = _FACES[face]
+            def rot(co, c=c, ang=ang, A=A):
+                rel = co - c
+                u, zz = rel.dot(A), rel.z
+                rest = rel - A * u - Vector((0, 0, zz))
+                u2, z2 = u * math.cos(ang) - zz * math.sin(ang), u * math.sin(ang) + zz * math.cos(ang)
+                co.xyz = c + A * u2 + Vector((0, 0, z2)) + rest
+            edit_verts(b, rot)
+            parts.append(b)
+    else:
+        parts.append(fbox("anchor", face, plane, a, 0.02, z - 0.3, 0.05, 0.03, 0.6, iron))
+        if kind == "S":
+            parts.append(fbox("anchor_t", face, plane, a + 0.07, 0.02, z + 0.26, 0.14, 0.03, 0.05, iron))
+            parts.append(fbox("anchor_b", face, plane, a - 0.07, 0.02, z - 0.3, 0.14, 0.03, 0.05, iron))
+        parts.append(fbox("anchor_nut", face, plane, a, 0.04, z - 0.04, 0.08, 0.04, 0.08, iron))
+
+
+def balcony_iron(parts, face, plane, a, z, w=2.2, d=0.85, seed=0):
+    """Stone balcony slab on three carved consoles with a wrought-iron railing (balusters, a scrolled panel in
+    front), snow on the slab and the top rail and a fringe of icicles under the slab lip."""
+    st, iron = M("stone_pale"), M("iron")
+    parts.append(fbox("bal_slab", face, plane, a, d / 2, z - 0.18, w, d, 0.18, st, bevel=0.03, seg=1))
+    cc = _wp(face, plane, a, z - 0.09, d / 2)
+    A_, N_ = _FACES[face]
+    climb("ledge", (w, d, 0.2) if abs(A_.x) > 0.5 else (d, w, 0.2), (cc.x, cc.y, z - 0.09))
+    for k in (-1, 0, 1):
+        c = fbox("console", face, plane, a + k * (w / 2 - 0.25), 0.25, z - 0.7, 0.24, 0.5, 0.52, st, bevel=0.02, seg=1)
+        A, N = _FACES[face]
+        base = _wp(face, plane, 0, z - 0.7, 0.0)
+        def taper(co, base=base, N=N):
+            rel = co - base
+            out = rel.dot(N)
+            zz = rel.z
+            if zz < 0.2:
+                co.xyz = co - N * out + N * min(out, 0.08)
+        edit_verts(c, taper)
+        parts.append(c)
+    H = 0.95
+    parts.append(fbox("bal_rail", face, plane, a, d - 0.06, z + H - 0.04, w - 0.08, 0.05, 0.05, iron))
+    parts.append(fbox("bal_bot", face, plane, a, d - 0.06, z + 0.08, w - 0.08, 0.04, 0.035, iron))
+    for s in (-1, 1):
+        parts.append(fbox("bal_side_r", face, plane, a + s * (w / 2 - 0.06), d / 2, z + H - 0.04, 0.05, d - 0.1, 0.05, iron))
+        parts.append(fbox("bal_side_b", face, plane, a + s * (w / 2 - 0.06), d / 2, z + 0.08, 0.035, d - 0.1, 0.035, iron))
+        for j in range(3):
+            parts.append(fbox("bal_sbal", face, plane, a + s * (w / 2 - 0.06), 0.15 + j * (d - 0.25) / 2, z + 0.1, 0.02, 0.02, H - 0.14, iron))
+    n = int((w - 0.2) / 0.13)
+    for j in range(n + 1):
+        aa = a - (w - 0.2) / 2 + (w - 0.2) * j / n
+        if abs(aa - a) < 0.32:
+            continue
+        parts.append(fbox("bal_bal", face, plane, aa, d - 0.06, z + 0.1, 0.02, 0.02, H - 0.14, iron))
+    ctr = _wp(face, plane, a, z + H * 0.5, d - 0.06)
+    rot = (math.pi / 2, 0, 0) if face in ("-Y", "+Y") else (0, math.pi / 2, 0)
+    parts.append(torus("bal_scroll", 0.2, 0.014, tuple(ctr), iron, rot=rot, seg=12, mseg=3))
+    for s in (-1, 1):
+        c2 = _wp(face, plane, a + s * 0.17, z + H * 0.5 + 0.2 * s, d - 0.06)
+        parts.append(torus("bal_scroll", 0.1, 0.012, tuple(c2), iron, rot=rot, seg=8, mseg=3))
+    parts.append(fbox("bal_snow", face, plane, a, d / 2 + 0.02, z, w - 0.14, d - 0.12, 0.04, M("snow")))
+    parts.append(fbox("bal_rsnow", face, plane, a, d - 0.06, z + H + 0.01, w - 0.2, 0.06, 0.025, M("snow")))
+    p0, p1 = _wp(face, plane, a - w / 2 + 0.1, 0, d + 0.01), _wp(face, plane, a + w / 2 - 0.1, 0, d + 0.01)
+    icicles(parts, p0, p1, z - 0.18, maxlen=0.35, seed=seed, density=3.0)
+
+
+def gallery_wood(parts, face, plane, a0, a1, z, d=1.2, posts=4, roof_h=2.6, seed=0):
+    """Courtyard gallery (ganek): joists out of the wall, a plank deck, turned posts to a lean-to roof above,
+    a rail of flat cut-out balusters, snow on the rail, the deck edge and the little roof."""
+    wd, dk = M("wood"), M("wood_dark")
+    w = a1 - a0
+    ac = (a0 + a1) / 2
+    parts.append(fbox("gal_deck", face, plane, ac, d / 2, z - 0.08, w, d, 0.08, wd))
+    gc = _wp(face, plane, ac, z - 0.06, d / 2)
+    A_, N_ = _FACES[face]
+    climb("ledge", (w, d, 0.12) if abs(A_.x) > 0.5 else (d, w, 0.12), (gc.x, gc.y, z - 0.06))
+    for k in range(int(w / 0.9) + 1):
+        aa = a0 + 0.1 + (w - 0.2) * k / max(1, int(w / 0.9))
+        parts.append(fbox("gal_joist", face, plane, aa, d / 2, z - 0.28, 0.14, d + 0.1, 0.2, dk))
+    for k in range(posts + 1):
+        aa = a0 + 0.08 + (w - 0.16) * k / posts
+        parts.append(fbox("gal_post", face, plane, aa, d - 0.08, z, 0.12, 0.12, roof_h, dk))
+        parts.append(fbox("gal_brace", face, plane, aa, d - 0.4, z + roof_h - 0.45, 0.08, 0.6, 0.08, dk))
+    parts.append(fbox("gal_rail", face, plane, ac, d - 0.08, z + 0.95, w, 0.1, 0.07, wd))
+    parts.append(fbox("gal_rsnow", face, plane, ac, d - 0.08, z + 1.02, w - 0.1, 0.1, 0.03, M("snow")))
+    nb = int(w / 0.24)
+    for k in range(nb):
+        aa = a0 + 0.12 + (w - 0.24) * (k + 0.5) / nb
+        parts.append(fbox("gal_bal", face, plane, aa, d - 0.08, z, 0.1, 0.025, 0.95, wd))
+    parts.append(fbox("gal_plate", face, plane, ac, d - 0.08, z + roof_h, w + 0.2, 0.14, 0.14, dk))
+    A, N = _FACES[face]
+    c0 = _wp(face, plane, ac, z + roof_h + 0.14, d / 2)
+    pts = [(a0 - 0.2, z + roof_h + 0.1), (a1 + 0.2, z + roof_h + 0.1), (a1 + 0.2, z + roof_h + 0.2), (a0 - 0.2, z + roof_h + 0.2)]
+    roofp = slab("gal_roof", pts, face, plane, 0.0, d + 0.35, M("shingle"))
+    def pitch(co):
+        out = (co - _wp(face, plane, 0, 0, 0)).dot(N)
+        co.z += 0.6 * (1.0 - out / (d + 0.35))
+    edit_verts(roofp, pitch)
+    parts.append(roofp)
+    sn = slab("gal_roof_snow", [(a0 - 0.15, z + roof_h + 0.2), (a1 + 0.15, z + roof_h + 0.2), (a1 + 0.15, z + roof_h + 0.25), (a0 - 0.15, z + roof_h + 0.25)], face, plane, 0.05, d + 0.3, M("snow"))
+    edit_verts(sn, pitch)
+    parts.append(sn)
+    p0, p1 = _wp(face, plane, a0, 0, d + 0.35), _wp(face, plane, a1, 0, d + 0.35)
+    icicles(parts, p0, p1, z + roof_h + 0.1, maxlen=0.4, seed=seed)
+
+
+def rustication(parts, face, plane, a0, a1, z0, z1, ops=(), course=0.5, proud=0.035, mat=None):
+    """Banded rustication: horizontal stone courses standing proud with sunk joints, broken around openings
+    (a, zb, w, h, shape) (their bounding rectangles plus the arch ring)."""
+    mat = mat or M("stone")
+    z = z0
+    while z < z1 - 0.1:
+        zt = min(z1, z + course) - 0.04
+        segs = [(a0, a1)]
+        for (a, zb, w, h, sh) in ops:
+            if zb - 0.02 < zt and zb + h + 0.35 > z:
+                lo, hi = a - w / 2 - 0.08, a + w / 2 + 0.08
+                nxt = []
+                for (s0, s1) in segs:
+                    if hi <= s0 or lo >= s1:
+                        nxt.append((s0, s1))
+                    else:
+                        if lo > s0:
+                            nxt.append((s0, lo))
+                        if hi < s1:
+                            nxt.append((hi, s1))
+                segs = nxt
+        for (s0, s1) in segs:
+            if s1 - s0 > 0.1:
+                parts.append(fbox("rust", face, plane, (s0 + s1) / 2, proud / 2, z, s1 - s0, proud, zt - z, mat))
+        z += course
+
+
+def dome_ribs(parts, cx, cy, zc, r, n=8, zscale=1.0, mat=None, snow=True, z_from=0.0, width=0.07):
+    """Standing ribs down a dome (sphere centre zc, radius r, squashed by zscale) from the top to z_from above the
+    centre, with a thin line of snow lodged on the upper side of each rib."""
+    mat = mat or M("gold", 0.4)
+    bm = bmesh.new()
+    bs = bmesh.new()
+    lat0 = math.asin(max(-0.99, min(0.99, z_from / (r * zscale))))
+    steps = 8
+    for k in range(n):
+        a = math.tau * k / n
+        prev = None
+        for j in range(steps + 1):
+            lat = lat0 + (math.pi / 2 - 0.08 - lat0) * j / steps
+            p = Vector((cx + (r + 0.03) * math.cos(lat) * math.cos(a), cy + (r + 0.03) * math.cos(lat) * math.sin(a), zc + (r + 0.03) * math.sin(lat) * zscale))
+            if prev is not None:
+                _tube(bm, prev, p, width, width, n=4)
+                if snow and lat > 0.35:
+                    up = Vector((0, 0, width * 0.9))
+                    _tube(bs, prev + up, p + up, width * 0.8, width * 0.8, n=4)
+            prev = p
+    parts.append(_mesh_obj("ribs", bm, mat))
+    if snow and bs.verts:
+        parts.append(_mesh_obj("rib_snow", bs, M("snow")))
+    else:
+        bs.free()
+
+
+def rot_panel(parts, name, cx, cy, ang, pts, d0, d1, mat):
+    """Extrude an (a, z) outline on a vertical plane facing direction `ang` (radians) through (cx, cy)."""
+    n = Vector((math.cos(ang), math.sin(ang), 0.0))
+    t = Vector((-math.sin(ang), math.cos(ang), 0.0))
+    bm = bmesh.new()
+    f = [bm.verts.new(Vector((cx, cy, 0)) + t * a + n * d1 + Vector((0, 0, z))) for (a, z) in pts]
+    b = [bm.verts.new(Vector((cx, cy, 0)) + t * a + n * d0 + Vector((0, 0, z))) for (a, z) in pts]
+    bm.faces.new(f)
+    bm.faces.new(list(reversed(b)))
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bm.faces.new((f[i], b[i], b[j], f[j]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj(name, bm, mat)
+    for p in o.data.polygons:
+        p.use_smooth = False
+    parts.append(o)
+    return o
+
+
+def clock_face(parts, c, n, R, hh=11, mm=50, mat_hand=None):
+    """Hour ticks, a chapter ring and two hands on a clock dial of radius R centred at c facing the unit normal n."""
+    n = Vector(n).normalized()
+    t = Vector((-n.y, n.x, 0.0)) * -1.0          # the viewer's right, looking at the dial from outside
+    up = Vector((0, 0, 1))
+    c = Vector(c) + n * 0.01
+    bm = bmesh.new()
+    def quad(u0, v0, u1, v1, dir_u, dir_v, off):
+        pts = [c + n * off + dir_u * u + dir_v * v for (u, v) in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+        bm.faces.new([bm.verts.new(p) for p in pts])
+    for k in range(12):
+        th = math.tau * k / 12
+        du = t * math.cos(th) - up * math.sin(th)      # radial direction on the dial (k=0 at 3 o'clock)
+        dv = t * math.sin(th) + up * math.cos(th)
+        L = 0.22 if k % 3 == 0 else 0.12
+        wdt = 0.05 if k % 3 == 0 else 0.03
+        quad(R * 0.78, -wdt, R * 0.78 + L, wdt, du, dv, 0.0)
+    for (ang, L, wdt) in ((math.tau * ((hh % 12) + mm / 60) / 12, R * 0.52, 0.07), (math.tau * mm / 60, R * 0.78, 0.045)):
+        dirv = t * math.sin(ang) + up * math.cos(ang)
+        perp = t * math.cos(ang) - up * math.sin(ang)
+        pts = [c + n * 0.02 - dirv * 0.12 - perp * wdt, c + n * 0.02 - dirv * 0.12 + perp * wdt,
+               c + n * 0.02 + dirv * L * 0.8 + perp * wdt * 1.4, c + n * 0.02 + dirv * L, c + n * 0.02 + dirv * L * 0.8 - perp * wdt * 1.4]
+        bm.faces.new([bm.verts.new(p) for p in pts])
+    o = _mesh_obj("clock_marks", bm, mat_hand or M("black"))
+    parts.append(o)
+    parts.append(sphere("clock_boss", 0.07, tuple(c + n * 0.04), M("gold", 0.35), seg=8, rings=5))
+
+
+def mascaron(parts, face, plane, a, z, s=0.3, mat=None):
+    """Carved head on a keystone: a lumpy face with brow, nose and a hint of beard."""
+    mat = mat or M("stone_pale")
+    c = _wp(face, plane, a, z, 0.08)
+    parts.append(blob("masc", (s, s * 0.5, s * 1.2), (c.x, c.y, z - s * 0.6), mat, subsurf=1))
+    n = _wp(face, plane, a, z + s * 0.05, 0.08 + s * 0.3)
+    parts.append(blob("masc_nose", (s * 0.18, s * 0.2, s * 0.3), (n.x, n.y, z - s * 0.1), mat, subsurf=1))
 
 
 # ------------------------------------------------------------------ TENEMENT (kamienica)
 SIGNS = iter(["disc", "key", "pretzel", "boot", "disc", "key", "boot", "pretzel"] * 4)
 
 
-def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, arched_windows=False, shutters=False):
+def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, arched_windows=False, shutters=False,
+             shutter_col="shutter", shutter_style="louvre", balcony=None, gallery=False, seed=0):
+    """Kamienica facing the square. The street openings (door, shop windows, upper windows) are fixed: dressing.gd
+    mirrors them. shutters: painted louvred or boarded leaves (shutter_style) in the district colour, mostly
+    folded back, a few standing half-open or closed. balcony: storey index whose middle window becomes a
+    balcony door with a wrought-iron balcony. gallery: a timber courtyard gallery on the back (+Y) wall.
+    The back wall facing the outer streets gets plain casements, anchors and a frost crust; the roof gets a
+    snow blanket with drifts at the chimney and dormers and icicles along the eaves and the cornice."""
     reset()
+    rng = random.Random(seed or hash(name) & 0xffff)
     D = 8.0
     GF, FL = 4.2, 3.3
     body_h = GF + FL * (storeys - 1)
@@ -1655,7 +2361,8 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
     parts.append(facade("gf_face", spale, "-Y", face, -width / 2 - 0.01, width / 2 + 0.01, 0.0, GF, gf_open + gf_win))
     door_unit(parts, "-Y", face, px, dw, dh)
     for (x, zb, w, h, sh) in gf_win:
-        win_unit(parts, "-Y", face, x, zb, w, h, sh, warm=RNG.random() < 0.5, surround=None, bars=True, cross=True)
+        win_unit(parts, "-Y", face, x, zb, w, h, sh, warm=RNG.random() < 0.5, surround=None, bars=True, cross=True, mark=True)
+    rustication(parts, "-Y", face, -width / 2, width / 2, 0.55, GF - 0.3, gf_open + gf_win, course=0.62, proud=0.03, mat=spale)
     plinth(parts, -width / 2, width / 2, face, h=0.55, skip=[(px - dw / 2 - 0.45, px + dw / 2 + 0.45)])
     parts.append(box("gf_band", (width + 0.1, 0.22, 0.22), (0, face - 0.06, GF - 0.26), stone, bevel=0.03, seg=1))
     side = 1 if px < 0.5 else -1
@@ -1670,17 +2377,37 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
         ws = width + jetty * s * 0.4
         parts.append(box("floor", (ws, D + jetty * s - REV, FL), (0, -jetty * s * 0.5 + REV / 2, z0), plaster, bevel=0.06, seg=1, wonk=0.035))
         ops = [(x, z0 + 0.8, 1.1, 1.85 if not (arched_windows and s == 1) else 2.1, "round" if (arched_windows and s == 1) else "rect") for x in xs]
+        bal_x = None
+        if balcony == s:
+            bal_x = xs[len(xs) // 2]
+            ops = [(x, z0 + 0.1, 1.1, 2.55, "rect") if x == bal_x else o for (x, o) in zip(xs, ops)]
         parts.append(facade("face", plaster, "-Y", yf, -ws / 2 - 0.01, ws / 2 + 0.01, z0, z0 + FL, ops))
         for (x, zb, w, h, sh) in ops:
-            win_unit(parts, "-Y", yf, x, zb, w, h, sh, warm=RNG.random() < 0.3, shutters=shutters and sh == "rect")
+            if x == bal_x:
+                win_unit(parts, "-Y", yf, x, zb, w, h, sh, warm=True, sill=False, snow=False, drip=False)
+                balcony_iron(parts, "-Y", yf, x, zb, w=2.4, d=0.85, seed=s + 11)
+                continue
+            op = (180, 180)
+            r = rng.random()
+            if r < 0.18:
+                op = (rng.uniform(95, 125), 180)
+            elif r < 0.3 and s > 1:
+                op = (180, rng.uniform(100, 130))
+            elif r < 0.36 and s > 1:
+                op = (0, 0)
+            st = shutter_style if (shutters and sh == "rect") else False
+            win_unit(parts, "-Y", yf, x, zb, w, h, sh, warm=RNG.random() < 0.3, shutters=st, shutter_col=shutter_col,
+                     shutter_open=op, mark=(s == 1))
         parts.append(box("string", (ws + 0.16, 0.30 + jetty, 0.22), (0, yf + 0.1 + jetty / 2 - 0.12, z0 - 0.12), spale, bevel=0.03, seg=1, wonk=0.02))
         quoins(parts, ws, D, z0 + 0.12, z0 + FL, yf)
+        for ax_ in (-ws / 2 + 0.75, ws / 2 - 0.75):
+            wall_anchor(parts, "-Y", yf, ax_ + (bay_w * 0.5 if abs(ax_ + bay_w * 0.5) < ws / 2 - 0.6 and False else 0), z0 + FL - 0.35, kind="S" if s % 2 else "X")
         if pilasters:
             for i in range(bays + 1):
                 px_ = -width / 2 + bay_w * i
                 px_ = max(min(px_, width / 2 - 0.3), -width / 2 + 0.3)
-                parts.append(box("pil", (0.42, 0.10, FL - 0.4), (px_, yf - 0.05, z0 + 0.15), M("plaster_white"), bevel=0.02, seg=1))
-                parts.append(box("pil_cap", (0.56, 0.16, 0.14), (px_, yf - 0.08, z0 + FL - 0.3), spale, bevel=0.02, seg=1))
+                parts.append(box("pil", (0.42, 0.10, FL - 0.4), (px_, yf - 0.05, z0 + 0.15), M("plaster_white")))
+                parts.append(box("pil_cap", (0.56, 0.16, 0.14), (px_, yf - 0.08, z0 + FL - 0.3), spale))
         walls.append((z0 + 1.2, yf))
 
     yfront = face - jetty * (storeys - 1)
@@ -1695,15 +2422,46 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
         x = -wtop / 2 + wtop * i / nmod
         parts.append(box("modil", (0.12, 0.34, 0.14), (x, yfront - 0.17, body_h), stone))
     drainpipe(parts, (wtop / 2 - 0.35) * (1 if side < 0 else -1), yfront - 0.14, body_h - 0.25, walls)
+    icicles(parts, (-wtop / 2 - 0.2, yfront - 0.62), (wtop / 2 + 0.2, yfront - 0.62), body_h - 0.05, maxlen=0.5, seed=seed + 1, density=2.0, gap=0.45)
+
+    # the back wall on the outer street: casements (glass and frame on the plaster, no reveal), anchors, frost
+    yb = D / 2
+    for s in range(1, storeys):
+        z0 = GF + FL * (s - 1)
+        for x in (-width / 4, width / 4):
+            if gallery and s == 1:
+                continue
+            parts.append(fbox("bk_glass", "+Y", yb, -x, 0.01, z0 + 0.9, 0.9, 0.02, 1.4, M("glass_warm" if rng.random() < 0.25 else "glass")))
+            parts.append(fbox("bk_frame", "+Y", yb, -x, 0.03, z0 + 0.84, 1.08, 0.04, 0.08, M("wood_dark")))
+            parts.append(fbox("bk_frame", "+Y", yb, -x, 0.03, z0 + 2.3, 1.08, 0.04, 0.08, M("wood_dark")))
+            parts.append(fbox("bk_mull", "+Y", yb, -x, 0.03, z0 + 0.9, 0.06, 0.04, 1.4, M("wood_dark")))
+            parts.append(fbox("bk_sill", "+Y", yb, -x, 0.06, z0 + 0.78, 1.2, 0.12, 0.08, stone))
+            parts.append(fbox("bk_snow", "+Y", yb, -x, 0.06, z0 + 0.86, 1.1, 0.1, 0.025, M("snow")))
+        wall_anchor(parts, "+Y", yb, 0.0, z0 + FL - 0.35, kind="S")
+    parts.append(fbox("bk_door", "+Y", yb, width / 2 - 1.4, 0.02, 0.0, 1.1, 0.05, 2.2, M("wood_dark")))
+    parts.append(fbox("bk_door_step", "+Y", yb, width / 2 - 1.4, 0.2, 0.0, 1.4, 0.4, 0.14, M("stone_dark")))
+    parts.append(fbox("bk_damp", "+Y", yb, 0.0, 0.01, 0.0, width, 0.02, 0.7, M(colour + "_damp")))
+    rime(parts, "+Y", yb, 0.0, body_h * 0.45, width * 0.8, body_h * 0.5, seed=seed + 5)
+    if gallery:
+        gallery_wood(parts, "+Y", yb, -width / 2 + 0.6, width / 2 - 0.6, GF + 0.1, d=1.2, posts=max(3, int(width / 2.6)), roof_h=2.7, seed=seed)
+        for x in (-width / 4, width / 4):
+            parts.append(fbox("gal_door", "+Y", yb, -x, 0.02, GF + 0.1, 0.95, 0.05, 2.1, M("wood")))
+
     top = body_h + 0.4
     Wr = dtop + 1.2
     yc = -jetty * (storeys - 1) * 0.5
+    drifts = []
+    lee = (rng.uniform(-0.4, 0.4), 1.0)
 
     if roof_kind == "gable":
         parts.append(roof("roof", width + 0.9, Wr, 4.6, (0, yc, top), M("tile"), sag=0.18, flare=0.16, courses=6, ridge=True))
         for x in xs[:: max(1, bays - 1)]:
-            dormer(parts, x, yfront + 1.0, top + 0.55, 1.3, 1.45, plaster, M("tile_dark"), warm=RNG.random() < 0.4)
-        chimney(parts, width * 0.3, 1.2, top + 2.0)
+            dormer(parts, x, yfront + 1.0, top + 0.55, 1.3, 1.45, plaster, M("tile_dark"), warm=RNG.random() < 0.4, snow=True)
+            drifts.append((x, yfront + 3.0, 1.3, 0.16))
+        cx_, cy_ = chimney(parts, width * 0.3, 1.2, top + 2.0)
+        drifts.append((cx_, cy_ - 0.8, 1.2, 0.22))
+        sn = roof_snow("roof_snow", width + 0.9, Wr, 4.6, (0, yc, top), sag=0.18, flare=0.16, thick=0.07, drifts=drifts, lee=lee, seed=seed + 2)
+        eave_icicles(parts, width + 0.9, Wr, top - 0.02, (0, yc), seed=seed + 3, maxlen=0.55)
         roof_top = top + 4.8
     elif roof_kind == "attyka":
         aw_front = yfront - 0.05
@@ -1712,12 +2470,14 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
         parts.append(facade("attic_face", plaster, "-Y", yc - (dtop + 0.2) / 2, -(width + 0.3) / 2 - 0.01, (width + 0.3) / 2 + 0.01, top - 0.4, top + 1.9, blind))
         af = yc - (dtop + 0.2) / 2
         for x in xs:
-            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x - bay_w * 0.25 - 0.14, af - 0.04, top), M("plaster_white"), bevel=0.015, seg=1))
-            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x + bay_w * 0.25 + 0.14, af - 0.04, top), M("plaster_white"), bevel=0.015, seg=1))
+            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x - bay_w * 0.25 - 0.14, af - 0.04, top), M("plaster_white")))
+            parts.append(box("blind_pil", (0.22, 0.08, 1.2), (x + bay_w * 0.25 + 0.14, af - 0.04, top), M("plaster_white")))
             voussoirs(parts, "-Y", af, x, top + 1.6 - bay_w * 0.25, bay_w * 0.5, 0.12, M("plaster_white"), n=7, proud=0.05, key=0.08)
+            parts.append(fbox("blind_snow", "-Y", af, x, -REV + 0.08, top - 0.005, bay_w * 0.5, 0.14, 0.025, M("snow")))
         parts.append(box("attic_base", (width + 0.5, 0.3, 0.2), (0, af - 0.1, top - 0.45), spale, bevel=0.03, seg=1))
         parts.append(box("coping", (width + 0.6, dtop + 0.5, 0.18), (0, yc, top + 1.9), stone, bevel=0.03, seg=1, wonk=0.02))
         parts.append(box("coping_snow", (width + 0.5, dtop + 0.4, 0.03), (0, yc, top + 2.08), M("snow"), bevel=0.01, seg=1))
+        icicles(parts, (-width / 2, af - 0.15), (width / 2, af - 0.15), top + 1.9, maxlen=0.35, seed=seed + 4, density=2.2, gap=0.4)
         n = max(2, int(width / 2.2))
         py_ = af + 0.2
         for i in range(n + 1):
@@ -1725,28 +2485,47 @@ def tenement(name, width, storeys, roof_kind, colour, bays=3, pilasters=False, a
             parts.append(box("pin_base", (0.62, 0.62, 0.16), (x, py_, top + 2.08), stone, bevel=0.02, seg=1))
             parts.append(box("pin", (0.48, 0.48, 0.8), (x, py_, top + 2.24), stone, bevel=0.03, seg=1, wonk=0.02))
             parts.append(box("pin_cap", (0.6, 0.6, 0.12), (x, py_, top + 3.04), stone, bevel=0.02, seg=1))
+            parts.append(box("pin_capsnow", (0.56, 0.56, 0.03), (x, py_, top + 3.16), M("snow")))
             parts.append(pyramid("pin_top", (0.34, 0.34, 0.8), (x, py_, top + 3.16), stone, apex=0.03))
             parts.append(sphere("pin_ball", 0.13, (x, py_, top + 4.05), M("gold", 0.35), seg=10, rings=6))
+            snow_cap(parts, x, py_, top + 4.1, 0.1, 0.05, seg=8)
         for i in range(n):
             x = -width / 2 + (width / n) * (i + 0.5)
             parts.append(cyl("cren", (width / n) * 0.36, 0.3, (x, py_, top + 2.08), stone, verts=16, rot=(math.pi / 2, 0, 0), center=True, bevel=0.02, seg=1))
         parts.append(roof("lowroof", width, D - 1.5, 1.4, (0, 0.6, top + 1.7), M("tile_dark"), sag=0.05, flare=0.05, courses=3))
-        chimney(parts, -width * 0.25, 1.5, top + 1.5, h=2.2)
+        cx_, cy_ = chimney(parts, -width * 0.25, 1.5, top + 1.5, h=2.2)
+        drifts.append((cx_, cy_ - 0.7, 1.1, 0.2))
+        drifts.append((0.0, af + 1.0, width, 0.12))          # snow banked up behind the parapet
+        sn = roof_snow("roof_snow", width, D - 1.5, 1.4, (0, 0.6, top + 1.7), sag=0.05, flare=0.05, thick=0.08, drifts=drifts, lee=lee, seed=seed + 2, bare=0.2, slide=0.1)
         roof_top = top + 3.7
     else:  # mansard
         parts.append(roof("mansard_lo", width + 0.9, Wr, 2.8, (0, yc, top), M("tile"), sag=0.08, flare=-0.05, top_w=Wr * 0.5, courses=4))
         parts.append(roof("mansard_hi", width + 0.9, Wr * 0.5, 2.2, (0, yc, top + 2.8), M("tile_dark"), sag=0.12, flare=0.1, courses=2, ridge=True))
         for x in xs:
-            dormer(parts, x, yfront + 0.05, top + 0.3, 1.2, 1.55, plaster, M("lead"), depth=1.9, warm=RNG.random() < 0.4)
-        chimney(parts, -width * 0.3, 1.0, top + 2.6, h=2.4)
+            dormer(parts, x, yfront + 0.05, top + 0.3, 1.2, 1.55, plaster, M("lead"), depth=1.9, warm=RNG.random() < 0.4, snow=True)
+        cx_, cy_ = chimney(parts, -width * 0.3, 1.0, top + 2.6, h=2.4)
+        drifts.append((cx_, cy_ - 0.7, 1.0, 0.2))
+        lo = roof_snow("roof_snow_lo", width + 0.9, Wr, 2.8, (0, yc, top), sag=0.08, flare=-0.05, top_w=Wr * 0.5, thick=0.06, lee=lee, seed=seed + 6, bare=0.36, slide=0.4, minz=0.5, maxz=0.95, cell=1.2)
+        if lo:
+            parts.append(lo)
+        sn = roof_snow("roof_snow", width + 0.9, Wr * 0.5, 2.2, (0, yc, top + 2.8), sag=0.12, flare=0.1, thick=0.07, drifts=drifts, lee=lee, seed=seed + 2)
+        eave_icicles(parts, width + 0.9, Wr, top - 0.02, (0, yc), seed=seed + 3, maxlen=0.5)
         roof_top = top + 4.9
+    if sn:
+        parts.append(sn)
 
     parts.append(box("snow_c", (wtop + 0.7, dtop + 0.7, 0.035), (0, yc, body_h + 0.45), M("snow"), bevel=0.015, seg=1, wonk=0.01))
 
     visual = join(parts, name)
     lean_x, lean_y = RNG.uniform(-0.0125, 0.0125), RNG.uniform(-0.01, 0.0025)
     shear(visual, lean_x, lean_y)
-    col = box("col", (width + 0.2, D + jetty * (storeys - 1), roof_top), (0, -jetty * (storeys - 1) * 0.5, 0))
+    shear_marks(lean_x, lean_y)
+    # collision: the body to the eaves and the real roof shape on top, so the roofs can be walked (parkour)
+    if roof_kind == "attyka":
+        col = box("col", (width + 0.2, D + jetty * (storeys - 1), top + 2.1), (0, -jetty * (storeys - 1) * 0.5, 0))
+    else:
+        col = join([box("col", (width + 0.2, D + jetty * (storeys - 1), top), (0, -jetty * (storeys - 1) * 0.5, 0)),
+                    wedge("col_roof", (width + 0.9, Wr, 4.6 if roof_kind == "gable" else 4.9), (0, yc, top))], "col")
     shear(col, lean_x, lean_y)
     export(name, visual, col)
 
@@ -1841,7 +2620,36 @@ def sukiennice():
             parts.append(box("kram_sill", (2.6, 0.4, 0.08), (x, y + sy * 1.1, 0.85), M("wood_dark"), bevel=0.01, seg=1))
             col.append(box("c", (3.0, 1.9, 2.3), (x, y, 0)))
 
-    parts.append(box("snow", (L + 0.8, W + 0.8, 0.1), (0, 0, H + 0.35), M("snow"), bevel=0.04, seg=1, wonk=0.03))
+    parts.append(box("snow", (L + 0.8, W + 0.8, 0.04), (0, 0, H + 0.35), M("snow"), bevel=0.015, seg=1, wonk=0.01))
+    parts.append(roof_snow("roof_snow", L - 0.5, W - 1.2, 2.2, (0, 0, A0 + 2.4), sag=0.1, flare=0.05, thick=0.08, seed=61, cell=1.4, bare=0.18, slide=0.1))
+    for sy in (-1, 1):
+        icicles(parts, (-L / 2, sy * (AW / 2 + 0.2)), (L / 2, sy * (AW / 2 + 0.2)), A0 + 2.6, maxlen=0.4, seed=62 + sy, density=1.6, gap=0.5)
+        icicles(parts, (-L / 2, sy * (W / 2 + 0.55)), (L / 2, sy * (W / 2 + 0.55)), H - 0.1, maxlen=0.55, seed=64 + sy, density=1.4, gap=0.5)
+        for i in range(n + 1):
+            snow_cap(parts, -L / 2 + step * i, sy * (W / 2 + 0.25), A0 + 5.07, 0.13, 0.06, seg=6)
+        for i in range(-2, 3):
+            if i == 0:
+                continue
+            x = i * 6.0 + (1.5 if i < 0 else -1.5)
+            sn = roof_snow("kram_snow", 3.5, 2.4, 0.9, (x, sy * (W / 2 + 1.0), 2.3), sag=0.04, flare=0.1, cuts=3, thick=0.05, cell=0.6, seed=66 + i, slide=0.0)
+            if sn:
+                parts.append(sn)
+            icicles(parts, (x - 1.6, sy * (W / 2 + 2.2)), (x + 1.6, sy * (W / 2 + 2.2)), 2.28, maxlen=0.3, seed=70 + i, density=2.5)
+    for sx in (-1, 1):
+        x0 = sx * (L / 2 + 1.5)
+        parts.append(box("log_snow", (3.3, W + 0.4, 0.035), (x0, 0, 6.9), M("snow")))
+    # climbing: drainpipes up the long walls to the cornice, the market booths' roofs, a wall-walk inside the attic
+    # and its coping (the parapet a thief can crouch behind)
+    for sy in (-1, 1):
+        for x in (-11.0, 11.0):
+            drainpipe(parts, x, sy * (W / 2 + 0.15), H - 0.2, [(2.0, sy * W / 2), (5.0, sy * W / 2)])
+        climb("ledge", (L + 0.8, 0.9, 0.3), (0, sy * (AW / 2), A0 + 2.75))
+        climb("ledge", (L, 1.2, 0.2), (0, sy * (AW / 2 - 0.9), 8.5))
+        for i in range(-2, 3):
+            if i == 0:
+                continue
+            x = i * 6.0 + (1.5 if i < 0 else -1.5)
+            climb("mantle", (3.5, 2.4, 0.25), (x, sy * (W / 2 + 1.0), 2.85))
     visual = join(parts, "sukiennice")
     export("sukiennice", visual, join(col, "col"))
 
@@ -1864,7 +2672,7 @@ def st_marys():
         parts.append(facade("clere", brick, face, plane, -NL / 2 + 2 - 0.01 if sgn > 0 else -(NL / 2 + 2) - 0.01,
                             NL / 2 + 2 + 0.01 if sgn > 0 else NL / 2 - 2 + 0.01, NH * 0.6 + 0.3, NH, ops))
         for (a, zb, w, h, sh) in ops:
-            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, sill=True, cross=True, snow=True)
+            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, sill=True, cross=True, snow=True, glass="glass_stained", tracery=True)
     for sx in (-1, 1):
         face = "-X" if sx < 0 else "+X"
         plane = sx * (NW / 2 + 3.0)
@@ -1874,7 +2682,7 @@ def st_marys():
         a0, a1 = sorted((sx * (-NL / 2 + 3), sx * (NL / 2 + 1)))
         parts.append(facade("aisle_face", brick, face, plane, a0 - 0.01, a1 + 0.01, 0.0, NH * 0.6, ops))
         for (a, zb, w, h, sh) in ops:
-            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, cross=True)
+            win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, cross=True, glass="glass_stained", tracery=True)
         parts.append(fbox("aisle_plinth", face, plane, sx * 2, 0.06, 0, NL - 2, 0.12, 0.8, M("stone_dark"), bevel=0.02, seg=1))
         parts.append(roof("aisle_roof", NL - 2, 3.6, 2.2, (sx * (NW / 2 + 1.5), 2, NH * 0.6), M("tile"), sag=0.05, flare=0.05, along_x=False, courses=2))
         for j in range(6):
@@ -1890,13 +2698,24 @@ def st_marys():
         a = math.pi * (k + 0.5) / 5
         bx, by = (NW / 2 - 0.6) * math.cos(a), NL / 2 + 2 + (NW / 2 - 0.6) * math.sin(a)
         parts.append(taper_box("apse_butt", (1.1, 1.1, NH - 4), (bx, by, 0), bdark, top=0.6, bevel=0.03, seg=1))
-        wx, wy = (NW / 2 - 1.02) * math.cos(a + math.pi / 10), NL / 2 + 2 + (NW / 2 - 1.02) * math.sin(a + math.pi / 10)
-        parts.append(cbox("apse_win", (1.2, 0.08, 6.5), (wx, wy, 7.5), M("glass"), rot=(0, 0, a + math.pi / 10 - math.pi / 2)))
+    # the presbytery's tall east windows: stained glass with a stone mullion and an oculus, lit from within
+    for k in range(4):
+        wa = math.pi * (k + 1) / 5
+        wr = (NW / 2 - 1) * math.cos(math.pi / 10) + 0.02
+        wx, wy = wr * math.cos(wa), NL / 2 + 2 + wr * math.sin(wa)
+        pw = 1.5
+        rot_panel(parts, "apse_glass", wx, wy, wa, outline(0.0, 4.2, pw, 8.0, "pointed"), -0.02, 0.02, M("glass_stained"))
+        rot_panel(parts, "apse_rev", wx, wy, wa, [(-pw / 2 - 0.2, 4.0), (pw / 2 + 0.2, 4.0)] + outline(0.0, 4.0, pw + 0.4, 8.4, "pointed")[2:], 0.0, 0.08, bdark)
+        rot_panel(parts, "apse_glass2", wx, wy, wa, outline(0.0, 4.2, pw, 8.0, "pointed"), 0.081, 0.09, M("glass_stained"))
+        rot_panel(parts, "apse_mull", wx, wy, wa, [(-0.05, 4.2), (0.05, 4.2), (0.05, 10.8), (-0.05, 10.8)], 0.08, 0.2, stone)
+        rot_panel(parts, "apse_tr", wx, wy, wa, [(-pw / 2, 7.4), (pw / 2, 7.4), (pw / 2, 7.5), (-pw / 2, 7.5)], 0.08, 0.18, stone)
+        rot_panel(parts, "apse_sill", wx, wy, wa, [(-pw / 2 - 0.25, 4.0), (pw / 2 + 0.25, 4.0), (pw / 2 + 0.25, 4.15), (-pw / 2 - 0.25, 4.15)], 0.0, 0.3, stone)
+        rot_panel(parts, "apse_sillsnow", wx, wy, wa, [(-pw / 2 - 0.2, 4.15), (pw / 2 + 0.2, 4.15), (pw / 2 + 0.2, 4.18), (-pw / 2 - 0.2, 4.18)], 0.05, 0.28, M("snow"))
 
     # west front between the towers: a tall pointed window over the stepped portal
     fo = [(0.0, 8.8, 3.0, 7.6, "pointed")]
     parts.append(facade("west", brick, "-Y", front, -2.45, 2.45, 0.0, NH, fo))
-    win_unit(parts, "-Y", front, 0.0, 8.8, 3.0, 7.6, "pointed", warm=True, surround=None, cross=True)
+    win_unit(parts, "-Y", front, 0.0, 8.8, 3.0, 7.6, "pointed", surround=None, cross=True, glass="glass_stained", tracery=True)
     for x in (-5.5, 5.5):
         tall = x < 0
         TH = 30.0 if tall else 25.0
@@ -1907,13 +2726,13 @@ def st_marys():
         ops = [(x, zz, 1.5, 4.2, "pointed") for zz in zz_list]
         parts.append(facade("tower_f", brick, "-Y", tf, x - 3.11, x + 3.11, 0.0, TH, ops))
         for (a, zb, w, h, sh) in ops:
-            win_unit(parts, "-Y", tf, a, zb, w, h, sh, surround=None, cross=False)
+            win_unit(parts, "-Y", tf, a, zb, w, h, sh, surround=None, cross=False, louvre=zb == zz_list[-1])
         sface, splane = ("-X", x - 3.1) if tall else ("+X", x + 3.1)
         sa = -(front - 1.0) if tall else (front - 1.0)
         sops = [(sa, zz, 1.4, 4.0, "pointed") for zz in zz_list]
         parts.append(facade("tower_s", brick, sface, splane, sa - 3.11, sa + 3.11, 0.0, TH, sops))
         for (a, zb, w, h, sh) in sops:
-            win_unit(parts, sface, splane, a, zb, w, h, sh, surround=None, cross=False)
+            win_unit(parts, sface, splane, a, zb, w, h, sh, surround=None, cross=False, louvre=zb == zz_list[-1])
         for zz in [z - 0.6 for z in zz_list] + [TH - 0.4]:
             parts.append(box("band", (6.5, 6.5, 0.25), (x, front - 1.0, zz), stone, bevel=0.03, seg=1))
         for cx_ in (x - 3.1, x + 3.1):
@@ -1935,9 +2754,9 @@ def st_marys():
         parts.append(cyl("tn_turret", 0.7, 4.5, (x + 3.6 * math.cos(a), front - 1.0 + 3.6 * math.sin(a), 34.5), M("lead", 0.5), verts=8, r2=0.03, bevel=0))
     x = NW / 2 - 1.5
     parts.append(cyl("ts_drum", 3.3, 2.6, (x, front - 1.0, 25.0), stone, verts=16, bevel=0.04, seg=1))
-    parts.append(sphere("ts_dome", 3.5, (x, front - 1.0, 27.6), M("copper", 0.5), seg=24, rings=14, zscale=0.95))
+    parts.append(sphere("ts_dome", 3.5, (x, front - 1.0, 27.6), M("patina"), seg=24, rings=14, zscale=0.95))
     parts.append(cyl("ts_lantern", 1.0, 2.6, (x, front - 1.0, 30.6), stone, verts=10, bevel=0.03, seg=1))
-    parts.append(cyl("ts_lantop", 1.3, 1.8, (x, front - 1.0, 33.2), M("copper", 0.5), verts=10, r2=0.05, bevel=0.02, seg=1))
+    parts.append(cyl("ts_lantop", 1.3, 1.8, (x, front - 1.0, 33.2), M("patina"), verts=10, r2=0.05, bevel=0.02, seg=1))
     parts.append(cyl("ts_clock", 1.3, 0.25, (x, front - 4.2, 20.0), M("plaster_white"), verts=24, rot=(math.pi / 2, 0, 0), center=True, bevel=0.02, seg=1))
     parts.append(torus("ts_clockrim", 1.3, 0.1, (x, front - 4.3, 20.0), M("gold", 0.4), rot=(math.pi / 2, 0, 0), seg=24, mseg=6))
     parts.append(arch("portal", 4.4, 8.0, 0.7, (0, front - 0.35, 0), stone, bevel=0.05, seg=1))
@@ -1947,7 +2766,26 @@ def st_marys():
         parts.append(box("dstrap", (2.6, 0.04, 0.1), (0, front - 0.72, zz), M("iron")))
     parts.append(box("dsplit", (0.06, 0.04, 5.3), (0, front - 0.72, 0), M("iron")))
     parts.append(roof("gable", 1.2, NW + 0.8, 9.5, (0, front + 0.6, NH), bdark, sag=0.0, flare=0.12, cuts=2, along_x=False))
-    parts.append(box("snow", (NW + 0.8, NL, 0.1), (0, 2, NH + 0.02), M("snow"), bevel=0.03, seg=1))
+    parts.append(box("snow", (NW + 0.8, NL, 0.04), (0, 2, NH + 0.02), M("snow"), bevel=0.015, seg=1))
+    # winter: a blanket on the great roof (thicker on the lee side), the aisles, the apse cone, the helm dome's ribs
+    parts.append(roof_snow("roof_snow", NL, NW + 0.8, 9.5, (0, 2, NH), sag=0.2, flare=0.12, along_x=False, thick=0.08,
+                           lee=(1.0, 0.2), seed=31, cell=1.3, bare=0.2))
+    eave_icicles(parts, NL - 1.0, NW + 0.8, NH - 0.02, (0, 2), along_x=False, seed=32, maxlen=0.8, density=1.6)
+    for sx in (-1, 1):
+        sn = roof_snow("aisle_snow", NL - 2, 3.6, 2.2, (sx * (NW / 2 + 1.5), 2, NH * 0.6), sag=0.05, flare=0.05, along_x=False,
+                       thick=0.07, seed=33 + sx, cell=1.0, lee=(-sx, 0.0), drifts=[(sx * (NW / 2 + 0.2), 2 + dy, 1.5, 0.12) for dy in (-10, 0, 10)])
+        if sn:
+            parts.append(sn)
+        eave_icicles(parts, NL - 3, 3.6, NH * 0.6 - 0.02, (sx * (NW / 2 + 1.5), 2), along_x=False, sides=(sx,), seed=35 + sx, maxlen=0.6)
+    sn = cap_snow("apse_snow", lambda: cyl("tmp", NW / 2 - 0.8, 5, (0, NL / 2 + 2, NH - 3), None, verts=10, r2=0.2), thick=0.07, cell=0.9, bare=0.25, slide=0.3)
+    if sn:
+        parts.append(sn)
+    xd = NW / 2 - 1.5
+    dome_ribs(parts, xd, front - 1.0, 27.6, 3.5, n=8, zscale=0.95, mat=M("patina"), z_from=0.2)
+    sn = cap_snow("dome_snow", lambda: sphere("tmp", 3.5, (xd, front - 1.0, 27.6), None, seg=24, rings=14, zscale=0.95), minz=0.62, thick=0.06, cell=0.6, bare=0.2)
+    if sn:
+        parts.append(sn)
+    snow_cap(parts, xd, front - 1.0, 33.1, 1.1, 0.12)
     visual = join(parts, "st_marys")
     export("st_marys", visual, join(col, "col"))
 
@@ -1974,6 +2812,12 @@ def town_hall():
     for p_ in parts[-3:]:
         edit_verts(p_, lambda co: setattr(co, "x", co.x - 9.0))
     drainpipe(parts, -16.6, -4.2, 8.6, [(1.5, -4.0), (4.8, -4.0), (7.5, -4.0)])
+    parts.append(roof_snow("hall_snow", 16.8, 9.0, 4.4, (-9.0, 0, 9.0), sag=0.15, flare=0.12, thick=0.07, seed=42, lee=(0.2, 1.0),
+                           drifts=[(-14.0, 1.0, 1.2, 0.2)]))
+    eave_icicles(parts, 16.8, 9.0, 8.98, (-9.0, 0), seed=43, maxlen=0.6)
+    chimney(parts, -14.0, 1.8, 11.0, h=2.2)
+    for x in xs:
+        mark_window("-Y", -4.0, x, 1.4)
 
     tower.append(box("tower", (7.0, 7.0 - REV, 24.0), (0, REV / 2, 0), brick, bevel=0.1, seg=1, wonk=0.04))
     col.append(box("c", (7.0, 7.0, 24.0), (0, 0, 0)))
@@ -1993,12 +2837,27 @@ def town_hall():
         tower.append(cyl("clock", 1.5, 0.3, (cx, cy, 20.5), white, verts=24, rot=(math.pi / 2, 0, a), center=True, bevel=0.02, seg=1))
         tower.append(torus("clockrim", 1.5, 0.12, (cx * 1.03, cy * 1.03, 20.5), M("gold", 0.4), rot=(math.pi / 2, 0, a)))
     tower.append(cyl("drum", 3.7, 3.0, (0, 0, 24.0), stone, verts=8, bevel=0.05, seg=1))
-    tower.append(sphere("onion", 3.7, (0, 0, 28.6), M("copper", 0.5), seg=24, rings=14, zscale=1.15))
+    tower.append(sphere("onion", 3.7, (0, 0, 28.6), M("patina"), seg=24, rings=14, zscale=1.15))
     tower.append(cyl("onion_neck", 1.4, 2.2, (0, 0, 31.9), stone, verts=10, bevel=0.03, seg=1))
-    tower.append(sphere("onion2", 1.7, (0, 0, 34.7), M("copper", 0.5), seg=20, rings=12, zscale=1.2))
+    tower.append(sphere("onion2", 1.7, (0, 0, 34.7), M("patina"), seg=20, rings=12, zscale=1.2))
     tower.append(cyl("spike", 0.18, 3.0, (0, 0, 36.3), M("gold", 0.4), verts=8, r2=0.02, bevel=0))
     tower.append(sphere("ball", 0.5, (0, 0, 37.8), M("gold", 0.4), seg=12, rings=8))
     tower.append(box("snow", (7.4, 7.4, 0.1), (0, 0, 24.0), M("snow"), bevel=0.03, seg=1))
+    for k in range(4):
+        a = math.tau * k / 4
+        n = Vector((math.sin(a), -math.cos(a), 0.0))
+        clock_face(tower, Vector((0, 0, 20.5)) + n * 3.75, n, 1.5, hh=11, mm=50)
+    rustication(tower, "-Y", -3.9, -3.9, 3.9, 0.2, 2.9, [(0.0, 0.0, 1.5, 2.65, "round")], course=0.45, proud=0.04, mat=stone)
+    for face_, plane_ in (("-X", -3.9), ("+X", 3.9), ("+Y", 3.9)):
+        rustication(tower, face_, plane_, -3.9, 3.9, 0.2, 2.9, [], course=0.45, proud=0.04, mat=stone)
+    dome_ribs(tower, 0, 0, 28.6, 3.7, n=8, zscale=1.15, mat=M("gold", 0.4), z_from=-0.5, width=0.06)
+    sn = cap_snow("onion_snow", lambda: sphere("tmp", 3.7, (0, 0, 28.6), None, seg=24, rings=14, zscale=1.15), minz=0.6, thick=0.06, cell=0.6, bare=0.2)
+    if sn:
+        tower.append(sn)
+    sn = cap_snow("onion2_snow", lambda: sphere("tmp", 1.7, (0, 0, 34.7), None, seg=20, rings=12, zscale=1.2), minz=0.65, thick=0.04, cell=0.4, bare=0.15)
+    if sn:
+        tower.append(sn)
+    icicles(tower, (-3.7, -3.72), (3.7, -3.72), 23.9, maxlen=0.5, seed=41, density=1.8)
     t = join(tower, "tower")
     shear(t, 0.006, 0.004)          # the real tower leans; it still does
     parts.append(t)
@@ -2031,10 +2890,16 @@ def st_adalbert():
     for k in range(8):
         a = math.tau * (k + 0.5) / 8
         parts.append(cbox("drum_win", (0.7, 0.1, 1.1), (3.58 * math.cos(a), 3.58 * math.sin(a), 6.1), M("glass"), rot=(0, 0, a + math.pi / 2)))
-    parts.append(sphere("dome", 3.8, (0, 0, 7.4), M("copper", 0.5), seg=24, rings=14, zscale=0.85))
+    parts.append(sphere("dome", 3.8, (0, 0, 7.4), M("patina"), seg=24, rings=14, zscale=0.85))
     parts.append(cyl("lantern", 0.9, 1.6, (0, 0, 10.4), white, verts=10, bevel=0.03, seg=1))
-    parts.append(cyl("lantop", 1.2, 1.3, (0, 0, 12.0), M("copper", 0.5), verts=10, r2=0.03, bevel=0.02, seg=1))
-    parts.append(box("snow", (7.3, 7.3, 0.1), (0, 0, 5.3), M("snow"), bevel=0.03, seg=1))
+    parts.append(cyl("lantop", 1.2, 1.3, (0, 0, 12.0), M("patina"), verts=10, r2=0.03, bevel=0.02, seg=1))
+    parts.append(box("snow", (7.3, 7.3, 0.04), (0, 0, 5.3), M("snow"), bevel=0.015, seg=1))
+    dome_ribs(parts, 0, 0, 7.4, 3.8, n=12, zscale=0.85, mat=M("patina"), z_from=0.1, width=0.06)
+    sn = cap_snow("dome_snow", lambda: sphere("tmp", 3.8, (0, 0, 7.4), None, seg=24, rings=14, zscale=0.85), minz=0.6, thick=0.06, cell=0.6, bare=0.22, lee=(1, 0))
+    if sn:
+        parts.append(sn)
+    snow_cap(parts, 0, 0, 12.0, 1.15, 0.1)
+    icicles(parts, (-3.7, -3.72), (3.7, -3.72), 4.95, maxlen=0.45, seed=51)
     visual = join(parts, "st_adalbert")
     export("st_adalbert", visual, join(col, "col"))
 
@@ -2113,26 +2978,6 @@ def brazier():
     parts.append(blob("flame", (0.30, 0.30, 0.42), (0, 0, 1.25), M("flame", 0.9, emit=(1.0, 0.55, 0.12), emit_strength=9.0)))
     parts.append(cyl("ash", 0.7, 0.01, (0, 0, 0.0), M("soot", 0.95), verts=16, bevel=0))
     export("brazier", join(parts, "brazier"), cyl("c", 0.45, 1.1, (0, 0, 0), verts=8, bevel=0))
-
-
-def well():
-    reset()
-    stone = M("stone_dark")
-    parts = []
-    for k in range(8):
-        a = math.tau * k / 8
-        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a), 1.15 * math.sin(a), 0.25), stone, rot=(0, 0, a + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
-        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a + math.pi / 8), 1.15 * math.sin(a + math.pi / 8), 0.75), stone, rot=(0, 0, a + math.pi / 8 + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
-    parts.append(cyl("hole", 1.0, 0.05, (0, 0, 0.9), M("void"), verts=16, bevel=0))
-    for sx in (-1, 1):
-        parts.append(cyl("post", 0.09, 2.4, (sx * 1.1, 0, 1.0), M("wood_dark"), verts=8, bevel=0.01, seg=1))
-    parts.append(cyl("beam", 0.08, 2.6, (0, 0, 3.35), M("wood_dark"), verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
-    parts.append(roof("wroof", 3.2, 1.8, 0.9, (0, 0, 3.45), M("tile_dark"), sag=0.05, flare=0.12, cuts=3, courses=2))
-    parts.append(roof("wroof_snow", 3.2, 1.7, 0.95, (0, 0, 3.48), M("snow"), sag=0.05, flare=0.12, cuts=3, top_w=0.3))
-    parts.append(cyl("windlass", 0.14, 2.0, (0, 0, 2.9), M("wood"), verts=10, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
-    parts.append(cyl("rope", 0.015, 1.2, (0, 0, 1.78), M("canvas"), verts=6))
-    parts.append(cyl("bucket", 0.16, 0.3, (0, 0, 1.5), M("wood"), verts=10, r2=0.14, bevel=0.01, seg=1))
-    export("well", join(parts, "well"), cyl("c", 1.4, 1.0, (0, 0, 0), None, verts=8))
 
 
 def lantern_post():
@@ -2345,7 +3190,7 @@ def kaz_synagogue():
         for yy in (-(D + 0.3) / 2 + 0.2, (D + 0.3) / 2 - 0.2):
             parts.append(box("merlon", (0.7, 0.4, 0.8), (x, yy, A0 + 2.58), M("stone"), bevel=0.02, seg=1))
             parts.append(pyramid("merlon_top", (0.5, 0.3, 0.4), (x, yy, A0 + 3.38), M("stone")))
-    parts.append(roof("lowroof", W - 0.4, D - 0.6, 1.8, (0, 0, A0 + 0.5), M("tile_dark"), along_x=False, sag=0.03, flare=0.03, courses=2))
+    parts.append(roof("lowroof", D - 0.6, W - 0.4, 1.8, (0, 0, A0 + 0.5), M("tile_dark"), along_x=False, sag=0.03, flare=0.03, courses=2))
     parts.append(box("snow", (W + 0.5, D + 0.5, 0.06), (0, 0, A0 + 2.58), M("snow")))
     # women's annex against the west side
     ax = -W / 2 - 3.2
@@ -2354,6 +3199,20 @@ def kaz_synagogue():
     parts.append(facade("annex_f", M("plaster_grey"), "-Y", 2.0 - 5.0 - 0.001, ax - 2.01, ax + 2.01, 0, 5.0, [(ax, 1.8, 0.8, 1.4, "round")]))
     win_unit(parts, "-Y", 2.0 - 5.0 - 0.001, ax, 1.8, 0.8, 1.4, "round", surround=None)
     parts.append(roof("annex_roof", 10.4, 4.6, 1.5, (ax, 2.0, 5.0), M("tile"), along_x=False, sag=0.03, flare=0.03, courses=2))
+    sn = roof_snow("roof_snow", D - 0.6, W - 0.4, 1.8, (0, 0, A0 + 0.5), sag=0.03, flare=0.03, along_x=False, thick=0.08, seed=81, bare=0.15, slide=0.0,
+                   drifts=[(0, -D / 2 + 1.2, W, 0.15), (0, D / 2 - 1.2, W, 0.15)])
+    if sn:
+        parts.append(sn)
+    sn = roof_snow("annex_snow", 10.4, 4.6, 1.5, (ax, 2.0, 5.0), sag=0.03, flare=0.03, along_x=False, thick=0.06, seed=82, cell=0.9)
+    if sn:
+        parts.append(sn)
+    eave_icicles(parts, 10.0, 4.6, 4.98, (ax, 2.0), along_x=False, sides=(-1,), seed=83, maxlen=0.5)
+    for yy in (-(D + 0.6) / 2, (D + 0.6) / 2):
+        icicles(parts, (-W / 2, yy), (W / 2, yy), A0 + 2.4, maxlen=0.35, seed=84 + int(yy), density=1.8, gap=0.5)
+    for i in range(7):
+        x = -W / 2 + W * i / 6
+        for yy in (-(D + 0.3) / 2 + 0.2, (D + 0.3) / 2 - 0.2):
+            parts.append(box("merlon_snow", (0.66, 0.36, 0.03), (x, yy, A0 + 3.38), M("snow")))
     visual = join(parts, "kaz_synagogue")
     export("kaz_synagogue", visual, join(col, "col"))
 
@@ -4932,16 +5791,2310 @@ DRESSING_BUILDS = [
 ]
 
 
+# ------------------------------------------------------------------ BUILDINGS PASS 2: more house types, water, industry, faith,
+# the castle and the justice props (placed on the outer streets by scripts/city/outer_city.gd)
+def _roof_set(parts, L, W, H, loc, mat, along_x=True, sag=0.12, flare=0.1, courses=4, drifts=(), seed=0, ice=True, thick=0.07, top_w=0.0, sides=(-1, 1), cell=1.0):
+    """A tiled/shingled roof() with its snow blanket and eave icicles."""
+    parts.append(roof("roof", L, W, H, loc, mat, sag=sag, flare=flare, along_x=along_x, courses=courses, ridge=courses > 0 and top_w == 0, top_w=top_w))
+    sn = roof_snow("roof_snow", L, W, H, loc, sag=sag, flare=flare, along_x=along_x, top_w=top_w, thick=thick, drifts=drifts, seed=seed, cell=cell)
+    if sn:
+        parts.append(sn)
+    if ice:
+        eave_icicles(parts, L - 0.4, W, loc[2] - 0.02, loc[:2], along_x=along_x, seed=seed + 1, sides=sides)
+
+
+def _hip_set(parts, L, W, H, loc, mat, hip=None, seed=0, thick=0.07):
+    parts.append(hip_roof("roof", L, W, H, loc, mat, hip=hip))
+    sn = cap_snow("roof_snow", lambda: hip_roof("tmp", L, W, H, loc, None, hip=hip), thick=thick, seed=seed, cell=0.9, slide=0.12, bare=0.17)
+    if sn:
+        parts.append(sn)
+    x, y, z = loc
+    icicles(parts, (x - L / 2 + 0.4, y - W / 2), (x + L / 2 - 0.4, y - W / 2), z - 0.02, seed=seed + 1)
+    icicles(parts, (x - L / 2 + 0.4, y + W / 2), (x + L / 2 - 0.4, y + W / 2), z - 0.02, seed=seed + 2)
+
+
+def _upper_windows(parts, plane, xs, z0, w=1.0, h=1.7, mark_=False, shutters=False, col="shutter", style="board", rng=None, surround="stone_pale", shape="rect", warm_p=0.3):
+    for x in xs:
+        op = (180, 180)
+        if rng and rng.random() < 0.25:
+            op = (rng.uniform(95, 130), 180)
+        win_unit(parts, "-Y", plane, x, z0, w, h, shape, warm=RNG.random() < warm_p, shutters=style if shutters else False,
+                 shutter_col=col, shutter_open=op, mark=mark_, surround=surround)
+
+
+def ten_renaissance(name="ten_renaissance", colour="plaster_straw", shutter_col="shutter_red", seed=21):
+    """Renaissance house with a tall Polish attic (attyka) of blind arcades, volutes, obelisks and a sgraffito
+    band, hiding a butterfly roof with snow banked in its valley. Rusticated ground floor, framed windows. 9 m."""
+    reset()
+    rng = random.Random(seed)
+    W, D, GF, FL, S = 9.0, 9.0, 4.2, 3.3, 3
+    wall = M(colour)
+    parts = []
+    xs = [-3.0, 0.0, 3.0]
+    gops = [(0.0, 0.0, 2.0, 2.9 + 0.12 + 1.0, "round"), (-3.0, 1.2, 1.2, 2.1, "round"), (3.0, 1.2, 1.2, 2.1, "round")]
+    y = front_block(parts, W, D, GF, M("stone_pale"), gops)
+    door_unit(parts, "-Y", y, 0.0, 2.0, 2.9)
+    for (a, zb, w, h, sh) in gops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, bars=True, surround=None, mark=True, warm=RNG.random() < 0.5)
+    rustication(parts, "-Y", y, -W / 2, W / 2, 0.5, GF - 0.3, gops, course=0.55, mat=M("stone_pale"))
+    plinth(parts, -W / 2, W / 2, y, h=0.5, skip=[(-1.5, 1.5)])
+    H = GF + FL * (S - 1)
+    ops = [(x, GF + FL * s + 0.8, 1.05, 1.8, "rect") for s in range(S - 1) for x in xs]
+    y2 = front_block(parts, W, D, FL * (S - 1), wall, ops, z0=GF)
+    for (a, zb, w, h, sh) in ops:
+        win_unit(parts, "-Y", y2, a, zb, w, h, sh, shutters="board", shutter_col=shutter_col, mark=zb < GF + FL,
+                 shutter_open=(rng.choice((180, 180, 110)), 180), warm=RNG.random() < 0.3)
+    for s in range(S - 1):
+        parts.append(box("string", (W + 0.1, 0.2, 0.2), (0, y2 - 0.08, GF + FL * s - 0.1), M("stone"), bevel=0.02, seg=1))
+        for ax in (-W / 2 + 0.6, W / 2 - 0.6):
+            wall_anchor(parts, "-Y", y2, ax, GF + FL * (s + 1) - 0.4, "S")
+    quoins(parts, W, D, GF, H, y2)
+    cornice(parts, W, D, H - 0.05, t=0.35, proud=0.25, modillions=False)
+    # the attic: a tall screen wall with a blind arcade and a sgraffito band, crest of volutes and obelisks
+    A0, AH = H + 0.3, 3.2
+    parts.append(box("attic", (W + 0.2, 0.6, AH), (0, y2 + 0.3, A0), wall, bevel=0.03, seg=1))
+    bl = [(x, A0 + 0.9, 1.6, 1.9, "round") for x in (-3.2, -1.05, 1.05, 3.2)]
+    parts.append(facade("attic_f", wall, "-Y", y2 - 0.01, -W / 2 - 0.1, W / 2 + 0.1, A0, A0 + AH, bl, depth=0.2))
+    for (a, zb, w, h, sh) in bl:
+        parts.append(fbox("bl_pil", "-Y", y2, a - w / 2 - 0.12, 0.04, A0 + 0.7, 0.2, 0.08, 1.7, M("plaster_white")))
+        parts.append(fbox("bl_snow", "-Y", y2, a, -0.08, zb, w, 0.2, 0.03, M("snow")))
+        voussoirs(parts, "-Y", y2, a, zb + h - w / 2, w, 0.12, M("plaster_white"), n=7, proud=0.05, key=0.08)
+    for k in range(18):                                            # sgraffito: dark and light squares
+        parts.append(fbox("sgraf", "-Y", y2, -W / 2 + 0.25 + k * (W - 0.5) / 17, 0.01, A0 + 0.25, 0.25, 0.02, 0.25, M("stone_dark" if k % 2 else "plaster_white")))
+    parts.append(box("att_cop", (W + 0.5, 0.9, 0.18), (0, y2 + 0.3, A0 + AH), M("stone"), bevel=0.02, seg=1))
+    parts.append(box("att_cop_snow", (W + 0.4, 0.8, 0.03), (0, y2 + 0.3, A0 + AH + 0.18), M("snow")))
+    icicles(parts, (-W / 2, y2 - 0.16), (W / 2, y2 - 0.16), A0 + AH, maxlen=0.4, seed=seed + 1, gap=0.4)
+    zt = A0 + AH + 0.18
+    for i, x in enumerate((-W / 2 + 0.2, -W / 4, 0.0, W / 4, W / 2 - 0.2)):
+        parts.append(box("ob_base", (0.5, 0.5, 0.35), (x, y2 + 0.2, zt), M("stone"), bevel=0.02, seg=1))
+        parts.append(pyramid("obelisk", (0.36, 0.36, 1.6 if i % 2 == 0 else 1.1), (x, y2 + 0.2, zt + 0.35), M("stone"), apex=0.03))
+        parts.append(sphere("ob_ball", 0.12, (x, y2 + 0.2, zt + (2.0 if i % 2 == 0 else 1.5)), M("gold", 0.35), seg=8, rings=5))
+        snow_cap(parts, x, y2 + 0.2, zt + 0.35, 0.26, 0.05, seg=6)
+    for x in (-W / 8 * 3, -W / 8, W / 8, W / 8 * 3):                 # volutes between the obelisks
+        parts.append(torus("volute", 0.35, 0.09, (x, y2 + 0.2, zt + 0.35), M("stone"), rot=(math.pi / 2, 0, 0), seg=12, mseg=4))
+    # butterfly roof behind: two slopes falling to a central valley gutter
+    for sx in (-1, 1):
+        r = roof("bfly", D - 0.6, W / 2, 1.6, (sx * W / 4, y2 + D / 2, A0), M("tile_dark"), sag=0.02, flare=0.0, along_x=False, cuts=3)
+        parts.append(r)
+    parts.append(box("valley_snow", (1.6, D - 0.8, 0.45), (0, y2 + D / 2, A0), M("snow"), bevel=0.2, seg=2, wonk=0.1))
+    for sx in (-1, 1):
+        sn = roof_snow("bfly_snow", D - 0.6, W / 2, 1.6, (sx * W / 4, y2 + D / 2, A0), sag=0.02, flare=0.0, along_x=False, cuts=3, thick=0.07, seed=seed + sx, cell=0.9)
+        if sn:
+            parts.append(sn)
+    chimney(parts, -2.5, y2 + D - 2.0, A0 + 0.6, h=2.6)
+    chimney(parts, 2.8, y2 + D / 2 + 1.0, A0 + 0.8, h=2.4)
+    drainpipe(parts, W / 2 - 0.3, y2 - 0.12, H - 0.2, [(1.0, y), (GF + 1.2, y2), (GF + FL + 1.2, y2)])
+    visual = join(parts, name)
+    shear(visual, 0.004, -0.004)
+    shear_marks(0.004, -0.004)
+    export(name, visual, box("c", (W, D, A0 + AH), (0, 0, 0)))
+
+
+def ten_gothic(name="ten_gothic", colour="plaster_grey", seed=22):
+    """Narrow Gothic gable house (6.5 m), gable end to the street: plastered lower storeys with a pointed portal
+    and paired windows, a stepped brick gable pierced by blind pointed niches, a steep roof running back."""
+    reset()
+    rng = random.Random(seed)
+    W, D, H = 6.5, 12.0, 8.4
+    wall = M(colour)
+    parts = []
+    ops = [(-1.2, 0.0, 1.7, 3.3, "pointed"), (1.7, 1.2, 0.8, 1.5, "rect"),
+           (-1.6, 4.4, 0.75, 1.5, "rect"), (-0.7, 4.4, 0.75, 1.5, "rect"), (0.9, 4.4, 0.75, 1.5, "rect"), (1.8, 4.4, 0.75, 1.5, "rect")]
+    y = front_block(parts, W, D, H, wall, ops)
+    door_unit(parts, "-Y", y, -1.2, 1.7, 1.8, portal=False, fanlight=False)
+    tymp = [(-2.05, 1.92), (-0.35, 1.92)] + outline(-1.2, 0.0, 1.7, 3.3, "pointed")[3:-1]
+    parts.append(slab("tymp", tymp, "-Y", y, -REV + 0.01, -REV + 0.05, M("wood_dark")))
+    voussoirs(parts, "-Y", y, -1.2, 3.3 - 1.7 * 0.866, 1.7, 0.24, M("stone"), shape="pointed", n=8)
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, bars=zb < 2, surround="stone", head="lintel", cross=True, mark=True,
+                 shutters="board" if zb > 2 else False, shutter_col="shutter_brown", shutter_open=(rng.choice((180, 105)), 180))
+    parts.append(box("plinth", (W, 0.1, 0.5), (0, y - 0.03, 0), M("stone_dark")))
+    parts.append(box("string", (W + 0.1, 0.18, 0.16), (0, y - 0.06, 3.9), M("stone"), bevel=0.02, seg=1))
+    for z in (3.9, 7.2):
+        wall_anchor(parts, "-Y", y, -W / 2 + 0.4, z, "X")
+        wall_anchor(parts, "-Y", y, W / 2 - 0.4, z, "X")
+    rise = 6.0
+    gable_slab(parts, "-Y", y, -W / 2, W / 2, H, rise, M("brick"), thick=0.4)
+    niches = [(-1.3, H + 0.6, 0.6, 2.0), (0.0, H + 0.6, 0.7, 3.2), (1.3, H + 0.6, 0.6, 2.0), (0.0, H + 4.1, 0.45, 1.1)]
+    for (a, zb, w, h) in niches:
+        parts.append(slab("niche", outline(a, zb, w, h, "pointed"), "-Y", y, 0.0, 0.04, M("plaster_white")))
+    parts.append(slab("gwin", outline(0.0, H + 1.2, 0.5, 1.4, "pointed"), "-Y", y, 0.04, 0.06, M("glass_warm")))
+    for k in range(5):
+        zz = H + rise * k / 5
+        hw = W / 2 * (1 - k / 5)
+        for sx in (-1, 1):
+            parts.append(box("step", (0.6, 0.5, rise / 5), (sx * (hw - 0.3), y + 0.1, zz), M("brick_dark"), bevel=0.02, seg=1))
+            parts.append(box("stepcap", (0.7, 0.6, 0.1), (sx * (hw - 0.3), y + 0.1, zz + rise / 5), M("stone")))
+            parts.append(box("stepsnow", (0.62, 0.52, 0.035), (sx * (hw - 0.3), y + 0.1, zz + rise / 5 + 0.1), M("snow")))
+            icicles(parts, (sx * (hw - 0.6), y - 0.21), (sx * hw, y - 0.21), zz + rise / 5, maxlen=0.25, seed=seed + k * 2 + sx)
+    parts.append(pyramid("finial", (0.3, 0.3, 0.9), (0, y + 0.1, H + rise), M("stone"), apex=0.02))
+    _roof_set(parts, D, W + 0.5, rise, (0, 0.2, H), M("tile_dark"), along_x=False, sag=0.06, flare=0.04, courses=5, seed=seed, cell=1.0,
+              drifts=[(1.2, 3.0, 1.0, 0.2)])
+    chimney(parts, 1.2, 3.8, H + 2.4, h=2.8)
+    drainpipe(parts, W / 2 - 0.2, y - 0.12, H - 0.2, [(1.0, y), (4.5, y)])
+    visual = join(parts, name)
+    shear(visual, -0.005, -0.004)
+    shear_marks(-0.005, -0.004)
+    export(name, visual, box("c", (W, D, H + rise), (0, 0, 0)))
+
+
+def ten_baroque(name="ten_baroque", colour="plaster_pink", seed=23):
+    """Baroque palace front (14 m): giant pilasters, a central risalit with a column portal carrying a wrought-
+    iron balcony, pedimented piano-nobile windows (triangular and segmental), a pediment with a cartouche and a
+    mansard with oval dormers."""
+    reset()
+    rng = random.Random(seed)
+    W, D, GF, FL = 14.0, 10.0, 4.4, 3.6
+    H = GF + FL * 2
+    wall = M(colour)
+    white = M("plaster_white")
+    parts = []
+    xs = [-5.6, -3.2, 0.0, 3.2, 5.6]
+    gops = [(0.0, 0.0, 2.2, 3.2 + 0.12 + 1.1, "round")] + [(x, 1.1, 1.2, 2.0, "rect") for x in xs if x]
+    y = front_block(parts, W, D, GF, white, gops)
+    door_unit(parts, "-Y", y, 0.0, 2.2, 3.2, portal=False)
+    for (a, zb, w, h, sh) in gops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, bars=True, surround="stone_pale", mark=True, warm=RNG.random() < 0.5)
+    rustication(parts, "-Y", y, -W / 2, W / 2, 0.5, GF - 0.25, gops, course=0.5, proud=0.04, mat=white)
+    for sx in (-1, 1):                                      # portal columns and entablature carrying the balcony
+        parts.append(cyl("pcol", 0.26, 3.9, (sx * 1.65, y - 0.55, 0.5), M("stone_pale"), verts=14, r2=0.22, bevel=0.01, seg=1))
+        parts.append(box("pcol_b", (0.7, 0.7, 0.5), (sx * 1.65, y - 0.55, 0), M("stone"), bevel=0.02, seg=1))
+        parts.append(box("pcol_c", (0.7, 0.7, 0.25), (sx * 1.65, y - 0.55, 4.4), M("stone_pale"), bevel=0.02, seg=1))
+    parts.append(box("entab", (4.2, 1.1, 0.4), (0, y - 0.5, 4.6), M("stone_pale"), bevel=0.03, seg=1))
+    y2 = front_block(parts, W, D, FL * 2, wall, [(x, GF + s * FL + (0.2 if (s == 0 and x == 0) else 0.7), 1.2, 2.5 if (s == 0 and x == 0) else 2.0, "rect") for s in range(2) for x in xs], z0=GF)
+    for s in range(2):
+        for x in xs:
+            zb = GF + s * FL + (0.2 if (s == 0 and x == 0) else 0.7)
+            if s == 0 and x == 0:
+                win_unit(parts, "-Y", y2, x, zb, 1.2, 2.5, "rect", warm=True, sill=False, snow=False, drip=False, head=None, surround="stone_pale")
+                balcony_iron(parts, "-Y", y2, 0.0, GF + 0.2, w=3.8, d=1.0, seed=seed)
+                continue
+            win_unit(parts, "-Y", y2, x, zb, 1.2, 2.0, "rect", warm=RNG.random() < 0.35, surround="stone_pale", mark=s == 0,
+                     head="lintel" if s else None, shutters="louvre" if s else False, shutter_col="shutter_grey", shutter_open=(rng.choice((180, 180, 100)), 180))
+            if s == 0:                                         # piano nobile pediments
+                zt = zb + 2.0 + 0.1
+                if int(x) % 2 == 0:
+                    parts.append(slab("ped", [(x - 0.95, zt), (x + 0.95, zt), (x, zt + 0.55)], "-Y", y2, 0.0, 0.18, M("stone_pale")))
+                else:
+                    parts.append(slab("ped", [(x + 0.95 * math.cos(math.pi * k / 8), zt + 0.4 * math.sin(math.pi * k / 8)) for k in range(0, 9)], "-Y", y2, 0.0, 0.18, M("stone_pale")))
+                parts.append(fbox("ped_snow", "-Y", y2, x, 0.1, zt + 0.02, 1.7, 0.2, 0.03, M("snow")))
+    for x in (-W / 2 + 0.3, -1.6, 1.6, W / 2 - 0.3):           # giant pilasters through two storeys
+        parts.append(box("gpil", (0.6, 0.14, FL * 2 - 0.5), (x, y2 - 0.07, GF + 0.1), white))
+        parts.append(box("gpil_cap", (0.8, 0.24, 0.3), (x, y2 - 0.12, H - 0.5), M("stone_pale"), bevel=0.02, seg=1))
+    parts.append(box("risalit", (3.4, 0.12, FL * 2), (0, y2 - 0.06, GF), wall))
+    cornice(parts, W, D, H - 0.1, t=0.45, proud=0.35, modillions=False)
+    icicles(parts, (-W / 2, y2 - 0.55), (W / 2, y2 - 0.55), H - 0.1, maxlen=0.5, seed=seed + 2, gap=0.45)
+    # pediment over the risalit with a cartouche
+    parts.append(slab("pediment", [(-2.2, H + 0.35), (2.2, H + 0.35), (0.0, H + 2.0)], "-Y", y2 - 0.3, 0.0, 0.5, white))
+    parts.append(slab("ped_rim", [(-2.4, H + 0.3), (2.4, H + 0.3), (0.0, H + 2.15)], "-Y", y2 - 0.3, -0.05, 0.05, M("stone_pale")))
+    parts.append(blob("cartouche", (0.9, 0.2, 0.8), (0, y2 - 0.35, H + 0.7), M("stone_pale"), subsurf=1))
+    parts.append(sphere("cart_gold", 0.14, (0, y2 - 0.46, H + 1.1), M("gold", 0.35), seg=8, rings=5))
+    top = H + 0.35
+    parts.append(roof("mansard_lo", W + 0.6, D + 0.8, 2.6, (0, 0, top), M("tile"), sag=0.05, flare=-0.05, top_w=(D + 0.8) * 0.5, courses=3))
+    _roof_set(parts, W + 0.6, (D + 0.8) * 0.5, 1.8, (0, 0, top + 2.6), M("tile_dark"), sag=0.08, courses=2, seed=seed, ice=False)
+    lo = roof_snow("mans_snow", W + 0.6, D + 0.8, 2.6, (0, 0, top), sag=0.05, flare=-0.05, top_w=(D + 0.8) * 0.5, thick=0.06, seed=seed + 5, minz=0.5, maxz=0.95, cell=1.2, bare=0.35, slide=0.4)
+    if lo:
+        parts.append(lo)
+    for x in (-4.4, 4.4):                                        # oeil-de-boeuf dormers
+        parts.append(box("od_body", (1.1, 1.2, 1.1), (x, -D / 2 + 1.2, top + 0.7), wall))
+        parts.append(cyl("od_ring", 0.42, 0.14, (x, -D / 2 + 0.58, top + 1.25), M("stone_pale"), verts=16, rot=(math.pi / 2, 0, 0), center=True))
+        parts.append(cyl("od_glass", 0.32, 0.05, (x, -D / 2 + 0.62, top + 1.25), M("glass_warm"), verts=12, rot=(math.pi / 2, 0, 0), center=True))
+        parts.append(sphere("od_cap", 0.65, (x, -D / 2 + 1.1, top + 1.8), M("lead"), seg=12, rings=6, zscale=0.6))
+        snow_cap(parts, x, -D / 2 + 1.1, top + 2.05, 0.5, 0.12)
+    for x in (-5.0, 5.0):
+        chimney(parts, x, 1.2, top + 2.6, h=2.2)
+    visual = join(parts, name)
+    export(name, visual, box("c", (W, D, top + 4.5), (0, 0, 0)))
+
+
+def ten_burgher(name="ten_burgher", colour="plaster_umber", shutter_col="shutter", seed=24):
+    """Plain plastered burgher house (10 m) with a shop arcade (podcienie) of three round arches over a vaulted
+    walk, board shutters, a hipped roof with a dormer, and a timber gallery on the courtyard side."""
+    reset()
+    rng = random.Random(seed)
+    W, D, GF, FL, S = 10.0, 10.0, 4.0, 3.2, 3
+    wall = M(colour)
+    parts, col = [], []
+    AD = 2.6                                              # arcade depth
+    ops = [(x, 0.0, 2.4, 2.6 + 1.2, "round") for x in (-3.2, 0.0, 3.2)]
+    parts.append(facade("arc_front", wall, "-Y", -D / 2, -W / 2, W / 2, 0.0, GF, ops, depth=AD, back=False))
+    parts.append(box("arc_ceiling", (W, AD, 0.2), (0, -D / 2 + AD / 2, GF - 0.2), wall))
+    for (a, zb, w, h, sh) in ops:
+        voussoirs(parts, "-Y", -D / 2, a, 2.6, 2.4, 0.3, M("stone"), n=9, proud=0.06, key=0.12)
+    for x in (-4.8, -1.6, 1.6, 4.8):
+        col.append(box("c", (0.4, 0.6, GF), (x, -D / 2 + 0.3, 0)))
+    parts.append(box("arc_floor", (W, AD, 0.06), (0, -D / 2 + AD / 2, 0), M("stone_dark")))
+    shop = -D / 2 + AD
+    sops = [(-3.2, 0.0, 1.5, 2.5, "rect"), (0.0, 0.8, 2.0, 1.8, "seg"), (3.2, 0.8, 2.0, 1.8, "seg")]
+    parts.append(box("gf", (W, D - AD - REV, GF), (0, shop + REV + (D - AD - REV) / 2, 0), wall))
+    parts.append(facade("shopf", wall, "-Y", shop, -W / 2, W / 2, 0, GF, sops))
+    parts.append(fbox("sdoor", "-Y", shop, -3.2, -REV + 0.05, 0, 1.46, 0.06, 2.46, M("shutter")))
+    for (a, zb, w, h, sh) in sops[1:]:
+        win_unit(parts, "-Y", shop, a, zb, w, h, sh, warm=True, surround=None, mark=True)
+        parts.append(fbox("counter", "-Y", shop, a, 0.3, zb - 0.1, w + 0.2, 0.6, 0.08, M("wood")))
+    y = -D / 2
+    H = GF + FL * (S - 1)
+    uops = [(x, GF + FL * s + 0.7, 1.0, 1.6, "rect") for s in range(S - 1) for x in (-3.4, -1.1, 1.1, 3.4)]
+    parts.append(box("upper", (W, D - REV, FL * (S - 1)), (0, REV / 2, GF), wall, bevel=0.04, seg=1, wonk=0.03))
+    parts.append(facade("upf", wall, "-Y", y, -W / 2 - 0.01, W / 2 + 0.01, GF, H, uops))
+    for (a, zb, w, h, sh) in uops:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, surround="plaster_white", head=None, shutters="board", shutter_col=shutter_col,
+                 shutter_open=(rng.choice((180, 180, 100, 0)) if zb > GF + FL else 180, 180), mark=zb < GF + FL, warm=RNG.random() < 0.3)
+    for s in range(S - 1):
+        wall_anchor(parts, "-Y", y, -W / 2 + 0.5, GF + FL * (s + 1) - 0.4, "S")
+        wall_anchor(parts, "-Y", y, W / 2 - 0.5, GF + FL * (s + 1) - 0.4, "S")
+    parts.append(box("band", (W + 0.1, 0.16, 0.2), (0, y - 0.05, GF - 0.1), M("plaster_white")))
+    cornice(parts, W, D, H - 0.05, t=0.3, proud=0.22, modillions=False, mat=M("plaster_white"))
+    gallery_wood(parts, "+Y", D / 2, -W / 2 + 0.5, W / 2 - 0.5, GF + 0.1, d=1.3, posts=4, roof_h=2.6, seed=seed)
+    _hip_set(parts, W + 0.9, D + 0.9, 4.2, (0, 0, H + 0.2), M("tile"), hip=3.2, seed=seed)
+    dormer(parts, 0.0, -D / 2 + 0.9, H + 0.6, 1.3, 1.4, wall, M("tile_dark"), snow=True)
+    chimney(parts, 2.0, 1.5, H + 2.2, h=2.4)
+    drainpipe(parts, -W / 2 + 0.25, y - 0.12, H - 0.2, [(1.0, y), (GF + 1.0, y)])
+    visual = join(parts, name)
+    col.append(box("c", (W, D - AD, H + 4.2), (0, AD / 2, 0)))
+    col.append(box("c", (W, AD, H - GF + 4.2), (0, -D / 2 + AD / 2, GF)))
+    export(name, visual, join(col, "col"))
+
+
+def ten_timber(name="ten_timber", seed=25):
+    """Half-timbered gable house of the suburbs (Kleparz, Garbary): stone and plaster ground floor, a jettied
+    timber-framed upper storey with plastered infill and braces, a framed street gable, shingle roof. 8 m."""
+    reset()
+    rng = random.Random(seed)
+    W, D, GF, FL = 8.0, 10.0, 3.2, 2.9
+    parts = []
+    ops = [(-2.0, 0.0, 1.3, 2.3, "rect"), (1.2, 1.0, 0.9, 1.1, "rect"), (2.9, 1.0, 0.9, 1.1, "rect")]
+    y = front_block(parts, W, D, GF, M("plaster_lime"), ops)
+    parts.append(fbox("door", "-Y", y, -2.0, -REV + 0.05, 0, 1.26, 0.06, 2.26, M("shutter_brown")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, surround=None, head=None, shutters="board", shutter_col="shutter_blue", mark=True, shutter_open=(rng.choice((180, 110)), 180))
+    parts.append(box("plinth", (W, 0.12, 0.6), (0, y - 0.04, 0), M("stone_dark")))
+    jet = 0.4
+    y2 = y - jet
+    uops = [(x, GF + 0.8, 0.8, 1.2, "rect") for x in (-2.6, -0.9, 0.9, 2.6)]
+    parts.append(box("upper", (W + 0.2, D + jet - REV, FL), (0, -jet / 2 + REV / 2, GF), M("plaster_lime")))
+    parts.append(facade("upf", M("plaster_lime"), "-Y", y2, -W / 2 - 0.1, W / 2 + 0.1, GF, GF + FL, uops))
+    for (a, zb, w, h, sh) in uops:
+        win_unit(parts, "-Y", y2, a, zb, w, h, sh, surround=None, head=None, sill=True, mark=True, warm=RNG.random() < 0.4)
+    timber_frame(parts, "-Y", y2, -W / 2 - 0.1, W / 2 + 0.1, GF, GF + FL, posts=8, braces=False)
+    for k in range(9):
+        parts.append(box("joist", (0.16, jet + 0.2, 0.18), (-W / 2 + k * W / 8, y - jet / 2, GF - 0.18), M("timber")))
+    rise = 4.6
+    gable_slab(parts, "-Y", y2, -W / 2 - 0.1, W / 2 + 0.1, GF + FL, rise, M("plaster_lime"), thick=0.3)
+    zg = GF + FL
+    for a in (-2.0, 0.0, 2.0):
+        zt = zg + rise * (1 - abs(a) / (W / 2 + 0.1))
+        parts.append(fbox("gpost", "-Y", y2, a, 0.05, zg, 0.18, 0.1, zt - zg - 0.1, M("timber")))
+    parts.append(fbox("grail", "-Y", y2, 0, 0.05, zg + 1.5, W * 0.62, 0.1, 0.18, M("timber")))
+    for sx in (-1, 1):
+        pts = [(sx * (W / 2 + 0.1), zg), (sx * (W / 2 - 0.1), zg), (sx * 0.1, zg + rise), (sx * 0.3, zg + rise)]
+        parts.append(slab("gbarge", pts if sx < 0 else list(reversed(pts)), "-Y", y2, 0.0, 0.12, M("timber")))
+    win_unit(parts, "-Y", y2, 0.0, zg + 1.8, 0.7, 0.9, "rect", surround=None, head=None, sill=False)
+    _roof_set(parts, D + jet + 0.8, W + 0.8, rise, (0, -jet / 2, zg), M("shingle"), along_x=False, sag=0.08, flare=0.05, courses=0, seed=seed, cell=1.0)
+    chimney(parts, 1.6, 2.0, zg + 1.8, h=2.2)
+    visual = join(parts, name)
+    shear(visual, 0.008, -0.004)
+    shear_marks(0.008, -0.004)
+    export(name, visual, box("c", (W, D, zg + rise), (0, 0, 0)))
+
+
+def ten_wooden(name="ten_wooden", seed=26):
+    """Wooden suburban house: limewashed-log walls on a stone sill, carved window frames with blue shutters, a
+    porch (ganek) on turned posts, a steep shingle roof with a gablet, a stack in the middle. 9 m."""
+    reset()
+    rng = random.Random(seed)
+    W, D, H = 9.0, 7.0, 3.0
+    parts = []
+    ops = [(-1.8, 0.25, 1.0, 2.0, "rect"), (0.6, 1.0, 0.8, 1.0, "rect"), (2.6, 1.0, 0.8, 1.0, "rect"), (-3.6, 1.0, 0.8, 1.0, "rect")]
+    parts.append(box("sill", (W + 0.3, D + 0.3, 0.3), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.04))
+    y = front_block(parts, W, D, H - 0.3, M("log"), ops, z0=0.3)
+    parts.append(fbox("door", "-Y", y, -1.8, -REV + 0.05, 0.3, 0.96, 0.06, 1.95, M("shutter_blue")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb + 0.3, w, h, sh, surround=None, head=None, sill=False, mark=True, warm=RNG.random() < 0.5,
+                 shutters="board", shutter_col="shutter_blue", shutter_open=(rng.choice((180, 120)), 180))
+        parts.append(fbox("wframe", "-Y", y, a, 0.03, zb + 0.22, w + 0.24, 0.05, h + 0.16, M("plaster_lime")))
+        parts.append(slab("wcrown", [(a - w / 2 - 0.16, zb + 0.3 + h + 0.08), (a + w / 2 + 0.16, zb + 0.3 + h + 0.08), (a, zb + 0.3 + h + 0.4)], "-Y", y, 0.0, 0.06, M("plaster_lime")))
+    log_corners(parts, W, D, H)
+    # porch
+    for x in (-2.8, -0.8):
+        parts.append(cyl("ppost", 0.1, 2.6, (x, y - 1.5, 0.3), M("wood"), verts=8, bevel=0.01, seg=1))
+    parts.append(box("pfloor", (2.6, 1.7, 0.3), (-1.8, y - 0.85, 0), M("wood_dark")))
+    parts.append(box("prail", (2.4, 0.08, 0.08), (-1.8, y - 1.5, 1.2), M("wood")))
+    sn = []
+    _roof_set(parts, 2.3, 2.8, 1.2, (-1.8, y - 1.2, 2.9), M("shingle"), along_x=False, courses=0, sag=0.02, flare=0.05, seed=seed + 7, cell=0.6, sides=(-1, 1))
+    _hip_set(parts, W + 1.4, D + 1.6, 4.4, (0, 0, H), M("shingle"), hip=1.4, seed=seed)
+    parts.append(box("stack", (0.8, 0.8, 1.4), (0.3, 0.4, H + 3.4), M("plaster_lime"), bevel=0.03, seg=1, wonk=0.04))
+    parts.append(box("stack_cap", (0.94, 0.94, 0.05), (0.3, 0.4, H + 4.8), M("snow")))
+    mark("Chimney", (0.3, 0.4, H + 4.9))
+    parts.append(box("drift", (W + 0.8, 0.9, 0.22), (1.2, y - 0.6, 0), M("snow"), bevel=0.2, seg=2, wonk=0.12))
+    visual = join(parts, name)
+    shear(visual, 0.006, -0.005)
+    shear_marks(0.006, -0.005)
+    export(name, visual, box("c", (W + 0.3, D + 0.3, H + 4.4), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ water: fountain, well, pump, trough, street gutter
+def fountain():
+    """Public fountain (studnia miejska): an octagonal stone basin with a moulded rim, a baluster pillar with a
+    small bowl and a spout figure (a lion's mask); the water is frozen over, icicles hang from bowl and spout."""
+    reset()
+    parts = []
+    R = 2.4
+    st, sp = M("stone"), M("stone_pale")
+    parts.append(cyl("step", R + 0.6, 0.2, (0, 0, 0), M("stone_dark"), verts=8, bevel=0.03, seg=1))
+    for k in range(8):
+        a = math.tau * (k + 0.5) / 8
+        parts.append(cbox("wall", (2 * R * math.tan(math.pi / 8) + 0.02, 0.32, 0.75), (R * math.cos(math.pi / 8) * math.cos(a), R * math.cos(math.pi / 8) * math.sin(a), 0.575), st, rot=(0, 0, a + math.pi / 2), bevel=0.02, seg=1))
+        parts.append(cbox("rim", (2 * (R + 0.08) * math.tan(math.pi / 8) + 0.04, 0.46, 0.14), ((R + 0.02) * math.cos(math.pi / 8) * math.cos(a), (R + 0.02) * math.cos(math.pi / 8) * math.sin(a), 1.0), sp, rot=(0, 0, a + math.pi / 2), bevel=0.03, seg=1))
+        parts.append(cbox("rim_snow", (2 * (R + 0.08) * math.tan(math.pi / 8) - 0.1, 0.36, 0.035), ((R + 0.02) * math.cos(math.pi / 8) * math.cos(a), (R + 0.02) * math.cos(math.pi / 8) * math.sin(a), 1.085), M("snow"), rot=(0, 0, a + math.pi / 2)))
+        c = Vector((math.cos(math.tau * k / 8), math.sin(math.tau * k / 8), 0)) * (R + 0.16)
+        parts.append(box("post", (0.3, 0.3, 1.0), (c.x, c.y, 0.2), sp))
+        parts.append(sphere("post_ball", 0.16, (c.x, c.y, 1.36), sp, seg=8, rings=5))
+        snow_cap(parts, c.x, c.y, 1.42, 0.12, 0.05, seg=6)
+    parts.append(cyl("ice", R - 0.12, 0.05, (0, 0, 0.72), M("ice", 0.05), verts=16))
+    parts.append(cyl("ice_snow", R * 0.6, 0.03, (0.5, 0.3, 0.77), M("snow"), verts=12))
+    parts.append(cyl("pillar_base", 0.5, 0.5, (0, 0, 0.7), sp, verts=12, r2=0.4, bevel=0.02, seg=1))
+    parts.append(cyl("pillar", 0.28, 1.4, (0, 0, 1.2), sp, verts=12, r2=0.22, bevel=0.02, seg=1))
+    parts.append(sphere("baluster", 0.36, (0, 0, 1.9), sp, seg=12, rings=8, zscale=0.8))
+    parts.append(cyl("bowl", 0.35, 0.35, (0, 0, 2.4), sp, verts=16, r2=1.05, bevel=0.02, seg=1))
+    parts.append(cyl("bowl_ice", 0.98, 0.04, (0, 0, 2.72), M("ice", 0.05), verts=16))
+    parts.append(cyl("bowl_snow", 0.9, 0.04, (0, 0, 2.74), M("snow"), verts=16))
+    icicles(parts, (-1.0, -0.35), (1.0, -0.35), 2.72, maxlen=0.6, seed=1, density=4)
+    icicles(parts, (-1.0, 0.35), (1.0, 0.35), 2.72, maxlen=0.6, seed=2, density=4)
+    parts.append(cyl("fig_ped", 0.22, 0.5, (0, 0, 2.75), sp, verts=10, bevel=0.01, seg=1))
+    parts.append(blob("fig_body", (0.45, 0.4, 0.9), (0, 0, 3.25), M("bronze", 0.4), subsurf=2))
+    parts.append(sphere("fig_head", 0.17, (0, 0, 4.25), M("bronze", 0.4), seg=10, rings=7))
+    snow_cap(parts, 0, 0, 4.36, 0.14, 0.06, seg=6)
+    for k in range(4):                                        # lion masks with a spout each, frozen mid-flow
+        a = math.tau * k / 4
+        c = Vector((math.cos(a), math.sin(a), 0))
+        parts.append(sphere("mask", 0.16, tuple(c * 0.3 + Vector((0, 0, 1.7))), M("bronze", 0.4), seg=10, rings=6))
+        parts.append(cyl("spout", 0.035, 0.35, tuple(c * 0.5 + Vector((0, 0, 1.62))), M("bronze", 0.4), verts=6, rot=(0, math.pi / 2, a), center=True))
+        bm = bmesh.new()
+        _tube(bm, c * 0.66 + Vector((0, 0, 1.6)), c * 0.9 + Vector((0, 0, 0.78)), 0.06, 0.03, n=6)
+        parts.append(_mesh_obj("frozen_jet", bm, M("ice", 0.05)))
+    export("fountain", join(parts, "fountain"), cyl("c", R + 0.3, 1.1, (0, 0, 0), None, verts=8))
+
+
+def well():
+    """Town well: an octagonal dressed-stone curb with snow on its lip, two oak posts carrying a windlass with a
+    crank and a coil of rope, a bucket on the curb and another hanging, and a shingle roof under snow with
+    icicles along both eaves."""
+    reset()
+    stone = M("stone_dark")
+    parts = []
+    for k in range(8):
+        a = math.tau * k / 8
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a), 1.15 * math.sin(a), 0.25), stone, rot=(0, 0, a + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a + math.pi / 8), 1.15 * math.sin(a + math.pi / 8), 0.75), stone, rot=(0, 0, a + math.pi / 8 + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+        parts.append(cbox("lip", (0.9, 0.62, 0.1), (1.15 * math.cos(a), 1.15 * math.sin(a), 1.05), M("stone"), rot=(0, 0, a + math.pi / 2), bevel=0.02, seg=1))
+        parts.append(cbox("lip_snow", (0.8, 0.5, 0.03), (1.15 * math.cos(a), 1.15 * math.sin(a), 1.115), M("snow"), rot=(0, 0, a + math.pi / 2)))
+    parts.append(cyl("hole", 0.92, 0.05, (0, 0, 0.9), M("void"), verts=16, bevel=0))
+    for sx in (-1, 1):
+        parts.append(cyl("post", 0.1, 2.5, (sx * 1.15, 0, 0.95), M("timber"), verts=8, bevel=0.01, seg=1))
+        parts.append(cbox("brace", (0.07, 0.07, 0.9), (sx * 0.95, 0, 3.05), M("timber"), rot=(0, sx * 0.6, 0)))
+    parts.append(cyl("beam", 0.09, 2.7, (0, 0, 3.45), M("timber"), verts=8, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
+    parts.append(cyl("windlass", 0.15, 2.1, (0, 0, 2.7), M("wood"), verts=10, rot=(0, math.pi / 2, 0), center=True, bevel=0.01, seg=1))
+    parts.append(cyl("rope_coil", 0.19, 0.7, (0, 0, 2.7), M("sacking"), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(cyl("crank_arm", 0.03, 0.5, (1.3, 0, 2.5), M("iron"), verts=6, center=True))
+    parts.append(cyl("crank_axle", 0.03, 0.25, (1.2, 0, 2.7), M("iron"), verts=6, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(cyl("crank_grip", 0.04, 0.3, (1.45, 0, 2.28), M("wood_dark"), verts=6, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(cyl("rope", 0.015, 1.1, (0, 0, 1.55), M("sacking"), verts=5))
+    parts.append(cyl("bucket", 0.17, 0.32, (0, 0, 1.25), M("wood"), verts=10, r2=0.15, bevel=0.01, seg=1))
+    parts.append(cyl("bucket_hoop", 0.18, 0.04, (0, 0, 1.45), M("iron"), verts=10))
+    parts.append(cyl("bucket2", 0.17, 0.32, (0.75, -0.95, 1.1), M("wood"), verts=10, r2=0.15, bevel=0.01, seg=1))
+    parts.append(cyl("bucket2_ice", 0.14, 0.02, (0.75, -0.95, 1.38), M("ice", 0.05), verts=10))
+    _roof_set(parts, 3.3, 2.0, 1.0, (0, 0, 3.55), M("shingle"), sag=0.04, flare=0.1, courses=0, seed=7, cell=0.5, thick=0.06)
+    parts.append(box("drift", (3.4, 3.4, 0.12), (0.3, 0.2, 0), M("snow"), bevel=0.25, seg=2, wonk=0.15))
+    export("well", join(parts, "well"), cyl("c", 1.45, 1.1, (0, 0, 0), None, verts=8))
+
+
+def water_pump():
+    """Wooden pump-post (drewniana pompa) c. 1800: a squared oak trunk bound with iron, a pivoted lever handle, a
+    lead spout over a hollowed stone trough, frozen, with icicles from the spout; a flag-stone apron."""
+    reset()
+    parts = []
+    parts.append(box("apron", (1.6, 1.8, 0.12), (0, -0.3, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.04))
+    parts.append(box("trunk", (0.34, 0.34, 2.1), (0, 0.2, 0.12), M("timber"), bevel=0.03, seg=1, wonk=0.02))
+    for z in (0.5, 1.2, 1.9):
+        parts.append(box("band", (0.38, 0.38, 0.06), (0, 0.2, z), M("iron")))
+    parts.append(pyramid("cap", (0.5, 0.5, 0.3), (0, 0.2, 2.22), M("wood_dark"), apex=0.03))
+    parts.append(pyramid("cap_snow", (0.36, 0.36, 0.2), (0, 0.2, 2.34), M("snow"), apex=0.03))
+    parts.append(box("pivot", (0.06, 0.2, 0.25), (0.2, 0.2, 1.75), M("iron")))
+    lever = box("lever", (0.07, 1.3, 0.07), (0.26, -0.35, 1.85), M("wood_dark"))
+    edit_verts(lever, lambda co: setattr(co, "z", co.z - (0.2 - co.y) * 0.35))
+    parts.append(lever)
+    parts.append(cyl("spout", 0.05, 0.45, (0, -0.1, 1.05), M("lead"), verts=8, rot=(math.radians(70), 0, 0), center=True))
+    parts.append(box("trough", (0.9, 0.6, 0.45), (0, -0.55, 0.12), M("stone"), bevel=0.04, seg=1))
+    parts.append(box("trough_ice", (0.76, 0.46, 0.02), (0, -0.55, 0.52), M("ice", 0.05)))
+    icicles(parts, (-0.03, -0.27), (0.03, -0.27), 1.0, maxlen=0.5, seed=3, density=40, gap=0.2, r=0.03)
+    bm = bmesh.new()
+    _tube(bm, (0, -0.3, 0.98), (0.02, -0.4, 0.55), 0.05, 0.08, n=6)
+    parts.append(_mesh_obj("ice_column", bm, M("ice", 0.05)))
+    parts.append(box("drift", (1.4, 1.0, 0.12), (0.2, 0.3, 0), M("snow"), bevel=0.2, seg=2, wonk=0.1))
+    export("water_pump", join(parts, "water_pump"), box("c", (0.5, 0.9, 1.3), (0, -0.2, 0)))
+
+
+def horse_trough():
+    """Stone horse trough, 2.4 m, iced over, snow on its rim and a slop of frozen spill on the ground."""
+    reset()
+    parts = [box("trough", (2.4, 0.8, 0.7), (0, 0, 0), M("stone"), bevel=0.05, seg=1, wonk=0.03),
+             box("ice", (2.2, 0.6, 0.02), (0, 0, 0.62), M("ice", 0.05)),
+             box("snow_l", (2.3, 0.08, 0.03), (0, -0.36, 0.7), M("snow")), box("snow_r", (2.3, 0.08, 0.03), (0, 0.36, 0.7), M("snow"))]
+    for x in (-1.0, 1.0):
+        parts.append(box("foot", (0.3, 0.9, 0.12), (x, 0, 0), M("stone_dark")))
+    icicles(parts, (-1.1, -0.41), (1.1, -0.41), 0.7, maxlen=0.18, seed=4, density=3)
+    parts.append(box("spill", (1.6, 1.2, 0.02), (0.2, -0.6, 0), M("ice", 0.05), wonk=0.2))
+    export("horse_trough", join(parts, "horse_trough"), box("c", (2.4, 0.8, 0.7), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ industry
+def windmill():
+    """Post mill (kozlak): the whole timber body turns on a great post braced by quarter-bars on crossed sills and
+    stone piers; a ladder and tail pole at the back, four bare lattice sails (canvas furled for winter) on a
+    tilted windshaft, boarded walls, a curved roof under snow with icicles."""
+    reset()
+    parts, col = [], []
+    tm, wd, dk = M("timber"), M("wood"), M("wood_dark")
+    for a in (0.0, math.pi / 2):
+        parts.append(cbox("sill", (7.0, 0.4, 0.4), (0, 0, 0.9), tm, rot=(0, 0, a + math.pi / 4)))
+    for k in range(4):
+        a = math.tau * k / 4 + math.pi / 4
+        c = Vector((math.cos(a), math.sin(a), 0)) * 3.2
+        parts.append(box("pier", (0.8, 0.8, 0.7), (c.x, c.y, 0), M("stone"), bevel=0.04, seg=1, wonk=0.04))
+        parts.append(box("pier_snow", (0.7, 0.7, 0.04), (c.x, c.y, 1.1), M("snow")))
+        bm = bmesh.new()
+        _tube(bm, c * 0.95 + Vector((0, 0, 1.1)), Vector((0, 0, 4.0)), 0.16, 0.14, n=6)
+        parts.append(_mesh_obj("quarter", bm, tm))
+    parts.append(cyl("post", 0.32, 4.4, (0, 0, 0.7), tm, verts=10))
+    col.append(box("c", (1.2, 1.2, 4.5), (0, 0, 0)))
+    for k in range(4):
+        a = math.tau * k / 4 + math.pi / 4
+        c = Vector((math.cos(a), math.sin(a), 0)) * 3.2
+        col.append(box("c", (0.8, 0.8, 1.2), (c.x, c.y, 0)))
+    # the body (buck)
+    BW, BD, BH, z0 = 4.2, 5.6, 5.4, 4.6
+    parts.append(box("crown", (1.2, BD, 0.5), (0, 0, z0 - 0.5), tm))
+    parts.append(box("buck", (BW, BD, BH), (0, 0, z0), wd, bevel=0.04, seg=1, wonk=0.05))
+    for k in range(9):
+        x = -BW / 2 + k * BW / 8
+        parts.append(box("batten", (0.06, BD + 0.04, BH), (x, 0, z0), dk))
+    for k in range(4):
+        parts.append(box("batten_s", (BW + 0.04, 0.04, 0.12), (0, -BD / 2 - 0.01, z0 + 0.6 + k * 1.4), dk))
+    parts.append(box("door", (1.0, 0.06, 1.8), (0, BD / 2 + 0.02, z0 + 0.2), dk))
+    parts.append(box("win", (0.6, 0.06, 0.6), (1.2, -BD / 2 - 0.02, z0 + 3.2), M("glass_warm")))
+    rf = roof("roof", BD + 0.6, BW + 0.8, 1.8, (0, 0, z0 + BH), M("shingle"), along_x=False, sag=0.0, flare=-0.35, cuts=4)
+    parts.append(rf)
+    sn = roof_snow("roof_snow", BD + 0.6, BW + 0.8, 1.8, (0, 0, z0 + BH), along_x=False, sag=0.0, flare=-0.35, cuts=4, thick=0.07, cell=0.7, seed=9)
+    if sn:
+        parts.append(sn)
+    eave_icicles(parts, BD, BW + 0.8, z0 + BH - 0.02, (0, 0), along_x=False, seed=10, maxlen=0.5)
+    # ladder and tail pole down the back
+    for sx in (-0.45, 0.45):
+        parts.append(cbox("stringer", (0.12, 0.12, 6.4), (sx, BD / 2 + 1.9, z0 / 2 + 0.3), tm, rot=(math.radians(-38), 0, 0)))
+    for k in range(12):
+        t = (k + 0.5) / 12
+        parts.append(box("rung", (0.9, 0.24, 0.05), (0, BD / 2 + 3.9 - t * 4.0, 0.5 + t * (z0 - 0.4)), wd))
+    parts.append(cbox("tail", (0.2, 0.2, 7.8), (0, BD / 2 + 2.6, z0 / 2 + 0.6), tm, rot=(math.radians(-45), 0, 0)))
+    col.append(box("c", (1.2, 4.0, 1.2), (0, BD / 2 + 3.4, 0)))
+    # sails
+    hub = Vector((0, -BD / 2 - 0.6, z0 + BH - 1.2))
+    tilt = math.radians(10)
+    ax = Vector((0, -math.cos(tilt), math.sin(tilt)))
+    parts.append(cyl("shaft", 0.3, 1.8, tuple(hub + Vector((0, 0.9, -0.15))), tm, verts=10, rot=(math.pi / 2 + tilt, 0, 0), center=True))
+    parts.append(sphere("poll", 0.45, tuple(hub), dk, seg=10, rings=6))
+    u0 = Vector((1, 0, 0))
+    v0 = ax.cross(u0).normalized()
+    bm = bmesh.new()
+    for k in range(4):
+        a = math.tau * k / 4 + 0.35
+        d = u0 * math.cos(a) + v0 * math.sin(a)
+        p = d.cross(ax).normalized()
+        _tube(bm, hub, hub + d * 8.5, 0.14, 0.09, n=4)
+        for side in (0.35, 1.7):
+            _tube(bm, hub + d * 1.8 + p * side, hub + d * 8.4 + p * side, 0.04, 0.04, n=4)
+        for j in range(12):
+            t = 1.8 + (8.4 - 1.8) * j / 11
+            _tube(bm, hub + d * t, hub + d * t + p * 1.7, 0.03, 0.03, n=4)
+        _tube(bm, hub + d * 2.0 + p * 1.0, hub + d * 8.0 + p * 1.0, 0.12, 0.1, n=6)   # furled canvas along the sail
+    parts.append(_mesh_obj("sails", bm, wd))
+    visual = join(parts, "windmill")
+    export("windmill", visual, join(col, "col"))
+
+
+def watermill():
+    """Town water mill on the Mlynowka: a brick ground floor with a timber upper storey and a hipped tile roof;
+    a stone-walled mill race raised along the +X side with a sluice, dark water and ice floes, and an
+    undershot wheel dipping into it, icicles hanging off its paddles."""
+    reset()
+    parts, col = [], []
+    W, D, GF, H = 9.0, 8.0, 3.2, 6.0
+    ops = [(-1.8, 0.0, 1.4, 2.5, "rect"), (1.5, 1.2, 0.9, 1.1, "seg")]
+    y = front_block(parts, W, D, GF, M("brick"), ops)
+    parts.append(fbox("door", "-Y", y, -1.8, -REV + 0.05, 0, 1.36, 0.06, 2.46, M("wood_dark")))
+    win_unit(parts, "-Y", y, 1.5, 1.2, 0.9, 1.1, "seg", warm=True, surround=None, mark=True)
+    uops = [(x, GF + 0.8, 0.8, 1.0, "rect") for x in (-2.6, 0.0, 2.6)]
+    y2 = front_block(parts, W, D, H - GF, M("plaster_lime"), uops, z0=GF)
+    for (a, zb, w, h, sh) in uops:
+        win_unit(parts, "-Y", y2, a, zb, w, h, sh, surround=None, head=None, mark=True, warm=RNG.random() < 0.4)
+    timber_frame(parts, "-Y", y2, -W / 2, W / 2, GF, H, posts=6, braces=True)
+    col.append(box("c", (W, D, H + 3.5), (0, 0, 0)))
+    _hip_set(parts, W + 1.2, D + 1.2, 3.6, (0, 0, H), M("tile"), hip=2.0, seed=12)
+    chimney(parts, -2.2, 1.4, H + 1.6, h=2.2)
+    # raised race along +X
+    rx = W / 2 + 1.6
+    for dx in (-1.1, 1.1):
+        parts.append(box("race_wall", (0.5, 22.0, 1.3), (rx + dx, 0, 0), M("stone"), bevel=0.03, seg=1, wonk=0.04))
+        parts.append(box("race_snow", (0.45, 22.0, 0.04), (rx + dx, 0, 1.3), M("snow"), wonk=0.03))
+        col.append(box("c", (0.5, 22.0, 1.3), (rx + dx, 0, 0)))
+    parts.append(box("race_bed", (1.8, 22.0, 0.3), (rx, 0, 0), M("stone_dark")))
+    parts.append(box("water", (1.72, 22.0, 0.02), (rx, 0, 0.95), M("water", 0.04)))
+    rng = random.Random(13)
+    for k in range(6):
+        parts.append(box("floe", (rng.uniform(0.4, 1.0), rng.uniform(0.5, 1.4), 0.04), (rx + rng.uniform(-0.4, 0.4), -9 + k * 3.4 + rng.uniform(-0.6, 0.6), 0.96), M("ice", 0.05), wonk=0.1))
+    parts.append(box("sluice", (2.8, 0.25, 0.3), (rx, -6.5, 2.2), M("timber")))
+    for dx in (-1.25, 1.25):
+        parts.append(box("sl_post", (0.22, 0.22, 2.5), (rx + dx, -6.5, 0), M("timber")))
+    parts.append(box("sl_gate", (1.7, 0.1, 1.1), (rx, -6.5, 1.0), M("wood_dark")))
+    parts.append(box("sl_snow", (2.7, 0.2, 0.04), (rx, -6.5, 2.5), M("snow")))
+    R = 2.4
+    wc = Vector((rx, 0.0, 0.95 + R - 0.5))
+    bm = bmesh.new()
+    for dx in (-0.55, 0.55):
+        for k in range(24):
+            a0, a1 = math.tau * k / 24, math.tau * (k + 1) / 24
+            _tube(bm, wc + Vector((dx, R * math.cos(a0), R * math.sin(a0))), wc + Vector((dx, R * math.cos(a1), R * math.sin(a1))), 0.08, 0.08, n=4)
+        for k in range(8):
+            a = math.tau * k / 8
+            _tube(bm, wc + Vector((dx, 0, 0)), wc + Vector((dx, R * math.cos(a), R * math.sin(a))), 0.06, 0.06, n=4)
+    parts.append(_mesh_obj("wheel", bm, M("wood_dark")))
+    for k in range(16):
+        a = math.tau * k / 16
+        parts.append(cbox("paddle", (1.3, 0.06, 0.55), (wc.x, wc.y + (R - 0.2) * math.cos(a), wc.z + (R - 0.2) * math.sin(a)), M("wood"), rot=(a, 0, 0)))
+        if math.sin(a) > 0.2:
+            icicles(parts, (wc.x - 0.5, wc.y + (R - 0.2) * math.cos(a)), (wc.x + 0.5, wc.y + (R - 0.2) * math.cos(a)), wc.z + (R - 0.45) * math.sin(a), maxlen=0.3, seed=20 + k, density=4)
+    parts.append(cyl("axle", 0.18, 2.6, (W / 2 + 0.3, 0.0, wc.z), M("timber"), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    visual = join(parts, "watermill")
+    export("watermill", visual, join(col, "col"))
+
+
+def _glow(key="ember", strength=6.0):
+    return M(key, 0.9, emit=(1.0, 0.36, 0.08), emit_strength=strength)
+
+
+def bell_foundry():
+    """Bell foundry (ludwisarnia): a brick casting hall with a wide arched front, a tall tapering furnace stack,
+    the furnace mouth glowing orange, a clay bell mould in the casting pit and a finished bell hung on a trestle
+    in the yard."""
+    reset()
+    parts, col = [], []
+    W, D, H = 12.0, 9.0, 5.0
+    ops = [(-1.0, 0.0, 4.4, 3.4 + 2.2, "round"), (4.2, 1.6, 1.0, 1.6, "seg")]
+    y = front_block(parts, W, D, H, M("brick"), ops)
+    parts.append(slab("hall_dark", outline(-1.0, 0.0, 4.4, 5.6, "round"), "-Y", y, -D + 0.6, -D + 0.62, M("void")))
+    win_unit(parts, "-Y", y, 4.2, 1.6, 1.0, 1.6, "seg", warm=True, surround=None, mark=True)
+    voussoirs(parts, "-Y", y, -1.0, 3.4, 4.4, 0.4, M("stone"), n=11, proud=0.1, key=0.2)
+    rustication(parts, "-Y", y, -W / 2, W / 2, 0.0, 1.0, ops, course=0.5, mat=M("stone_dark"))
+    col.append(box("c", (2.8, D, H), (-4.6, 0, 0)))
+    col.append(box("c", (4.8, D, H), (3.6, 0, 0)))
+    col.append(box("c", (4.4, D, H - 5.6 + 0.01), (-1.0, 0, 5.6)))
+    col.append(box("c", (W, 1.0, H), (0, D / 2 - 0.5, 0)))
+    _roof_set(parts, W + 0.8, D + 1.0, 3.6, (0, 0, H), M("tile_dark"), courses=4, seed=30, drifts=[(3.8, 1.0, 1.6, 0.25)])
+    # furnace stack at the back corner and the glowing furnace inside the arch
+    parts.append(taper_box("stack", (2.2, 2.2, 15.0), (3.8, 2.4, 0), M("brick"), top=0.55))
+    parts.append(box("stack_band", (1.5, 1.5, 0.25), (3.8, 2.4, 13.0), M("brick_dark")))
+    parts.append(box("stack_cap", (1.45, 1.45, 0.2), (3.8, 2.4, 15.0), M("stone_dark")))
+    mark("Chimney", (3.8, 2.4, 15.3))
+    col.append(box("c", (2.2, 2.2, 15.0), (3.8, 2.4, 0)))
+    parts.append(box("furnace", (3.2, 2.4, 2.4), (-1.0, D / 2 - 2.0, 0), M("brick_dark"), bevel=0.05, seg=1))
+    parts.append(arch("furnace_mouth", 1.0, 1.1, 0.1, (-1.0, D / 2 - 3.21, 0.35), _glow(strength=9.0), bevel=0))
+    mark("Furnace", (-1.0, D / 2 - 3.4, 0.9))
+    parts.append(blob("mould", (2.2, 2.2, 2.2), (-1.0, -0.6, -0.4), M("terracotta"), subsurf=2))
+    parts.append(cyl("pit_rim", 1.6, 0.15, (-1.0, -0.6, 0), M("stone_dark"), verts=16))
+    # finished bell on a trestle outside
+    bx = -4.3
+    for sx in (-1, 1):
+        parts.append(cbox("tr_leg", (0.2, 0.2, 3.4), (bx + sx * 1.2, y - 2.0, 1.6), M("timber"), rot=(0, sx * 0.2, 0)))
+    parts.append(box("tr_beam", (3.2, 0.3, 0.3), (bx, y - 2.0, 3.2), M("timber")))
+    parts.append(box("tr_snow", (3.1, 0.26, 0.04), (bx, y - 2.0, 3.5), M("snow")))
+    parts.append(cyl("bell", 0.55, 1.1, (bx, y - 2.0, 1.7), M("bronze", 0.35), verts=20, r2=0.35))
+    parts.append(sphere("bell_top", 0.36, (bx, y - 2.0, 2.8), M("bronze", 0.35), seg=16, rings=8, zscale=0.5))
+    parts.append(cyl("bell_lip", 0.62, 0.12, (bx, y - 2.0, 1.62), M("bronze", 0.35), verts=20))
+    col.append(box("c", (2.8, 0.6, 3.4), (bx, y - 2.0, 0)))
+    parts.append(box("woodpile", (2.6, 1.0, 1.2), (5.0, y - 0.8, 0), M("log"), bevel=0.1, seg=1, wonk=0.1))
+    parts.append(box("wp_snow", (2.5, 0.9, 0.06), (5.0, y - 0.8, 1.2), M("snow"), wonk=0.05))
+    visual = join(parts, "bell_foundry")
+    export("bell_foundry", visual, join(col, "col"))
+
+
+def forge():
+    """Blacksmith's forge (kuznia): an open-fronted timber shed against a brick back wall; a raised brick hearth
+    with glowing coals under a hood and chimney, leather bellows, the anvil on its stump, a quench tub, a rack of
+    tongs and hammers, horseshoes on the post and a grindstone outside."""
+    reset()
+    parts, col = [], []
+    W, D, H = 7.0, 5.0, 3.0
+    parts.append(box("back", (W, 0.5, H), (0, D / 2 - 0.25, 0), M("brick"), bevel=0.02, seg=1, wonk=0.03))
+    col.append(box("c", (W, 0.5, H), (0, D / 2 - 0.25, 0)))
+    for sx in (-1, 1):
+        parts.append(box("side", (0.2, D, H), (sx * (W / 2 - 0.1), 0, 0), M("timber"), wonk=0.03))
+        for k in range(6):
+            parts.append(box("board", (0.04, 0.05, H), (sx * (W / 2 + 0.01), -D / 2 + 0.4 + k * 0.84, 0), M("wood_dark")))
+        col.append(box("c", (0.2, D, H), (sx * (W / 2 - 0.1), 0, 0)))
+        parts.append(box("fpost", (0.25, 0.25, H), (sx * (W / 2 - 0.2), -D / 2 + 0.15, 0), M("timber")))
+    parts.append(box("head", (W, 0.3, 0.3), (0, -D / 2 + 0.15, H - 0.3), M("timber")))
+    parts.append(box("floor", (W, D, 0.04), (0, 0, 0), M("soot", 0.95)))
+    _roof_set(parts, W + 0.8, D + 1.2, 2.2, (0, 0, H), M("shingle"), courses=0, seed=40, drifts=[(1.5, 0.8, 1.2, 0.2)], cell=0.8)
+    # hearth, hood and chimney
+    parts.append(box("hearth", (2.0, 1.4, 0.8), (1.5, D / 2 - 1.2, 0), M("brick_dark"), bevel=0.03, seg=1))
+    parts.append(box("hearth_top", (2.1, 1.5, 0.08), (1.5, D / 2 - 1.2, 0.8), M("stone_dark")))
+    parts.append(blob("coals", (0.9, 0.7, 0.2), (1.5, D / 2 - 1.2, 0.84), _glow(strength=8.0)))
+    parts.append(blob("flame", (0.4, 0.3, 0.35), (1.5, D / 2 - 1.2, 0.9), M("flame", 0.9, emit=(1.0, 0.55, 0.12), emit_strength=10.0)))
+    mark("Furnace", (1.5, D / 2 - 1.2, 1.0))
+    col.append(box("c", (2.0, 1.4, 0.8), (1.5, D / 2 - 1.2, 0)))
+    parts.append(pyramid("hood", (2.2, 1.6, 1.3), (1.5, D / 2 - 1.1, 1.8), M("brick"), apex=0.4))
+    parts.append(box("flue", (0.8, 0.8, 3.8), (1.5, D / 2 - 1.1, 3.0), M("brick"), bevel=0.02, seg=1))
+    parts.append(box("flue_cap", (1.0, 1.0, 0.15), (1.5, D / 2 - 1.1, 6.8), M("stone_dark")))
+    mark("Chimney", (1.5, D / 2 - 1.1, 7.0))
+    parts.append(wedge("bellows", (0.9, 1.3, 0.5), (-0.1, D / 2 - 1.0, 0.7), M("leather")))
+    parts.append(box("bellows_arm", (0.06, 1.8, 0.06), (-0.1, D / 2 - 1.5, 1.6), M("wood_dark")))
+    # anvil
+    parts.append(cyl("stump", 0.35, 0.55, (0.8, -0.4, 0), M("log"), verts=10))
+    parts.append(box("anvil", (0.7, 0.26, 0.28), (0.8, -0.4, 0.55), M("iron")))
+    parts.append(cyl("horn", 0.12, 0.35, (1.3, -0.4, 0.72), M("iron"), verts=8, rot=(0, math.pi / 2, 0), r2=0.01, center=True))
+    col.append(cyl("c", 0.4, 0.8, (0.8, -0.4, 0), None, verts=8))
+    parts.append(cyl("tub", 0.4, 0.6, (2.9, 0.2, 0), M("wood"), verts=12))
+    parts.append(cyl("tub_water", 0.36, 0.02, (2.9, 0.2, 0.55), M("water", 0.05), verts=12))
+    for k in range(5):                                        # tools on the back wall
+        parts.append(box("tool", (0.05, 0.05, 0.9), (-2.8 + k * 0.3, D / 2 - 0.55, 1.2), M("iron")))
+        parts.append(box("tool_head", (0.16, 0.08, 0.1), (-2.8 + k * 0.3, D / 2 - 0.55, 2.05), M("iron")))
+    parts.append(box("rack", (1.8, 0.08, 0.1), (-2.2, D / 2 - 0.52, 2.15), M("wood_dark")))
+    for k in range(4):
+        parts.append(torus("shoe", 0.1, 0.02, (-W / 2 + 0.2, -D / 2 - 0.0, 1.2 + k * 0.3), M("iron"), rot=(math.pi / 2, 0, 0), seg=8, mseg=4))
+    parts.append(cyl("grind", 0.45, 0.12, (-2.6, -D / 2 - 1.0, 0.75), M("stone"), verts=16, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(box("grind_frame", (0.2, 1.0, 0.7), (-2.6, -D / 2 - 1.0, 0), M("timber")))
+    parts.append(box("drift", (W + 1.0, 0.9, 0.2), (0, -D / 2 - 0.9, 0), M("snow"), bevel=0.2, seg=2, wonk=0.1))
+    parts.append(box("melt", (2.0, 1.4, 0.015), (1.0, -D / 2 - 0.4, 0), M("water", 0.05), wonk=0.2))
+    visual = join(parts, "forge")
+    export("forge", visual, join(col, "col"))
+
+
+def brewery():
+    """Propination brewhouse (browar): two brick storeys, a louvred malt-kiln cowl on the ridge, a tall round
+    stack, a copper kettle under a lean-to at the side with its fire glowing, casks stacked by the door."""
+    reset()
+    parts, col = [], []
+    W, D, H = 14.0, 9.0, 6.4
+    ops = [(-4.0, 0.0, 2.2, 2.6 + 1.1, "round")] + [(x, 1.4, 1.0, 1.4, "seg") for x in (-0.5, 2.4, 5.2)] + [(x, 4.0, 1.0, 1.4, "seg") for x in (-4.0, -0.5, 2.4, 5.2)]
+    y = front_block(parts, W, D, H, M("brick"), ops)
+    door_unit(parts, "-Y", y, -4.0, 2.2, 2.6, portal=False)
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, surround=None, warm=RNG.random() < 0.5, mark=zb < 5, bars=zb < 2)
+    parts.append(box("band", (W + 0.1, 0.2, 0.25), (0, y - 0.06, 3.3), M("stone"), bevel=0.02, seg=1))
+    col.append(box("c", (W, D, H + 4.5), (0, 0, 0)))
+    _roof_set(parts, W + 0.8, D + 1.0, 4.2, (0, 0, H), M("tile"), courses=5, seed=50, drifts=[(0, 0.5, 2.0, 0.2)])
+    parts.append(box("cowl", (2.2, 2.2, 1.6), (0, 0, H + 3.9), M("wood_dark")))
+    for k in range(4):
+        parts.append(box("cowl_louvre", (2.3, 2.3, 0.08), (0, 0, H + 4.1 + k * 0.35), M("wood")))
+    parts.append(pyramid("cowl_roof", (2.8, 2.8, 1.2), (0, 0, H + 5.5), M("shingle"), apex=0.05))
+    parts.append(pyramid("cowl_snow", (1.6, 1.6, 0.68), (0, 0, H + 6.02), M("snow"), apex=0.05))
+    parts.append(cyl("stack", 0.9, 16.0, (5.6, 2.0, 0), M("brick"), verts=14, r2=0.6))
+    parts.append(cyl("stack_cap", 0.72, 0.3, (5.6, 2.0, 16.0), M("brick_dark"), verts=14))
+    mark("Chimney", (5.6, 2.0, 16.4))
+    col.append(cyl("c", 0.9, 16.0, (5.6, 2.0, 0), None, verts=8))
+    # kettle house lean-to on the -X end
+    kx = -W / 2 - 2.0
+    for yy in (-2.5, 2.5):
+        parts.append(box("lt_post", (0.25, 0.25, 3.4), (kx - 1.6, yy, 0), M("timber")))
+    parts.append(roof("lt_roof", 4.4, 6.4, 0.9, (kx, 0, 3.4), M("shingle"), along_x=False, sag=0.02, flare=0.0, cuts=3))
+    sn = roof_snow("lt_snow", 4.4, 6.4, 0.9, (kx, 0, 3.4), along_x=False, sag=0.02, flare=0.0, cuts=3, thick=0.06, cell=0.7, seed=51)
+    if sn:
+        parts.append(sn)
+    parts.append(box("kettle_base", (2.4, 2.4, 1.0), (kx, 0, 0), M("brick_dark"), bevel=0.03, seg=1))
+    parts.append(arch("kettle_fire", 0.7, 0.6, 0.1, (kx, -1.21, 0.1), _glow(strength=7.0), bevel=0))
+    mark("Furnace", (kx, -1.4, 0.4))
+    parts.append(cyl("kettle", 1.0, 1.0, (kx, 0, 1.0), M("copper", 0.4), verts=18, r2=1.1))
+    parts.append(sphere("kettle_dome", 1.1, (kx, 0, 2.0), M("patina"), seg=18, rings=8, zscale=0.55))
+    parts.append(cyl("kettle_pipe", 0.15, 2.4, (kx, 0, 2.5), M("copper", 0.4), verts=8))
+    col.append(box("c", (2.4, 2.4, 2.6), (kx, 0, 0)))
+    rng = random.Random(52)
+    for k in range(6):
+        parts.append(cyl("cask", 0.45, 0.9, (-1.8 + (k % 3) * 0.95, y - 0.8 - (k // 3) * 0.95, 0), M("wood"), verts=12, r2=0.45))
+        parts.append(cyl("cask_snow", 0.38, 0.03, (-1.8 + (k % 3) * 0.95, y - 0.8 - (k // 3) * 0.95, 0.9), M("snow"), verts=12))
+    col.append(box("c", (3.0, 2.0, 0.9), (-0.85, y - 1.3, 0)))
+    parts.append(box("bush_pole", (0.08, 1.2, 0.08), (-2.6, y - 0.6, 4.0), M("wood_dark")))
+    parts.append(blob("bush", (0.5, 0.5, 0.5), (-2.6, y - 1.2, 3.6), M("dead_grass")))
+    visual = join(parts, "brewery")
+    export("brewery", visual, join(col, "col"))
+
+
+def cooper_yard():
+    """Cooper's yard (bednarz): a lean-to workshop, stacks of seasoning staves, casks at every stage (raised with
+    trusses, fired over a cresset, hooped and finished), a shaving horse and hoops on pegs, inside a wattle fence."""
+    reset()
+    parts, col = [], []
+    W, D = 10.0, 8.0
+    parts.append(box("shed_back", (6.0, 0.3, 3.0), (-1.0, D / 2 - 0.15, 0), M("timber"), wonk=0.03))
+    col.append(box("c", (6.0, 0.3, 3.0), (-1.0, D / 2 - 0.15, 0)))
+    for x in (-3.8, -1.0, 1.8):
+        parts.append(box("shed_post", (0.2, 0.2, 2.4), (x, D / 2 - 2.5, 0), M("timber")))
+    sh = roof("shed_roof", 6.6, 2.8, 0.7, (-1.0, D / 2 - 1.3, 2.4), M("shingle"), sag=0.02, flare=0.0, cuts=3)
+    parts.append(sh)
+    sn = roof_snow("shed_snow", 6.6, 2.8, 0.7, (-1.0, D / 2 - 1.3, 2.4), sag=0.02, flare=0.0, cuts=3, thick=0.06, cell=0.7, seed=60)
+    if sn:
+        parts.append(sn)
+    icicles(parts, (-4.2, D / 2 - 2.7), (2.2, D / 2 - 2.7), 2.38, seed=61, maxlen=0.4)
+    rng = random.Random(62)
+    for k in range(3):                                         # stave stacks, crossed layers
+        x = 3.0 + (k % 2) * 1.2
+        yb = -2.0 + k * 1.6
+        for j in range(6):
+            parts.append(box("staves", (1.0, 0.9, 0.12), (x, yb, j * 0.14), M("wood"), rot=(0, 0, (j % 2) * math.pi / 2)))
+        parts.append(box("staves_snow", (0.9, 0.9, 0.05), (x, yb, 0.84), M("snow")))
+        col.append(box("c", (1.2, 1.2, 0.9), (x, yb, 0)))
+    for k in range(5):                                         # finished casks
+        x, yy = -3.6 + k * 1.0, -2.4 + (k % 2) * 0.4
+        parts.append(cyl("cask", 0.4, 0.45, (x, yy, 0), M("wood"), verts=12, r2=0.46))
+        parts.append(cyl("cask2", 0.46, 0.45, (x, yy, 0.45), M("wood"), verts=12, r2=0.4))
+        for z in (0.1, 0.8):
+            parts.append(cyl("hoop", 0.44, 0.05, (x, yy, z), M("iron"), verts=12))
+        parts.append(cyl("cask_snow", 0.34, 0.03, (x, yy, 0.9), M("snow"), verts=12))
+    col.append(box("c", (5.0, 1.4, 0.9), (-1.6, -2.2, 0)))
+    parts.append(cyl("raised", 0.5, 0.7, (-1.0, 1.2, 0), M("wood"), verts=12, r2=0.3))
+    parts.append(cyl("cresset", 0.25, 0.3, (-1.0, 1.2, 0), M("iron"), verts=8))
+    parts.append(blob("cresset_fire", (0.35, 0.35, 0.3), (-1.0, 1.2, 0.2), _glow(strength=6.0)))
+    mark("Furnace", (-1.0, 1.2, 0.5))
+    parts.append(box("horse", (0.3, 1.6, 0.5), (0.8, 1.6, 0), M("timber")))
+    parts.append(box("horse_seat", (0.35, 1.2, 0.08), (0.8, 1.6, 0.5), M("wood")))
+    for k in range(4):
+        parts.append(torus("hoop_peg", 0.4, 0.02, (-3.5 + k * 0.5, D / 2 - 0.35, 1.8), M("iron"), rot=(math.pi / 2, 0, 0), seg=12, mseg=3))
+    for sx, sy, L_, a in ((-1, 0, D, math.pi / 2), (1, 0, D, math.pi / 2), (0, -1, W, 0.0)):
+        if sy:
+            for x0 in (-W / 2, 1.5):
+                parts.append(box("fence", (W / 2 - 1.5 if x0 < 0 else W / 2 - 1.5, 0.12, 1.1), (x0 + (W / 2 - 1.5) / 2, -D / 2, 0), M("wood_dark"), wonk=0.04))
+                parts.append(box("fence_snow", (W / 2 - 1.6, 0.1, 0.035), (x0 + (W / 2 - 1.5) / 2, -D / 2, 1.1), M("snow")))
+        else:
+            parts.append(box("fence", (0.12, D, 1.1), (sx * W / 2, 0, 0), M("wood_dark"), wonk=0.04))
+            parts.append(box("fence_snow", (0.1, D - 0.1, 0.035), (sx * W / 2, 0, 1.1), M("snow")))
+            col.append(box("c", (0.12, D, 1.1), (sx * W / 2, 0, 0)))
+    visual = join(parts, "cooper_yard")
+    export("cooper_yard", visual, join(col, "col"))
+
+
+def tannery_frame():
+    """Tanners' drying frame: two trestles with poles hung with stretched hides, a vat of liquor beside, frozen."""
+    reset()
+    parts = []
+    for x in (-2.0, 2.0):
+        for sy in (-1, 1):
+            parts.append(cbox("leg", (0.12, 0.12, 2.6), (x, sy * 0.5, 1.25), M("timber"), rot=(sy * 0.25, 0, 0)))
+    parts.append(cyl("pole", 0.06, 4.6, (0, 0, 2.45), M("timber"), verts=8, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(cyl("pole_snow", 0.05, 4.4, (0, 0, 2.52), M("snow"), verts=6, rot=(0, math.pi / 2, 0), center=True))
+    for k in range(4):
+        h = box("hide", (0.85, 0.03, 1.3), (-1.5 + k, 0, 1.1), M("leather" if k % 2 else "sacking"), wonk=0.12)
+        parts.append(h)
+        parts.append(box("hide_snow", (0.8, 0.05, 0.03), (-1.5 + k, 0, 2.4), M("snow")))
+    parts.append(cyl("vat", 0.7, 1.0, (0, -1.6, 0), M("wood"), verts=14))
+    parts.append(cyl("vat_ice", 0.64, 0.02, (0, -1.6, 0.92), M("ice", 0.05), verts=14))
+    for z in (0.15, 0.8):
+        parts.append(cyl("hoop", 0.72, 0.06, (0, -1.6, z), M("iron"), verts=14))
+    export("tannery_frame", join(parts, "tannery_frame"), box("c", (4.4, 1.2, 2.5), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ faith: campanile, synagogues, Uniate church, prayer house
+def campanile():
+    """Free-standing bell tower (dzwonnica): a square brick shaft with stone quoins and string courses, a clock
+    dial, an open belfry of paired round arches showing the bells, a copper helm with ribs and snow, a cross."""
+    reset()
+    parts, col = [], []
+    S, H = 5.4, 22.0
+    parts.append(box("shaft", (S - 2 * REV, S - 2 * REV, H), (0, 0, 0), M("brick"), bevel=0.04, seg=1, wonk=0.03))
+    col.append(box("c", (S, S, H), (0, 0, 0)))
+    for face, plane in (("-Y", -S / 2), ("+Y", S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        ops = [(0.0, 0.0, 1.6, 2.4 + 0.8, "round")] if face == "-Y" else []
+        ops += [(0.0, 7.0, 0.5, 1.4, "round"), (-0.75, H - 5.2, 1.2, 3.6, "round"), (0.75, H - 5.2, 1.2, 3.6, "round")]
+        parts.append(facade("f" + face, M("brick"), face, plane, -S / 2, S / 2, 0.0, H, ops, depth=REV if face != "-Y" else REV))
+        for (a, zb, w, h, sh) in ops:
+            if zb > H - 6:
+                parts.append(slab("belfry_void", outline(a, zb, w, h, sh), face, plane, -S / 2 + 0.2, -S / 2 + 0.22, M("void")))
+                parts.append(fbox("bel_rail", face, plane, a, -0.05, zb, w, 0.08, 0.9, M("wood_dark")))
+                voussoirs(parts, face, plane, a, zb + h - w / 2, w, 0.16, M("stone"), n=7, proud=0.06)
+            elif zb > 1:
+                win_unit(parts, face, plane, a, zb, w, h, sh, surround=None, cross=False)
+        parts.append(fbox("colonnette", face, plane, 0.0, 0.05, H - 5.2, 0.22, 0.2, 3.0, M("stone_pale")))
+        if face == "-Y":
+            door_unit(parts, face, plane, 0.0, 1.6, 2.4, portal=True)
+        rustication(parts, face, plane, -S / 2, S / 2, 0.0, 2.0, [(0.0, 0.0, 1.6, 3.2, "round")] if face == "-Y" else [], course=0.5, mat=M("stone"))
+    for z in (5.0, 11.0, H - 5.8, H - 0.3):
+        parts.append(box("string", (S + 0.25, S + 0.25, 0.3), (0, 0, z), M("stone"), bevel=0.02, seg=1))
+        parts.append(box("string_snow", (S + 0.15, S + 0.15, 0.03), (0, 0, z + 0.3), M("snow")))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            z, i = 2.0, 0
+            while z < H - 0.6:
+                w = 0.8 if i % 2 == 0 else 0.5
+                parts.append(box("quoin", (w if i % 2 == 0 else 0.5, 0.5 if i % 2 == 0 else w, 0.45), (sx * (S / 2 - 0.2), sy * (S / 2 - 0.2), z), M("stone_pale"), bevel=0))
+                z += 0.5
+                i += 1
+    clock_face(parts, Vector((0, -S / 2 - 0.08, 14.0)), (0, -1, 0), 1.1, hh=11, mm=50)
+    parts.append(cyl("dial", 1.2, 0.12, (0, -S / 2 - 0.04, 14.0), M("plaster_white"), verts=24, rot=(math.pi / 2, 0, 0), center=True))
+    parts.append(torus("dial_rim", 1.2, 0.07, (0, -S / 2 - 0.1, 14.0), M("gold", 0.35), rot=(math.pi / 2, 0, 0), seg=24, mseg=4))
+    for (x, r) in ((-0.9, 0.6), (0.9, 0.45)):                  # the bells
+        parts.append(cyl("bell", r, r * 1.6, (x, 0.0, H - 4.4), M("bronze", 0.35), verts=16, r2=r * 0.62))
+        parts.append(sphere("bell_top", r * 0.64, (x, 0.0, H - 4.4 + r * 1.6), M("bronze", 0.35), seg=12, rings=6, zscale=0.5))
+    parts.append(box("bell_beam", (S - 0.6, 0.3, 0.3), (0, 0, H - 1.6), M("timber")))
+    icicles(parts, (-S / 2, -S / 2 - 0.13), (S / 2, -S / 2 - 0.13), H - 0.3, maxlen=0.5, seed=71)
+    # helm: a four-sided copper pyramid over a short drum-like lantern
+    parts.append(pyramid("helm", (S + 0.4, S + 0.4, 6.5), (0, 0, H), M("patina"), apex=0.3))
+    sn = cap_snow("helm_snow", lambda: pyramid("tmp", (S + 0.4, S + 0.4, 6.5), (0, 0, H), None, apex=0.3), minz=0.3, thick=0.06, cell=0.7, bare=0.14, slide=0.15, lee=(1, 0.3))
+    if sn:
+        parts.append(sn)
+    parts.append(cyl("lant", 0.5, 1.2, (0, 0, H + 6.5), M("patina"), verts=8))
+    parts.append(sphere("lant_ball", 0.4, (0, 0, H + 8.0), M("gold", 0.35), seg=10, rings=6))
+    parts.append(box("cross_v", (0.1, 0.1, 1.8), (0, 0, H + 8.3), M("gold", 0.35)))
+    parts.append(box("cross_h", (0.8, 0.1, 0.1), (0, 0, H + 9.4), M("gold", 0.35)))
+    visual = join(parts, "campanile")
+    export("campanile", visual, join(col, "col"))
+
+
+def synagogue_wooden():
+    """A smaller synagogue with a tall tiered wooden roof: plastered masonry prayer hall with high round-headed
+    windows, a three-tier shingled roof, a timber women's gallery on the side reached by an outside stair."""
+    reset()
+    parts, col = [], []
+    W, D, H = 10.0, 12.0, 6.0
+    wall = M("plaster_limeblue")
+    ops = [(0.0, 0.0, 1.6, 2.4 + 0.8, "round"), (-3.0, 2.6, 1.0, 2.6, "round"), (3.0, 2.6, 1.0, 2.6, "round")]
+    y = front_block(parts, W, D, H, wall, ops)
+    door_unit(parts, "-Y", y, 0.0, 1.6, 2.4, portal=True)
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, warm=True, surround="stone_pale", mark=True)
+    for face, plane, sgn in (("+X", W / 2, 1),):
+        sops = [(yy, 2.6, 1.0, 2.6, "round") for yy in (-3.5, 0.0, 3.5)]
+        parts.append(facade("side", wall, face, plane, -D / 2, D / 2, 0.0, H, sops))
+        for (a, zb, w, h, sh) in sops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, warm=True, surround="stone_pale")
+    parts.append(box("plinth", (W + 0.1, D + 0.1, 0.6), (0, 0, 0), M("plaster_limeblue_damp")))
+    parts.append(slab("tablets", [(-0.5, 4.2), (0.5, 4.2), (0.5, 5.0), (0.25, 5.3), (0.0, 5.0), (-0.25, 5.3), (-0.5, 5.0)], "-Y", y, 0.0, 0.08, M("stone_pale")))
+    col.append(box("c", (W, D, H + 8), (0, 0, 0)))
+    cornice(parts, W, D, H - 0.05, t=0.3, proud=0.25, modillions=False, mat=M("plaster_white"))
+    z = H
+    for k, (L, Wd, h) in enumerate(((W + 1.6, D + 1.6, 2.6), (W - 1.8, D - 1.8, 2.2), (W - 5.0, D - 5.0, 2.4))):
+        _hip_set(parts, L, Wd, h, (0, 0, z), M("shingle"), hip=min(L, Wd) / 2 - 0.2, seed=80 + k)
+        z += h * 0.7
+        if k < 2:
+            parts.append(box("tier_wall", (W - 3.6 - 2.8 * k, D - 3.6 - 2.8 * k, 0.9), (0, 0, z - 0.3), M("wood_dark")))
+            z += 0.6
+    # women's gallery on -X with an outside stair
+    gx = -W / 2 - 1.6
+    parts.append(box("gal", (3.2, D - 2.0, 3.2), (gx, 0, 2.6), M("log"), bevel=0.03, seg=1))
+    for yy in (-D / 2 + 1.2, 0.0, D / 2 - 1.2):
+        parts.append(box("gal_post", (0.24, 0.24, 2.6), (gx - 1.4, yy, 0), M("timber")))
+    for k in range(4):
+        parts.append(fbox("gal_win", "-X", gx - 1.6, -(-3.0 + k * 2.0), 0.02, 3.8, 0.7, 0.03, 0.9, M("glass_warm")))
+    parts.append(roof("gal_roof", D - 1.6, 3.8, 1.3, (gx, 0, 5.8), M("shingle"), along_x=False, sag=0.03, flare=0.05, cuts=3))
+    sn = roof_snow("gal_snow", D - 1.6, 3.8, 1.3, (gx, 0, 5.8), along_x=False, sag=0.03, flare=0.05, cuts=3, thick=0.06, cell=0.8, seed=85)
+    if sn:
+        parts.append(sn)
+    eave_icicles(parts, D - 2.0, 3.8, 5.78, (gx, 0), along_x=False, sides=(-1,), seed=86)
+    for k in range(10):
+        parts.append(box("stair", (1.0, 0.3, 0.1), (gx - 2.2, -D / 2 + 0.2 + k * 0.32, 0.26 * (k + 1)), M("wood")))
+    parts.append(cbox("stair_str", (0.1, 3.9, 0.2), (gx - 2.7, -D / 2 + 1.6, 1.4), M("timber"), rot=(math.atan2(2.6, 3.2), 0, 0)))
+    col.append(box("c", (3.2, D - 2.0, 5.8), (gx, 0, 0)))
+    visual = join(parts, "synagogue_wooden")
+    export("synagogue_wooden", visual, join(col, "col"))
+
+
+def _cross3(parts, x, y, z, s=1.0, mat=None):
+    """Three-bar (Eastern) cross: a short top bar, the main bar, and a slanted foot bar."""
+    mat = mat or M("gold", 0.35)
+    parts.append(box("x3_v", (0.08 * s, 0.08 * s, 1.8 * s), (x, y, z), mat))
+    parts.append(box("x3_t", (0.45 * s, 0.07 * s, 0.07 * s), (x, y, z + 1.5 * s), mat))
+    parts.append(box("x3_m", (0.8 * s, 0.07 * s, 0.08 * s), (x, y, z + 1.2 * s), mat))
+    parts.append(cbox("x3_f", (0.55 * s, 0.07 * s, 0.07 * s), (x, y, z + 0.45 * s), mat, rot=(0, math.radians(-20), 0)))
+
+
+def uniate_church():
+    """Greek Catholic (Uniate) church: plastered nave with round windows and an apse, a west tower carrying a drum
+    and a copper onion cupola with ribs, a small onion over the sanctuary, three-bar crosses. (Orthodox proper
+    had no church in Krakow in 1795; the Uniates did.)"""
+    reset()
+    parts, col = [], []
+    W, D, H = 8.0, 14.0, 7.0
+    wall = M("plaster_white")
+    parts.append(box("nave", (W - 2 * REV, D, H), (0, 1.0, 0), wall, bevel=0.06, seg=1, wonk=0.03))
+    col.append(box("c", (W, D, H), (0, 1.0, 0)))
+    for face, plane in (("-X", -W / 2), ("+X", W / 2)):
+        sops = [(yy * (1 if face == "+X" else -1), 3.0, 1.1, 2.6, "round") for yy in (-2.5, 1.0, 4.5)]
+        parts.append(facade("side", wall, face, plane, -D / 2 + 1.0 - 0.01, D / 2 + 1.0 + 0.01, 0.0, H, sops))
+        for (a, zb, w, h, sh) in sops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, warm=True, surround="plaster_ochre", glass="glass_stained")
+    parts.append(cyl("apse", 3.0, H - 1.0, (0, D / 2 + 1.0, 0), wall, verts=12, bevel=0.03, seg=1))
+    col.append(cyl("c", 3.0, H - 1.0, (0, D / 2 + 1.0, 0), None, verts=8))
+    parts.append(sphere("apse_roof", 3.1, (0, D / 2 + 1.0, H - 1.0), M("patina"), seg=16, rings=8, zscale=0.5))
+    sn = cap_snow("apse_snow", lambda: sphere("tmp", 3.1, (0, D / 2 + 1.0, H - 1.0), None, seg=16, rings=8, zscale=0.5), minz=0.5, thick=0.05, cell=0.6)
+    if sn:
+        parts.append(sn)
+    _roof_set(parts, D, W + 0.8, 3.8, (0, 1.0, H), M("shingle_dark"), along_x=False, courses=0, seed=90, cell=1.0)
+    parts.append(box("pilaster_band", (W + 0.2, D + 0.1, 0.35), (0, 1.0, H - 0.4), M("plaster_ochre")))
+    # sanctuary cupola on the ridge
+    sx_, sy_ = 0.0, D / 2 - 1.5
+    parts.append(cyl("s_drum", 0.9, 1.4, (sx_, sy_, H + 2.8), M("plaster_white"), verts=12))
+    parts.append(sphere("s_onion", 1.15, (sx_, sy_, H + 4.8), M("patina"), seg=16, rings=10, zscale=1.2))
+    parts.append(cyl("s_tip", 0.2, 1.0, (sx_, sy_, H + 6.0), M("patina"), verts=8, r2=0.02))
+    sn = cap_snow("s_snow", lambda: sphere("tmp", 1.15, (sx_, sy_, H + 4.8), None, seg=16, rings=10, zscale=1.2), minz=0.65, thick=0.04, cell=0.35)
+    if sn:
+        parts.append(sn)
+    _cross3(parts, sx_, sy_, H + 6.6, s=0.7)
+    # west tower with the main drum and onion
+    TS, TH = 5.0, 11.0
+    ty = -D / 2 + 1.0 - TS / 2 + 0.4
+    parts.append(box("tower", (TS - 2 * REV, TS - REV, TH), (0, ty + REV / 2, 0), wall, bevel=0.05, seg=1))
+    col.append(box("c", (TS, TS, TH), (0, ty, 0)))
+    tf = ty - TS / 2
+    ops = [(0.0, 0.0, 1.6, 2.4 + 0.8, "round"), (0.0, 5.2, 0.9, 1.8, "round"), (0.0, 8.4, 1.0, 1.8, "round")]
+    parts.append(facade("tower_f", wall, "-Y", tf, -TS / 2, TS / 2, 0.0, TH, ops))
+    door_unit(parts, "-Y", tf, 0.0, 1.6, 2.4, portal=True, surround="stone_pale")
+    win_unit(parts, "-Y", tf, 0.0, 5.2, 0.9, 1.8, "round", warm=True, surround="plaster_ochre", glass="glass_stained")
+    win_unit(parts, "-Y", tf, 0.0, 8.4, 1.0, 1.8, "round", louvre=True, surround="plaster_ochre")
+    parts.append(slab("icon", [(-0.5, 3.8), (0.5, 3.8), (0.5, 4.8), (0.0, 5.05), (-0.5, 4.8)], "-Y", tf, 0.0, 0.05, M("gold", 0.3)))
+    parts.append(slab("icon_in", [(-0.38, 3.9), (0.38, 3.9), (0.38, 4.75), (-0.38, 4.75)], "-Y", tf, 0.05, 0.07, M("navy")))
+    for z in (4.6, TH - 0.2):
+        parts.append(box("tband", (TS + 0.2, TS + 0.2, 0.3), (0, ty, z), M("plaster_ochre"), bevel=0.02, seg=1))
+        parts.append(box("tband_snow", (TS + 0.1, TS + 0.1, 0.03), (0, ty, z + 0.3), M("snow")))
+    quoins(parts, TS, TS, 0.3, TH, tf)
+    parts.append(cyl("drum", 1.9, 2.4, (0, ty, TH + 0.1), M("plaster_white"), verts=16, bevel=0.02, seg=1))
+    for k in range(8):
+        a = math.tau * (k + 0.5) / 8
+        parts.append(cbox("drum_win", (0.45, 0.08, 1.2), (1.9 * math.cos(a), ty + 1.9 * math.sin(a), TH + 1.3), M("glass_warm"), rot=(0, 0, a + math.pi / 2)))
+    parts.append(sphere("onion", 2.4, (0, ty, TH + 4.2), M("patina"), seg=20, rings=12, zscale=1.25))
+    bm = bmesh.new()
+    _tube(bm, (0, ty, TH + 6.9), (0, ty, TH + 8.2), 0.5, 0.02, n=10)
+    parts.append(_mesh_obj("onion_tip", bm, M("patina")))
+    dome_ribs(parts, 0, ty, TH + 4.2, 2.4, n=8, zscale=1.25, mat=M("gold", 0.35), z_from=-0.6, width=0.05)
+    sn = cap_snow("onion_snow", lambda: sphere("tmp", 2.4, (0, ty, TH + 4.2), None, seg=20, rings=12, zscale=1.25), minz=0.62, thick=0.05, cell=0.5, bare=0.2)
+    if sn:
+        parts.append(sn)
+    _cross3(parts, 0, ty, TH + 8.1, s=1.0)
+    icicles(parts, (-TS / 2, tf - 0.12), (TS / 2, tf - 0.12), TH - 0.2, maxlen=0.4, seed=91)
+    visual = join(parts, "uniate_church")
+    export("uniate_church", visual, join(col, "col"))
+
+
+def prayer_house():
+    """Small Protestant (Lutheran-Reformed) prayer house: a plain limewashed hall with tall round-headed windows
+    and no tower (the law allowed none), a hipped tile roof with a little ridge turret (sygnaturka)."""
+    reset()
+    parts, col = [], []
+    W, D, H = 14.0, 9.0, 6.0
+    wall = M("plaster_lime")
+    ops = [(0.0, 0.0, 1.6, 2.4 + 0.8, "round"), (-2.8, 2.0, 1.0, 2.8, "round"), (2.8, 2.0, 1.0, 2.8, "round"),
+           (-5.4, 2.0, 1.0, 2.8, "round"), (5.4, 2.0, 1.0, 2.8, "round"), (0.0, 4.2, 0.9, 0.9, "round")]
+    y = front_block(parts, W, D, H, wall, ops)
+    door_unit(parts, "-Y", y, 0.0, 1.6, 2.4, portal=False)
+    parts.append(slab("pediment_door", [(-1.4, 3.4), (1.4, 3.4), (0.0, 4.0)], "-Y", y, 0.0, 0.14, M("stone_pale")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, warm=True, surround="plaster_white", mark=zb < 3)
+    for face, plane in (("-X", -W / 2), ("+X", W / 2)):
+        sops = [(yy, 2.0, 1.0, 2.8, "round") for yy in (-2.0, 2.0)]
+        parts.append(facade("side", wall, face, plane, -D / 2, D / 2, 0.0, H, sops))
+        for (a, zb, w, h, sh) in sops:
+            win_unit(parts, face, plane, a, zb, w, h, sh, warm=True, surround="plaster_white")
+    parts.append(box("plinth", (W + 0.1, D + 0.1, 0.5), (0, 0, 0), M("plaster_lime_damp")))
+    cornice(parts, W, D, H - 0.05, t=0.3, proud=0.22, modillions=False, mat=M("plaster_white"))
+    col.append(box("c", (W, D, H + 4), (0, 0, 0)))
+    _hip_set(parts, W + 0.9, D + 0.9, 4.0, (0, 0, H + 0.2), M("tile"), hip=3.0, seed=95)
+    parts.append(box("turret", (1.0, 1.0, 1.4), (0, 0, H + 3.8), M("wood_dark")))
+    parts.append(cyl("turret_spire", 0.8, 2.2, (0, 0, H + 5.2), M("lead"), verts=8, r2=0.03))
+    parts.append(sphere("turret_ball", 0.16, (0, 0, H + 7.5), M("gold", 0.35), seg=8, rings=5))
+    parts.append(box("turret_cross", (0.06, 0.06, 0.8), (0, 0, H + 7.6), M("iron")))
+    visual = join(parts, "prayer_house")
+    export("prayer_house", visual, join(col, "col"))
+
+
+def shrine_column():
+    """Roadside column shrine (figura): a stone pedestal and a Tuscan column carrying a small painted figure of St
+    John Nepomuk under a tin umbrella, a wrought-iron railing round the base, a candle lantern, snow on it all."""
+    reset()
+    parts = []
+    parts.append(box("step", (2.2, 2.2, 0.25), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1))
+    parts.append(box("ped", (1.0, 1.0, 1.4), (0, 0, 0.25), M("stone"), bevel=0.03, seg=1))
+    parts.append(box("ped_cap", (1.2, 1.2, 0.15), (0, 0, 1.65), M("stone_pale"), bevel=0.02, seg=1))
+    parts.append(box("ped_snow", (1.1, 1.1, 0.04), (0, 0, 1.8), M("snow")))
+    parts.append(cyl("col", 0.26, 2.6, (0, 0, 1.8), M("stone_pale"), verts=12, r2=0.22, bevel=0.01, seg=1))
+    parts.append(box("capital", (0.6, 0.6, 0.2), (0, 0, 4.4), M("stone_pale"), bevel=0.02, seg=1))
+    parts.append(cyl("robe", 0.22, 1.0, (0, 0, 4.6), M("black"), verts=10, r2=0.12))
+    parts.append(cyl("surplice", 0.2, 0.4, (0, 0, 5.1), M("linen"), verts=10, r2=0.16))
+    parts.append(sphere("head", 0.12, (0, 0, 5.72), M("skin"), seg=10, rings=6))
+    parts.append(cyl("biretta", 0.1, 0.1, (0, 0, 5.8), M("black"), verts=8))
+    for k in range(5):
+        a = math.tau * k / 5
+        parts.append(sphere("star", 0.035, (0.18 * math.cos(a), 0.18 * math.sin(a), 6.05), M("gold", 0.3), seg=6, rings=4))
+    parts.append(cyl("umbrella", 0.75, 0.45, (0, 0, 6.2), M("lead"), verts=12, r2=0.05))
+    parts.append(cyl("umb_snow", 0.55, 0.25, (0, 0, 6.35), M("snow"), verts=12, r2=0.04))
+    icicles(parts, (-0.7, -0.2), (0.7, -0.2), 6.2, maxlen=0.2, seed=97, density=6)
+    parts.append(box("cross", (0.04, 0.04, 0.5), (0, 0, 6.65), M("iron")))
+    for sx, sy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        L_ = 2.0
+        parts.append(box("rail", (L_ if sy else 0.04, 0.04 if sy else L_, 0.04), (sx * 0.98, sy * 0.98, 1.05), M("iron")))
+        for k in range(9):
+            t = -0.9 + k * 0.225
+            parts.append(box("bar", (0.025, 0.025, 0.8), (sx * 0.98 + (t if sy else 0), sy * 0.98 + (0 if sy else t), 0.25), M("iron")))
+    parts.append(box("lantern", (0.2, 0.2, 0.3), (0, -0.62, 1.15), M("gold", 0.3, emit=(1.0, 0.7, 0.35), emit_strength=4.0)))
+    export("shrine_column", join(parts, "shrine_column"), box("c", (2.1, 2.1, 1.8), (0, 0, 0)))
+
+
+def monastery_wall():
+    """8 m of monastery enclosure wall: plastered brick on a stone footing, a buttress, a tile coping ridged with
+    snow; outer face at -Y. Segments butt end to end."""
+    reset()
+    parts = []
+    L, T, H = 8.0, 0.8, 3.6
+    parts.append(box("footing", (L, T + 0.2, 0.5), (0, 0, 0), M("stone_dark"), wonk=0.02))
+    parts.append(box("wall", (L, T, H - 0.5), (0, 0, 0.5), M("plaster_grey"), wonk=0.03))
+    parts.append(box("wall_damp", (L + 0.01, T + 0.02, 0.6), (0, 0, 0.5), M("plaster_grey_damp")))
+    parts.append(taper_box("butt", (0.9, 0.9, 2.8), (L / 2 - 0.5, -T / 2 - 0.4, 0), M("brick"), top=0.6))
+    parts.append(roof("coping", L + 0.05, T + 0.5, 0.45, (0, 0, H), M("tile_dark"), sag=0.0, flare=0.0, cuts=4, courses=1))
+    sn = roof_snow("coping_snow", L + 0.05, T + 0.5, 0.45, (0, 0, H), sag=0.0, flare=0.0, cuts=4, thick=0.07, cell=0.6, bare=0.12, slide=0.0, seed=98)
+    if sn:
+        parts.append(sn)
+    eave_icicles(parts, L - 0.2, T + 0.5, H - 0.02, (0, 0), seed=99, sides=(-1,), maxlen=0.35)
+    rime(parts, "-Y", -T / 2, 0.0, 1.5, L * 0.8, 1.8, seed=100)
+    export("monastery_wall", join(parts, "monastery_wall"), box("c", (L, T + 0.2, H + 0.4), (0, 0, 0)))
+
+
+def monastery_gate():
+    """Monastery gateway: an arched carriage gate with oak leaves (one ajar), a stone surround, a niche with a
+    figure of the Virgin above, a gabled tile cap; wall stubs either side. Front at -Y; walkable through."""
+    reset()
+    parts, col = [], []
+    W, T, H = 6.0, 1.2, 6.4
+    gw, gh = 3.0, 2.8 + 1.5
+    parts.append(facade("front", M("plaster_grey"), "-Y", -T / 2, -W / 2, W / 2, 0.0, H, [(0.0, 0.0, gw, gh, "round")], depth=T, back=False))
+    parts.append(box("top", (W, T, H - gh - 0.02), (0, 0, gh + 0.01), M("plaster_grey")))
+    voussoirs(parts, "-Y", -T / 2, 0.0, gh - gw / 2, gw, 0.35, M("stone"), n=11, proud=0.1, key=0.2)
+    for sx in (-1, 1):
+        parts.append(box("jamb", (0.4, 0.2, gh - gw / 2), (sx * (gw / 2 + 0.2), -T / 2 - 0.1, 0), M("stone"), bevel=0.02, seg=1))
+    leaf = fbox("leaf_l", "-Y", -T / 2, -gw / 4, -0.3, 0.0, gw / 2 - 0.04, 0.1, gh - gw / 2, M("wood_dark"))
+    parts.append(leaf)
+    leaf2 = fbox("leaf_r", "-Y", -T / 2, gw / 4, -0.3, 0.0, gw / 2 - 0.04, 0.1, gh - gw / 2, M("wood_dark"))
+    _swing(leaf2, Vector((gw / 2, -T / 2 + 0.3, 0)), math.radians(70))
+    parts.append(leaf2)
+    niche = (0.0, gh + 0.5, 0.8, 1.3, "round")
+    parts.append(slab("niche_bg", outline(*niche), "-Y", -T / 2, 0.0, 0.02, M("plaster_limeblue")))
+    parts.append(fbox("niche_sill", "-Y", -T / 2, 0.0, 0.1, gh + 0.4, 1.0, 0.25, 0.1, M("stone")))
+    parts.append(cyl("figure", 0.14, 0.7, (0, -T / 2 - 0.1, gh + 0.5), M("navy"), verts=8, r2=0.08))
+    parts.append(sphere("fig_head", 0.07, (0, -T / 2 - 0.1, gh + 1.27), M("plaster_white"), seg=8, rings=5))
+    parts.append(roof("cap", T + 0.8, W + 0.6, 1.4, (0, 0, H), M("tile_dark"), along_x=True, sag=0.03, flare=0.05, courses=2))
+    parts[-1] = parts[-1]
+    sn = roof_snow("cap_snow", T + 0.8, W + 0.6, 1.4, (0, 0, H), along_x=True, sag=0.03, flare=0.05, thick=0.06, cell=0.5, seed=101)
+    if sn:
+        parts.append(sn)
+    for sx in (-1, 1):
+        parts.append(box("stub", (2.0, 0.8, 3.6), (sx * (W / 2 + 1.0), 0.2, 0), M("plaster_grey")))
+        parts.append(box("stub_cop", (2.0, 1.1, 0.25), (sx * (W / 2 + 1.0), 0.2, 3.6), M("tile_dark")))
+        parts.append(box("stub_snow", (1.95, 1.0, 0.05), (sx * (W / 2 + 1.0), 0.2, 3.85), M("snow")))
+        col.append(box("c", ((W - gw) / 2 + 2.0, T, H), (sx * (gw / 2 + ((W - gw) / 2 + 2.0) / 2), 0, 0)))
+    col.append(box("c", (gw, T, H - gh), (0, 0, gh)))
+    icicles(parts, (-W / 2, -T / 2 - 0.4), (W / 2, -T / 2 - 0.4), H - 0.02, maxlen=0.4, seed=102)
+    visual = join(parts, "monastery_gate")
+    export("monastery_gate", visual, join(col, "col"))
+
+
+# ------------------------------------------------------------------ the castle
+def wawel_far():
+    """Wawel for the far skyline (no collision, ~6k tris): the hill, the curtain wall with the Senators' and
+    Sandomierska towers, the palace's snowy roofs round its courtyard, and the cathedral with its towers and the
+    gold dome of the Sigismund Chapel. Built at 1:1, placed ~150 m off; roofs are snow white."""
+    reset()
+    parts = []
+    snow, br, st, pl = M("snow"), M("brick"), M("stone"), M("plaster_cream")
+    hill = cyl("hill", 70.0, 12.0, (0, 0, -1.0), M("stone_dark"), verts=16, r2=55.0)
+    rng = random.Random(3)
+    edit_verts(hill, lambda co: (setattr(co, "x", co.x * (1 + rng.uniform(-0.05, 0.05))), setattr(co, "y", co.y * 0.7)))
+    parts.append(hill)
+    parts.append(cyl("hill_snow", 56.0, 0.4, (0, 0, 11.0), snow, verts=16))
+    edit_verts(parts[-1], lambda co: setattr(co, "y", co.y * 0.7))
+    # curtain wall ring
+    pts = [(math.cos(a) * 52, math.sin(a) * 34) for a in [math.tau * k / 14 for k in range(14)]]
+    for i in range(14):
+        p0, p1 = Vector((*pts[i], 0)), Vector((*pts[(i + 1) % 14], 0))
+        c = (p0 + p1) / 2
+        L = (p1 - p0).length
+        ang = math.atan2(p1.y - p0.y, p1.x - p0.x)
+        parts.append(cbox("curtain", (L + 0.5, 2.5, 8.0), (c.x, c.y, 15.0), br, rot=(0, 0, ang)))
+        parts.append(cbox("curtain_snow", (L + 0.5, 2.6, 0.3), (c.x, c.y, 19.1), snow, rot=(0, 0, ang)))
+    def tower(x, y, r, h, roof_h, cone=True):
+        parts.append(cyl("tower", r, h, (x, y, 11.0), br, verts=12))
+        parts.append(cyl("tower_band", r + 0.4, 1.2, (x, y, 11.0 + h - 1.2), st, verts=12))
+        parts.append(cyl("tower_roof", r + 0.6, roof_h, (x, y, 11.0 + h), snow if cone else M("patina"), verts=12, r2=0.1))
+    tower(-38, -24, 5.0, 22.0, 9.0)            # Senators' Tower (Lubranka)
+    tower(-50, 8, 4.5, 18.0, 7.0)              # Sandomierska
+    tower(40, -22, 4.0, 16.0, 6.0)             # Thieves' Tower
+    # the palace round its arcaded courtyard
+    for (cx, cy, L, W) in ((10, 10, 44, 10), (10, 38, 44, 10), (-7, 24, 10, 38), (27, 24, 10, 38)):
+        parts.append(box("palace", (L, W, 14.0), (cx, cy - 14, 11.0), pl))
+        parts.append(roof("palace_roof", L, W + 1.0, 6.0, (cx, cy - 14, 25.0), snow, sag=0.0, flare=0.0, cuts=2, along_x=L > W))
+        for k in range(int(max(L, W) / 4)):
+            t = -max(L, W) / 2 + 2 + k * 4
+            px, py = (cx + t, cy - 14 - W / 2 - 0.05) if L > W else (cx - L / 2 - 0.05, cy - 14 + t)
+            parts.append(box("pwin", (1.2 if L > W else 0.1, 0.1 if L > W else 1.2, 2.0), (px, py, 17.0), M("glass_warm")))
+    # cathedral: nave, towers, and the Sigismund Chapel's gold dome on its drum
+    cx, cy = -20, -8
+    parts.append(box("nave", (44, 14, 22), (cx, cy, 11.0), st))
+    parts.append(roof("nave_roof", 44, 15, 10, (cx, cy, 33.0), snow, sag=0.0, flare=0.0, cuts=2))
+    for (tx, h) in ((cx - 24, 36), (cx + 20, 30)):
+        parts.append(box("ctower", (8, 8, h), (tx, cy - 3, 11.0), br))
+        parts.append(cyl("ctower_helm", 5.0, 8.0, (tx, cy - 3, 11.0 + h), M("patina"), verts=8, r2=1.5))
+        parts.append(sphere("ctower_bulb", 2.2, (tx, cy - 3, 20.0 + h), M("patina"), seg=10, rings=6))
+        parts.append(cyl("ctower_spike", 0.4, 5.0, (tx, cy - 3, 22.0 + h), M("gold", 0.35), verts=6, r2=0.05))
+    parts.append(box("chapel", (10, 10, 14), (cx - 6, cy - 12, 11.0), st))
+    parts.append(cyl("chapel_drum", 4.2, 5.0, (cx - 6, cy - 12, 25.0), st, verts=16))
+    parts.append(sphere("sigismund_dome", 4.6, (cx - 6, cy - 12, 30.0), M("gold", 0.25), seg=20, rings=10, zscale=0.9))
+    parts.append(cyl("chapel_lantern", 1.2, 3.0, (cx - 6, cy - 12, 34.0), M("gold", 0.25), verts=10))
+    parts.append(sphere("chapel_crown", 0.9, (cx - 6, cy - 12, 37.6), M("gold", 0.25), seg=10, rings=6))
+    parts.append(sphere("vasa_dome", 3.8, (cx + 4, cy - 12, 29.0), M("patina"), seg=16, rings=8, zscale=0.9))
+    parts.append(box("vasa", (8, 8, 14), (cx + 4, cy - 12, 11.0), st))
+    # the lit windows twinkle across the river at night
+    for k in range(7):
+        parts.append(box("cwin", (1.2, 0.1, 5.0), (cx - 18 + k * 6, cy - 7.05, 18.0), M("glass_warm")))
+    visual = join(parts, "wawel_far")
+    export("wawel_far", visual, None)
+
+
+def castle_gate():
+    """Near castle gate: a square gate tower with a vaulted passage (walkable), two round flanking towers with
+    conical roofs, wall stubs with battlements, a drawbridge lowered over a dry ditch, snow on every ledge."""
+    reset()
+    parts, col = [], []
+    S, H = 8.0, 14.0
+    gw, gh = 3.4, 3.4 + 1.7
+    parts.append(facade("front", M("stone"), "-Y", -S / 2, -S / 2, S / 2, 0.0, 5.5, [(0.0, 0.0, gw, gh, "round")], depth=S, back=False))
+    parts.append(facade("back", M("stone"), "+Y", S / 2, -S / 2, S / 2, 0.0, 5.5, [(0.0, 0.0, gw, gh, "round")], depth=0.01, back=False))
+    parts.append(box("upper", (S - 0.6, S - 0.6, H - 5.5), (0, 0, 5.5), M("brick")))
+    parts.append(box("roofslab", (S, S, 0.3), (0, 0, 5.2), M("stone")))
+    ops = [(0.0, 8.0, 1.0, 1.8, "round"), (-2.4, 8.0, 0.25, 1.4, "rect"), (2.4, 8.0, 0.25, 1.4, "rect")]
+    parts.append(facade("up_f", M("brick"), "-Y", -S / 2, -S / 2, S / 2, 5.5, H, ops, depth=0.3))
+    win_unit(parts, "-Y", -S / 2, 0.0, 8.0, 1.0, 1.8, "round", surround=None, warm=True, cross=False)
+    voussoirs(parts, "-Y", -S / 2, 0.0, gh - gw / 2, gw, 0.5, M("stone_pale"), n=11, proud=0.12, key=0.2)
+    parts.append(fbox("arms", "-Y", -S / 2, 0.0, 0.08, 6.0, 1.2, 0.14, 1.4, M("stone_pale")))
+    parts.append(cyl("eagle", 0.35, 0.08, (0, -S / 2 - 0.2, 6.7), M("plaster_white"), verts=12, rot=(math.pi / 2, 0, 0), center=True))
+    parts.append(box("band", (S + 0.3, S + 0.3, 0.3), (0, 0, 5.5), M("stone"), bevel=0.02, seg=1))
+    parts.append(box("band_snow", (S + 0.2, S + 0.2, 0.03), (0, 0, 5.8), M("snow")))
+    for face, plane in (("-Y", -S / 2), ("+Y", S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        for k in range(5):
+            parts.append(fbox("corbel", face, plane, -S / 2 + 0.8 + k * 1.6, 0.25, H - 0.6, 0.35, 0.5, 0.6, M("stone")))
+    parts.append(box("parapet", (S + 0.9, S + 0.9, 1.0), (0, 0, H), M("brick")))
+    for sx in range(5):
+        for side in range(4):
+            x = -S / 2 - 0.2 + sx * (S + 0.4) / 4
+            px, py = [(x, -S / 2 - 0.25), (x, S / 2 + 0.25), (-S / 2 - 0.25, x), (S / 2 + 0.25, x)][side]
+            parts.append(box("merlon", (0.8, 0.8, 0.9), (px, py, H + 1.0), M("brick")))
+            parts.append(box("merlon_snow", (0.72, 0.72, 0.04), (px, py, H + 1.9), M("snow")))
+    parts.append(pyramid("roof", (S - 0.4, S - 0.4, 5.0), (0, 0, H + 1.0), M("tile_dark"), apex=0.2))
+    sn = cap_snow("roof_snow", lambda: pyramid("tmp", (S - 0.4, S - 0.4, 5.0), (0, 0, H + 1.0), None, apex=0.2), minz=0.3, thick=0.07, cell=0.8, slide=0.3)
+    if sn:
+        parts.append(sn)
+    for sx in (-1, 1):
+        tx = sx * (S / 2 + 2.6)
+        parts.append(cyl("rtower", 3.0, 11.0, (tx, -0.5, 0), M("brick"), verts=16))
+        parts.append(cyl("rtower_base", 3.4, 2.5, (tx, -0.5, 0), M("stone"), verts=16, r2=3.0))
+        for k in range(3):
+            a = -math.pi / 2 + (k - 1) * 0.6
+            parts.append(cbox("loop", (0.2, 0.15, 1.3), (tx + 3.02 * math.cos(a), -0.5 + 3.02 * math.sin(a), 6.0), M("void"), rot=(0, 0, a + math.pi / 2)))
+        parts.append(cyl("rtower_roof", 3.5, 5.0, (tx, -0.5, 11.0), M("tile_dark"), verts=16, r2=0.1))
+        sn = cap_snow("rt_snow", lambda tx=tx: cyl("tmp", 3.5, 5.0, (tx, -0.5, 11.0), None, verts=16, r2=0.1), minz=0.5, thick=0.06, cell=0.8, slide=0.3)
+        if sn:
+            parts.append(sn)
+        icicles(parts, (tx - 2.8, -3.9), (tx + 2.8, -3.9), 10.98, maxlen=0.5, seed=110 + sx)
+        col.append(cyl("c", 3.2, 11.0, (tx, -0.5, 0), None, verts=8))
+        wx = sx * (S / 2 + 2.6 + 3.0 + 3.0)
+        parts.append(box("wall", (6.0, 2.4, 8.0), (wx, 0.3, 0), M("brick")))
+        for k in range(3):
+            parts.append(box("wmerlon", (1.0, 0.6, 0.9), (wx - 2.0 + k * 2.0, -0.6, 8.0), M("brick")))
+            parts.append(box("wmerlon_snow", (0.92, 0.52, 0.04), (wx - 2.0 + k * 2.0, -0.6, 8.9), M("snow")))
+        parts.append(box("walk_snow", (6.0, 1.6, 0.05), (wx, 0.6, 8.0), M("snow")))
+        col.append(box("c", (6.0, 2.4, 8.0), (wx, 0.3, 0)))
+    parts.append(box("bridge", (gw - 0.2, 5.0, 0.25), (0, -S / 2 - 2.5, -0.05), M("wood")))
+    for k in range(10):
+        parts.append(box("plank", (gw - 0.2, 0.06, 0.02), (0, -S / 2 - 0.3 - k * 0.48, 0.2), M("wood_dark")))
+    for sx in (-1, 1):
+        bm = bmesh.new()
+        _tube(bm, (sx * (gw / 2 - 0.1), -S / 2 - 4.9, 0.3), (sx * (gw / 2 - 0.1), -S / 2 - 0.1, 5.0), 0.04, 0.04, n=4)
+        parts.append(_mesh_obj("chain", bm, M("iron")))
+    parts.append(box("bridge_snow", (gw - 0.8, 4.6, 0.02), (0.1, -S / 2 - 2.6, 0.2), M("snow_dirty")))
+    visual = join(parts, "castle_gate")
+    for sx in (-1, 1):
+        col.append(box("c", ((S - gw) / 2, S, H + 1), (sx * (S / 2 - (S - gw) / 4), 0, 0)))
+    col.append(box("c", (gw, S, H + 1 - gh), (0, 0, gh)))
+    export("castle_gate", visual, join(col, "col"))
+
+
+# ------------------------------------------------------------------ justice props (placed by the street-life scenes)
+def pillory():
+    """Pregierz: a wooden post on a two-step stone base with a hinged neck-and-wrist board, an iron collar on a
+    chain, a small lead cap and a snowy step."""
+    reset()
+    parts = []
+    parts.append(box("step1", (2.4, 2.4, 0.35), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.03))
+    parts.append(box("step2", (1.6, 1.6, 0.35), (0, 0, 0.35), M("stone"), bevel=0.03, seg=1, wonk=0.03))
+    parts.append(box("step_snow", (2.3, 2.3, 0.03), (0.0, 0.0, 0.35), M("snow")))
+    parts.append(box("step2_snow", (1.5, 1.5, 0.03), (0, 0, 0.7), M("snow")))
+    parts.append(box("post", (0.3, 0.3, 3.0), (0, 0.15, 0.7), M("timber"), bevel=0.02, seg=1))
+    parts.append(pyramid("cap", (0.5, 0.5, 0.35), (0, 0.15, 3.7), M("lead"), apex=0.02))
+    snow_cap(parts, 0, 0.15, 3.9, 0.15, 0.06, seg=6)
+    for zz, dz in ((1.95, 0.0), (2.13, 0.0)):
+        parts.append(box("board", (1.4, 0.1, 0.18), (0, -0.05, zz + dz), M("wood")))
+    for x, r in ((-0.45, 0.06), (0.0, 0.1), (0.45, 0.06)):
+        parts.append(cyl("hole", r, 0.12, (x, -0.05, 2.13), M("void"), verts=10, rot=(math.pi / 2, 0, 0), center=True))
+    parts.append(box("board_snow", (1.36, 0.09, 0.025), (0, -0.05, 2.31), M("snow")))
+    parts.append(box("hinge", (0.06, 0.12, 0.36), (-0.72, -0.05, 1.95), M("iron")))
+    parts.append(box("hasp", (0.06, 0.12, 0.36), (0.72, -0.05, 1.95), M("iron")))
+    parts.append(torus("collar", 0.13, 0.02, (0.0, -0.02, 1.2), M("iron"), rot=(0, 0, 0), seg=12, mseg=4))
+    bm = bmesh.new()
+    _tube(bm, (0, 0.0, 1.6), (0.05, -0.02, 1.25), 0.012, 0.012, n=4)
+    parts.append(_mesh_obj("chain", bm, M("iron")))
+    export("pillory", join(parts, "pillory"), box("c", (1.6, 1.6, 3.7), (0, 0, 0)))
+
+
+def stocks():
+    """Dyby: a low plank bench behind a two-part board with four leg holes, on oak posts; snow on the board."""
+    reset()
+    parts = [box("bench", (2.0, 0.4, 0.08), (0, 0.6, 0.42), M("wood"))]
+    for x in (-0.85, 0.85):
+        parts.append(box("bench_leg", (0.1, 0.35, 0.42), (x, 0.6, 0), M("wood_dark")))
+        parts.append(box("post", (0.16, 0.16, 0.9), (x + (0.12 if x > 0 else -0.12), 0, 0), M("timber")))
+    parts.append(box("board_lo", (2.1, 0.1, 0.2), (0, 0, 0.25), M("wood")))
+    parts.append(box("board_hi", (2.1, 0.1, 0.2), (0, 0, 0.45), M("wood")))
+    for x in (-0.65, -0.35, 0.35, 0.65):
+        parts.append(cyl("hole", 0.07, 0.12, (x, 0, 0.45), M("void"), verts=10, rot=(math.pi / 2, 0, 0), center=True))
+    parts.append(box("board_snow", (2.0, 0.09, 0.025), (0, 0, 0.65), M("snow")))
+    parts.append(box("bench_snow", (1.9, 0.36, 0.025), (0, 0.6, 0.5), M("snow")))
+    parts.append(box("hasp", (0.12, 0.12, 0.3), (1.08, 0, 0.3), M("iron")))
+    export("stocks", join(parts, "stocks"), box("c", (2.3, 1.0, 0.9), (0, 0.3, 0)))
+
+
+def whipping_post():
+    """Kuna / whipping post: an oak post on a stone block with iron rings and a chain at head height, the town
+    drum on a stand beside it (the sentence was drummed out)."""
+    reset()
+    parts = [box("block", (0.9, 0.9, 0.4), (0, 0, 0), M("stone"), bevel=0.03, seg=1, wonk=0.03),
+             box("block_snow", (0.8, 0.8, 0.03), (0, 0, 0.4), M("snow")),
+             box("post", (0.26, 0.26, 2.4), (0, 0, 0.4), M("timber"), bevel=0.02, seg=1)]
+    snow_cap(parts, 0, 0, 2.8, 0.14, 0.05, seg=6)
+    for z in (1.8, 2.1):
+        parts.append(torus("ring", 0.09, 0.018, (0, -0.2, z), M("iron"), rot=(math.pi / 2, 0, 0), seg=10, mseg=4))
+        parts.append(box("staple", (0.06, 0.06, 0.06), (0, -0.14, z + 0.08), M("iron")))
+    bm = bmesh.new()
+    _tube(bm, (0, -0.25, 1.75), (0.1, -0.3, 1.2), 0.012, 0.012, n=4)
+    parts.append(_mesh_obj("chain", bm, M("iron")))
+    dx = 1.1
+    for k in range(3):
+        a = math.tau * k / 3
+        parts.append(cbox("stand", (0.05, 0.05, 0.75), (dx + 0.25 * math.cos(a), 0.2 + 0.25 * math.sin(a), 0.36), M("wood_dark"), rot=(0.25 * math.sin(a), -0.25 * math.cos(a), 0)))
+    parts.append(cyl("drum", 0.32, 0.4, (dx, 0.2, 0.72), M("crimson"), verts=14))
+    for z in (0.72, 1.1):
+        parts.append(cyl("drum_hoop", 0.34, 0.05, (dx, 0.2, z), M("wood"), verts=14))
+    parts.append(cyl("drum_head", 0.3, 0.02, (dx, 0.2, 1.12), M("paper"), verts=14))
+    parts.append(cyl("drum_snow", 0.24, 0.02, (dx, 0.2, 1.14), M("snow"), verts=12))
+    for s in (-1, 1):
+        parts.append(cbox("stick", (0.03, 0.03, 0.4), (dx + s * 0.08, 0.15, 1.2), M("wood"), rot=(0, 1.2 * s, 0)))
+    export("whipping_post", join(parts, "whipping_post"), box("c", (0.9, 0.9, 2.8), (0, 0, 0)))
+
+
+def gallows():
+    """Szubienica outside the walls: two oak posts on a stone footing joined by a beam with braces, a noose on the
+    rope, a placard board on its own post and a ladder leaning on the beam; snow along the beam."""
+    reset()
+    parts = [box("footing", (4.4, 1.4, 0.4), (0, 0, 0), M("stone_dark"), bevel=0.03, seg=1, wonk=0.04),
+             box("footing_snow", (4.3, 1.3, 0.03), (0, 0, 0.4), M("snow"))]
+    for x in (-1.8, 1.8):
+        parts.append(box("post", (0.3, 0.3, 4.0), (x, 0, 0.4), M("timber"), bevel=0.02, seg=1, wonk=0.02))
+        parts.append(cbox("brace", (0.14, 0.14, 1.2), (x - 0.4 * (1 if x > 0 else -1), 0, 3.95), M("timber"), rot=(0, (0.8 if x > 0 else -0.8), 0)))
+    parts.append(box("beam", (4.2, 0.3, 0.3), (0, 0, 4.4), M("timber"), bevel=0.02, seg=1))
+    parts.append(box("beam_snow", (4.1, 0.26, 0.04), (0, 0, 4.7), M("snow")))
+    icicles(parts, (-1.6, -0.15), (1.6, -0.15), 4.4, maxlen=0.2, seed=120, density=3)
+    parts.append(cyl("rope", 0.02, 1.4, (0.3, 0, 3.0), M("sacking"), verts=5))
+    parts.append(torus("noose", 0.14, 0.025, (0.3, 0, 2.86), M("sacking"), rot=(math.pi / 2, 0, 0), seg=10, mseg=4))
+    parts.append(box("placard_post", (0.12, 0.12, 2.2), (2.8, -0.5, 0), M("wood_dark")))
+    parts.append(box("placard", (0.9, 0.05, 0.6), (2.8, -0.58, 1.6), M("paper_old")))
+    parts.append(box("placard_snow", (0.85, 0.06, 0.03), (2.8, -0.58, 2.2), M("snow")))
+    for sx in (-0.22, 0.22):
+        parts.append(cbox("ladder", (0.07, 0.07, 4.6), (-0.8 + sx, -0.9, 2.15), M("wood"), rot=(math.radians(-12), 0, 0)))
+    for k in range(10):
+        parts.append(box("lrung", (0.5, 0.05, 0.05), (-0.8, -0.95 + k * 0.085, 0.35 + k * 0.42), M("wood")))
+    export("gallows", join(parts, "gallows"), box("c", (4.4, 1.4, 4.7), (0, 0, 0)))
+
+
+# ------------------------------------------------------------------ CITY WALLS, GATES, THE COLLEGIUM, STREET GUTTERS
+def city_tower():
+    """Wall tower (baszta) of the city ring: a square brick tower on a battered stone base, arrow loops, a band of
+    machicolation corbels, a tiled pyramid roof under snow. Outer face at -Y; wawel_wall segments butt its sides."""
+    reset()
+    parts = []
+    S, H = 7.0, 13.0
+    base = box("batter", (S + 0.8, S + 0.8, 3.0), (0, 0, 0), M("stone"), wonk=0.02)
+    edit_verts(base, lambda co: (setattr(co, "x", co.x * (0.94 if co.z > 1.5 else 1.0)), setattr(co, "y", co.y * (0.94 if co.z > 1.5 else 1.0))))
+    parts.append(base)
+    parts.append(box("shaft", (S, S, H - 3.0), (0, 0, 3.0), M("brick"), wonk=0.03))
+    for face, plane in (("-Y", -S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        for zz in (5.0, 8.5):
+            parts.append(fbox("loop", face, plane, 0.0, 0.01, zz, 0.2, 0.03, 1.2, M("void")))
+            parts.append(fbox("loop_x", face, plane, 0.0, 0.015, zz + 0.5, 0.5, 0.03, 0.14, M("void")))
+    parts.append(box("band", (S + 0.3, S + 0.3, 0.25), (0, 0, 3.0), M("stone")))
+    for face, plane in (("-Y", -S / 2), ("+Y", S / 2), ("-X", -S / 2), ("+X", S / 2)):
+        for k in range(4):
+            parts.append(fbox("corbel", face, plane, -S / 2 + 0.9 + k * 1.75, 0.2, H - 0.6, 0.3, 0.4, 0.6, M("stone")))
+    parts.append(box("parapet", (S + 0.6, S + 0.6, 0.9), (0, 0, H), M("brick")))
+    parts.append(box("par_snow", (S + 0.5, S + 0.5, 0.04), (0, 0, H + 0.9), M("snow")))
+    parts.append(pyramid("roof", (S + 1.0, S + 1.0, 5.0), (0, 0, H + 0.9), M("tile_dark"), apex=0.15))
+    sn = cap_snow("roof_snow", lambda: pyramid("tmp", (S + 1.0, S + 1.0, 5.0), (0, 0, H + 0.9), None, apex=0.15), minz=0.3, thick=0.06, cell=0.9, bare=0.15, slide=0.15)
+    if sn:
+        parts.append(sn)
+    parts.append(cyl("finial", 0.08, 1.2, (0, 0, H + 5.9), M("iron"), verts=6, r2=0.02))
+    for s in (-1, 1):
+        icicles(parts, (-S / 2, s * (S / 2 + 0.45)), (S / 2, s * (S / 2 + 0.45)), H + 0.9, maxlen=0.4, seed=5 + s)
+    export("city_tower", join(parts, "city_tower"), box("c", (S + 0.8, S + 0.8, H + 1.0), (0, 0, 0)))
+
+
+def florian_gate():
+    """St Florian's Gate: a tall Gothic gate tower on the north wall, a pointed passage straight through (walkable),
+    stone lower storeys, brick above with blind niches, the Piast eagle relief, a Baroque copper helm with a
+    lantern, ribs and snow. Outside (towards the Barbican) at -Y."""
+    reset()
+    parts, col = [], []
+    S, H = 10.0, 22.0
+    gw, gh = 3.8, 3.8 + 2.4
+    parts.append(facade("front", M("stone"), "-Y", -S / 2, -S / 2, S / 2, 0.0, 7.0, [(0.0, 0.0, gw, gh, "pointed")], depth=S, back=False))
+    parts.append(facade("back", M("stone"), "+Y", S / 2, -S / 2, S / 2, 0.0, 7.0, [(0.0, 0.0, gw, gh, "pointed")], depth=0.01, back=False))
+    voussoirs(parts, "-Y", -S / 2, 0.0, gh - gw * 0.866, gw, 0.45, M("stone_pale"), shape="pointed", n=10, proud=0.12, key=0.1)
+    voussoirs(parts, "+Y", S / 2, 0.0, gh - gw * 0.866, gw, 0.45, M("stone_pale"), shape="pointed", n=10, proud=0.12, key=0.1)
+    parts.append(box("slab", (S, S, 0.3), (0, 0, 6.8), M("stone")))
+    parts.append(box("upper", (S - 0.4, S - 0.4, H - 7.0), (0, 0, 7.0), M("brick")))
+    for face, plane in (("-Y", -S / 2 + 0.2), ("+Y", S / 2 - 0.2), ("-X", -S / 2 + 0.2), ("+X", S / 2 - 0.2)):
+        for a in (-2.6, 0.0, 2.6):
+            parts.append(slab("niche", outline(a, 12.5, 1.4, 5.5, "pointed"), face, plane, 0.0, 0.03, M("plaster_white")))
+        parts.append(fbox("band", face, plane, 0.0, 0.1, 11.8, S, 0.2, 0.25, M("stone")))
+        parts.append(fbox("band_snow", face, plane, 0.0, 0.1, 12.05, S - 0.1, 0.2, 0.03, M("snow")))
+    parts.append(fbox("eagle_plate", "-Y", -S / 2, 0.0, 0.1, 8.0, 2.2, 0.15, 2.6, M("stone_pale")))
+    parts.append(blob("eagle", (1.4, 0.2, 1.6), (0, -S / 2 - 0.25, 8.4), M("stone_pale"), subsurf=1))
+    for sx in (-1, 1):
+        parts.append(taper_box("butt", (1.2, 1.2, 12.0), (sx * (S / 2 + 0.3), -S / 2 + 0.3, 0), M("brick"), top=0.5))
+    parts.append(box("parapet", (S + 0.6, S + 0.6, 1.0), (0, 0, H), M("brick")))
+    parts.append(box("par_snow", (S + 0.5, S + 0.5, 0.04), (0, 0, H + 1.0), M("snow")))
+    icicles(parts, (-S / 2, -S / 2 - 0.35), (S / 2, -S / 2 - 0.35), H + 1.0, maxlen=0.5, seed=13)
+    # the Baroque helm
+    z = H + 1.0
+    parts.append(pyramid("helm_base", (S - 0.8, S - 0.8, 2.6), (0, 0, z), M("patina"), apex=2.6))
+    parts.append(cyl("helm_drum", 2.4, 2.4, (0, 0, z + 2.6), M("patina"), verts=12))
+    parts.append(sphere("helm_bulb", 2.9, (0, 0, z + 6.2), M("patina"), seg=16, rings=10, zscale=0.9))
+    dome_ribs(parts, 0, 0, z + 6.2, 2.9, n=8, zscale=0.9, mat=M("gold", 0.35), z_from=-0.5, width=0.05)
+    sn = cap_snow("helm_snow", lambda: sphere("tmp", 2.9, (0, 0, z + 6.2), None, seg=16, rings=10, zscale=0.9), minz=0.6, thick=0.05, cell=0.5, bare=0.2)
+    if sn:
+        parts.append(sn)
+    sn = cap_snow("base_snow", lambda: pyramid("tmp", (S - 0.8, S - 0.8, 2.6), (0, 0, z), None, apex=2.6), minz=0.3, thick=0.06, cell=0.8, bare=0.15, slide=0.1)
+    if sn:
+        parts.append(sn)
+    parts.append(cyl("lantern", 0.8, 2.2, (0, 0, z + 8.7), M("patina"), verts=8))
+    parts.append(sphere("lant_bulb", 0.9, (0, 0, z + 11.3), M("patina"), seg=10, rings=6))
+    parts.append(cyl("spire", 0.2, 3.0, (0, 0, z + 12.0), M("gold", 0.35), verts=6, r2=0.02))
+    visual = join(parts, "florian_gate")
+    for sx in (-1, 1):
+        col.append(box("c", ((S - gw) / 2, S, H + 1), (sx * (S / 2 - (S - gw) / 4), 0, 0)))
+    col.append(box("c", (gw, S, H + 1 - gh), (0, 0, gh)))
+    export("florian_gate", visual, join(col, "col"))
+
+
+def barbican():
+    """The Barbican: a round brick bastion (r 12 m) in front of St Florian's Gate, a walkable passage straight
+    through along Y between two gate-necks, a crenellated wall-walk, seven slender turrets with conical caps,
+    arrow loops in tiers; snow on every merlon. Origin at the centre; the gate-necks face -Y and +Y."""
+    reset()
+    parts, col = [], []
+    R, T, H = 12.0, 2.2, 10.0
+    n = 24
+    for k in range(n):
+        a = math.tau * (k + 0.5) / n
+        c = Vector((math.cos(a), math.sin(a), 0)) * (R - T / 2)
+        if abs(math.cos(a)) < 0.2:                 # passage gaps at +-Y
+            continue
+        L = 2 * R * math.tan(math.pi / n) + 0.1
+        parts.append(cbox("ring", (L, T, H), (c.x, c.y, H / 2), M("brick"), rot=(0, 0, a + math.pi / 2)))
+        col.append(cbox("c", (L, T, H), (c.x, c.y, H / 2), None, rot=(0, 0, a + math.pi / 2)))
+        parts.append(cbox("merlon", (L * 0.55, 0.7, 1.0), (c.x * (R - 0.35) / (R - T / 2), c.y * (R - 0.35) / (R - T / 2), H + 0.5), M("brick"), rot=(0, 0, a + math.pi / 2)))
+        parts.append(cbox("merlon_snow", (L * 0.5, 0.64, 0.04), (c.x * (R - 0.35) / (R - T / 2), c.y * (R - 0.35) / (R - T / 2), H + 1.02), M("snow"), rot=(0, 0, a + math.pi / 2)))
+        parts.append(cbox("walk_snow", (L, T - 0.8, 0.05), (c.x * (R - T / 2 - 0.3) / (R - T / 2), c.y * (R - T / 2 - 0.3) / (R - T / 2), H + 0.02), M("snow"), rot=(0, 0, a + math.pi / 2)))
+        for zz in (3.0, 6.5):
+            cc = Vector((math.cos(a), math.sin(a), 0)) * (R + 0.01)
+            parts.append(cbox("loop", (0.16, 0.05, 1.0), (cc.x, cc.y, zz), M("void"), rot=(0, 0, a + math.pi / 2)))
+    parts.append(cyl("batter", R + 0.8, 1.6, (0, 0, 0), M("stone"), verts=24, r2=R + 0.1))
+    for sy in (-1, 1):                               # gate-necks
+        y0 = sy * (R + 1.0)
+        for sx in (-1, 1):
+            parts.append(box("neck", (1.8, 4.0, H + 2.0), (sx * 2.6, y0, 0), M("brick")))
+            col.append(box("c", (1.8, 4.0, H + 2.0), (sx * 2.6, y0, 0)))
+        parts.append(box("neck_top", (7.0, 4.0, 3.0), (0, y0, H - 1.0), M("brick")))
+        parts.append(box("neck_snow", (6.9, 3.9, 0.05), (0, y0, H + 2.0), M("snow")))
+        parts.append(arch("neck_arch", 3.4, 5.2, 4.2, (0, y0, 0), M("void"), bevel=0))
+        voussoirs(parts, "-Y" if sy < 0 else "+Y", sy * (R + 3.0), 0.0, 3.5, 3.4, 0.4, M("stone_pale"), n=9, proud=0.1)
+        parts.append(pyramid("neck_roof", (7.4, 4.4, 2.6), (0, y0, H + 2.0), M("tile_dark"), apex=0.1))
+    for k in range(7):
+        a = math.tau * (k + 0.5) / 7 + 0.2
+        c = Vector((math.cos(a), math.sin(a), 0)) * (R + 0.3)
+        if abs(math.cos(a)) < 0.3:
+            continue
+        parts.append(cyl("turret", 1.1, 4.0, (c.x, c.y, H), M("brick"), verts=10))
+        parts.append(cyl("turret_cap", 1.4, 3.6, (c.x, c.y, H + 4.0), M("tile_dark"), verts=10, r2=0.05))
+        parts.append(cyl("turret_snow", 1.2, 1.6, (c.x, c.y, H + 4.6), M("snow"), verts=10, r2=0.35))
+    parts.append(cyl("court_snow", R - T, 0.03, (0, 0, 0), M("snow_dirty"), verts=24))
+    visual = join(parts, "barbican")
+    export("barbican", visual, join(col, "col"))
+
+
+def collegium_maius():
+    """Collegium Maius, the university's Gothic college (c. 1500): four brick wings round an arcaded courtyard,
+    stone window frames with crossed mullions, a stepped gable and an oriel on the street front, a gate passage
+    from the street (-Y) into the courtyard. 20 x 28 m."""
+    reset()
+    parts, col = [], []
+    W, D, H, T = 20.0, 28.0, 10.0, 5.0
+    br, st = M("brick"), M("stone_pale")
+    gw = 2.6
+    # street wing (front) with the gate passage
+    ops = [(0.0, 0.0, gw, 3.0 + 1.3, "round")] + [(x, zz, 1.1, 1.8, "rect") for zz in (1.6, 5.4) for x in (-7.0, -4.0, 4.0, 7.0)] + [(x, 5.4, 1.1, 1.8, "rect") for x in (-1.3, 1.3)]
+    parts.append(facade("front", br, "-Y", -D / 2, -W / 2, W / 2, 0.0, H, ops, depth=REV, back=True))
+    parts.append(box("front_mass", (W, T - REV, H), (0, -D / 2 + REV + (T - REV) / 2, 0), br))
+    parts.append(slab("gate_void", outline(0.0, 0.0, gw, 4.3, "round"), "-Y", -D / 2, -T + 0.1, -T + 0.12, M("void")))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", -D / 2, a, zb, w, h, sh, warm=RNG.random() < 0.5, surround="stone_pale", cross=True, mark=zb < 3)
+    voussoirs(parts, "-Y", -D / 2, 0.0, 3.0, gw, 0.3, st, n=9, proud=0.08)
+    col.append(box("c", ((W - gw) / 2, T, H), (-(gw / 2 + (W - gw) / 4), -D / 2 + T / 2, 0)))
+    col.append(box("c", ((W - gw) / 2, T, H), ((gw / 2 + (W - gw) / 4), -D / 2 + T / 2, 0)))
+    # side and back wings
+    for sx in (-1, 1):
+        parts.append(box("side", (T, D - 2 * T, H), (sx * (W / 2 - T / 2), 0, 0), br))
+        col.append(box("c", (T, D - 2 * T, H), (sx * (W / 2 - T / 2), 0, 0)))
+        for k in range(4):
+            yy = -D / 2 + T + 2.0 + k * 4.2
+            parts.append(fbox("sw", "-X" if sx < 0 else "+X", sx * W / 2, -yy if sx < 0 else yy, 0.02, 5.4, 1.0, 0.03, 1.8, M("glass_warm" if k % 2 else "glass")))
+    parts.append(box("back", (W, T, H), (0, D / 2 - T / 2, 0), br))
+    col.append(box("c", (W, T, H), (0, D / 2 - T / 2, 0)))
+    # courtyard arcade (cloister) on the inner faces
+    cw, cd = W - 2 * T, D - 2 * T
+    for k in range(6):
+        for (x, y) in [(-cw / 2 + 0.3 + k * (cw - 0.6) / 5, -cd / 2 + 1.4), (-cw / 2 + 0.3 + k * (cw - 0.6) / 5, cd / 2 - 1.4)]:
+            parts.append(cyl("arc_col", 0.18, 3.2, (x, y, 0), st, verts=8))
+    parts.append(box("gallery", (cw, 1.8, 0.4), (0, -cd / 2 + 0.9, 3.2), st))
+    parts.append(box("gallery2", (cw, 1.8, 0.4), (0, cd / 2 - 0.9, 3.2), st))
+    parts.append(box("gal_snow", (cw - 0.2, 1.7, 0.04), (0, -cd / 2 + 0.9, 3.6), M("snow")))
+    parts.append(box("court_floor", (cw, cd, 0.03), (0, 0, 0), M("snow")))
+    # roofs: a steep tiled roof on each wing with snow
+    for (L_, W_, loc, ax) in ((W + 0.8, T + 1.0, (0, -D / 2 + T / 2, H), True), (W + 0.8, T + 1.0, (0, D / 2 - T / 2, H), True),
+                              (D - 2 * T, T + 1.0, (-W / 2 + T / 2, 0, H), False), (D - 2 * T, T + 1.0, (W / 2 - T / 2, 0, H), False)):
+        parts.append(roof("roof", L_, W_, 4.2, loc, M("tile_dark"), sag=0.06, flare=0.05, along_x=ax, courses=3, ridge=True))
+        sn = roof_snow("roof_snow", L_, W_, 4.2, loc, sag=0.06, flare=0.05, along_x=ax, thick=0.07, cell=1.0, seed=int(loc[0] + loc[1]))
+        if sn:
+            parts.append(sn)
+    icicles(parts, (-W / 2, -D / 2 - 0.5), (W / 2, -D / 2 - 0.5), H - 0.02, seed=17, maxlen=0.5)
+    # stepped gable on the street end and a stone oriel
+    for k in range(5):
+        zz = H + 4.2 * k / 5
+        hw = W / 2 * (1 - k / 5)
+        for sx in (-1, 1):
+            parts.append(box("step", (0.8, 0.5, 4.2 / 5), (sx * (hw - 0.4), -D / 2 + 0.25, zz), br))
+            parts.append(box("step_snow", (0.75, 0.45, 0.035), (sx * (hw - 0.4), -D / 2 + 0.25, zz + 4.2 / 5), M("snow")))
+    parts.append(box("oriel", (2.2, 1.0, 2.6), (5.5, -D / 2 - 0.5, 4.2), st))
+    parts.append(fbox("oriel_glass", "-Y", -D / 2 - 1.0, 5.5, 0.01, 4.6, 1.6, 0.02, 1.8, M("glass_stained")))
+    parts.append(pyramid("oriel_corbel", (2.2, 1.0, 1.0), (5.5, -D / 2 - 0.5, 4.2), st))
+    edit_verts(parts[-1], lambda co: setattr(co, "z", 2 * 4.2 - co.z))
+    parts.append(pyramid("oriel_roof", (2.4, 1.2, 1.0), (5.5, -D / 2 - 0.5, 6.8), M("patina")))
+    parts.append(box("oriel_snow", (1.6, 0.6, 0.12), (5.5, -D / 2 - 0.5, 7.2), M("snow"), bevel=0.05, seg=1))
+    chimney(parts, -6.0, D / 2 - T / 2, H + 1.5, h=2.5)
+    visual = join(parts, "collegium_maius")
+    export("collegium_maius", visual, join(col, "col"))
+
+
+def gutter_channel():
+    """Street gutter (rynsztok), straight 4 m along X: two dressed lip stones standing 4 cm proud of the cobbles
+    either side of a dished stone channel whose floor sits 3-4 cm below the lips, a thin dark wet strip of
+    snow-melt (low roughness), skins of ice. Lies on the paving (y=0); no collision."""
+    reset()
+    parts = []
+    L = 4.0
+    for sy in (-1, 1):
+        for k in range(5):
+            x = -L / 2 + 0.4 + k * 0.8
+            parts.append(box("lip", (0.78, 0.16, 0.045), (x, sy * 0.22, -0.005), M("stone")))
+        b = box("dish", (L, 0.16, 0.02), (0, sy * 0.1, -0.005), M("stone_dark"))
+        edit_verts(b, lambda co, sy=sy: setattr(co, "z", co.z - (0.012 if abs(co.y) < 0.05 else 0.0)))
+        parts.append(b)
+    parts.append(box("wet", (L, 0.18, 0.004), (0, 0, 0.004), M("water", 0.04)))
+    rng = random.Random(5)
+    for k in range(3):
+        x = -L / 2 + 0.6 + k * 1.3 + rng.uniform(-0.2, 0.2)
+        parts.append(box("ice", (rng.uniform(0.25, 0.5), 0.14, 0.004), (x, rng.uniform(-0.02, 0.02), 0.009), M("ice", 0.05)))
+    parts.append(box("slush_l", (L, 0.12, 0.025), (0, -0.36, 0.0), M("snow_dirty")))
+    export("gutter_channel", join(parts, "gutter_channel"), None)
+
+
+def gutter_corner():
+    """Mitred corner piece of the gutter: two 1 m arms (along +X and +Y from the origin, the turn's inside in the
+    +X+Y quadrant) meeting on the mitre, same lip-dish-wet section as gutter_channel."""
+    reset()
+    parts = []
+    def sw(co):
+        co.x, co.y = co.y, co.x
+    for arm in (0, 1):
+        ps = [box("lip_in", (0.78, 0.16, 0.045), (0.22 + 0.39, 0.22, -0.005), M("stone")),
+              box("lip_out", (1.3, 0.16, 0.045), (-0.3 + 0.65, -0.22, -0.005), M("stone")),
+              box("dish", (1.0, 0.28, 0.015), (0.5, 0, -0.008), M("stone_dark")),
+              box("wet", (1.0, 0.18, 0.004), (0.5, 0, 0.004), M("water", 0.04))]
+        if arm:
+            for o in ps:
+                edit_verts(o, sw)
+                o.data.flip_normals()
+        parts += ps
+    parts.append(box("mitre_wet", (0.28, 0.28, 0.004), (0, 0, 0.004), M("water", 0.04)))
+    export("gutter_corner", join(parts, "gutter_corner"), None)
+
+
+def gutter_slab():
+    """Crossing slab: a 1.4 m worn stone slab bridging the gutter at a doorway or a lane crossing, the channel
+    running on under it. Across X (the gutter runs along X)."""
+    reset()
+    parts = [box("slab", (1.4, 1.0, 0.08), (0, 0, 0.0), M("stone"), bevel=0.02, seg=1, wonk=0.02),
+             box("slab_snow", (0.6, 0.5, 0.012), (0.2, 0.1, 0.08), M("snow_dirty"), wonk=0.04)]
+    for sx in (-1, 1):
+        parts.append(box("dark", (0.04, 0.18, 0.02), (sx * 0.71, 0, 0.0), M("void")))
+    export("gutter_slab", join(parts, "gutter_slab"), None)
+
+
+def gutter_outfall():
+    """Drain / outfall where a street gutter ends: a stone drain box with an iron grate over a dark sump, the
+    channel's last metre sloping into it, a fringe of icicles on the lip of the spout on the moat side (+X)."""
+    reset()
+    parts = [box("box", (0.9, 0.9, 0.12), (0, 0, -0.08), M("stone_dark"), bevel=0.02, seg=1),
+             box("sump", (0.6, 0.6, 0.02), (0, 0, 0.02), M("void"))]
+    for k in range(5):
+        parts.append(box("grate", (0.04, 0.62, 0.03), (-0.24 + k * 0.12, 0, 0.03), M("iron")))
+    parts.append(box("grate_x", (0.62, 0.04, 0.03), (0, 0, 0.035), M("iron")))
+    parts.append(box("spout", (0.5, 0.3, 0.12), (0.6, 0, -0.1), M("stone")))
+    icicles(parts, (0.85, -0.12), (0.85, 0.12), -0.1, maxlen=0.35, seed=3, density=20, gap=0.2)
+    parts.append(box("ice_sheet", (0.6, 0.5, 0.01), (1.0, 0, -0.35), M("ice", 0.05), wonk=0.05))
+    export("gutter_outfall", join(parts, "gutter_outfall"), None)
+
+
+PASS3_BUILDS = [("city_tower", city_tower), ("florian_gate", florian_gate), ("barbican", barbican),
+                ("collegium_maius", collegium_maius), ("gutter_corner", gutter_corner), ("gutter_slab", gutter_slab),
+                ("gutter_outfall", gutter_outfall)]
+
+
+# ------------------------------------------------------------------ GROUND SLABS, BACK YARDS AND CLIMBING (pass 4)
+# Climbable geometry: extra collision boxes exported as climb_<kind>_<n>-colonly children of the asset (kinds: vault
+# <= 1.2 m, mantle <= 2.4 m, ledge for sills, parapets, balconies and gallery decks, pipe for straight climbs such as
+# drainpipes and ladders). outer_city.gd puts their StaticBody3D in group "climbable" with meta climb_kind.
+def climb(kind, size, center, rot=(0, 0, 0)):
+    o = cbox("climb", size, center, None, rot=rot)
+    _CLIMB.append((kind, o))
+    return o
+
+
+def _tx_flags(g):
+    """Worn sandstone flagstones: staggered rows of large slabs (5 across, 4 rows per 4 m, jittered widths), wide
+    dark joints packed with grit and frost, polished wear paths, pale lime stains and chipped arrises."""
+    cu, cv, iu, iv, par = g.cells(5.0, 4.0, 0.37)
+    d = g.mn(g.mul(g.edge(cu), 4.0 / 5.0), g.mul(g.edge(cv), 1.0))
+    joint = g.one_minus(g.smooth(d, 0.012, 0.03))
+    chip = g.mul(g.smooth(g.noise(40, 40, 3, seed=92), 0.55, 0.7), g.one_minus(g.smooth(d, 0.03, 0.08)))
+    r = g.white(iu, iv, 12.0)
+    col = g.ramp(r, [(0.0, (0.36, 0.33, 0.28)), (0.35, (0.50, 0.45, 0.37)), (0.7, (0.60, 0.54, 0.44)), (1.0, (0.44, 0.39, 0.32))])
+    grime = g.smooth(g.noise(8, 8, 5, 0.6, seed=98), 0.4, 0.75)
+    col = g.mix(g.mul(grime, 0.5), col, (0.24, 0.22, 0.19))
+    bed = g.noise(2.0, 20, 3, 0.5, dist=0.5, seed=93)
+    col = g.mix(g.mul(g.sub(bed, 0.4), 0.4), col, (0.48, 0.43, 0.35))
+    wear = g.smooth(g.noise(2, 6, 3, seed=94), 0.5, 0.7)
+    col = g.mix(g.mul(wear, 0.25), col, (0.74, 0.70, 0.62))
+    stain = g.smooth(g.noise(6, 6, 4, seed=95), 0.62, 0.72)
+    col = g.mix(g.mul(stain, 0.35), col, (0.80, 0.78, 0.72))
+    frost = g.smooth(g.noise(30, 30, 2, seed=96), 0.4, 0.7)
+    jcol = g.mix(frost, (0.16, 0.15, 0.13), (0.62, 0.66, 0.72))
+    col = g.mix(g.mul(chip, 0.5), col, (0.40, 0.36, 0.30))
+    col = g.mix(joint, col, jcol)
+    grain = g.noise(180, 180, 2, seed=97)
+    h = g.sub(g.add(0.7, g.mul(grain, 0.1)), g.add(g.mul(joint, 0.6), g.mul(chip, 0.25)))
+    h = g.add(h, g.mul(g.sub(r, 0.5), 0.08))
+    rough = g.sub(g.add(0.72, g.mul(grain, 0.1)), g.mul(wear, 0.25))
+    return col, rough, h, 0.02
+
+
+def _tx_mud(g):
+    """Frozen packed earth of alleys, yards and suburban roads: brown-grey clay with two cart ruts running along v,
+    frozen puddles in the ruts and hollows (dark, glossy, low roughness), trodden straw, grit and snow in patches."""
+    lumps = g.noise(5, 5, 4, 0.55, seed=101)
+    fine = g.noise(150, 150, 2, seed=102)
+    # ruts: two troughs along v at u = 0.3 and 0.7 of the repeat, wobbling
+    wob = g.mul(g.sub(g.noise(1, 3, 2, seed=103), 0.5), 0.05)
+    uu = g.add(g.u, wob)
+    rut = g.mx(g.one_minus(g.smooth(g.m("ABSOLUTE", g.sub(uu, 0.3)), 0.01, 0.06)), g.one_minus(g.smooth(g.m("ABSOLUTE", g.sub(uu, 0.7)), 0.01, 0.06)))
+    hollow = g.smooth(g.sub(0.5, lumps), 0.08, 0.2)
+    pmask = g.smooth(g.noise(3, 9, 3, seed=107), 0.55, 0.65)
+    puddle = g.mul(g.smooth(g.add(g.mul(rut, 0.7), g.mul(hollow, 0.6)), 0.6, 0.66), pmask)
+    col = g.mix(g.smooth(lumps, 0.3, 0.7), (0.14, 0.11, 0.08), (0.38, 0.31, 0.22))
+    col = g.mix(g.mul(g.smooth(g.noise(12, 12, 4, seed=108), 0.3, 0.7), 0.5), col, (0.28, 0.24, 0.20))
+    col = g.mix(g.mul(rut, 0.45), col, (0.16, 0.12, 0.09))
+    col = g.mix(g.mul(g.smooth(fine, 0.6, 0.8), 0.4), col, (0.44, 0.40, 0.34))
+    straw = g.mul(g.smooth(g.noise(260, 12, 2, dist=0.6, seed=104), 0.72, 0.78), g.smooth(g.noise(4, 4, 3, seed=105), 0.5, 0.65))
+    col = g.mix(g.mul(straw, 0.8), col, (0.62, 0.52, 0.30))
+    snow = g.smooth(g.noise(7, 7, 4, seed=106), 0.6, 0.66)
+    col = g.mix(g.mul(snow, g.one_minus(rut)), col, (0.78, 0.80, 0.84))
+    col = g.mix(g.mul(puddle, 0.85), col, (0.12, 0.13, 0.15))
+    h = g.sub(g.add(g.mul(lumps, 0.5), g.mul(fine, 0.1)), g.add(g.mul(rut, 0.35), g.mul(puddle, 0.1)))
+    h = g.add(h, g.mul(snow, 0.15))
+    rough = g.lerp(puddle, g.add(0.82, g.mul(fine, 0.1)), 0.12)
+    return col, rough, h, 0.03
+
+
+RECIPES.update({"flags": _tx_flags, "mud": _tx_mud})
+TEXSPEC.update({"flags": (2048, 4.0), "mud": (2048, 4.0)})
+HEIGHT_EXPORT.update({"flags", "mud"})
+PAL.update({"flags": (1.0, 1.0, 1.0), "mud": (1.0, 1.0, 1.0), "mud_light": (1.0, 1.0, 1.0), "cobble_rough": (1.0, 1.0, 1.0)})
+TEX_OF.update({"flags": "flags", "mud": "mud", "mud_light": "mud", "cobble_rough": "cobbles"})
+TINT.update({"flags": (1, 1, 1), "mud": (1, 1, 1), "mud_light": (1.35, 1.3, 1.22), "cobble_rough": (0.74, 0.70, 0.66)})
+
+
+def _slab(name, key, rut=0.0, jitter=0.004, sink=0.0, extra=None):
+    """4 x 4 m tileable ground slab like ground_cobbles: top near z=0, texture exactly once across it."""
+    reset()
+    bpy.ops.mesh.primitive_grid_add(x_subdivisions=4, y_subdivisions=4, size=4.0, location=(0, 0, 0))
+    top = _finish_prim(bpy.context.object, "top", M(key))
+    _tag(top, mat=M(key), offset=(0.5, 0.5))
+    rng = random.Random(len(name))
+    def f(co):
+        edge = abs(abs(co.x) - 2) < 1e-3 or abs(abs(co.y) - 2) < 1e-3
+        if rut:
+            for ux in (-0.8, 0.8):
+                co.z -= rut * max(0.0, 1.0 - abs(co.x - ux) / 0.3)
+        if not edge:
+            co.z += rng.uniform(-jitter, jitter * 0.3) - sink
+    edit_verts(top, f)
+    parts = [top] + (extra() if extra else [])
+    export(name, join(parts, name) if len(parts) > 1 else top, None)
+
+
+def ground_flags(): _slab("ground_flags", "flags", jitter=0.003)
+def ground_cobbles_lo(): _slab("ground_cobbles_lo", "cobble", jitter=0.006)
+def ground_cobbles_rough(): _slab("ground_cobbles_rough", "cobble_rough", jitter=0.02, sink=0.01)
+def ground_mud(): _slab("ground_mud", "mud", rut=0.05, jitter=0.015)
+def ground_gravel(): _slab("ground_gravel", "mud_light", jitter=0.008)
+
+
+def ground_planks():
+    """Plank walkway for the deep-mud suburban roads: 4 m of boards on two sleepers, 1.2 m wide, top at 0.1 m."""
+    reset()
+    parts = []
+    for sy in (-0.45, 0.45):
+        parts.append(box("sleeper", (4.0, 0.14, 0.08), (0, sy, 0.0), M("timber")))
+    for k in range(13):
+        parts.append(box("board", (0.28, 1.2, 0.03), (-1.85 + k * 0.308, 0, 0.08), M("wood")))
+    parts.append(box("snow", (1.4, 0.5, 0.012), (0.6, 0.2, 0.11), M("snow_dirty")))
+    export("ground_planks", join(parts, "ground_planks"), None)
+
+
+def snow_drift():
+    """Snow drift banked against a wall: 4 m along X, its back flat to the wall at y=0, sloping out 0.9 m to -Y."""
+    reset()
+    bm = bmesh.new()
+    rng = random.Random(7)
+    rows = []
+    for i in range(9):
+        x = -2.0 + 0.5 * i
+        h = 0.35 + 0.18 * math.sin(i * 1.3) + rng.uniform(-0.05, 0.05)
+        if i in (0, 8):
+            h = 0.05
+        d = 0.5 + h * 1.2
+        rows.append([bm.verts.new((x, 0.02, -0.02)), bm.verts.new((x, 0.02, h)), bm.verts.new((x, -d * 0.45, h * 0.75)), bm.verts.new((x, -d, -0.02))])
+    for a, b in zip(rows, rows[1:]):
+        for k in range(3):
+            bm.faces.new((a[k], a[k + 1], b[k + 1], b[k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = _mesh_obj("drift", bm, M("snow"))
+    for p in o.data.polygons:
+        p.use_smooth = True
+    export("snow_drift", o, None)
+
+
+def ladder():
+    """A timber ladder leaning on a wall (4.4 m, foot 1.1 m out at -Y): climbable (pipe)."""
+    reset()
+    parts = []
+    ang = math.atan2(1.1, 4.3)
+    for sx in (-0.24, 0.24):
+        parts.append(cbox("rail", (0.07, 0.07, 4.45), (sx, -0.55, 2.15), M("wood"), rot=(-ang, 0, 0)))
+    for k in range(13):
+        t = (k + 0.5) / 13
+        parts.append(box("rung", (0.52, 0.045, 0.045), (0, -1.1 + t * 1.1, t * 4.3), M("wood_dark")))
+    parts.append(box("snow", (0.5, 0.06, 0.02), (0, -1.05, 0.45), M("snow")))
+    climb("pipe", (0.7, 0.5, 4.4), (0, -0.55, 2.2), rot=(-ang, 0, 0))
+    export("ladder", join(parts, "ladder"), None)
+
+
+def low_wall():
+    """Yard wall, 6 m along X, 1.1 m high (vault), rubble stone with a tile coping and snow."""
+    reset()
+    parts = [box("wall", (6.0, 0.5, 1.0), (0, 0, 0), M("stone_dark"), wonk=0.03),
+             roof("coping", 6.1, 0.7, 0.18, (0, 0, 1.0), M("tile_dark"), sag=0.0, flare=0.0, cuts=3),
+             box("snow", (5.9, 0.3, 0.05), (0, 0, 1.13), M("snow"), bevel=0.02, seg=1)]
+    climb("vault", (6.0, 0.6, 1.15), (0, 0, 0.575))
+    export("low_wall", join(parts, "low_wall"), None)
+
+
+def water_butt():
+    """Rain barrel under a downpipe, iced over (vault)."""
+    reset()
+    parts = [cyl("butt", 0.42, 1.0, (0, 0, 0), M("wood"), verts=12, r2=0.46),
+             cyl("ice", 0.4, 0.02, (0, 0, 0.98), M("ice", 0.05), verts=12),
+             cyl("snow", 0.3, 0.03, (0.05, 0.05, 1.0), M("snow"), verts=10)]
+    for z in (0.15, 0.85):
+        parts.append(cyl("hoop", 0.46, 0.05, (0, 0, z), M("iron"), verts=12))
+    climb("vault", (0.9, 0.9, 1.02), (0, 0, 0.51))
+    export("water_butt", join(parts, "water_butt"), None)
+
+
+def yard_shed():
+    """Lean-to shed for a back yard: board walls, a shingle roof falling from 2.6 m (back, +Y) to 2.1 m (front),
+    snow on it; its roof is solid to stand on (mantle from the ground or from a crate)."""
+    reset()
+    parts = []
+    W, D = 3.2, 2.4
+    parts.append(box("walls", (W, D, 2.1), (0, 0, 0), M("timber"), wonk=0.03))
+    parts.append(box("door", (0.8, 0.05, 1.8), (-0.6, -D / 2 - 0.02, 0), M("wood_dark")))
+    r = box("roof", (W + 0.4, D + 0.5, 0.1), (0, 0, 2.1), M("shingle"))
+    edit_verts(r, lambda co: setattr(co, "z", co.z + (co.y + D / 2) / D * 0.5))
+    parts.append(r)
+    s = box("roof_snow", (W + 0.3, D + 0.3, 0.06), (0, 0, 2.2), M("snow"), bevel=0.03, seg=1)
+    edit_verts(s, lambda co: setattr(co, "z", co.z + (co.y + D / 2) / D * 0.5))
+    parts.append(s)
+    icicles(parts, (-W / 2, -D / 2 - 0.25), (W / 2, -D / 2 - 0.25), 2.08, maxlen=0.3, seed=21)
+    c = box("c", (W, D, 2.1), (0, 0, 0))
+    rc = climb("mantle", (W + 0.4, D + 0.5, 0.3), (0, 0, 2.3))
+    edit_verts(rc, lambda co: setattr(co, "z", co.z + (co.y + D / 2) / D * 0.5))
+    export("yard_shed", join(parts, "yard_shed"), c)
+
+
+def yard_stair():
+    """Outside timber stair (a courtyard gallery's access): 10 steps up the wall (+Y side against it) to a 3.4 m
+    landing with a rail; the treads are solid (a ramp collider), the landing is a ledge."""
+    reset()
+    parts, col = [], []
+    for k in range(10):
+        parts.append(box("tread", (0.32, 1.0, 0.06), (-2.6 + k * 0.32, 0.0, 0.34 * (k + 1) - 0.06), M("wood")))
+        parts.append(box("tread_snow", (0.2, 0.9, 0.015), (-2.6 + k * 0.32, 0.0, 0.34 * (k + 1)), M("snow_dirty")))
+    parts.append(cbox("stringer", (3.6, 0.1, 0.25), (-1.15, -0.5, 1.7), M("timber"), rot=(0, math.atan2(-3.4, 3.2), 0)))
+    parts.append(box("landing", (1.6, 1.2, 0.12), (1.2, 0.1, 3.3), M("wood")))
+    for x in (0.45, 1.95):
+        parts.append(box("post", (0.12, 0.12, 3.4), (x, -0.45, 0), M("timber")))
+    parts.append(box("rail", (1.6, 0.06, 0.06), (1.2, -0.45, 4.3), M("wood")))
+    parts.append(box("rail_snow", (1.5, 0.06, 0.02), (1.2, -0.45, 4.36), M("snow")))
+    ramp = climb("mantle", (4.4, 1.0, 0.2), (-1.0, 0.0, 1.6), rot=(0, math.atan2(-3.4, 3.2) * 0.98, 0))
+    climb("ledge", (1.6, 1.2, 0.12), (1.2, 0.1, 3.36))
+    export("yard_stair", join(parts, "yard_stair"), box("c", (0.2, 0.2, 3.3), (1.95, 0.55, 0)))
+
+
+def perch_ledge():
+    """A timber hoarding balcony between two first-floor windows (1.6 m wide, 0.9 m out, deck at 4.3 m), with a
+    board parapet to crouch behind: an eavesdropping perch. Wall-mounted: origin on the wall face at ground level,
+    front at -Y."""
+    reset()
+    parts = []
+    z = 4.3
+    parts.append(box("deck", (1.6, 0.9, 0.08), (0, -0.45, z - 0.08), M("wood_dark")))
+    for x in (-0.7, 0.7):
+        parts.append(cbox("brace", (0.08, 0.08, 1.1), (x, -0.4, z - 0.5), M("timber"), rot=(math.radians(40), 0, 0)))
+    parts.append(box("parapet", (1.6, 0.05, 0.7), (0, -0.88, z), M("wood")))
+    for x in (-0.78, 0.78):
+        parts.append(box("side", (0.05, 0.85, 0.7), (x, -0.45, z), M("wood")))
+    parts.append(box("par_snow", (1.55, 0.06, 0.03), (0, -0.88, z + 0.7), M("snow")))
+    icicles(parts, (-0.8, -0.9), (0.8, -0.9), z - 0.08, maxlen=0.3, seed=31, density=5)
+    climb("ledge", (1.6, 0.9, 0.12), (0, -0.45, z - 0.06))
+    climb("vault", (1.6, 0.08, 0.7), (0, -0.88, z + 0.35))
+    export("perch_ledge", join(parts, "perch_ledge"), None)
+
+
+def sien_passage():
+    """A through-passage (sien) where an alley cuts a block: two tenement shoulders 8.6 m deep with a vaulted
+    passage 2.4 m wide and 3.2 m high between them under a bridging upper storey, windows over the arch, a lantern,
+    steps down into the yard at the back. Front (street) at -Y; walkable through."""
+    reset()
+    parts, col = [], []
+    W, D, H = 3.6, 8.6, 10.4
+    gw, gh = 2.4, 3.2
+    parts.append(facade("front", M("plaster_grey"), "-Y", -D / 2, -W / 2, W / 2, 0.0, 4.2, [(0.0, 0.0, gw, gh, "round")], depth=D, back=False))
+    parts.append(facade("back", M("plaster_grey"), "+Y", D / 2, -W / 2, W / 2, 0.0, 4.2, [(0.0, 0.0, gw, gh, "round")], depth=0.01, back=False))
+    voussoirs(parts, "-Y", -D / 2, 0.0, gh - gw / 2, gw, 0.3, M("stone"), n=9, proud=0.08, key=0.12)
+    parts.append(box("upper", (W, D, H - 4.2), (0, 0, 4.2), M("plaster_grey")))
+    for zz in (5.2, 8.4):
+        parts.append(fbox("win", "-Y", -D / 2, 0.0, 0.01, zz, 0.8, 0.03, 1.4, M("glass_warm" if zz < 6 else "glass")))
+        parts.append(fbox("sill", "-Y", -D / 2, 0.0, 0.06, zz - 0.1, 1.0, 0.12, 0.1, M("stone")))
+        parts.append(fbox("sill_snow", "-Y", -D / 2, 0.0, 0.06, zz, 0.95, 0.1, 0.025, M("snow")))
+    parts.append(roof("roof", D + 0.8, W + 0.6, 2.4, (0, 0, H), M("tile_dark"), along_x=False, sag=0.03, flare=0.05, cuts=3))
+    sn = roof_snow("roof_snow", D + 0.8, W + 0.6, 2.4, (0, 0, H), along_x=False, sag=0.03, flare=0.05, cuts=3, thick=0.06, cell=0.8, seed=41)
+    if sn:
+        parts.append(sn)
+    parts.append(box("floor", (gw, D, 0.04), (0, 0, 0), M("flags")))
+    parts.append(box("lantern", (0.2, 0.2, 0.3), (0, -D / 2 + 0.6, gh - 0.5), M("gold", 0.3, emit=(1.0, 0.7, 0.35), emit_strength=3.0)))
+    for sx in (-1, 1):
+        col.append(box("c", ((W - gw) / 2, D, H), (sx * (gw / 2 + (W - gw) / 4), 0, 0)))
+    col.append(box("c", (gw, D, H - gh), (0, 0, gh)))
+    export("sien_passage", join(parts, "sien_passage"), join(col, "col"))
+
+
+PASS4_BUILDS = [("ground_flags", ground_flags), ("ground_cobbles_lo", ground_cobbles_lo), ("ground_cobbles_rough", ground_cobbles_rough), ("ground_mud", ground_mud),
+                ("ground_gravel", ground_gravel), ("ground_planks", ground_planks), ("snow_drift", snow_drift),
+                ("ladder", ladder), ("low_wall", low_wall), ("water_butt", water_butt), ("yard_shed", yard_shed),
+                ("yard_stair", yard_stair), ("perch_ledge", perch_ledge), ("sien_passage", sien_passage)]
+
+
+# ------------------------------------------------------------------ THE FINALE NIGHT (pass 5): bathhouse, the kingpin's
+# warehouse and townhouse, carpenter's yard, guillotine, torches, riot and fire damage
+def extra(name, objs):
+    """Keep objs as a separate child node called `name` (not joined into the visual): runtime-tagged parts such as
+    the cargo hook or the flammable bales."""
+    o = join(objs, name) if len(objs) > 1 else objs[0]
+    o.name = name
+    _EXTRA.append((name, o))
+    return o
+
+
+def mark_named(name, loc, rot_z=0.0):
+    """An anchor empty with an exact name (Door_front, Gate, ...)."""
+    _MARKS.append(["!" + name, Vector(loc), rot_z])
+
+
+def bathhouse():
+    """Laznia: a low vaulted bathhouse by the river, 14 x 10 m: brick walls with small high windows, a barrel
+    vault under tiles and snow (the snow thinner over the warm vault), a squat chimney that steams, a door with
+    a bench and a bucket. Interior footprint 12 x 8 m (walls 1 m thick), door at the middle of the -Y front."""
+    reset()
+    parts = []
+    W, D, H = 14.0, 10.0, 3.4
+    ops = [(0.0, 0.0, 1.3, 2.2, "rect")] + [(x, 2.2, 0.8, 0.6, "seg") for x in (-4.6, -2.4, 2.4, 4.6)]
+    y = front_block(parts, W, D, H, M("brick"), ops)
+    parts.append(fbox("door", "-Y", y, 0.0, -REV + 0.05, 0.0, 1.26, 0.06, 2.16, M("wood_dark")))
+    parts.append(fbox("door_lintel", "-Y", y, 0.0, 0.05, 2.2, 1.7, 0.12, 0.25, M("stone")))
+    mark_named("Door_front", _wp("-Y", y, 0.0, 0.0, 0.05))
+    for (a, zb, w, h, sh) in ops[1:]:
+        win_unit(parts, "-Y", y, a, zb, w, h, sh, warm=True, surround=None, head=None, cross=False)
+    parts.append(box("plinth", (W + 0.1, D + 0.1, 0.5), (0, 0, 0), M("stone_dark")))
+    vault = cyl("vault", D / 2 + 0.4, W + 0.6, (0, 0, H), M("tile_dark"), verts=16, rot=(0, math.pi / 2, 0), center=True)
+    bm = bmesh.new()
+    bm.from_mesh(vault.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < H - 0.01], context="VERTS")
+    bm.to_mesh(vault.data)
+    bm.free()
+    parts.append(vault)
+    sn = cap_snow("vault_snow", lambda: cyl("tmp", D / 2 + 0.4, W + 0.6, (0, 0, H), None, verts=16, rot=(0, math.pi / 2, 0), center=True), minz=0.55, thick=0.04, cell=0.8, bare=0.35)
+    if sn:
+        parts.append(sn)
+    for sx in (-1, 1):
+        gable_slab(parts, "-X" if sx < 0 else "+X", sx * W / 2, -D / 2, D / 2, H, D / 2, M("brick"), thick=0.3)
+    parts.append(box("chimney", (1.1, 1.1, 3.0), (3.5, 2.0, H + 3.0), M("brick"), bevel=0.02, seg=1))
+    parts.append(box("chim_cap", (1.3, 1.3, 0.15), (3.5, 2.0, H + 6.0), M("stone_dark")))
+    mark("Chimney", (3.5, 2.0, H + 6.3))
+    parts.append(box("bench", (1.6, 0.4, 0.08), (-2.0, y - 0.35, 0.45), M("wood")))
+    for x in (-2.6, -1.4):
+        parts.append(box("bench_leg", (0.08, 0.35, 0.45), (x, y - 0.35, 0), M("wood")))
+    parts.append(cyl("bucket", 0.18, 0.3, (2.0, y - 0.4, 0), M("wood"), verts=10))
+    parts.append(box("wet", (2.0, 1.4, 0.01), (0, y - 0.8, 0), M("ice", 0.05)))
+    icicles(parts, (-W / 2, y - 0.3), (W / 2, y - 0.3), H, maxlen=0.5, seed=51)
+    export("bathhouse", join(parts, "bathhouse"), box("c", (W, D, H + D / 2), (0, 0, 0)))
+
+
+def kingpin_warehouse():
+    """The kingpin's store on the quay: a brick ground floor and a boarded upper floor, a wide loading door, an
+    upper hatch with a hoist beam and the cargo hook on its rope (separate node CargoHook: rig, drop), casks and
+    straw-bound bales stacked outside (Bales: flammable), a small office with a lit window on the side, a back
+    door to the alley. 16 x 12 m, front (river side) at -Y."""
+    reset()
+    parts, col = [], []
+    W, D, GF, H = 16.0, 12.0, 4.0, 8.0
+    ops = [(-2.0, 0.0, 3.6, 3.4, "rect"), (4.5, 1.4, 1.0, 1.2, "rect")]
+    y = front_block(parts, W, D, GF, M("brick"), ops)
+    parts.append(slab("load_dark", outline(-2.0, 0.0, 3.6, 3.4), "-Y", y, -REV - 0.5, -REV - 0.48, M("void")))
+    for sx in (-1, 1):
+        leaf = fbox("leaf", "-Y", y, -2.0 + sx * 0.9, -REV + 0.05, 0.0, 1.76, 0.07, 3.36, M("wood_dark"))
+        _swing(leaf, _wp("-Y", y, -2.0 + sx * 1.8, 0, -REV + 0.05), math.radians(100) * (1 if sx < 0 else -1) * -1)
+        parts.append(leaf)
+    win_unit(parts, "-Y", y, 4.5, 1.4, 1.0, 1.2, "rect", bars=True, surround=None, head="lintel")
+    uops = [(-2.0, GF + 0.3, 2.0, 2.2, "rect"), (4.5, GF + 1.0, 0.9, 1.1, "rect"), (-6.0, GF + 1.0, 0.9, 1.1, "rect")]
+    y2 = front_block(parts, W, D, H - GF, M("timber"), uops, z0=GF)
+    parts.append(slab("hatch_dark", outline(-2.0, GF + 0.3, 2.0, 2.2), "-Y", y2, -REV - 0.4, -REV - 0.38, M("void")))
+    for (a, zb, w, h, sh) in uops[1:]:
+        win_unit(parts, "-Y", y2, a, zb, w, h, sh, surround=None, head=None, warm=False)
+    for k in range(12):
+        parts.append(fbox("batten", "-Y", y2, -W / 2 + 0.2 + k * (W - 0.4) / 11, 0.03, GF, 0.06, 0.05, H - GF, M("wood_dark")))
+    col.append(box("c", (W, D, H), (0, 0, 0)))
+    _roof_set(parts, W + 0.8, D + 1.0, 4.0, (0, 0, H), M("tile_dark"), courses=4, seed=61)
+    # hoist beam over the hatch and the hook on its rope
+    parts.append(box("hoist", (0.3, 2.4, 0.3), (-2.0, y2 - 1.0, GF + 3.3), M("timber")))
+    parts.append(cbox("hoist_brace", (0.15, 1.4, 0.15), (-2.0, y2 - 0.5, GF + 2.8), M("timber"), rot=(math.radians(45), 0, 0)))
+    parts.append(cyl("pulley", 0.18, 0.1, (-2.0, y2 - 2.0, GF + 3.15), M("iron"), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    hook = [cyl("hook_rope", 0.02, 3.4, (-2.0, y2 - 2.0, GF - 0.35), M("sacking"), verts=5),
+            torus("hook", 0.14, 0.03, (-2.0, y2 - 2.0, GF - 0.45), M("iron"), rot=(math.pi / 2, 0, 0), seg=10, mseg=4),
+            box("hook_block", (0.12, 0.12, 0.25), (-2.0, y2 - 2.0, GF - 0.3), M("iron"))]
+    extra("CargoHook", hook)
+    # office annex on +X with its lit window
+    parts.append(box("office", (3.0, 4.0, 3.0), (W / 2 + 1.5, -1.0, 0), M("plaster_grey")))
+    parts.append(box("office_win", (0.05, 1.0, 1.0), (W / 2 + 3.02, -1.0, 1.2), M("glass_warm")))
+    parts.append(fbox("office_win_f", "-Y", -3.0, W / 2 + 1.5, 0.02, 1.2, 1.0, 0.03, 1.0, M("glass_warm")))
+    parts.append(roof("office_roof", 3.4, 4.4, 0.8, (W / 2 + 1.5, -1.0, 3.0), M("shingle"), along_x=False, sag=0.02, flare=0.0, cuts=3))
+    sn = roof_snow("office_snow", 3.4, 4.4, 0.8, (W / 2 + 1.5, -1.0, 3.0), along_x=False, sag=0.02, flare=0.0, cuts=3, thick=0.05, cell=0.6, seed=62)
+    if sn:
+        parts.append(sn)
+    col.append(box("c", (3.0, 4.0, 3.0), (W / 2 + 1.5, -1.0, 0)))
+    # back door to the alley (+Y)
+    parts.append(fbox("back_door", "+Y", D / 2, 5.0, 0.03, 0.0, 1.1, 0.06, 2.1, M("wood_dark")))
+    mark_named("Door_back", _wp("+Y", D / 2, 5.0, 0.0, 0.05), math.pi)
+    mark_named("Door_front", _wp("-Y", y, -2.0, 0.0, 0.05))
+    # casks (poisonable) and bales (flammable) on the quay
+    casks = []
+    for k in range(6):
+        casks.append(cyl("cask", 0.45, 0.9, (-7.0 + (k % 3) * 0.95, y - 1.0 - (k // 3) * 0.95, 0), M("wood"), verts=12, r2=0.45))
+        casks.append(cyl("cask_snow", 0.36, 0.03, (-7.0 + (k % 3) * 0.95, y - 1.0 - (k // 3) * 0.95, 0.9), M("snow"), verts=10))
+    extra("Casks", casks)
+    col.append(box("c", (3.0, 2.0, 0.9), (-6.05, y - 1.5, 0)))
+    bales = []
+    for k in range(5):
+        bx = 2.0 + (k % 3) * 1.25
+        bz = 0.0 if k < 3 else 0.8
+        bales.append(box("bale", (1.2, 0.8, 0.8), (bx + (0.6 if k >= 3 else 0), y - 1.2, bz), M("hay"), bevel=0.06, seg=1))
+        bales.append(box("bale_band", (0.06, 0.82, 0.82), (bx + (0.6 if k >= 3 else 0) - 0.3, y - 1.2, bz - 0.01), M("sacking")))
+    extra("Bales", bales)
+    col.append(box("c", (3.8, 0.9, 1.6), (3.25, y - 1.2, 0)))
+    parts.append(box("snow_drift", (W, 0.8, 0.2), (0, D / 2 + 0.4, 0), M("snow"), bevel=0.15, seg=2, wonk=0.1))
+    climb("pipe", (0.3, 0.3, H), (W / 2 - 0.2, y - 0.1, H / 2))
+    export("kingpin_warehouse", join(parts, "kingpin_warehouse"), join(col, "col"))
+
+
+def carpenter_yard():
+    """Carpenter's yard (ciesla) outside Kleparz: stacks of squared timber and planks under snow, a sawpit with a
+    log on its trestles and the long two-man saw, a work shed, shavings (flammable)."""
+    reset()
+    parts, col = [], []
+    for k in range(3):
+        for j in range(4):
+            parts.append(box("timber", (5.0, 0.3, 0.3), (-1.0, -3.0 + k * 1.2 + (j % 2) * 0.35, j * 0.32), M("timber")))
+        parts.append(box("timber_snow", (4.9, 0.8, 0.05), (-1.0, -2.8 + k * 1.2, 1.28), M("snow")))
+        col.append(box("c", (5.0, 0.9, 1.3), (-1.0, -2.8 + k * 1.2, 0)))
+    parts.append(box("pit_rim", (4.0, 1.4, 0.2), (3.0, 2.0, 0), M("wood_dark")))
+    parts.append(box("pit_dark", (3.6, 1.0, 0.02), (3.0, 2.0, 0.19), M("void")))
+    for x in (1.6, 4.4):
+        parts.append(box("trestle", (0.2, 1.4, 0.2), (x, 2.0, 0.2), M("timber")))
+    parts.append(cyl("log", 0.3, 4.4, (3.0, 2.0, 0.7), M("log"), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    parts.append(box("saw", (0.04, 0.02, 2.2), (3.4, 2.0, 0.0), M("iron")))
+    parts.append(box("saw_h", (0.5, 0.04, 0.04), (3.4, 2.0, 2.2), M("wood")))
+    col.append(box("c", (4.0, 1.4, 1.0), (3.0, 2.0, 0)))
+    parts.append(box("shed", (3.0, 2.0, 2.2), (-4.5, 3.0, 0), M("timber")))
+    r = box("shed_roof", (3.4, 2.6, 0.1), (-4.5, 3.0, 2.2), M("shingle"))
+    edit_verts(r, lambda co: setattr(co, "z", co.z + (co.y - 1.7) * 0.25))
+    parts.append(r)
+    parts.append(box("shed_snow", (3.3, 2.4, 0.05), (-4.5, 3.0, 2.3), M("snow")))
+    col.append(box("c", (3.0, 2.0, 2.2), (-4.5, 3.0, 0)))
+    climb("mantle", (3.4, 2.6, 0.3), (-4.5, 3.0, 2.35))
+    extra("Shavings", [box("shavings", (1.6, 1.2, 0.2), (1.0, 3.2, 0), M("straw"), bevel=0.1, seg=2, wonk=0.1)])
+    export("carpenter_yard", join(parts, "carpenter_yard"), join(col, "col"))
+
+
+def guillotine():
+    """Guillotine on a scaffold: a plank platform with steps, two grooved uprights and a crossbar, the angled
+    blade in its weighted block held up by a rope to a cleat, the two-part lunette and a tilting bench, a basket.
+    (An import of the Revolution for the finale, not a Krakow fixture.)"""
+    reset()
+    parts = []
+    parts.append(box("platform", (4.0, 3.0, 1.4), (0, 0, 0), M("wood_dark")))
+    for k in range(10):
+        parts.append(box("plank", (0.38, 3.0, 0.03), (-1.8 + k * 0.4, 0, 1.4), M("wood")))
+    for k in range(5):
+        parts.append(box("step", (1.2, 0.35, 0.28 * (k + 1)), (-1.2, 1.5 + 0.35 * (4 - k) + 0.175, 0), M("wood")))
+    for sx in (-0.4, 0.4):
+        parts.append(box("upright", (0.16, 0.2, 4.0), (sx + 0.9, -0.6, 1.43), M("wood_dark")))
+    parts.append(box("crossbar", (1.2, 0.3, 0.25), (0.9, -0.6, 5.43), M("wood_dark")))
+    blade = [box("weight", (0.66, 0.16, 0.4), (0.9, -0.6, 4.4), M("iron")),
+             wedge("blade", (0.64, 0.05, 0.4), (0.9, -0.6, 4.0), M("iron"))]
+    edit_verts(blade[1], lambda co: setattr(co, "z", co.z + (co.x - 0.9) * 0.45))
+    parts += blade
+    parts.append(cyl("rope", 0.012, 1.2, (0.9, -0.6, 4.8), M("sacking"), verts=5))
+    parts.append(box("cleat", (0.06, 0.1, 0.2), (1.35, -0.5, 2.6), M("iron")))
+    parts.append(box("lunette_lo", (0.64, 0.1, 0.16), (0.9, -0.6, 1.9), M("wood")))
+    parts.append(box("lunette_hi", (0.64, 0.1, 0.16), (0.9, -0.6, 2.06), M("wood")))
+    parts.append(box("bench", (0.4, 1.8, 0.1), (0.9, 0.4, 1.8), M("wood")))
+    parts.append(box("bench_leg", (0.3, 0.1, 0.4), (0.9, 1.2, 1.43), M("wood_dark")))
+    parts.append(cyl("basket", 0.3, 0.35, (0.9, -1.1, 1.43), M("straw"), verts=10))
+    parts.append(box("snow", (1.6, 1.0, 0.03), (-1.0, -0.6, 1.43), M("snow")))
+    export("guillotine", join(parts, "guillotine"), box("c", (4.0, 3.0, 1.4), (0, 0, 0)))
+
+
+def guillotine_parts():
+    """The guillotine unbuilt: its timbers, the crated blade and the bench roped on a cart."""
+    reset()
+    parts = []
+    parts.append(box("bed", (1.4, 3.0, 0.15), (0, 0, 0.6), M("wood")))
+    for sx in (-1, 1):
+        parts.append(cyl("wheel", 0.6, 0.12, (sx * 0.8, 0.3, 0.6), M("wood_dark"), verts=14, rot=(0, math.pi / 2, 0), center=True))
+    for k in range(4):
+        parts.append(box("beam", (0.2, 3.2, 0.2), (-0.45 + k * 0.3, 0, 0.75), M("wood_dark")))
+    parts.append(box("crate", (0.9, 0.6, 0.5), (0.1, -0.8, 0.95), M("wood")))
+    parts.append(box("bench", (0.4, 1.8, 0.1), (0.2, 0.6, 0.95), M("wood")))
+    for y in (-1.2, 0.0, 1.2):
+        parts.append(box("rope", (1.45, 0.04, 0.04), (0, y, 1.1), M("sacking")))
+    parts.append(cyl("shaft", 0.05, 1.8, (0, -2.3, 0.5), M("wood_dark"), verts=6, rot=(math.pi / 2 - 0.2, 0, 0), center=True))
+    parts.append(box("snow", (1.2, 2.6, 0.03), (0, 0, 0.97), M("snow")))
+    export("guillotine_parts", join(parts, "guillotine_parts"), box("c", (1.8, 3.2, 1.2), (0, 0, 0)))
+
+
+def torch():
+    """A pitch-wrapped torch on a stick (0.9 m, origin at the grip end's bottom), its tip glowing (emissive)."""
+    reset()
+    parts = [cyl("stick", 0.025, 0.7, (0, 0, 0), M("wood_dark"), verts=6, r2=0.02),
+             cyl("wrap", 0.05, 0.22, (0, 0, 0.66), M("soot"), verts=8, r2=0.06),
+             blob("flame", (0.12, 0.12, 0.22), (0, 0, 0.84), M("flame", 0.9, emit=(1.0, 0.55, 0.12), emit_strength=9.0))]
+    mark("Furnace", (0, 0, 0.95))
+    export("torch", join(parts, "torch"), None)
+
+
+def torch_wall():
+    """A torch in a wrought-iron wall bracket (origin on the wall face, front -Y), tip glowing."""
+    reset()
+    parts = [box("plate", (0.12, 0.03, 0.3), (0, -0.015, 1.9), M("iron")),
+             cbox("arm", (0.03, 0.35, 0.03), (0, -0.17, 2.05), M("iron"), rot=(math.radians(-30), 0, 0)),
+             torus("ring", 0.05, 0.012, (0, -0.33, 2.15), M("iron"), seg=10, mseg=4),
+             cbox("stick", (0.04, 0.04, 0.6), (0, -0.36, 2.25), M("wood_dark"), rot=(math.radians(-15), 0, 0)),
+             blob("wrap", (0.1, 0.1, 0.18), (0, -0.44, 2.46), M("soot")),
+             blob("flame", (0.12, 0.12, 0.22), (0, -0.46, 2.6), M("flame", 0.9, emit=(1.0, 0.55, 0.12), emit_strength=9.0))]
+    mark("Furnace", (0, -0.46, 2.72))
+    export("torch_wall", join(parts, "torch_wall"), None)
+
+
+def broken_stall():
+    """A market stall wrecked in a riot: the counter kicked over, a post snapped, the awning torn and hanging."""
+    reset()
+    parts = [box("counter", (2.4, 1.2, 1.1), (0.2, 0.4, 0), M("wood"), rot=(0, 0, 0.3))]
+    edit_verts(parts[0], lambda co: setattr(co, "z", co.z * 0.9))
+    for (x, y, h, t) in ((-1.15, -0.55, 2.4, 0.0), (1.15, -0.55, 1.2, 0.4), (-1.15, 0.55, 2.4, 0.1), (1.15, 0.55, 0.8, 0.9)):
+        parts.append(cbox("post", (0.14, 0.14, h), (x, y, h / 2), M("wood_dark"), rot=(t, 0, 0)))
+    aw = roof("awning", 3.0, 2.0, 0.7, (0, 0, 2.0), M("canvas"), sag=0.3, flare=0.25, cuts=4)
+    edit_verts(aw, lambda co: setattr(co, "z", co.z - max(0.0, co.x) * 0.6))
+    parts.append(aw)
+    for k in range(5):
+        parts.append(blob("debris", (0.3, 0.2, 0.1), (RNG.uniform(-2, 2), RNG.uniform(-1.5, 1.5), 0), M("wood" if k % 2 else "crust")))
+    export("broken_stall", join(parts, "broken_stall"), box("c", (2.6, 1.6, 1.1), (0.2, 0.4, 0)))
+
+
+def broken_shutter():
+    """A shutter torn off its hinges lying in the snow, a slat or two sprung (1.0 x 1.6 m)."""
+    reset()
+    parts = [box("leaf", (0.6, 1.6, 0.04), (0, 0, 0.0), M("shutter"), rot=(0.1, 0.05, 0.3))]
+    parts.append(box("slat", (0.5, 0.08, 0.02), (0.4, 0.3, 0.02), M("shutter"), rot=(0, 0, 1.0)))
+    parts.append(box("hinge", (0.3, 0.04, 0.01), (-0.2, 0.6, 0.05), M("iron")))
+    export("broken_shutter", join(parts, "broken_shutter"), None)
+
+
+def charred_patch():
+    """Scorch on the ground (and up a wall at +Y) after a fire: black soot, ash, a few charred timbers, melted snow."""
+    reset()
+    parts = [cyl("soot", 2.2, 0.01, (0, 0, 0), M("soot", 0.95), verts=16),
+             cyl("ash", 1.4, 0.015, (0.3, -0.2, 0), M("plaster_grey"), verts=12),
+             box("wall_soot", (3.0, 0.02, 2.4), (0, 1.9, 0), M("soot", 0.95))]
+    edit_verts(parts[0], lambda co: (setattr(co, "x", co.x * RNG.uniform(0.8, 1.1))))
+    for k in range(4):
+        parts.append(cbox("charred", (1.2, 0.14, 0.14), (RNG.uniform(-1, 1), RNG.uniform(-1, 1), 0.07), M("soot", 0.9), rot=(0, 0, RNG.uniform(0, 3))))
+    parts.append(cyl("melt", 2.6, 0.005, (0, 0, 0.0), M("water", 0.05), verts=16))
+    export("charred_patch", join(parts, "charred_patch"), None)
+
+
+def kingpin_house():
+    """The kingpin's townhouse: a broad late-Baroque three-storey palace front (20 m) with an attic parapet and urns,
+    a rusticated ground floor with a carriage gate (sien) into a courtyard, a wrought-iron balcony over the gate,
+    tall lit windows with drawn curtains, a pair of lanterns at the gate, a doorman's bench and a bell pull, a
+    bought coat of arms, his steps swept clean. Behind: the courtyard with a stable, a well, a back stair to a
+    gallery, a privy and a back gate to the alley. Roof access from the neighbour's side by drainpipe and
+    chimney-breast steps. Front at -Y. Main block 20 x 10 m (x -10..10, y -12..-2); courtyard y -2..10; back wall
+    at y 11."""
+    reset()
+    parts, col = [], []
+    W, D, GF, FL = 20.0, 10.0, 4.6, 3.8
+    y0 = -12.0
+    H = GF + 2 * FL
+    wall = M("plaster_straw")
+    white = M("plaster_white")
+    cy = y0 + D / 2
+    gw, gh = 3.2, 3.0 + 1.6
+    # ground floor with the gate passage straight through the block
+    gops = [(0.0, 0.0, gw, gh, "round"), (-6.0, 0.0, 1.5, 2.6 + 0.75, "round"), (-8.6, 1.3, 1.2, 2.2, "rect"), (-3.2, 1.3, 1.2, 2.2, "rect"),
+            (3.6, 1.3, 1.2, 2.2, "rect"), (6.2, 1.3, 1.2, 2.2, "rect"), (8.6, 1.3, 1.2, 2.2, "rect")]
+    parts.append(facade("gf_front", white, "-Y", y0, -W / 2, W / 2, 0.0, GF, gops, depth=REV, back=True))
+    parts.append(facade("gf_back", white, "+Y", y0 + D, -W / 2, W / 2, 0.0, GF, gops[:1], depth=0.01, back=False))
+    for sx in (-1, 1):                              # the gate passage: side walls and a vault through the block
+        parts.append(box("gf_mass", ((W - gw) / 2 - 0.02, D - REV, GF), (sx * (gw / 2 + (W - gw) / 4), cy + REV / 2, 0), white))
+    parts.append(box("gf_over_gate", (gw + 0.04, D - REV, GF - gh), (0, cy + REV / 2, gh), white))
+    vault_ = cyl("passage_vault", gw / 2, D - REV, (0, cy + REV / 2, gh - gw / 2), M("plaster_white"), verts=12, rot=(math.pi / 2, 0, 0), center=True)
+    edit_verts(vault_, lambda co: setattr(co, "z", max(co.z, gh - gw / 2)))
+    parts.append(vault_)
+    parts.append(box("passage_floor", (gw, D, 0.03), (0, cy, 0), M("flags")))
+    door_unit(parts, "-Y", y0, -6.0, 1.5, 2.6, portal=True, surround="stone_pale")
+    for (a, zb, w, h, sh) in gops[2:]:
+        win_unit(parts, "-Y", y0, a, zb, w, h, sh, warm=True, bars=True, surround="stone_pale", mark=True, glass="glass_warm")
+    rustication(parts, "-Y", y0, -W / 2, W / 2, 0.5, GF - 0.3, gops, course=0.55, proud=0.04, mat=white)
+    voussoirs(parts, "-Y", y0, 0.0, gh - gw / 2, gw, 0.4, M("stone_pale"), n=11, proud=0.12, key=0.22)
+    mascaron(parts, "-Y", y0, 0.0, gh + 0.45, s=0.34)
+    parts.append(fbox("gf_band", "-Y", y0, 0.0, 0.08, GF - 0.25, W + 0.1, 0.2, 0.25, M("stone_pale")))
+    mark_named("Gate", _wp("-Y", y0, 0.0, 0.0, 0.1))
+    mark_named("Door_front", _wp("-Y", y0, -6.0, 0.0, 0.1))
+    # upper storeys
+    xs = [-8.4, -5.0, -1.7, 1.7, 5.0, 8.4]
+    uops = [(x, GF + s * FL + (0.25 if (s == 0 and abs(x) < 2) else 0.7), 1.25, 2.55 if (s == 0 and abs(x) < 2) else 2.2, "rect") for s in range(2) for x in xs]
+    parts.append(box("upper", (W, D - REV, 2 * FL), (0, cy + REV / 2, GF), wall))
+    parts.append(facade("up_front", wall, "-Y", y0, -W / 2 - 0.01, W / 2 + 0.01, GF, H, uops))
+    for (a, zb, w, h, sh) in uops:
+        win_unit(parts, "-Y", y0, a, zb, w, h, sh, warm=True, surround="stone_pale", mark=zb < GF + FL, glass="glass_warm",
+                 head="lintel" if zb > GF + FL else None, sill=not (zb < GF + 1 and abs(a) < 2), snow=True)
+        # drawn curtains behind the glass: dark red panels leaving a lit slit
+        for sx in (-1, 1):
+            parts.append(fbox("curtain", "-Y", y0, a + sx * w * 0.3, -REV - 0.04, zb + 0.05, w * 0.42, 0.02, h - 0.2, M("crimson")))
+        if zb < GF + FL and abs(a) > 2:
+            zt = zb + 2.35
+            parts.append(slab("ped", [(a - 0.9, zt), (a + 0.9, zt), (a, zt + 0.5)], "-Y", y0, 0.0, 0.16, M("stone_pale")))
+            parts.append(fbox("ped_snow", "-Y", y0, a, 0.08, zt + 0.01, 1.5, 0.16, 0.025, M("snow")))
+    balcony_iron(parts, "-Y", y0, 0.0, GF + 0.25, w=4.6, d=1.1, seed=71)
+    for x in (-W / 2 + 0.3, -3.4, 3.4, W / 2 - 0.3):
+        parts.append(box("gpil", (0.6, 0.14, 2 * FL - 0.4), (x, y0 - 0.07, GF + 0.1), white))
+        parts.append(box("gpil_cap", (0.8, 0.24, 0.3), (x, y0 - 0.12, H - 0.4), M("stone_pale")))
+    for s in range(2):
+        for x in (-W / 2 + 0.9, W / 2 - 0.9):
+            wall_anchor(parts, "-Y", y0, x, GF + FL * (s + 1) - 0.4, "S")
+    cornice(parts, W, D, H - 0.1, t=0.45, proud=0.35, modillions=False)
+    for p_ in parts[-3:]:
+        edit_verts(p_, lambda co: setattr(co, "y", co.y + cy))
+    icicles(parts, (-W / 2, y0 - 0.55), (W / 2, y0 - 0.55), H - 0.1, maxlen=0.5, seed=72, gap=0.45)
+    # attic parapet with balusters and urns; a low roof behind it
+    A0 = H + 0.35
+    parts.append(box("attic", (W + 0.3, 0.5, 1.3), (0, y0 + 0.2, A0), wall))
+    for k in range(13):
+        x = -W / 2 + 0.8 + k * (W - 1.6) / 12
+        parts.append(cyl("baluster", 0.1, 0.8, (x, y0 - 0.08, A0 + 0.25), white, verts=8, r2=0.07))
+    parts.append(box("att_cop", (W + 0.5, 0.8, 0.18), (0, y0 + 0.2, A0 + 1.3), M("stone_pale")))
+    parts.append(box("att_cop_snow", (W + 0.4, 0.7, 0.03), (0, y0 + 0.2, A0 + 1.48), M("snow")))
+    for x in (-W / 2 + 0.3, -3.4, 3.4, W / 2 - 0.3):
+        parts.append(cyl("urn_base", 0.25, 0.3, (x, y0 + 0.2, A0 + 1.48), M("stone_pale"), verts=10))
+        parts.append(sphere("urn", 0.3, (x, y0 + 0.2, A0 + 2.05), M("stone_pale"), seg=10, rings=6, zscale=1.3))
+        parts.append(sphere("flame", 0.12, (x, y0 + 0.2, A0 + 2.5), M("gold", 0.35), seg=8, rings=5))
+        snow_cap(parts, x, y0 + 0.2, A0 + 2.4, 0.22, 0.06, seg=8)
+    _roof_set(parts, W + 0.6, D + 0.8, 3.4, (0, cy + 0.6, H), M("tile_dark"), courses=3, seed=73, ice=False,
+              drifts=[(0, y0 + 1.2, W, 0.12)])
+    for x in (-6.0, 6.0):
+        chimney(parts, x, cy + 2.0, H + 1.6, h=2.4)
+    # the gate: lanterns, bench, bell pull, coat of arms, swept steps (flags, no snow)
+    for sx in (-1, 1):
+        parts.append(fbox("lantern_arm", "-Y", y0, sx * 2.3, 0.3, 3.3, 0.04, 0.6, 0.04, M("iron")))
+        parts.append(fbox("lantern", "-Y", y0, sx * 2.3, 0.6, 2.8, 0.3, 0.3, 0.45, M("gold", 0.3, emit=(1.0, 0.72, 0.35), emit_strength=5.0)))
+        parts.append(fbox("lantern_cap", "-Y", y0, sx * 2.3, 0.6, 3.25, 0.4, 0.4, 0.1, M("iron")))
+    parts.append(fbox("bench", "-Y", y0, 3.2, 0.35, 0.45, 1.6, 0.4, 0.08, M("wood_dark")))
+    for x in (2.6, 3.8):
+        parts.append(fbox("bench_leg", "-Y", y0, x, 0.35, 0.0, 0.08, 0.35, 0.45, M("wood_dark")))
+    parts.append(fbox("bell_pull", "-Y", y0, -1.95, 0.08, 1.2, 0.02, 0.02, 0.9, M("iron")))
+    parts.append(torus("bell_ring", 0.06, 0.012, tuple(_wp("-Y", y0, -1.95, 1.15, 0.09)), M("gold", 0.35), rot=(math.pi / 2, 0, 0), seg=10, mseg=4))
+    parts.append(fbox("arms_shield", "-Y", y0, 0.0, 0.12, H - 1.4, 1.1, 0.12, 1.3, M("crimson")))
+    parts.append(fbox("arms_band", "-Y", y0, 0.0, 0.19, H - 0.9, 1.1, 0.02, 0.18, M("gold", 0.3)))
+    parts.append(blob("arms_crown", (0.9, 0.15, 0.35), (0, y0 - 0.2, H - 0.05), M("gold", 0.3), subsurf=1))
+    parts.append(box("steps", (W - 2.0, 1.2, 0.14), (-1.0, y0 - 0.6, 0), M("flags")))
+    parts.append(box("steps2", (3.0, 0.5, 0.28), (-6.0, y0 - 0.25, 0), M("stone_pale")))
+    for sx in (-1, 1):                       # his neighbours' snow, shovelled against the ends of his frontage
+        parts.append(box("drift", (1.6, 1.2, 0.5), (sx * (W / 2 + 0.3), y0 - 0.7, 0), M("snow"), bevel=0.3, seg=2, wonk=0.15))
+    mark_named("Post_0", (2.6, y0 - 1.2, 0.0), 0.0)
+    mark_named("Post_1", (-2.6, y0 - 1.2, 0.0), 0.0)
+    # courtyard: side walls, stable, well, back stair and gallery, privy, back wall with the back gate
+    for sx in (-1, 1):
+        parts.append(box("yard_wall", (0.6, 13.0, 4.0), (sx * (W / 2 - 0.3), 4.5, 0), M("plaster_grey")))
+        parts.append(box("yard_wall_cop", (0.8, 13.0, 0.15), (sx * (W / 2 - 0.3), 4.5, 4.0), M("tile_dark")))
+        parts.append(box("yard_wall_snow", (0.7, 12.9, 0.04), (sx * (W / 2 - 0.3), 4.5, 4.15), M("snow")))
+        col.append(box("c", (0.6, 13.0, 4.1), (sx * (W / 2 - 0.3), 4.5, 0)))
+    parts.append(box("stable", (5.0, 7.0, 3.4), (W / 2 - 3.1, 4.5, 0), M("timber")))
+    parts.append(box("stable_door", (0.06, 1.6, 2.4), (W / 2 - 5.63, 3.5, 0), M("wood_dark")))
+    parts.append(roof("stable_roof", 7.4, 5.6, 1.4, (W / 2 - 3.1, 4.5, 3.4), M("shingle"), along_x=False, sag=0.03, flare=0.04, cuts=3))
+    sn = roof_snow("stable_snow", 7.4, 5.6, 1.4, (W / 2 - 3.1, 4.5, 3.4), along_x=False, sag=0.03, flare=0.04, cuts=3, thick=0.06, cell=0.7, seed=74)
+    if sn:
+        parts.append(sn)
+    col.append(box("c", (5.0, 7.0, 3.4), (W / 2 - 3.1, 4.5, 0)))
+    climb("mantle", (5.6, 7.4, 0.3), (W / 2 - 3.1, 4.5, 3.9))
+    for k in range(8):
+        a = math.tau * k / 8
+        parts.append(cbox("well", (0.7, 0.35, 0.8), (-3.0 + 0.8 * math.cos(a), 3.0 + 0.8 * math.sin(a), 0.4), M("stone"), rot=(0, 0, a + math.pi / 2)))
+    parts.append(cyl("well_snow", 0.6, 0.02, (-3.0, 3.0, 0.8), M("ice", 0.05), verts=12))
+    col.append(cyl("c", 1.0, 0.8, (-3.0, 3.0, 0), None, verts=8))
+    gallery_wood(parts, "+Y", y0 + D, -W / 2 + 1.0, 2.0, GF + 0.1, d=1.4, posts=4, roof_h=2.8, seed=75)
+    for k in range(12):
+        parts.append(box("stair", (1.0, 0.32, 0.06), (-W / 2 + 1.7, y0 + D + 5.4 - k * 0.32, 0.38 * (k + 1)), M("wood")))
+    climb("mantle", (1.0, 4.0, 0.2), (-W / 2 + 1.7, y0 + D + 3.6, 2.3), rot=(math.atan2(4.6, 3.8), 0, 0))
+    parts.append(box("privy", (1.2, 1.2, 2.2), (-W / 2 + 1.6, 9.6, 0), M("wood_dark")))
+    parts.append(box("privy_roof", (1.4, 1.4, 0.1), (-W / 2 + 1.6, 9.6, 2.2), M("shingle")))
+    parts.append(box("privy_snow", (1.3, 1.3, 0.05), (-W / 2 + 1.6, 9.6, 2.3), M("snow")))
+    col.append(box("c", (1.2, 1.2, 2.2), (-W / 2 + 1.6, 9.6, 0)))
+    for sx in (-1, 1):
+        parts.append(box("back_wall", (W / 2 - 1.4, 0.6, 3.6), (sx * (W / 4 + 0.7), 10.7, 0), M("plaster_grey")))
+        col.append(box("c", (W / 2 - 1.4, 0.6, 3.6), (sx * (W / 4 + 0.7), 10.7, 0)))
+        parts.append(box("back_wall_snow", (W / 2 - 1.5, 0.5, 0.05), (sx * (W / 4 + 0.7), 10.7, 3.6), M("snow")))
+    parts.append(box("back_gate", (2.6, 0.08, 2.4), (0, 10.95, 0), M("wood_dark")))
+    parts.append(box("back_gate_lintel", (3.0, 0.6, 0.3), (0, 10.7, 2.6), M("timber")))
+    mark_named("Door_back", (0, 11.2, 0.0), math.pi)
+    mark_named("Post_2", (0.0, 5.0, 0.0), math.pi)
+    mark_named("Post_3", (0.0, 12.4, 0.0), math.pi)
+    parts.append(box("yard_floor", (W - 1.2, 12.4, 0.03), (0, 4.3, 0), M("flags")))
+    # roof access from the neighbour's side (+X): a drainpipe and chimney-breast steps up the gable wall
+    climb("pipe", (0.3, 0.3, H), (W / 2 + 0.15, y0 + 1.0, H / 2))
+    parts.append(cyl("pipe", 0.055, H, (W / 2 + 0.15, y0 + 1.0, 0.0), M("lead"), verts=8))
+    for k in range(3):
+        climb("ledge", (0.6, 1.2, 0.2), (W / 2 + 0.3, cy + 2.0, 3.0 + k * 2.2))
+        parts.append(box("breast", (0.5, 1.2, 0.18), (W / 2 + 0.25, cy + 2.0, 2.9 + k * 2.2), M("brick")))
+    climb("ledge", (W + 0.5, 0.8, 0.2), (0, y0 + 0.2, A0 + 1.4))
+    # collision: the block either side of the gate passage and over it, the roof to walk on
+    col.append(box("c", ((W - gw) / 2, D, H), (-(gw / 2 + (W - gw) / 4), cy, 0)))
+    col.append(box("c", ((W - gw) / 2, D, H), ((gw / 2 + (W - gw) / 4), cy, 0)))
+    col.append(box("c", (gw, D, H - gh), (0, cy, gh)))
+    col.append(wedge("c_roof", (W + 0.6, D + 0.8, 3.4), (0, cy + 0.6, H)))
+    export("kingpin_house", join(parts, "kingpin_house"), join(col, "col"))
+
+
+PASS5_BUILDS = [("bathhouse", bathhouse), ("kingpin_warehouse", kingpin_warehouse), ("carpenter_yard", carpenter_yard),
+                ("guillotine", guillotine), ("guillotine_parts", guillotine_parts), ("torch", torch), ("torch_wall", torch_wall),
+                ("broken_stall", broken_stall), ("broken_shutter", broken_shutter), ("charred_patch", charred_patch),
+                ("kingpin_house", kingpin_house)]
+
+
+PASS2_BUILDS = [
+    ("ten_renaissance", ten_renaissance), ("ten_renaissance_b", lambda: ten_renaissance("ten_renaissance_b", "plaster_mint", "shutter_brown", seed=31)),
+    ("ten_gothic", ten_gothic), ("ten_gothic_b", lambda: ten_gothic("ten_gothic_b", "plaster_oxblood", seed=32)),
+    ("ten_baroque", ten_baroque), ("ten_burgher", ten_burgher),
+    ("ten_burgher_b", lambda: ten_burgher("ten_burgher_b", "plaster_limeblue", "shutter_red", seed=34)),
+    ("ten_timber", ten_timber), ("ten_wooden", ten_wooden),
+    ("fountain", fountain), ("water_pump", water_pump), ("horse_trough", horse_trough), ("gutter_channel", gutter_channel),
+    ("windmill", windmill), ("watermill", watermill), ("bell_foundry", bell_foundry), ("forge", forge), ("brewery", brewery),
+    ("cooper_yard", cooper_yard), ("tannery_frame", tannery_frame),
+    ("campanile", campanile), ("synagogue_wooden", synagogue_wooden), ("uniate_church", uniate_church), ("prayer_house", prayer_house),
+    ("shrine_column", shrine_column), ("monastery_wall", monastery_wall), ("monastery_gate", monastery_gate),
+    ("wawel_far", wawel_far), ("castle_gate", castle_gate),
+    ("pillory", pillory), ("stocks", stocks), ("whipping_post", whipping_post), ("gallows", gallows),
+]
+
+
 BUILDS = [
-    ("tenement_a", lambda: tenement("tenement_a", 10.0, 3, "gable", "plaster_ochre", bays=3, shutters=True)),
-    ("tenement_b", lambda: tenement("tenement_b", 8.0, 3, "attyka", "plaster_rose", bays=2)),
-    ("tenement_c", lambda: tenement("tenement_c", 12.0, 4, "mansard", "plaster_cream", bays=3, pilasters=True, arched_windows=True)),
-    ("tenement_d", lambda: tenement("tenement_d", 10.0, 3, "attyka", "plaster_sage", bays=3, arched_windows=True, shutters=True)),
-    ("tenement_e", lambda: tenement("tenement_e", 8.0, 4, "gable", "plaster_blue", bays=2, shutters=True)),
+    ("tenement_a", lambda: tenement("tenement_a", 10.0, 3, "gable", "plaster_ochre", bays=3, shutters=True, shutter_col="shutter", shutter_style="louvre", gallery=True, seed=11)),
+    ("tenement_b", lambda: tenement("tenement_b", 8.0, 3, "attyka", "plaster_rose", bays=2, seed=12)),
+    ("tenement_c", lambda: tenement("tenement_c", 12.0, 4, "mansard", "plaster_cream", bays=3, pilasters=True, arched_windows=True, balcony=3, seed=13)),
+    ("tenement_d", lambda: tenement("tenement_d", 10.0, 3, "attyka", "plaster_sage", bays=3, arched_windows=True, shutters=True, shutter_col="shutter_red", shutter_style="board", gallery=True, seed=14)),
+    ("tenement_e", lambda: tenement("tenement_e", 8.0, 4, "gable", "plaster_blue", bays=2, shutters=True, shutter_col="shutter_ochre", shutter_style="louvre", seed=15)),
     ("sukiennice", sukiennice), ("st_marys", st_marys), ("town_hall", town_hall), ("st_adalbert", st_adalbert),
     ("market_stall", market_stall), ("barrel", barrel), ("crate_stack", crate_stack), ("cart", cart), ("well", well),
     ("lantern_post", lantern_post), ("brazier", brazier), ("ground_cobbles", ground_cobbles),
-] + globals().get("DISTRICT_BUILDS", []) + globals().get("FARM_BUILDS", []) + globals().get("DRESSING_BUILDS", [])
+] + globals().get("DISTRICT_BUILDS", []) + globals().get("FARM_BUILDS", []) + globals().get("DRESSING_BUILDS", []) + globals().get("PASS2_BUILDS", []) + globals().get("PASS3_BUILDS", []) + globals().get("PASS4_BUILDS", []) + globals().get("PASS5_BUILDS", [])
 
 
 def _cli_list(flag):
@@ -4959,9 +8112,12 @@ if __name__ == "__main__" and "--animals" not in sys.argv:
     print("[tex] cache ready in %.1fs (%s)" % (time.time() - t0, TEX))
     if "--textures" not in sys.argv:
         only = _cli_list("--only")
+        full = {n for n, _ in BUILDS[:BUILDS.index(next(b for b in BUILDS if b[0] == "ground_cobbles")) + 1]} | {n for n, _ in DRESSING_BUILDS}
         for name, fn in BUILDS:
             if only and name not in only:
                 continue
+            TEX_HALF = name not in full and name not in ("fountain", "pillory", "gutter_channel", "gutter_corner", "gutter_slab",
+                                                         "gutter_outfall", "ground_cobbles_lo", "ground_flags", "ground_mud")
             fn()
         print("[assets] tris", " ".join("%s=%d" % kv for kv in TRI_LOG.items()))
     print("[assets] done in %.1fs" % (time.time() - t0))

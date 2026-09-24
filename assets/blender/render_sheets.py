@@ -1,13 +1,15 @@
 """Contact sheets of the exported glTF assets, rendered with EEVEE under a low winter sun and a sky-blue world.
 
 Run:  blender -b --python assets/blender/render_sheets.py -- <outdir> [group,group,...]
-Groups: tenements, landmarks, props, districts, farm, figures (figures only when named).
+Groups: tenements, landmarks, props, districts, farm, houses2, industry, faith, water, castle, stmarys,
+        figures (figures only when named).
 """
 import bpy, math, os, sys
 ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "assets", "models")
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[0] if args else os.path.join(os.path.dirname(ROOT), "..", "docs", "screenshots")
-WANT = args[1].split(",") if len(args) > 1 else ["tenements", "landmarks", "props", "districts", "farm"]
+WANT = args[1].split(",") if len(args) > 1 else ["tenements", "landmarks", "props", "districts", "farm", "houses2", "houses3", "faith2",
+                                                 "industry", "faith", "water", "castle", "stmarys", "walls", "finale", "yard"]
 groups = {
     "tenements": (["tenement_a", "tenement_b", "tenement_c", "tenement_d", "tenement_e"], 14.0, 9.0),
     "landmarks": (["st_adalbert", "town_hall", "sukiennice", "st_marys"], 40.0, 18.0),
@@ -16,6 +18,20 @@ groups = {
                    "dock_wharf", "salt_barge", "klep_house", "klep_stable", "kan_house", "wawel_wall", "wawel_gate"], 17.0, 7.0),
     "farm": (["farm_field", "farm_fence", "farm_cottage", "farm_barn", "farm_haystack", "farm_haystack_small",
               "farm_mill", "farm_shrine", "farm_manor"], 15.0, 4.0),
+    "houses2": (["ten_renaissance", "ten_gothic", "ten_baroque", "ten_burgher", "ten_timber"], 14.0, 9.0),
+    "houses3": (["ten_renaissance_b", "ten_gothic_b", "ten_burgher_b", "ten_wooden"], 14.0, 9.0),
+    "industry": (["windmill", "watermill", "bell_foundry", "forge", "brewery", "cooper_yard", "tannery_frame"], 14.0, 8.0),
+    "faith": (["campanile", "synagogue_wooden", "uniate_church", "prayer_house"], 14.0, 10.0),
+    "faith2": (["kaz_synagogue", "shrine_column", "monastery_gate", "monastery_wall", "farm_shrine"], 10.0, 6.0),
+    "water": (["fountain", "well", "water_pump", "horse_trough", "gutter_channel", "pillory", "stocks", "whipping_post",
+               "gallows"], 5.0, 2.0),
+    "castle": (["castle_gate", "wawel_far"], 40.0, 20.0),
+    "walls": (["city_tower", "florian_gate", "barbican", "collegium_maius", "sien_passage"], 20.0, 12.0),
+    "finale": (["kingpin_house", "kingpin_warehouse", "bathhouse", "carpenter_yard", "guillotine", "guillotine_parts"], 16.0, 10.0),
+    "yard": (["yard_shed", "yard_stair", "ladder", "low_wall", "water_butt", "perch_ledge", "torch_wall", "torch",
+              "broken_stall", "broken_shutter", "charred_patch", "gutter_channel", "gutter_corner", "gutter_slab", "gutter_outfall",
+              "snow_drift"], 4.0, 2.0),
+    "stmarys": (["st_marys"], 40.0, 30.0),
     "figures": (["watchman", "figure_noble", "figure_artist", "figure_veteran", "figure_merchant", "figure_priest",
                  "figure_kazimierz", "figure_townsman", "figure_townswoman"], 1.3, 1.0),
 }
