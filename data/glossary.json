@@ -322,5 +322,269 @@
   {
     "term": "Strzyga",
     "gloss": "a night demon of Slavic folklore, a woman who died unbaptised or cursed and rises to feed"
+  },
+  {
+    "term": "morowe powietrze",
+    "gloss": "'the plague air': the old name for pestilence, thought to rise from the ground or come on a bad wind"
+  },
+  {
+    "term": "biegunka",
+    "gloss": "the flux: dysentery, the sickness of bad water and armies"
+  },
+  {
+    "term": "tyfus / gorączka",
+    "gloss": "the fever: typhus, carried by the armies of 1794-95"
+  },
+  {
+    "term": "wiatyk",
+    "gloss": "the viaticum: the last communion carried to the dying"
+  },
+  {
+    "term": "strzyga",
+    "gloss": "in Polish folklore a dead woman (or a man, strzygoń) who rises and drinks the life of the living"
+  },
+  {
+    "term": "mamka",
+    "gloss": "a madam of a house (also a wet-nurse); in the red lantern's slang, 'mother'"
+  },
+  {
+    "term": "burdel",
+    "gloss": "a brothel"
+  },
+  {
+    "term": "rajca",
+    "gloss": "a town councillor of the old Kraków council"
+  },
+  {
+    "term": "Strzygoń",
+    "gloss": "the male strzyga of the Kraków country: a man born with two souls, one unbaptised, who rises after death; ended with an aspen peg, a sickle or burial face down"
+  },
+  {
+    "term": "Upiór",
+    "gloss": "the revenant of Polish and Ruthenian belief, the vampire of the 1730s Habsburg panics; wąpierz in the older western form; upír to the Bohemian soldiers"
+  },
+  {
+    "term": "Wąpierz",
+    "gloss": "the older Polish word for the upiór, the walking dead"
+  },
+  {
+    "term": "Topielec",
+    "gloss": "a drowned man's spirit that pulls swimmers and drunks under and sings under bridges; the Vistula's own"
+  },
+  {
+    "term": "Południca",
+    "gloss": "the noon-woman of the harvest fields who twists the necks of reapers; a summer being, a joke in January"
+  },
+  {
+    "term": "Zmora",
+    "gloss": "the night-presser: a living person's soul that sits on a sleeper's chest; also mara. A knife under the bed keeps her off"
+  },
+  {
+    "term": "Boginka",
+    "gloss": "a wild woman of the riverbanks who swaps an unchurched mother's baby for her own; also mamuna"
+  },
+  {
+    "term": "Odmieniec",
+    "gloss": "a changeling, the boginka's child left in the cradle; the old 'test' for one was cruel and the game says so"
+  },
+  {
+    "term": "Płanetnik",
+    "gloss": "the cloud-herd of Lesser Poland, a man taken up into the storm who drives hail and snow; villagers left him flour, and could hire him"
+  },
+  {
+    "term": "Licho",
+    "gloss": "the small nameless evil of proverbs: licho nie śpi, the evil one never sleeps"
+  },
+  {
+    "term": "Skrzat",
+    "gloss": "the Polish house-spirit (ubożę in Old Polish), fed crumbs on Thursdays; not the Ruthenian domowik"
+  },
+  {
+    "term": "Latawiec",
+    "gloss": "a spirit hatched from an egg carried under the armpit, seen as a fiery streak in the sky carrying its keeper's money home; a meteor, to the market"
+  },
+  {
+    "term": "Smok Wawelski",
+    "gloss": "the Wawel dragon of Kadłubek's chronicle, killed by Krak (or his sons, or the shoemaker Skuba) with a sulphur-stuffed sheep; his cave under the castle was a tavern in the 18th century"
+  },
+  {
+    "term": "Krak",
+    "gloss": "the legendary founder of Kraków, buried under the Krakus mound across the river in Podgórze"
+  },
+  {
+    "term": "Wanda",
+    "gloss": "Krak's daughter, who would not have a German prince; her mound stands at Mogiła by the Vistula"
+  },
+  {
+    "term": "Pan Twardowski",
+    "gloss": "the Kraków sorcerer of the 1550s who sold his soul on condition it was collected in Rome, and was caught at an inn of that name; later tales put him on the moon"
+  },
+  {
+    "term": "Karczma Rzym",
+    "gloss": "the inn called Rome where the devil caught Twardowski on a technicality"
+  },
+  {
+    "term": "Lajkonik",
+    "gloss": "the Zwierzyniec raftsmen's hobby-horse rider who beats the crowd with his mace in June; paid for by the Norbertine nuns since 1738"
+  },
+  {
+    "term": "Hejnał",
+    "gloss": "the trumpet call from St Mary's tower, hourly since the 14th century, that breaks off mid-phrase; the Tatar-arrow story explaining why is a 20th-century invention"
+  },
+  {
+    "term": "Skałka",
+    "gloss": "the church on the rock below Wawel where Bishop Stanislaus was killed in 1079 and his hacked body, the Life says, grew back together: as the Kingdom would"
+  },
+  {
+    "term": "Święty Stanisław",
+    "gloss": "St Stanislaus, bishop and martyr, patron of Poland; his relic in Wawel cathedral, his prophecy of a reunited Kingdom in the Life"
+  },
+  {
+    "term": "Czarna Madonna",
+    "gloss": "the Black Madonna of Częstochowa, Queen of Poland since the Lwów oath of 1656; on every holy card"
+  },
+  {
+    "term": "Zygmunt",
+    "gloss": "the great bell of Wawel cathedral (1520), rung for coronations, deaths and disasters; the town fears it will be melted for cannon"
+  },
+  {
+    "term": "Dzwonienie na chmury",
+    "gloss": "ringing the church bells against storm clouds, a custom the synods regulated and never stopped"
+  },
+  {
+    "term": "Gromnica",
+    "gloss": "the thunder-candle blessed at Candlemas, lit in the window against storms and put in the hands of the dying"
+  },
+  {
+    "term": "Matki Boskiej Gromnicznej",
+    "gloss": "Candlemas, 2 February: Our Lady of the Thunder Candle, who walks the winter fields and keeps the wolves off the villages"
+  },
+  {
+    "term": "Sól świętej Agaty",
+    "gloss": "St Agatha's salt, blessed with bread on 5 February and thrown into a fire to stop it"
+  },
+  {
+    "term": "Wigilia",
+    "gloss": "Christmas Eve: hay under the cloth, the wafer, the first star, and at midnight the cattle speak"
+  },
+  {
+    "term": "Trzech Króli",
+    "gloss": "Twelfth Night, 6 January: blessed chalk and K+M+B over the door, star-carollers, the turoń and the Herod play"
+  },
+  {
+    "term": "K+M+B",
+    "gloss": "the three Kings' initials chalked over a door at Epiphany; a door with the Kings rubbed off is a house given up"
+  },
+  {
+    "term": "Kolędnicy",
+    "gloss": "carollers with a star, a turoń and a Herod play, out between Christmas and Candlemas"
+  },
+  {
+    "term": "Turoń",
+    "gloss": "the horned, snapping beast on a pole that goes round with the carollers"
+  },
+  {
+    "term": "Osika",
+    "gloss": "aspen, the tree that trembles because Judas hanged on it; the wood of the stake"
+  },
+  {
+    "term": "Morowa dziewica",
+    "gloss": "the plague as a tall maiden on the rooftops waving a red kerchief"
+  },
+  {
+    "term": "Gorączka gnilna",
+    "gloss": "putrid fever: typhus, the winter disease of barracks and prisons"
+  },
+  {
+    "term": "Kołtun",
+    "gloss": "the plica polonica, the matted plait the peasantry would not cut for fear the sickness would go inward; the professors' favourite example of zabobon"
+  },
+  {
+    "term": "Zabobon",
+    "gloss": "superstition, as the pulpit and the professors both called it, meaning different things"
+  },
+  {
+    "term": "Znachorka",
+    "gloss": "a village wise-woman: herbs, curses, and who bought one"
+  },
+  {
+    "term": "Wilkołak",
+    "gloss": "a werewolf; also what the Commandant's bill for 'the wolf' means to the street, which knows one Wilk"
+  },
+  {
+    "term": "Obol",
+    "gloss": "the coin under a dead man's tongue for the ferryman; on the river, the toll the river king takes"
+  },
+  {
+    "term": "Bohomolec",
+    "gloss": "Jan Bohomolec SJ, whose Diabeł w swojej postaci (1772) argued that upiory and witches were delusion; the professor's authority, and a Jesuit, so the Bishop cannot object"
+  },
+  {
+    "term": "Van Swieten",
+    "gloss": "Gerard van Swieten, the Empress's physician, on whose report Maria Theresa forbade the staking of corpses in 1755: the occupier's own law against the occupier's own fears"
+  },
+  {
+    "term": "Dybuk",
+    "gloss": "(Yiddish dibek) the clinging spirit of a sinner that enters a living person; exorcised by a ba'al shem with a minyan and a shofar"
+  },
+  {
+    "term": "Golem",
+    "gloss": "the clay man; in 1795 the tale told is Rabbi Elijah of Chełm's, which crushed its maker when it fell, not yet Prague's"
+  },
+  {
+    "term": "Szedim",
+    "gloss": "(Hebrew shedim) demons, who live in bathhouses, privies and ruins; do not bathe alone after dark"
+  },
+  {
+    "term": "Mykwa",
+    "gloss": "the ritual bath of Kazimierz; also the riverside bathhouse the finale passes through"
+  },
+  {
+    "term": "Malach ha-Mawet",
+    "gloss": "(Yiddish malekh-hamoves) the Angel of Death, who keeps a list; the water is poured out of a house where he has been, and a sick child is renamed to slip his list"
+  },
+  {
+    "term": "Mezuza",
+    "gloss": "the scripture case on a Jewish doorpost, checked for flaws when misfortune runs"
+  },
+  {
+    "term": "Reb Eizik Reb Yekeles",
+    "gloss": "Izaak Jakubowicz of Kazimierz, who dreamed of treasure under the Prague bridge and found it under his own stove; he built the Izaak synagogue in 1644"
+  },
+  {
+    "term": "Remuh",
+    "gloss": "Rabbi Moses Isserles (d. 1572), whose grave in Kazimierz is visited for help"
+  },
+  {
+    "term": "Zol Got ophitn",
+    "gloss": "(Yiddish) God forbid"
+  },
+  {
+    "term": "Percht",
+    "gloss": "(German, Tyrol) Perchta, who rides in the Twelve Nights; the Tyrolean soldiers' own winter fear"
+  },
+  {
+    "term": "Lichtmess",
+    "gloss": "(German) Candlemas"
+  },
+  {
+    "term": "Księżyc w lisiej czapie",
+    "gloss": "the moon in a fox cap: a halo round the moon, meaning frost or snow by the almanac and a burial by the well"
+  },
+  {
+    "term": "Kometa",
+    "gloss": "a comet: war, plague and the death of kings, said the almanacs; a body on an orbit, said Professor Śniadecki, who had met Herschel"
+  },
+  {
+    "term": "Smocza Jama",
+    "gloss": "the dragon's den under Wawel, a tavern of low repute in the 18th century"
+  },
+  {
+    "term": "Kopiec",
+    "gloss": "a mound: Krak's at Podgórze, Wanda's at Mogiła"
+  },
+  {
+    "term": "Ganganelli",
+    "gloss": "Cardinal Lorenzo Ganganelli, later Pope Clement XIV, whose report of 1759 found the blood libel baseless; read from the Town Hall steps if you stop the slander"
   }
 ]

@@ -1,0 +1,2741 @@
+{
+  "_doc": "Folklore, superstition and the deniable supernatural (docs/FOLKLORE.md). Written by the folklore agent for the campaign agent to merge. `rumours`: rumours.json schema plus `kind` (two new kinds, beast and ghost, with `kind_spread` below), `trigger` (what in play seeds it: prose for the campaign agent), `notable` (a holds target), `salon_cost` (overrides superstition_salon_cost), and a `dread` effect (see `dread`). Every `truth` is false: the game never confirms the supernatural; the town believes what it needs to. `chatter`: bubble lines by class and trigger. `omens`: sky and weather events the town reads. `items`: cheap vendor items for the stagings. `stagings`: how a killing is dressed as something else, and how a sceptic undresses it. `counters`: what the Church, the occupier, the salon and the street do when dread rises, including the blood slander (never plantable, always stoppable). Tone per docs/GDD.md: plain, dry, local; never at the expense of the dead or the frightened.",
+  "dread": {
+    "_doc": "Proposed city resource (GameState.dread, 0-100): how much the town believes something walks. Separate from per-faction `fear` (fear of Austria). Sources: omens, believed stagings, rumours of kind beast/ghost/omen taking hold (their `dread` effect), bodies found. Decays `decay` a dawn; halved by counters.sermon and counters.pamphlet. Tiers gate chatter (idle folklore bubbles from `chatter_from`), counters (`counters` fire at their `when`), and the tactical effects listed per tier. The dawn report shows it as 'the town's dread' with one line.",
+    "decay": 5,
+    "chatter_from": 25,
+    "tiers": {
+      "25": {
+        "name": "whispers",
+        "text": "Salt on the thresholds along the rows.",
+        "effects": {
+          "folklore_chatter": true
+        }
+      },
+      "50": {
+        "name": "fear",
+        "text": "Nobody takes the well grate after dark; the shops shutter before the bell.",
+        "effects": {
+          "undercroft_guards": -1,
+          "civilians_home_minutes": -30,
+          "church_influence_per_dawn": 1,
+          "salon_influence_per_dawn": -1
+        }
+      },
+      "75": {
+        "name": "terror",
+        "text": "Processions by day, empty streets by night, and the Commandant looking for someone to hang.",
+        "effects": {
+          "undercroft_guards": -2,
+          "riot_threshold_mult": 0.7,
+          "crackdown_per_dawn": 2,
+          "blood_slander_possible": true
+        }
+      }
+    }
+  },
+  "kind_spread": {
+    "_doc": "Merge into rumours.json kind_spread: two new superstition kinds. beast (strzyga, upiór, topielec, the wolf, the clay man) runs fastest in the taverns, the passage and at the well; ghost (Twardowski, Wanda, the kings, the singer) in the taverns and the church. Both crawl through the crossing (the salon's ear) and the watch.",
+    "beast": {
+      "tavern": 1.5,
+      "passage": 1.4,
+      "well": 1.4,
+      "market": 1.1,
+      "church": 0.9,
+      "watch": 1.0,
+      "crossing": 0.5
+    },
+    "ghost": {
+      "tavern": 1.4,
+      "church": 1.3,
+      "passage": 1.2,
+      "well": 1.2,
+      "watch": 0.9,
+      "crossing": 0.6
+    }
+  },
+  "rumours": {
+    "strzyga_cellars": {
+      "kind": "beast",
+      "subject": "The strzyga in the cellars",
+      "truth": false,
+      "source": "the women at the west well",
+      "spread": 0.5,
+      "seed": [
+        "well",
+        "passage"
+      ],
+      "trigger": "a lethal takedown on the Rynek found by a civilian before dawn; or a believed staging (garlic_mouth, aspen_peg, heel_cut)",
+      "text": "A strzyga nests in the cellars under the Rynek and takes one a night; the body by the Cloth Hall had no blood left in it.",
+      "line": [
+        "Strzyga siedzi w piwnicach pod Rynkiem. Tego spod Sukiennic znaleźli bez kropli krwi.",
+        "A strzyga nests in the cellars under the Rynek. The one by the Cloth Hall was found without a drop of blood."
+      ],
+      "plantable": true,
+      "plant_note": "The watch hunts a beast, not a man: the kill's notoriety is halved and sentries will not go down the well grate (the undercroft is emptier). The Church blesses the cellar door, which closes it for a night.",
+      "disprove": 0.3,
+      "effects": {
+        "dread": 15,
+        "notoriety": -8,
+        "loyalty": {
+          "church": 2
+        },
+        "camp": [
+          "cellars_shunned"
+        ],
+        "text": "Nobody will take the well grate after dark; two sentries refused the cellar post and were flogged for it."
+      },
+      "disproved": {
+        "notoriety": 6,
+        "crackdown": 2,
+        "text": "The regimental surgeon showed the wound: a knife, from behind. The strzyga has a name now, and the watch wants it."
+      }
+    },
+    "topielec_moat": {
+      "kind": "beast",
+      "subject": "The topielec at the moat",
+      "truth": false,
+      "source": "the raftsmen at the Zajazd",
+      "spread": 0.45,
+      "seed": [
+        "tavern",
+        "crossing"
+      ],
+      "trigger": "a body put into the moat, the drains or the river (events corpse_carried; a kill outside the walls)",
+      "text": "The topielec has been taking men at the plank bridges over the moat: the last was found with his boots on and his hands wet in the frost.",
+      "line": [
+        "Topielec bierze przy kładkach na fosie. Ostatniego znaleźli w butach, z mokrymi rękami na mrozie.",
+        "The topielec takes men at the plank bridges over the moat. The last was found in his boots, hands wet in the frost."
+      ],
+      "plantable": true,
+      "plant_note": "The moat bridges empty after dark: the watch's outer round shortens, and a body in the water is the river's, not yours.",
+      "disprove": 0.25,
+      "effects": {
+        "dread": 10,
+        "notoriety": -5,
+        "camp": [
+          "moat_shunned"
+        ],
+        "text": "The watch's outer round no longer crosses the plank bridges after midnight; the raftsmen light a candle at the water."
+      },
+      "disproved": {
+        "notoriety": 5,
+        "text": "The 'topielec's' last man was pulled out with a cord round his neck. The river is innocent; someone in the city is not."
+      }
+    },
+    "comet_crown": {
+      "kind": "omen",
+      "subject": "The comet and the crown",
+      "truth": false,
+      "source": "the church steps",
+      "spread": 0.55,
+      "seed": [
+        "church",
+        "passage",
+        "well"
+      ],
+      "trigger": "the comet is up (sky.json comet from night 3, clear look)",
+      "text": "The comet is the sign that took the King's crown: it stood over Grodno the night he signed, and it stands over Wawel now for the ones who hold it.",
+      "line": [
+        "Kometa zabrała królowi koronę. Stała nad Grodnem, jak podpisywał. Teraz stoi nad Wawelem.",
+        "The comet took the King his crown. It stood over Grodno when he signed. Now it stands over Wawel."
+      ],
+      "person": "sniadecki",
+      "plantable": true,
+      "plant_note": "The garrison reads the tail as pointing at itself and deserts by ones and twos. Professor Śniadecki can compute it away if he is found: following this lead brings him into the night.",
+      "disprove": 0.2,
+      "effects": {
+        "dread": 12,
+        "strength": {
+          "austria": -2
+        },
+        "loyalty": {
+          "street": 2
+        },
+        "text": "Soldiers cross themselves under the comet; two Bohemians deserted the Wawel post and were caught at the Kazimierz bridge."
+      },
+      "disproved": {
+        "loyalty": {
+          "salon": 2
+        },
+        "text": "Professor Śniadecki printed the comet's path: it points at nothing and sets on the twelfth. The salon is pleased with itself."
+      }
+    },
+    "halo_burial": {
+      "kind": "omen",
+      "subject": "A ring for a burial",
+      "truth": false,
+      "source": "the well",
+      "spread": 0.5,
+      "seed": [
+        "well",
+        "market"
+      ],
+      "trigger": "a 22-degree halo round the moon (sky.json halo22 >= 0.4: the cirrus and fog looks)",
+      "text": "A ring round the moon is a ring for a burial: someone great in the city dies before it is full, and the well women have a name.",
+      "line": [
+        "Koło koło księżyca to koło na pogrzeb. Ktoś wielki umrze przed pełnią. Baby u studni już wiedzą kto.",
+        "A ring round the moon is a ring for a burial. Someone great dies before it's full. The well women already know who."
+      ],
+      "notable": "magistrate",
+      "_note": "Retarget `notable` to whichever notable the player names when planting; the default is the magistrate.",
+      "plantable": true,
+      "plant_note": "Name the notable: the town expects his death. If he then dies or vanishes it was foretold (a removal counts as a sign, not blood: its crackdown halved). If he lives past the full moon the tale dies and the ballad seller is laughed at.",
+      "disprove": 0.35,
+      "effects": {
+        "dread": 8,
+        "camp": [
+          "foretold_death"
+        ],
+        "text": "The magistrate has taken to sleeping with a candle lit and a priest in the next room."
+      },
+      "disproved": {
+        "text": "The moon filled and nobody great died; the well women say it was the wrong moon."
+      }
+    },
+    "planetnik_prussian": {
+      "kind": "curse",
+      "subject": "The Prussian's płanetnik",
+      "truth": false,
+      "source": "the carters at Kleparz",
+      "spread": 0.45,
+      "seed": [
+        "market",
+        "crossing"
+      ],
+      "trigger": "the blizzard preset tonight",
+      "text": "The płanetnik who drives this snow is paid in flour by Herr Stolle the Prussian, so that nothing moves on the Vistula but Prussian barges.",
+      "line": [
+        "Ten śnieg pędzi płanetnik, a płaci mu mąką Prusak Stolle. Żeby Wisłą nic nie szło prócz pruskich barek.",
+        "A płanetnik drives this snow, and Stolle the Prussian pays him in flour. So nothing moves on the Vistula but Prussian barges."
+      ],
+      "notable": "prussian",
+      "plantable": true,
+      "plant_note": "Absurd and popular: the carters and the raftsmen turn on the Prussian agent (a fear hold on him at half price) and Prussia's standing with the street falls.",
+      "disprove": 0.4,
+      "effects": {
+        "loyalty": {
+          "guilds": 2,
+          "street": 2
+        },
+        "strength": {
+          "prussia": -3
+        },
+        "camp": [
+          "stolle_cursed"
+        ],
+        "text": "Carters spit when Herr Stolle passes and a boy threw a snowball with a stone in it."
+      },
+      "disproved": {
+        "text": "The snow stopped and the Prussian's flour turned out to be for his horses. The carters feel foolish, briefly."
+      }
+    },
+    "dragon_ember": {
+      "kind": "beast",
+      "subject": "The dragon's breath",
+      "truth": false,
+      "source": "the children",
+      "spread": 0.55,
+      "seed": [
+        "passage",
+        "crossing"
+      ],
+      "trigger": "a fire (the fire system, a stall fire) glowing beyond the walls; the Garbary kilns",
+      "text": "The red glow over the west wall at night is the dragon's breath: the Austrians dig at Wawel for their powder magazine and have woken him.",
+      "line": [
+        "Ta łuna za murem to smoczy oddech. Austriacy kopią na Wawelu pod prochownię i go zbudzili.",
+        "That glow beyond the wall is the dragon's breath. The Austrians are digging at Wawel for a powder store and have woken him."
+      ],
+      "plantable": true,
+      "plant_note": "A fire becomes the dragon's and nobody asks who lit it; the children's tale runs faster than the Polizei. Small effect, small risk.",
+      "disprove": 0.15,
+      "effects": {
+        "dread": 5,
+        "loyalty": {
+          "street": 2
+        },
+        "notoriety": -4,
+        "text": "Children run to the west wall at dusk to watch for the dragon's breath, and the watch shoos them home."
+      },
+      "disproved": {
+        "text": "The dragon's breath was the tanners' kilns at Garbary. The children are unconvinced."
+      }
+    },
+    "bells_storm": {
+      "kind": "omen",
+      "subject": "The bells and the storm",
+      "truth": false,
+      "source": "the sacristan's boy",
+      "spread": 0.5,
+      "seed": [
+        "church",
+        "well"
+      ],
+      "trigger": "thunder in January (the storm look), or bells rung out of hours (counters.procession, counters.cellar_exorcism)",
+      "text": "The bells were rung against the thunder and it would not stop, because the Austrians have marked Zygmunt for the gun-foundry, and a bell that is sold will not turn a storm.",
+      "line": [
+        "Dzwonili na chmury i nie pomogło. Bo Austriacy zapisali Zygmunta na armaty, a sprzedany dzwon burzy nie zawróci.",
+        "They rang against the clouds and it did no good. The Austrians have Zygmunt down for cannon, and a sold bell won't turn a storm."
+      ],
+      "plantable": true,
+      "plant_note": "The chapter and the town close ranks over the bell: Church and guild loyalty rise together, and the Bishop is angry with the right people for the wrong reason.",
+      "disprove": 0.3,
+      "effects": {
+        "loyalty": {
+          "church": 3,
+          "guilds": 2
+        },
+        "text": "A crowd stood under the tower in the sleet to hear whether Zygmunt still hung; the canons let them."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -2
+        },
+        "text": "The commandant published a denial about the bell, which nobody read, and the sacristan was dismissed."
+      }
+    },
+    "changeling_tenement": {
+      "kind": "curse",
+      "subject": "The changeling on Szewska",
+      "truth": false,
+      "source": "the women at the west well",
+      "spread": 0.5,
+      "seed": [
+        "well",
+        "passage"
+      ],
+      "trigger": "the lost_child event, or a sick child in a tenement; a dangerous tale that starts on its own",
+      "text": "The shoemaker's child on Szewska is an odmieniec: the boginki swapped it at the well, it screams at holy water and eats for three. (A dangerous tale: the women know the old test. Counter it.)",
+      "line": [
+        "Szewcowej dziecko to odmieniec. Boginki zamieniły przy studni. Krzyczy na święconą wodę, a je za trzech.",
+        "The shoemaker's wife's child is a changeling. The boginki swapped it at the well. Screams at holy water and eats for three."
+      ],
+      "person": "hryhorij",
+      "counter": {
+        "label": "Take Father Hryhorij and the herb woman to the shoemaker's",
+        "desc": "The Uniate priest baptises the child a second time in front of the neighbours and the herb woman names the fever. Church loyalty +2, street loyalty +1; the child lives.",
+        "effects": {
+          "loyalty": {
+            "church": 2,
+            "street": 1
+          },
+          "text": "You stood in a Szewska kitchen while a Uniate priest wetted a screaming baby's head for the second time. The women went home."
+        }
+      },
+      "disprove": 0.15,
+      "effects": {
+        "dread": 10,
+        "district": {
+          "rynek": {
+            "unrest": 5
+          }
+        },
+        "camp": [
+          "changeling_test"
+        ],
+        "text": "The women took the shoemaker's child to the dungheap behind the row and did the old thing with the birch. It is alive. The shoemaker has not spoken since."
+      },
+      "disproved": {
+        "text": "The child's fever broke. The women say the boginka brought the real one back, which is one way of putting it."
+      }
+    },
+    "twardowski_moon": {
+      "kind": "ghost",
+      "subject": "Twardowski on the moon",
+      "truth": false,
+      "source": "the drunk at the Zajazd",
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "tavern",
+        "crossing"
+      ],
+      "trigger": "background; louder on clear frost with the moon past three-quarters",
+      "text": "Twardowski was seen on the moon on Thursday, waving. The Austrians have offered him a post and he is still not signed.",
+      "line": [
+        "Twardowskiego widzieli na księżycu, w czwartek. Machał. Austriacy dają mu posadę, a on nie podpisuje.",
+        "They saw Twardowski on the moon on Thursday. Waving. The Austrians offer him a post and he still won't sign."
+      ],
+      "disprove": 0.05,
+      "effects": {
+        "loyalty": {
+          "street": 1
+        },
+        "text": "Drunks salute the moon on their way home; the watch has stopped asking why."
+      }
+    },
+    "drowned_singer": {
+      "kind": "ghost",
+      "subject": "The singer under the bridge",
+      "truth": false,
+      "source": "the boatmen",
+      "spread": 0.45,
+      "seed": [
+        "tavern"
+      ],
+      "trigger": "the corpse_carried event was seen (an informer sunk in the drains)",
+      "text": "The informer the river took sings under the Stradom bridge at midnight, and he sings names: whoever paid him, and whoever else is paid.",
+      "line": [
+        "Ten donosiciel, co go Wisła wzięła, śpiewa pod mostem na Stradomiu o północy. I śpiewa nazwiska.",
+        "The informer the Vistula took sings under the Stradom bridge at midnight. And he sings names."
+      ],
+      "plantable": true,
+      "plant_note": "Every informer in the city hears that the dead name their paymasters. The grey informer keeps to lit streets (his reports thin) and Wilk's men are pleased.",
+      "disprove": 0.2,
+      "effects": {
+        "notoriety": -6,
+        "loyalty": {
+          "underworld": 2
+        },
+        "camp": [
+          "informers_spooked"
+        ],
+        "text": "The grey man in the good coat has not been seen on the south row since the singing started."
+      },
+      "disproved": {
+        "text": "A raftsman's boy was found under the bridge with a fiddle and a bottle. The informers come back out."
+      }
+    },
+    "left_hand_clerk": {
+      "kind": "curse",
+      "subject": "The clerk who signs with his left hand",
+      "truth": false,
+      "source": "the Town Hall porters",
+      "spread": 0.4,
+      "seed": [
+        "watch",
+        "market"
+      ],
+      "trigger": "on demand; a whisper against the commissary's clerk",
+      "text": "Herr Wlach, the commissary's clerk, signs with his left hand and will not take the wafer: the Kazimierz wise-woman says a man like that signs for someone else.",
+      "line": [
+        "Wlach, ten pisarz komisarza, podpisuje lewą ręką i opłatka nie bierze. Znachorka mówi, że taki podpisuje za kogoś innego.",
+        "Wlach, the commissary's clerk, signs with his left hand and won't take the wafer. The wise-woman says a man like that signs for someone else."
+      ],
+      "notable": "clerk",
+      "plantable": true,
+      "plant_note": "The clerk's servants and the sentries avoid him: a fear hold on Herr Wlach without a dead dog, and his papers are copied less carefully.",
+      "disprove": 0.45,
+      "effects": {
+        "camp": [
+          "clerk_shunned"
+        ],
+        "strength": {
+          "austria": -1
+        },
+        "text": "The clerk's maid has given notice and the sentry at his door has asked for another post."
+      },
+      "disproved": {
+        "text": "The clerk is left-handed because a horse broke his right arm at Olmütz. The wise-woman has left town."
+      }
+    },
+    "salt_ring_found": {
+      "kind": "beast",
+      "subject": "The ring of salt",
+      "truth": false,
+      "source": "whoever found the body",
+      "spread": 0.45,
+      "seed": [
+        "well",
+        "market"
+      ],
+      "trigger": "stagings.salt_ring believed",
+      "text": "They found him inside a ring of salt on the cobbles, and the salt had not held: a witch's work, or a thing that laughs at salt.",
+      "line": [
+        "Leżał w kole z soli i sól nie utrzymała. Albo czarownica, albo coś, co się z soli śmieje.",
+        "He lay in a ring of salt and the salt didn't hold. A witch, or something that laughs at salt."
+      ],
+      "disprove": 0.35,
+      "effects": {
+        "dread": 8,
+        "notoriety": -4,
+        "text": "Salt is dearer at the market than it was, and the excise clerk is pleased."
+      },
+      "disproved": {
+        "notoriety": 4,
+        "text": "The surgeon said the salt was laid after the man fell: the ring was for whoever found him."
+      }
+    },
+    "garlic_mouth_found": {
+      "kind": "beast",
+      "subject": "Garlic in the mouth",
+      "truth": false,
+      "source": "the market",
+      "spread": 0.5,
+      "seed": [
+        "market",
+        "well"
+      ],
+      "trigger": "stagings.garlic_mouth believed",
+      "text": "Garlic in the dead man's mouth: whoever laid him out knew what he was and did not want him back.",
+      "line": [
+        "Czosnek w ustach miał. Kto go tak ułożył, wiedział, czym był, i nie chciał go z powrotem.",
+        "He had garlic in his mouth. Whoever laid him out knew what he was and didn't want him back."
+      ],
+      "disprove": 0.3,
+      "effects": {
+        "dread": 10,
+        "notoriety": -6,
+        "camp": [
+          "garlic_talk"
+        ],
+        "text": "The herb woman has sold out of garlic and the soldiers from Moravia buy it too."
+      },
+      "disproved": {
+        "notoriety": 5,
+        "text": "The dead man was nothing but a clerk, and the garlic went in after his jaw had set."
+      }
+    },
+    "face_down_found": {
+      "kind": "beast",
+      "subject": "Laid face down",
+      "truth": false,
+      "source": "the watch",
+      "spread": 0.45,
+      "seed": [
+        "watch",
+        "passage"
+      ],
+      "trigger": "stagings.face_down believed",
+      "text": "The body was laid face down, so that it should dig the other way if it woke. The Bohemians on the watch would not turn it over.",
+      "line": [
+        "Twarzą do ziemi go położyli, żeby kopał w drugą stronę, jak się zbudzi. Czesi ze straży nie chcieli go odwrócić.",
+        "They laid him face down, so he'd dig the other way if he woke. The Bohemians on the watch wouldn't turn him over."
+      ],
+      "disprove": 0.3,
+      "effects": {
+        "dread": 8,
+        "notoriety": -5,
+        "strength": {
+          "austria": -1
+        },
+        "text": "The watch sends a Tyrolean and a priest now to any body found before dawn."
+      },
+      "disproved": {
+        "notoriety": 5,
+        "text": "The regimental surgeon read the bruising: the man lay an hour on his back before someone turned him. A knife, and a story."
+      }
+    },
+    "heel_cut_found": {
+      "kind": "beast",
+      "subject": "Hamstrung after death",
+      "truth": false,
+      "source": "the porters",
+      "spread": 0.5,
+      "seed": [
+        "passage",
+        "tavern"
+      ],
+      "trigger": "stagings.heel_cut believed",
+      "text": "Hamstrung after death, the way the old people cut a strzygoń so it cannot walk to its killer's door. Someone in the city was raised properly.",
+      "line": [
+        "Ścięgna podcięte, już po śmierci, jak starzy strzygoniowi podcinali, żeby nie doszedł do drzwi. Ktoś w tym mieście był dobrze chowany.",
+        "Sinews cut, after death, the way the old ones cut a strzygoń so he couldn't reach the door. Someone in this city was properly brought up."
+      ],
+      "disprove": 0.3,
+      "effects": {
+        "dread": 12,
+        "notoriety": -6,
+        "loyalty": {
+          "underworld": 1
+        },
+        "text": "Porters carry their loads with a knife in the belt now and nobody minds."
+      },
+      "disproved": {
+        "notoriety": 6,
+        "crackdown": 2,
+        "text": "Cuts without blood are cuts on a dead man; the surgeon says so and the watch wants the hand that held the knife."
+      }
+    },
+    "aspen_peg_found": {
+      "kind": "beast",
+      "subject": "The aspen peg",
+      "truth": false,
+      "source": "the church steps",
+      "spread": 0.55,
+      "seed": [
+        "church",
+        "passage"
+      ],
+      "trigger": "stagings.aspen_peg believed",
+      "text": "An aspen peg through the coat over the heart. The strzygoń will not rise, and whoever did it went to the trouble of finding aspen in January.",
+      "line": [
+        "Osikowy kołek przez surdut, nad sercem. Strzygoń nie wstanie. Ktoś się natrudził, żeby w styczniu osikę znaleźć.",
+        "An aspen peg through the coat, over the heart. The strzygoń won't rise. Someone went to trouble to find aspen in January."
+      ],
+      "disprove": 0.25,
+      "effects": {
+        "dread": 15,
+        "notoriety": -8,
+        "loyalty": {
+          "church": 1,
+          "street": 2
+        },
+        "camp": [
+          "cellars_shunned"
+        ],
+        "text": "Old women bring aspen twigs to the Cloth Hall passage and nobody laughs at them."
+      },
+      "disproved": {
+        "notoriety": 8,
+        "crackdown": 3,
+        "loyalty": {
+          "church": -3
+        },
+        "text": "The peg was through cloth and nothing else, a carpenter's peg from the Kleparz yards, still green. The Church calls it a desecration and the commandant calls it a murder."
+      }
+    },
+    "chalk_rubbed_found": {
+      "kind": "curse",
+      "subject": "The Kings wiped from the door",
+      "truth": false,
+      "source": "the neighbours",
+      "spread": 0.45,
+      "seed": [
+        "well",
+        "market"
+      ],
+      "trigger": "stagings.chalk_rubbed believed",
+      "text": "The Kings were rubbed off his door the night before: K, M, B wiped clean with a sleeve. A house that is given up.",
+      "line": [
+        "Króli mu z drzwi starli w nocy przedtem. K, M, B, rękawem. Dom, który ktoś oddał.",
+        "The Kings were wiped off his door the night before. K, M, B, with a sleeve. A house somebody gave up."
+      ],
+      "disprove": 0.4,
+      "effects": {
+        "dread": 6,
+        "camp": [
+          "doors_rechalked"
+        ],
+        "text": "Every door on the row has fresh chalk, and the candle seller has none left."
+      },
+      "disproved": {
+        "text": "Chalk rubs off in sleet. The neighbours have forgotten they said anything."
+      }
+    },
+    "candle_stub_found": {
+      "kind": "curse",
+      "subject": "The thunder-candle that went out",
+      "truth": false,
+      "source": "the candle seller",
+      "spread": 0.45,
+      "seed": [
+        "church",
+        "well"
+      ],
+      "trigger": "stagings.candle_stub believed",
+      "text": "A gromnica stub beside him, burnt to the finger: he lit the thunder-candle against something and it went out before he did.",
+      "line": [
+        "Ogarek gromnicy przy nim, wypalony do palca. Zapalił gromnicę na coś, a zgasła przed nim.",
+        "A gromnica stub beside him, burnt to the finger. He lit the thunder-candle against something and it went out before he did."
+      ],
+      "disprove": 0.35,
+      "effects": {
+        "dread": 8,
+        "loyalty": {
+          "church": 2
+        },
+        "notoriety": -4,
+        "text": "The candle seller does a trade in gromnice out of season and the sacristan blesses them by the dozen."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -3
+        },
+        "notoriety": 5,
+        "text": "Tallow, not wax; a shop candle, and the wick pinched out by a finger. The canons call it sacrilege and want the finger."
+      }
+    },
+    "coin_toll_found": {
+      "kind": "curse",
+      "subject": "The river king's toll",
+      "truth": false,
+      "source": "the boatmen",
+      "spread": 0.45,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "trigger": "stagings.coin_toll believed",
+      "text": "A coin under the dead man's tongue: the toll the river king takes from those who owe him. Wilk's mark, or someone who wants it read as Wilk's.",
+      "line": [
+        "Grosz pod językiem. Myto, co je król rzeki bierze od dłużników. Znak Wilka, albo kogoś, kto chce, żeby tak czytali.",
+        "A coin under his tongue. The toll the river king takes from debtors. Wilk's mark, or someone who wants it read as Wilk's."
+      ],
+      "disprove": 0.3,
+      "effects": {
+        "camp": [
+          "wilk_blamed"
+        ],
+        "strength": {
+          "underworld": -2
+        },
+        "notoriety": -5,
+        "text": "The Polizei took two of Wilk's carters in for a death that was not theirs; Wilk wants to know who pays tolls in his name."
+      },
+      "disproved": {
+        "text": "The coin was the dead man's own, in his cheek against the cold. Wilk's carters came home."
+      }
+    },
+    "poppy_count_found": {
+      "kind": "beast",
+      "subject": "Poppy on the body",
+      "truth": false,
+      "source": "the baker's boy",
+      "spread": 0.45,
+      "seed": [
+        "passage",
+        "market"
+      ],
+      "trigger": "stagings.poppy_scatter believed",
+      "text": "Poppy seed scattered over the body: it must count every grain before it can rise, and it will not be done by cockcrow.",
+      "line": [
+        "Mak na nim rozsypali. Musi policzyć każde ziarnko, zanim wstanie, a do kura nie zdąży.",
+        "They scattered poppy over him. Has to count every grain before he can rise, and won't be done by cockcrow."
+      ],
+      "disprove": 0.3,
+      "effects": {
+        "dread": 8,
+        "notoriety": -5,
+        "text": "The baker on Floriańska will not sell poppy after dark."
+      },
+      "disproved": {
+        "notoriety": 4,
+        "text": "Poppy in January comes from a baker's sack, and the baker remembers who bought a pound of it."
+      }
+    },
+    "wolf_wilk": {
+      "kind": "curse",
+      "subject": "The Commandant's wolf",
+      "truth": false,
+      "source": "the Zajazd",
+      "spread": 0.5,
+      "seed": [
+        "tavern",
+        "passage"
+      ],
+      "trigger": "counters.wolf_reward posted",
+      "text": "The Commandant offers fifty gulden for 'the wolf' who kills by night. The street knows one Wilk, and he is on the river, and the Austrians know it too.",
+      "line": [
+        "Komendant daje pięćdziesiąt guldenów za 'wilka', co po nocach zabija. Ulica zna jednego Wilka, jest na rzece, i Austriacy też to wiedzą.",
+        "The Commandant offers fifty gulden for 'the wolf' who kills by night. The street knows one Wilk, on the river, and the Austrians know it too."
+      ],
+      "plantable": true,
+      "plant_note": "The reward for your killings is turned on the river king: the Polizei watch Wilk's quays, his bodyguards are jumpier, and one of his stations is watched on the finale night.",
+      "disprove": 0.3,
+      "effects": {
+        "camp": [
+          "wilk_watched"
+        ],
+        "strength": {
+          "underworld": -3
+        },
+        "notoriety": -5,
+        "text": "Two Polizei in plain coats sit in the fishermen's tavern every night now, drinking slowly and watching the river king's door."
+      },
+      "disproved": {
+        "text": "The wolf was a man in a good coat with a knife, said the surgeon, and Wilk laughed at the Polizei from his barge."
+      }
+    },
+    "plague_maiden_wawel": {
+      "kind": "omen",
+      "subject": "The Maiden on the Wawel roofs",
+      "truth": false,
+      "source": "the water carrier",
+      "spread": 0.5,
+      "seed": [
+        "well",
+        "church"
+      ],
+      "trigger": "typhus in the garrison (a campaign flag), or deaths at Wawel",
+      "text": "The Maiden was seen on the Wawel roofs waving her red kerchief: the pestilential air is in the barracks and the Austrians bury their dead at night.",
+      "line": [
+        "Dziewicę widzieli na dachach Wawelu, z czerwoną chustą. Morowe powietrze jest w koszarach i Austriacy chowają swoich po nocy.",
+        "They saw the Maiden on the Wawel roofs with her red kerchief. The pestilence is in the barracks and the Austrians bury their dead by night."
+      ],
+      "plantable": true,
+      "plant_note": "The garrison is shunned: fewer townsfolk near the posts (fewer witnesses), the guilds refuse to billet soldiers (Austrian strength falls), but the market empties too and the Church sells Masses.",
+      "disprove": 0.3,
+      "effects": {
+        "dread": 15,
+        "strength": {
+          "austria": -3
+        },
+        "loyalty": {
+          "guilds": 1
+        },
+        "district": {
+          "wawel": {
+            "unrest": 5
+          }
+        },
+        "text": "Nobody will sell to a soldier who coughs; the garrison's own bakers feed it now."
+      },
+      "disproved": {
+        "text": "The regimental surgeon opened the barracks to the magistrate: three men with the putrid fever and thirty with the cold. The Maiden was a sentry's wife hanging washing."
+      }
+    },
+    "mora_barracks": {
+      "kind": "curse",
+      "subject": "The mora at the guardhouse",
+      "truth": false,
+      "source": "Mother Weronika's girls",
+      "spread": 0.45,
+      "seed": [
+        "watch",
+        "tavern"
+      ],
+      "trigger": "the haunted_watch flag (commissioner_curse) or a Town Hall post that has seen a body",
+      "text": "The mora sits on the sentries at the Town Hall post: three Bohemians woke unable to breathe, and one has asked for a knife under his straw.",
+      "line": [
+        "Mora dusi wartowników na odwachu. Trzech Czechów obudziło się bez tchu, a jeden prosi o nóż pod siennik.",
+        "The mora is smothering the sentries at the guardhouse. Three Bohemians woke unable to breathe, and one asks for a knife under his straw."
+      ],
+      "plantable": true,
+      "plant_note": "Tired sentries: the Town Hall post sees a little less far at night (the haunted_watch flag), and one man will not stand it alone.",
+      "disprove": 0.35,
+      "effects": {
+        "camp": [
+          "haunted_watch"
+        ],
+        "strength": {
+          "austria": -1
+        },
+        "text": "The corporal doubles the guardhouse post and halves everyone's sleep, which suits the mora."
+      },
+      "disproved": {
+        "text": "The guardhouse stove was blocked; the surgeon opened the flue and the mora left with the smoke."
+      }
+    },
+    "stanislaus_grows": {
+      "kind": "prophecy",
+      "subject": "St Stanislaus grew together",
+      "truth": false,
+      "source": "the canons' servants",
+      "spread": 0.5,
+      "start": true,
+      "seed": [
+        "church",
+        "passage"
+      ],
+      "trigger": "background from day 1; louder after the Bishop's Letter night",
+      "text": "St Stanislaus was cut in pieces at Skałka and grew together again under the eagles; the old Life says so of the Kingdom too. Three cuts, and it will knit.",
+      "line": [
+        "Świętego Stanisława na Skałce porąbali, a zrósł się pod orłami. Stary żywot mówi, że tak i z Królestwem. Trzy razy cięte, a się zrośnie.",
+        "St Stanislaus was hacked to pieces at Skałka and grew back under the eagles. The old Life says the Kingdom does the same. Cut three times, and it will knit."
+      ],
+      "plantable": true,
+      "plant_note": "A prophecy the Church cannot disown, five hundred years old: street and Church loyalty rise, and it costs less Salon than the others (the professors know the Vita too).",
+      "salon_cost": 1,
+      "disprove": 0.05,
+      "effects": {
+        "loyalty": {
+          "street": 4,
+          "church": 3
+        },
+        "text": "The Skałka pool has a crowd at it in the frost, and the Pauline fathers have started selling water from it."
+      }
+    },
+    "madonna_turned": {
+      "kind": "miracle",
+      "subject": "The Madonna who turned her face",
+      "truth": false,
+      "source": "the pedlar",
+      "spread": 0.45,
+      "seed": [
+        "market",
+        "church"
+      ],
+      "trigger": "the holy_cards day action",
+      "text": "The Black Madonna on the pedlar's holy cards turned her face from an Austrian corporal who bought one; he has gone to confession and his sergeant has gone to the pedlar.",
+      "line": [
+        "Czarna Madonna na obrazku odwróciła twarz od austriackiego kaprala, co go kupił. On poszedł do spowiedzi, a sierżant do kramarza.",
+        "The Black Madonna on the holy card turned her face from the Austrian corporal who bought it. He went to confession, and his sergeant went to the pedlar."
+      ],
+      "plantable": true,
+      "plant_note": "The holy cards sell out and the Church is flattered; if it is exposed as a misprint the pedlar is flogged and the Salon laughs.",
+      "disprove": 0.35,
+      "effects": {
+        "loyalty": {
+          "church": 3,
+          "street": 2
+        },
+        "influence": {
+          "church": 1
+        },
+        "text": "Holy cards change hands at a złoty and the Austrian corporals will not buy them."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -2
+        },
+        "text": "Two plates of the print were set crooked: the Madonna's face is to the left on half of them. The pedlar was flogged for it all the same."
+      }
+    },
+    "wanda_thaw": {
+      "kind": "ghost",
+      "subject": "Wanda turning in her mound",
+      "truth": false,
+      "source": "the Mogiła carters",
+      "spread": 0.45,
+      "seed": [
+        "crossing",
+        "market"
+      ],
+      "trigger": "the rain_thaw preset; ice breaking",
+      "text": "The ice broke early at Mogiła under Wanda's mound: she is turning in it, because she would not have a German either.",
+      "line": [
+        "Lód pękł za wcześnie pod kopcem Wandy w Mogile. Przewraca się w nim, bo ona też Niemca nie chciała.",
+        "The ice broke early under Wanda's mound at Mogiła. She's turning in it: she wouldn't have a German either."
+      ],
+      "plantable": true,
+      "plant_note": "Harmless and warm: street loyalty, a magnate's smile, and the ballad seller has a new verse. Costs little Salon.",
+      "salon_cost": 1,
+      "disprove": 0.1,
+      "effects": {
+        "loyalty": {
+          "street": 3,
+          "magnates": 1
+        },
+        "text": "The ballad of Wanda who would not have a German is sung to a carol tune under the Cloth Hall."
+      }
+    },
+    "kings_stir": {
+      "kind": "ghost",
+      "subject": "The kings knock in the crypt",
+      "truth": false,
+      "source": "the Wawel sentries' women",
+      "spread": 0.45,
+      "seed": [
+        "watch",
+        "church"
+      ],
+      "trigger": "Austrians quartered in Wawel; deaths there; the comet up",
+      "text": "The kings knock in the crypt under the cathedral and Queen Barbara walks the royal rooms the Austrians sleep in. Two sentries have asked to be moved and one has been flogged for leaving his post.",
+      "line": [
+        "Królowie stukają w krypcie pod katedrą, a królowa Barbara chodzi po komnatach, gdzie śpią Austriacy. Dwóch wartowników prosiło o przeniesienie, jednego zbili za opuszczenie posterunku.",
+        "The kings knock in the crypt under the cathedral and Queen Barbara walks the rooms the Austrians sleep in. Two sentries asked to be moved, one was flogged for leaving his post."
+      ],
+      "plantable": true,
+      "plant_note": "The Wawel garrison sleeps badly: Austrian strength falls, the Wawel district's watch thins by one, and the Church enjoys it.",
+      "disprove": 0.25,
+      "effects": {
+        "strength": {
+          "austria": -2
+        },
+        "district": {
+          "wawel": {
+            "unrest": 5
+          }
+        },
+        "dread": 8,
+        "loyalty": {
+          "church": 1
+        },
+        "text": "The Wawel posts are doubled and the men on them are grey by morning."
+      },
+      "disproved": {
+        "text": "The knocking was the frost in the cathedral roof-beams. The sentries were flogged again for good measure."
+      }
+    },
+    "red_snow": {
+      "kind": "omen",
+      "subject": "Red snow on the Rynek",
+      "truth": false,
+      "source": "the market",
+      "spread": 0.5,
+      "seed": [
+        "market",
+        "well",
+        "church"
+      ],
+      "trigger": "a blood-red dawn over the Rynek (omens.red_dawn)",
+      "text": "The snow on the Rynek was red at dawn, as it was before the Swedes came: blood from the sky for blood to come.",
+      "line": [
+        "Śnieg na Rynku był o świcie czerwony, jak przed Szwedami. Krew z nieba na krew, co przyjdzie.",
+        "The snow on the Rynek was red at dawn, like before the Swedes came. Blood from the sky for blood to come."
+      ],
+      "plantable": true,
+      "plant_note": "Dread rises across the city; the riot on the pillory night needs less to start, and the guilds shutter early.",
+      "disprove": 0.2,
+      "effects": {
+        "dread": 15,
+        "district": {
+          "rynek": {
+            "unrest": 8
+          }
+        },
+        "loyalty": {
+          "guilds": -1
+        },
+        "text": "Shops on the rows close before the curfew bell and the square is a soldier's square by ten."
+      },
+      "disproved": {
+        "text": "The red snow was brick dust from the Austrians' works at the Barbican, said the professor, who had a jar of it."
+      }
+    },
+    "ox_spoke": {
+      "kind": "prophecy",
+      "subject": "The ox that spoke on Wigilia",
+      "truth": false,
+      "source": "a Kleparz stable boy",
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "crossing",
+        "passage"
+      ],
+      "trigger": "background from day 1 (Christmas is behind the campaign)",
+      "text": "On Wigilia at midnight the ox in the Kleparz posting stable spoke, as they do, and said the white coats would be gone by Easter. The boy who heard it will die within the year, which is the rule.",
+      "line": [
+        "W Wigilię o północy wół w stajni pocztowej na Kleparzu przemówił, jak to one, i powiedział, że białe mundury pójdą do Wielkanocy. Chłopak, co słyszał, umrze w tym roku, taka reguła.",
+        "On Christmas Eve at midnight the ox in the Kleparz posting stable spoke, as they do, and said the white coats would be gone by Easter. The boy who heard it will die within the year; that's the rule."
+      ],
+      "disprove": 0.1,
+      "effects": {
+        "loyalty": {
+          "street": 2
+        },
+        "text": "'By Easter' is said in the taverns the way 'God willing' used to be."
+      }
+    },
+    "gromnica_wolves": {
+      "kind": "omen",
+      "subject": "Wolves at the gate on Candlemas",
+      "truth": false,
+      "source": "the Sławkowska gate",
+      "spread": 0.5,
+      "seed": [
+        "crossing",
+        "church",
+        "well"
+      ],
+      "trigger": "omens.candlemas (the night of 2 February)",
+      "text": "Wolves came to the Sławkowska gate on Candlemas night and sat, as they do when Our Lady of the Thunder Candle has left the country. This year the wolves at the gate wear white coats.",
+      "line": [
+        "Wilki przyszły na Gromniczną pod bramę Sławkowską i siedziały, jak to one, kiedy Gromniczna kraj opuściła. W tym roku wilki pod bramą noszą białe mundury.",
+        "Wolves came to the Sławkowska gate on Candlemas night and sat, as they do when Our Lady of the Thunder Candle has left the country. This year the wolves at the gate wear white coats."
+      ],
+      "plantable": true,
+      "plant_note": "Candlemas only. The town lights gromnice in every window (the streets are a little brighter: sight ranges up) and street and Church loyalty rise.",
+      "disprove": 0.15,
+      "effects": {
+        "loyalty": {
+          "street": 3,
+          "church": 2
+        },
+        "camp": [
+          "gromnice_lit"
+        ],
+        "text": "A candle burns in every window on the rows and the soldiers walk down the middle of the square."
+      }
+    },
+    "mikveh_shedim": {
+      "kind": "curse",
+      "subject": "The shedim in the bathhouse",
+      "truth": false,
+      "source": "the Kazimierz bath-keeper",
+      "spread": 0.4,
+      "seed": [
+        "tavern",
+        "market"
+      ],
+      "trigger": "on demand; useful before the finale's bathhouse station (22:40)",
+      "text": "The shedim in the bathhouse by the river have taken to the last man to bathe alone after dark: the bath-keeper found the water still warm and the bench empty twice this month.",
+      "line": [
+        "Szedim z łaźni nad rzeką biorą ostatniego, co się kąpie sam po zmroku. Łaziebny dwa razy w tym miesiącu zastał wodę ciepłą, a ławę pustą.",
+        "The shedim in the bathhouse by the river take the last man who bathes alone after dark. Twice this month the bath-keeper found the water warm and the bench empty."
+      ],
+      "plantable": true,
+      "plant_note": "The riverside bathhouse empties after dark: on the finale night Wilk bathes with fewer witnesses and one bodyguard waits outside the door where the steam is. Kazimierz talk; it stays in Kazimierz unless someone carries it.",
+      "disprove": 0.3,
+      "effects": {
+        "camp": [
+          "bathhouse_empty"
+        ],
+        "text": "The riverside bathhouse closes its stove at dusk; only men who fear nothing, or owe money, bathe late."
+      },
+      "disproved": {
+        "text": "The bench was empty because the bath-keeper's brother-in-law was using the back door. The steam is innocent."
+      }
+    },
+    "golem_cellar": {
+      "kind": "beast",
+      "subject": "The clay man under Szeroka",
+      "truth": false,
+      "source": "the Zajazd",
+      "spread": 0.5,
+      "seed": [
+        "tavern",
+        "well"
+      ],
+      "trigger": "on demand; a dangerous slander",
+      "text": "The Kazimierz Jews keep a clay man from Chełm in a cellar under Szeroka, for the night the soldiers come for their sons. (A dangerous tale: it brings the Polizei to Kazimierz and the mob after them.)",
+      "line": [
+        "Żydzi z Kazimierza trzymają glinianego człowieka z Chełma w piwnicy pod Szeroką. Na noc, kiedy żołnierze przyjdą po ich synów.",
+        "The Kazimierz Jews keep a clay man from Chełm in a cellar under Szeroka. For the night the soldiers come for their sons."
+      ],
+      "plantable": true,
+      "plant_note": "The Polizei search Kazimierz cellars: a patrol leaves the Rynek for a night. The price is Kazimierz's: unrest, stones at windows, and the blood slander comes a step closer. The rabbi and the professor can counter it.",
+      "counter": {
+        "label": "Walk Szeroka with the rabbi and Professor Śniadecki",
+        "desc": "Open the cellars under Szeroka to the neighbours: barrels, cabbages, a tailor's shop. Salon +2, guilds loyalty +3, church loyalty -1.",
+        "effects": {
+          "influence": {
+            "salon": 2
+          },
+          "loyalty": {
+            "guilds": 3,
+            "church": -1
+          },
+          "text": "You opened the cellars under Szeroka with the rabbi and a professor: cabbages, herring, one drunk. No clay man. The tale shrivels."
+        }
+      },
+      "disprove": 0.3,
+      "effects": {
+        "camp": [
+          "kazimierz_search"
+        ],
+        "district": {
+          "kazimierz": {
+            "unrest": 15
+          }
+        },
+        "loyalty": {
+          "guilds": -4
+        },
+        "dread": 8,
+        "text": "The Polizei turned out every cellar on Szeroka by torchlight and found herring. A window was broken after they left, and not by them."
+      },
+      "disproved": {
+        "text": "The clay man from Chełm was a tailor's dummy. The window is still broken."
+      }
+    },
+    "name_changed": {
+      "kind": "miracle",
+      "subject": "The boy with the new name",
+      "truth": false,
+      "source": "the Kazimierz tailors",
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "market",
+        "passage"
+      ],
+      "trigger": "background from day 1; Kazimierz's own",
+      "text": "The tailor Feivel's boy was dying of the fever, so they gave him a new name at the synagogue to cheat the Angel of Death's list, and the Angel took an Austrian corporal of the same age that night instead. Nobody had renamed the corporal.",
+      "line": [
+        "Chłopak krawca Fajwla umierał na gorączkę, to mu w bóżnicy dali nowe imię, żeby oszukać listę Anioła Śmierci. Anioł wziął tej nocy austriackiego kaprala w tym samym wieku. Kaprala nikt nie przemianował.",
+        "Tailor Feivel's boy was dying of the fever, so they gave him a new name at the synagogue to cheat the Angel of Death's list. The Angel took an Austrian corporal the same age that night instead. Nobody had renamed the corporal."
+      ],
+      "disprove": 0.1,
+      "effects": {
+        "loyalty": {
+          "guilds": 1,
+          "street": 1
+        },
+        "text": "Soldiers in Kazimierz are asked their names more carefully than before, and answer less."
+      }
+    },
+    "blood_slander": {
+      "kind": "curse",
+      "subject": "The oldest lie",
+      "truth": false,
+      "source": "nobody will say",
+      "spread": 0.55,
+      "seed": [
+        "well",
+        "market",
+        "tavern"
+      ],
+      "trigger": "counters.blood_slander only: never planted, never plantable",
+      "plantable": false,
+      "text": "The dead man near the Kazimierz gate was bled, they say, and it is the season the Jews need blood for. (The oldest lie in the city. Counter it before it takes hold; the endings remember whether you did.)",
+      "line": [
+        "Tego spod bramy kazimierskiej wykrwawili, mówią. A to ta pora, kiedy Żydom krwi potrzeba.",
+        "The one by the Kazimierz gate was bled, they say. And it's the season the Jews need blood for."
+      ],
+      "counter": {
+        "label": "Stand on the Town Hall steps with the rabbi, Father Hryhorij and the professor",
+        "desc": "The rabbi, a Uniate priest and Professor Śniadecki read the surgeon's finding and Cardinal Ganganelli's report aloud from the Town Hall steps; you stand with them. Salon +3, guilds loyalty +4, church loyalty -2, notoriety +5 (the Polizei note who stood there).",
+        "effects": {
+          "influence": {
+            "salon": 3
+          },
+          "loyalty": {
+            "guilds": 4,
+            "church": -2
+          },
+          "notoriety": 5,
+          "text": "You stood on the Town Hall steps beside a rabbi, a Uniate priest and an astronomer while the surgeon's paper was read. The crowd went home. Somebody wrote your name down."
+        }
+      },
+      "disprove": 0.15,
+      "effects": {
+        "district": {
+          "kazimierz": {
+            "unrest": 25
+          }
+        },
+        "loyalty": {
+          "guilds": -8,
+          "church": 1
+        },
+        "fear": {
+          "guilds": 8
+        },
+        "camp": [
+          "kazimierz_stoned"
+        ],
+        "crackdown": 4,
+        "dread": 10,
+        "text": "Stones through the windows on Szeroka, a shop burned, a boy's arm broken. The Austrians posted a curfew on Kazimierz and called it protection. The guilds of Kazimierz will remember who spoke and who did not."
+      },
+      "disproved": {
+        "text": "The surgeon's paper was read from the pulpit at last: a knife, no more. The windows on Szeroka are boarded and nobody apologises."
+      }
+    },
+    "licho_clocks": {
+      "kind": "curse",
+      "subject": "The licho in the Town Hall clock",
+      "truth": false,
+      "source": "the Town Hall porters",
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "market",
+        "crossing"
+      ],
+      "trigger": "background from day 1",
+      "text": "The licho has got into the Town Hall clock: it strikes the curfew a quarter early on Austrian orders and a quarter late on Polish ones.",
+      "line": [
+        "Licho weszło w ratuszowy zegar. Na austriackie rozkazy bije o kwadrans za wcześnie, a na polskie o kwadrans za późno.",
+        "The licho has got into the Town Hall clock. It strikes a quarter early for Austrian orders and a quarter late for Polish ones."
+      ],
+      "disprove": 0.1,
+      "effects": {
+        "loyalty": {
+          "street": 1
+        },
+        "text": "'The licho's quarter' is what the rows call the last quarter-hour before the curfew bell."
+      }
+    },
+    "skrzat_press": {
+      "kind": "curse",
+      "subject": "The skrzat in the press",
+      "truth": false,
+      "source": "the printer's apprentice",
+      "spread": 0.4,
+      "seed": [
+        "passage",
+        "market"
+      ],
+      "trigger": "the Printer's Bundle won",
+      "text": "A skrzat lives in the printer's press on Floriańska and will only set Polish: every German patent comes out with the lines crossed, and the printer is very sorry.",
+      "line": [
+        "W prasie na Floriańskiej mieszka skrzat i składa tylko po polsku. Każdy niemiecki patent wychodzi z przestawionymi wierszami, a drukarz bardzo przeprasza.",
+        "A skrzat lives in the press on Floriańska and only sets Polish. Every German patent comes out with its lines crossed, and the printer is very sorry."
+      ],
+      "person": "apprentice",
+      "plantable": true,
+      "plant_note": "Cover for the press's 'mistakes' with the Austrian notices: the printer is fined, not arrested (the press lever survives one traced pamphlet).",
+      "disprove": 0.2,
+      "effects": {
+        "camp": [
+          "press_skrzat"
+        ],
+        "loyalty": {
+          "salon": 1,
+          "street": 1
+        },
+        "text": "The commissary's patents come back for a second printing and the printer charges for both."
+      },
+      "disproved": {
+        "text": "The skrzat was the apprentice, who was flogged. The press prints German now, slowly."
+      }
+    }
+  },
+  "chatter": {
+    "_doc": "Bubble lines for street_life.gd / walker.gd speech(), {text, gloss, personality}. pools[class][trigger] = lines. Pick a line whose `personality` matches the speaker's (campaign.json tones.personalities) or any if the speaker has none. Triggers: idle (any time dread >= 25), murder_nearby (a kill within 30 m in the last hour, body not yet found), body_found (a body found tonight), fog, blizzard, comet (comet up), halo (moon halo up), bell (a bell tolling out of hours), raid (the Visitation on the red lantern), thaw (rain_thaw preset), candlemas (2 February). Keep them sparse: one folklore bubble per speaker per 90 s, none within 12 m of a guard unless the speaker is a soldier. Every foreign line carries its gloss.",
+    "classes": {
+      "market_women": "stallholders, the well women, the milk woman, the herb woman",
+      "porters": "porters, carters, the water carrier, the firewood seller",
+      "raftsmen": "boatmen and raftsmen at the Zajazd and the quays",
+      "soldiers": "Austrian rank and file (German with a Moravian or Tyrolean turn)",
+      "students": "students of the Main School, the printer's apprentice",
+      "clergy": "priests, the sacristan, the bishop's chaplain, beggars on the church steps",
+      "jewish_tradesmen": "Kazimierz pedlars, tailors and the bath-keeper (Yiddish and Polish)",
+      "urchins": "Staś, Kasia and the passage children",
+      "brothel": "the women at the red lantern, the doorman, the madam",
+      "bard": "Cyprian the lute-player (one line: the easter egg)"
+    },
+    "pools": {
+      "market_women": {
+        "murder_nearby": [
+          {
+            "text": "Strzygoń to był. Zagryzł, a nie zabrał. Człowiek by zabrał.",
+            "gloss": "It was a strzygoń. Bit him, took nothing. A man would've taken something.",
+            "personality": "wry"
+          },
+          {
+            "text": "Sól na próg, czosnek za drzwi. Austriaka i tak nie odstraszy.",
+            "gloss": "Salt on the step, garlic behind the door. Still won't keep the Austrian out.",
+            "personality": "cynical-merchant"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Twarzą do ziemi leżał. Ktoś wiedział, co robi.",
+            "gloss": "He lay face down. Somebody knew what they were doing.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Bez kropli krwi, mówią. Kto mówi? Ta, co go nie widziała.",
+            "gloss": "Not a drop of blood, they say. Who says? The one who never saw him.",
+            "personality": "wry"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Taka mgła, że topielec by wyszedł na Rynek i nikt by go nie poznał.",
+            "gloss": "Fog like this, a topielec could walk onto the Rynek and nobody would know him.",
+            "personality": "wry"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "Płanetnik dziś robi za dwóch. Ktoś mu płaci, i nie my.",
+            "gloss": "The płanetnik's doing two men's work tonight. Somebody's paying him, and it isn't us.",
+            "personality": "cynical-merchant"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Kometa. Za Szwedów też była, i patrz, co wyszło.",
+            "gloss": "A comet. There was one before the Swedes too, and look how that went.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Świeci na Wawel. Niech świeci, tam ich pełno.",
+            "gloss": "It's shining on Wawel. Let it; the place is full of them.",
+            "personality": "wry"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Koło na księżycu. Pogrzeb będzie, i nie byle czyj.",
+            "gloss": "A ring round the moon. There'll be a funeral, and not just anybody's.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Księżyc w lisiej czapie: mróz. Albo pogrzeb. Ubieraj się ciepło na oba.",
+            "gloss": "Moon in a fox cap: frost. Or a funeral. Dress warm for both.",
+            "personality": "wry"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Dzwonią na chmury czy na umarłego? Teraz to jedno.",
+            "gloss": "Ringing against the clouds or for the dead? Same thing these days.",
+            "personality": "stern"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Straż pod latarnią szuka upiora. Znajdą swojego porucznika.",
+            "gloss": "The watch is under the red lantern looking for an upiór. They'll find their own lieutenant.",
+            "personality": "wry"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Odwilż. Wisła odda, co wzięła. Nie patrz, dziecko.",
+            "gloss": "Thaw. The Vistula will give back what it took. Don't look, child.",
+            "personality": "tender"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Gromnica w oknie, wilki za bramą. W tym roku wilki mają białe mundury.",
+            "gloss": "A thunder-candle in the window, wolves at the gate. This year the wolves wear white coats.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Czosnek, święcony! Na strzygonia i na kaszel, jedna cena.",
+            "gloss": "Garlic, blessed! For the strzygoń and for the cough, one price.",
+            "personality": "cynical-merchant"
+          },
+          {
+            "text": "Siódma córka, w czepku urodzona. Ja bym takiej dziecka nie dała trzymać.",
+            "gloss": "A seventh daughter, born in the caul. I wouldn't let one like that hold my child.",
+            "personality": "fearful"
+          }
+        ]
+      },
+      "porters": {
+        "murder_nearby": [
+          {
+            "text": "Nosiłem trumny i nosiłem sól. Sól cięższa.",
+            "gloss": "I've carried coffins and I've carried salt. Salt's heavier.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Kołek osikowy przez surdut. Dobry surdut, szkoda.",
+            "gloss": "An aspen peg through the coat. Good coat, too. Pity.",
+            "personality": "gallows-humour"
+          },
+          {
+            "text": "Nie odwracaj go. Niech Czesi odwracają, oni się znają.",
+            "gloss": "Don't turn him over. Let the Bohemians turn him; they know about these things.",
+            "personality": "stern"
+          }
+        ],
+        "fog": [
+          {
+            "text": "We mgle każdy tragarz to upiór. Zapłać i nie patrz.",
+            "gloss": "In fog every porter's an upiór. Pay and don't look.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "Płanetnik. Nawet on ma dziś robotę, a ja nie.",
+            "gloss": "The płanetnik. Even he has work tonight, and I don't.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Ogon na wschód. Moskal się ucieszy.",
+            "gloss": "Tail to the east. The Muscovite will be pleased.",
+            "personality": "stern"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Koło koło księżyca. Ktoś umrze. Codziennie ktoś umiera, dziś przynajmniej z ogłoszeniem.",
+            "gloss": "A ring round the moon. Someone will die. Someone dies every day; tonight at least it's announced.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Zygmunt bije, a nie ma po kim. To znaczy, że będzie po kim.",
+            "gloss": "Zygmunt's ringing and there's nobody dead. That means there will be.",
+            "personality": "stern"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Roztopy. Wypłynie wszystko, co zimą wrzucili. Będzie robota przy noszeniu.",
+            "gloss": "Thaw. Everything they threw in over the winter will float up. There'll be carrying work.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Nóż w Sukiennicach wisi od stu lat. Nikt go nie ukradł. To dopiero cud.",
+            "gloss": "That knife's hung in the Cloth Hall a hundred years. Nobody's stolen it. Now that's a miracle.",
+            "personality": "wry"
+          },
+          {
+            "text": "Licho nie śpi. Licho ma nocną zmianę, jak ja.",
+            "gloss": "The licho never sleeps. The licho works nights, like me.",
+            "personality": "drunk-philosopher"
+          }
+        ]
+      },
+      "raftsmen": {
+        "murder_nearby": [
+          {
+            "text": "Rzeka prowadzi rachunki. Rynek też, tylko gorzej pisze.",
+            "gloss": "The river keeps accounts. So does the Rynek, only its handwriting's worse.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Śpiewa pod mostem. Fałszuje jak za życia.",
+            "gloss": "He sings under the bridge. Off-key, same as when he was alive.",
+            "personality": "gallows-humour"
+          },
+          {
+            "text": "Topielec nie bierze tego, co Wisłę szanuje. Bierze tego, co w nią pluje.",
+            "gloss": "The topielec doesn't take a man who respects the Vistula. He takes the one who spits in it.",
+            "personality": "stern"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Mgła nad wodą to topielce oddychają. Nie gwiżdż.",
+            "gloss": "Fog on the water is the drowned breathing. Don't whistle.",
+            "personality": "stern"
+          },
+          {
+            "text": "Nie ratuj tonącego we mgle. Woda weźmie ciebie za niego.",
+            "gloss": "Don't save a drowning man in fog. The water will take you in his place.",
+            "personality": "stern"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "Śnieg na lód, lód na wodę, woda na nas. Płanetnik zna kolejność.",
+            "gloss": "Snow on the ice, ice on the water, water on us. The płanetnik knows the order.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Kometa nad Wisłą. Będzie wielka woda na wiosnę. Zawsze jest.",
+            "gloss": "A comet over the Vistula. There'll be a great flood in spring. There always is.",
+            "personality": "wry"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja. Lepiej pod latarnią niż pod lodem.",
+            "gloss": "The Visitation. Better under the lantern than under the ice.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Lód pęka pod kopcem Wandy. Też Niemca nie chciała.",
+            "gloss": "The ice is cracking under Wanda's mound. She wouldn't have a German either.",
+            "personality": "wry"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Święta Barbara pilnuje flisaka, Gromniczna pilnuje wsi. Rynku nie pilnuje nikt.",
+            "gloss": "St Barbara looks after the raftsman, Our Lady of the Candle looks after the village. Nobody looks after the Rynek.",
+            "personality": "stern"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Lajkonik w czerwcu wybije ich z Rynku buławą. Za darmo, on tak lubi.",
+            "gloss": "In June the Lajkonik will beat them out of the square with his mace. For free; he enjoys it.",
+            "personality": "gallows-humour"
+          },
+          {
+            "text": "Pod Stradomiem woda nie zamarza. Wiesz czemu? Ja też nie. I nie chcę.",
+            "gloss": "Under the Stradom bridge the water never freezes. Know why? Nor do I. Nor do I want to.",
+            "personality": "drunk-philosopher"
+          }
+        ]
+      },
+      "soldiers": {
+        "murder_nearby": [
+          {
+            "text": "Das war kein Wolf. Ein Wolf nimmt keine Stiefel.",
+            "gloss": "That was no wolf. A wolf doesn't take boots.",
+            "personality": "stern"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Bei uns in Mähren kriegt so einer einen Pflock, Herr Korporal. Sicher ist sicher.",
+            "gloss": "Back home in Moravia a man like that gets a stake, corporal. Better safe.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Ich dreh ihn nicht um. Dreh du ihn um.",
+            "gloss": "I'm not turning him over. You turn him.",
+            "personality": "fearful"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Im Nebel hört man die Toten singen. Oder die Flößer. Ist dasselbe Lied.",
+            "gloss": "In fog you hear the dead singing. Or the raftsmen. Same song.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "Daheim geht die Percht um in solchen Nächten. Hier gehen nur wir um.",
+            "gloss": "Back home Perchta rides on nights like this. Here it's only us doing the rounds.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Der Schweif zeigt auf die Burg. Auf uns.",
+            "gloss": "The tail points at the castle. At us.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Ein Komet ist ein Komet. Weitergehen.",
+            "gloss": "A comet is a comet. Move along.",
+            "personality": "stern"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Der Mond hat einen Hof. Daheim heißt das: einer stirbt. Hier heißt es: einer friert.",
+            "gloss": "The moon has a ring. At home that means someone dies. Here it means someone freezes.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Warum läuten die? Es brennt nicht. Es donnert nicht.",
+            "gloss": "Why are they ringing? Nothing's burning. No thunder.",
+            "personality": "fearful"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Visitation! Und wenn oben ein Upír sitzt, den nehmen wir auch mit.",
+            "gloss": "Visitation! And if there's an upír upstairs, we take him too.",
+            "personality": "stern"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Tauwetter. Jetzt kommt alles wieder raus, was der Winter versteckt hat. Auch die Deserteure.",
+            "gloss": "Thaw. Now everything the winter hid comes back out. Deserters included.",
+            "personality": "stern"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Lichtmess. Meine Mutter zündet die Kerze an. Für mich, glaub ich.",
+            "gloss": "Candlemas. My mother's lighting the candle. For me, I think.",
+            "personality": "tender"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Der Brunnenschacht? Nein. Da unten wohnt was. Der Feldwebel sagt Ratten. Der Feldwebel geht auch nicht runter.",
+            "gloss": "The well shaft? No. Something lives down there. The sergeant says rats. The sergeant doesn't go down either.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Die Alten sagen, hier hat ein König einen Drachen unter der Burg. Wir haben einen Oberst. Ist ähnlich.",
+            "gloss": "The old folk say a king here had a dragon under the castle. We've got a colonel. Similar.",
+            "personality": "drunk-philosopher"
+          }
+        ]
+      },
+      "students": {
+        "murder_nearby": [
+          {
+            "text": "Strzygoń? Bohomolec to obalił w siedemdziesiątym drugim. Trup nie czytał.",
+            "gloss": "A strzygoń? Bohomolec refuted that in 'seventy-two. The corpse hadn't read it.",
+            "personality": "wry"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Sinienie na plecach, a leżał na brzuchu. Ktoś go odwrócił. Cyrulik to zobaczy, straż nie.",
+            "gloss": "Lividity on the back, and he lay on his belly. Someone turned him. The barber-surgeon will see it; the watch won't.",
+            "personality": "stern"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Trzy noce mgły. Z ambony będzie Egipt, z kawiarni Austria.",
+            "gloss": "Three nights of fog. From the pulpit it'll be Egypt; from the coffee house, Austria.",
+            "personality": "wry"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Profesor mówi: ciało na orbicie. Ciało, orbita: i tak brzmi jak pogrzeb.",
+            "gloss": "The professor says: a body on an orbit. Body, orbit: still sounds like a funeral.",
+            "personality": "wry"
+          },
+          {
+            "text": "Herschel odkrył kometę w listopadzie. Nasza jest większa. Wszystko mamy większe, oprócz kraju.",
+            "gloss": "Herschel found a comet in November. Ours is bigger. Everything of ours is bigger, except the country.",
+            "personality": "wry"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Halo to lód w powietrzu. Załamanie światła. Powiedz to babie u studni, zobaczysz.",
+            "gloss": "A halo is ice in the air. Refraction. Tell that to the woman at the well and see.",
+            "personality": "ambitious"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Dzwonią na chmury. Synod tego zabronił w zeszłym stuleciu. Synod nie mieszka na Rynku.",
+            "gloss": "Ringing against the clouds. The synod forbade it last century. The synod doesn't live on the Rynek.",
+            "personality": "wry"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja szuka jakobinów pod latarnią. Jakobini są w kawiarni. Latarnia ma lepsze ogrzewanie.",
+            "gloss": "The Visitation hunts Jacobins under the red lantern. The Jacobins are in the coffee house. The lantern has better heating.",
+            "personality": "wry"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Odwilż to fizyka. Wanda w kopcu to poezja. Na Rynku wygrywa poezja.",
+            "gloss": "Thaw is physics. Wanda in her mound is poetry. On the Rynek, poetry wins.",
+            "personality": "drunk-philosopher"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Gromnica, zimy połowica. Druga połowa też austriacka.",
+            "gloss": "Candlemas, winter's half. The second half is Austrian too.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Kołtun się tnie. Nie umiera się od tego. Umiera się od tego, co pod kołtunem.",
+            "gloss": "You cut the kołtun. You don't die of that. You die of what's under it.",
+            "personality": "stern"
+          },
+          {
+            "text": "Van Swieten zabronił kołków w pięćdziesiątym piątym. Cesarzowa podpisała. Ich własne prawo, a boją się bardziej niż my.",
+            "gloss": "Van Swieten banned the stakes in 'fifty-five. The Empress signed it. Their own law, and they're more afraid than we are.",
+            "personality": "ambitious"
+          }
+        ]
+      },
+      "clergy": {
+        "murder_nearby": [
+          {
+            "text": "Nie ma strzygoni. Są dusze bez mszy. Msza kosztuje złotego.",
+            "gloss": "There are no strzygonie. There are souls without a Mass. A Mass costs a złoty.",
+            "personality": "wry"
+          },
+          {
+            "text": "Módl się, nie plotkuj. Zabobon to też grzech.",
+            "gloss": "Pray, don't gossip. Superstition is a sin too.",
+            "personality": "pious"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Pochowamy go w święconej. Wtedy nie wstanie, choćby chciał.",
+            "gloss": "We'll bury him in consecrated ground. Then he won't rise, even if he wanted to.",
+            "personality": "pious"
+          },
+          {
+            "text": "Osika przez serce. Kto tak robi, wierzy w diabła bardziej niż w Boga. Zapamiętam to na kazanie.",
+            "gloss": "Aspen through the heart. Whoever does that believes in the devil more than in God. I'll keep that for a sermon.",
+            "personality": "stern"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Ciemność jak w Egipcie. Faraon też nie chciał puścić.",
+            "gloss": "Darkness as in Egypt. Pharaoh didn't want to let go either.",
+            "personality": "pious"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Kometa to znak. Znak czego, powie biskup. Biskup jeszcze nie powiedział.",
+            "gloss": "A comet is a sign. Of what, the Bishop will say. The Bishop hasn't said yet.",
+            "personality": "wry"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Koło koło księżyca. Panie, świeć nad duszą tego, kogo dotyczy. I nie nad moją.",
+            "gloss": "A ring round the moon. Lord, shine on the soul of whoever it's for. And not on mine.",
+            "personality": "wry"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Dzwonimy na chmury, bo lud prosi. Kapituła nie zabroniła. Kapituła zapytała, ile lud da.",
+            "gloss": "We ring against the clouds because the people ask. The chapter didn't forbid it. The chapter asked how much the people would give.",
+            "personality": "cynical-merchant"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja pod latarnią. Kilku moich penitentów będzie dziś miało ciekawą spowiedź.",
+            "gloss": "The Visitation at the red lantern. A few of my penitents will have an interesting confession tonight.",
+            "personality": "wry"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Odwilż. Ziemia zmięknie, będzie można grzebać. Bogu dzięki i za to.",
+            "gloss": "Thaw. The ground will soften and we can bury again. Thank God for that much.",
+            "personality": "stern"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Gromnicę do ręki, do okna, do trumny. Trzy razy w życiu, a teraz wszyscy chcą naraz.",
+            "gloss": "The thunder-candle in the hand, in the window, in the coffin. Three times in a life, and now everyone wants it at once.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Święty Stanisław się zrósł. Królestwo też. Tak jest w Żywocie, nie ode mnie.",
+            "gloss": "St Stanislaus grew back together. So will the Kingdom. It's in the Life, not from me.",
+            "personality": "pious"
+          },
+          {
+            "text": "Grosz za mszę, grosz za świecę, grosz za sól. Strach to jedyny parafianin, co płaci na czas.",
+            "gloss": "A grosz for a Mass, a grosz for a candle, a grosz for salt. Fear is the only parishioner who pays on time.",
+            "personality": "cynical-merchant"
+          }
+        ]
+      },
+      "jewish_tradesmen": {
+        "murder_nearby": [
+          {
+            "text": "A strzyga? Bay undz heyst dos a shiker mit a meser.",
+            "gloss": "A strzyga? With us that's called a drunk with a knife.",
+            "personality": "wry"
+          },
+          {
+            "text": "Trupa znaleźli sto kroków od naszej bramy. Wiem, co to znaczy. Ty też wiesz.",
+            "gloss": "They found a body a hundred paces from our gate. I know what that means. So do you.",
+            "personality": "stern"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Zol Got ophitn. Nisht undzerer, nisht bay undz. Zog dos yedn.",
+            "gloss": "God forbid. Not one of ours, not near us. Tell everyone that.",
+            "personality": "fearful"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Nebl. Di shedim in der mikve hobn haynt gest.",
+            "gloss": "Fog. The shedim in the bathhouse have guests tonight.",
+            "personality": "wry"
+          },
+          {
+            "text": "W taką mgłę sprawdza się mezuzę. I zasuwę.",
+            "gloss": "In fog like this you check the mezuzah. And the bolt.",
+            "personality": "tender"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "A płanetnik? Nu. Bay undz iz dos poshet vinter.",
+            "gloss": "A płanetnik? Well. With us it's simply called winter.",
+            "personality": "wry"
+          }
+        ],
+        "comet": [
+          {
+            "text": "A shtern mit a shvants. Mayn zeyde hot gezen aza in Chełm. Dernokh iz gekumen der Shved.",
+            "gloss": "A star with a tail. My grandfather saw one like it in Chełm. Then the Swede came.",
+            "personality": "fearful"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Der malekh-hamoves hot a reshime. Der ring iz zayn zigl.",
+            "gloss": "The Angel of Death has a list. The ring is his seal.",
+            "personality": "fearful"
+          },
+          {
+            "text": "Koło na księżycu? U nas na to mówią: będzie zimno. Też trzeba mieć na to anioła?",
+            "gloss": "A ring on the moon? With us that means: it'll be cold. Do you need an angel for that too?",
+            "personality": "wry"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Zey klingen. Ven zey klingen, farmakht men di lodn af Szeroka.",
+            "gloss": "They're ringing. When they ring, the shutters go up on Szeroka.",
+            "personality": "stern"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja u nich. Kiedy skończą u nich, przyjdą do nas. Zawsze tak jest.",
+            "gloss": "A Visitation at theirs. When they're done at theirs they come to ours. It's always so.",
+            "personality": "fearful"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Taut. Di Vaysl vet zikh efenen un opgebn vos zi hot genumen. Mir hobn ir gornisht gegebn.",
+            "gloss": "Thaw. The Vistula will open and give back what it took. We gave it nothing.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Der goylem fun Chełm hot dermordet zayn rebn ven er iz gefaln. Dos iz di gantse mayse mit goylems.",
+            "gloss": "The golem of Chełm crushed his rabbi when he fell. That's the whole story with golems.",
+            "personality": "wry"
+          },
+          {
+            "text": "Feivl hot zayn yingl gegebn a nayem nomen, un der yingl lebt. Der doktor zogt: di fiber iz aleyn avek. Zoln beyde zayn gerekht.",
+            "gloss": "Feivel gave his boy a new name and the boy lives. The doctor says the fever went by itself. Let them both be right.",
+            "personality": "tender"
+          },
+          {
+            "text": "Izaak Jakubowicz szedł po skarb aż do Pragi, a skarb był pod jego piecem. Ja do Pragi nie muszę: pod moim piecem nie ma nic.",
+            "gloss": "Izaak Jakubowicz walked to Prague for a treasure that was under his own stove. I needn't go to Prague: there's nothing under mine.",
+            "personality": "wry"
+          },
+          {
+            "text": "Dibek? Dos iz far di khsidim. Bay undz af Szeroka iz der eyntsiker shed a soldat mit shtivl.",
+            "gloss": "A dybbuk? That's for the Hasidim. On Szeroka the only demon is a soldier in boots.",
+            "personality": "wry"
+          }
+        ]
+      },
+      "urchins": {
+        "murder_nearby": [
+          {
+            "text": "Strzygoń! Widziałem! Miał wąsy jak kapral!",
+            "gloss": "A strzygoń! I saw it! It had a moustache like the corporal!",
+            "personality": "wry"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Za grosz pokażę, gdzie leży. Za dwa, gdzie leżał wczoraj.",
+            "gloss": "For a grosz I'll show you where he's lying. For two, where he lay yesterday.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "fog": [
+          {
+            "text": "We mgle Staś udaje topielca. Dwa grosze od Austriaka za strach.",
+            "gloss": "In the fog Staś plays the topielec. Two groszy a fright, Austrians only.",
+            "personality": "wry"
+          }
+        ],
+        "blizzard": [
+          {
+            "text": "Płanetnik! Daj mu chleba, to przestanie! Daj mnie, ja mu zaniosę!",
+            "gloss": "The płanetnik! Give him bread and he'll stop! Give it to me, I'll take it to him!",
+            "personality": "wry"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Kometa leci na Wiedeń! Kasia mówi, że na Petersburg. Pobiliśmy się.",
+            "gloss": "The comet's flying to Vienna! Kasia says Petersburg. We had a fight about it.",
+            "personality": "wry"
+          },
+          {
+            "text": "Smok śpi. Sprawdzałem. Chrapie po niemiecku.",
+            "gloss": "The dragon's asleep. I checked. He snores in German.",
+            "personality": "wry"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Koło na księżycu to na pogrzeb kaprala. Sam wybrałem.",
+            "gloss": "The ring round the moon is for the corporal's funeral. I picked him myself.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Dzwonią! Uciekaj! Nie wiem przed czym, ale dzwonią!",
+            "gloss": "They're ringing! Run! I don't know from what, but they're ringing!",
+            "personality": "fearful"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja! Kasia, do okna, liczymy oficerów!",
+            "gloss": "Visitation! Kasia, to the window, we're counting officers!",
+            "personality": "wry"
+          }
+        ],
+        "thaw": [
+          {
+            "text": "Roztopy. Sprawdzamy fosę. Czasem coś ma sakiewkę.",
+            "gloss": "Thaw. We check the moat. Sometimes something has a purse.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Gromnica w każdym oknie. Najlepsza noc na kradzież świec w roku.",
+            "gloss": "A candle in every window. Best night of the year for stealing candles.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Twardowski siedzi na księżycu i patrzy. Kasia mu pokazała język.",
+            "gloss": "Twardowski sits on the moon and watches. Kasia stuck her tongue out at him.",
+            "personality": "wry"
+          }
+        ]
+      },
+      "brothel": {
+        "murder_nearby": [
+          {
+            "text": "Upiór? U nas upiory płacą z góry.",
+            "gloss": "An upiór? In this house the upiory pay in advance.",
+            "personality": "wry"
+          },
+          {
+            "text": "Strzygoń pod Sukiennicami. Klienci będą wcześniej w domu. Albo później.",
+            "gloss": "A strzygoń by the Cloth Hall. The clients will be home earlier. Or later.",
+            "personality": "cynical-merchant"
+          }
+        ],
+        "body_found": [
+          {
+            "text": "Panienka mówi, że ją mora dusiła. Mora miała epolety.",
+            "gloss": "The girl says the mora was smothering her. The mora had epaulettes.",
+            "personality": "wry"
+          }
+        ],
+        "fog": [
+          {
+            "text": "Mgła. Dziś nikt nie zobaczy, kto wchodzi. Jak w niedzielę.",
+            "gloss": "Fog. Tonight nobody sees who comes in. Like a Sunday.",
+            "personality": "wry"
+          }
+        ],
+        "comet": [
+          {
+            "text": "Kometa nad domem. Matka Weronika każe brać podwójnie, jak na koniec świata.",
+            "gloss": "A comet over the house. Mother Weronika says charge double, end-of-the-world rates.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "halo": [
+          {
+            "text": "Koło na księżycu, koło na palcu. Oba kosztują.",
+            "gloss": "A ring round the moon, a ring on the finger. Both cost.",
+            "personality": "cynical-merchant"
+          }
+        ],
+        "bell": [
+          {
+            "text": "Dzwonią na chmury. Porucznik na górze myśli, że na niego.",
+            "gloss": "They're ringing against the clouds. The lieutenant upstairs thinks it's for him.",
+            "personality": "wry"
+          }
+        ],
+        "raid": [
+          {
+            "text": "Wizytacja! Upiory tylnym oknem, oficerowie schodami.",
+            "gloss": "Visitation! Upiory out the back window, officers down the stairs.",
+            "personality": "gallows-humour"
+          }
+        ],
+        "candlemas": [
+          {
+            "text": "Gromnica w oknie? My mamy czerwoną latarnię. Też odstrasza wilki, tylko innych.",
+            "gloss": "A thunder-candle in the window? We've got the red lantern. Keeps wolves off too, just different ones.",
+            "personality": "wry"
+          }
+        ],
+        "idle": [
+          {
+            "text": "Czosnek pod poduszką. Na strzygonia albo na Tyrolczyka. Na jedno działa.",
+            "gloss": "Garlic under the pillow. For the strzygoń or the Tyrolean. Works on one of them.",
+            "personality": "wry"
+          }
+        ]
+      },
+      "bard": {
+        "murder_nearby": [
+          {
+            "text": "Strzyga w piwnicach Rynku? Znałem takiego, co by ją odczarował za trzy noce i pół królestwa. Ja biorę złotego i śpiewam, że jej nie ma.",
+            "gloss": "A strzyga in the Rynek cellars? I knew a man who'd have lifted her curse for three nights and half a kingdom. I take a złoty and sing that she isn't there.",
+            "personality": "wry"
+          }
+        ]
+      }
+    }
+  },
+  "omens": {
+    "_doc": "Sky and weather events the town reads. `when`: the condition for the campaign agent (sky.gd / weather.gd state at dusk or during the night). `notice`: a Log line when it is seen (no on-screen text otherwise). `dread`, `fear`, `district`, `loyalty`: applied once when first seen that night. `chatter`: the chatter trigger it unlocks for the night. `seed`: folklore rumours put into play (their own effects follow when they take hold). `lasts`: nights the chatter stays unlocked. `quelled_by`: counters that end it early.",
+    "comet_up": {
+      "name": "The comet",
+      "when": "sky:comet (sky.json comet enabled, GameState.day >= from_night, a look with comet true)",
+      "notice": "A comet stands over Wawel, its tail away from the sun. The square looks up.",
+      "dread": 6,
+      "fear": {
+        "church": 2,
+        "guilds": 2
+      },
+      "loyalty": {
+        "street": 1
+      },
+      "chatter": "comet",
+      "seed": [
+        "comet_crown"
+      ],
+      "lasts": 99,
+      "quelled_by": [
+        "pamphlet"
+      ],
+      "note": "Every clear night from night 3. The professor's tables (counters.pamphlet, or finding Śniadecki) turn it from omen to curiosity: dread from it stops."
+    },
+    "fireball": {
+      "name": "The dragon flying",
+      "when": "sky:fireball (sky.gd spawn_meteor(true) seen by the player or within the square)",
+      "notice": "A fireball crosses the sky and throws shadows on the snow. Someone screams; someone laughs.",
+      "dread": 10,
+      "fear": {
+        "church": 1
+      },
+      "chatter": "comet",
+      "seed": [
+        "dragon_ember"
+      ],
+      "lasts": 1,
+      "note": "The strongest single omen the sky produces. If it falls on a night with a body found, that body's staging convinces +0.15."
+    },
+    "halo": {
+      "name": "A ring for a burial",
+      "when": "sky:halo22 >= 0.4 with the moon up (the cirrus and fog looks)",
+      "notice": "The moon wears a ring tonight.",
+      "dread": 5,
+      "chatter": "halo",
+      "seed": [
+        "halo_burial"
+      ],
+      "lasts": 1,
+      "note": "Cheap and frequent. Its rumour is where the player names a notable."
+    },
+    "fog_three": {
+      "name": "Egypt's dark",
+      "when": "weather:fog on three consecutive nights (GameState.campaign.weather_state history)",
+      "notice": "The third night of fog. The Rynek ends ten paces from your face.",
+      "dread": 12,
+      "district": {
+        "rynek": {
+          "unrest": 4
+        }
+      },
+      "chatter": "fog",
+      "seed": [
+        "topielec_moat"
+      ],
+      "lasts": 1,
+      "quelled_by": [
+        "procession",
+        "sermon"
+      ],
+      "note": "Never 'three days of darkness' (a 19th-c. prophecy): the pulpit says Egypt, the tavern says Austria's luck. Single fog nights unlock the fog chatter alone, no dread."
+    },
+    "red_dawn": {
+      "name": "Red snow",
+      "when": "dawn:red (the dawn sky_horizon reddened by haze after clear_frost; or a scripted look once in the campaign)",
+      "notice": "The snow on the Rynek is red at dawn. Brick dust, says a voice; blood, say the rest.",
+      "dread": 15,
+      "district": {
+        "rynek": {
+          "unrest": 5
+        }
+      },
+      "chatter": "idle",
+      "seed": [
+        "red_snow"
+      ],
+      "lasts": 2,
+      "quelled_by": [
+        "pamphlet"
+      ]
+    },
+    "thunder_january": {
+      "name": "Thunder in January",
+      "when": "weather:storm (sky.json storm look with lightning) between December and February",
+      "notice": "Thunder over a snowed city. The bells begin.",
+      "dread": 15,
+      "fear": {
+        "church": 3,
+        "guilds": 3
+      },
+      "chatter": "bell",
+      "seed": [
+        "bells_storm"
+      ],
+      "lasts": 2,
+      "note": "The bells ring na chmury automatically (audio: the church bell loop for the storm's length). Rare; if the weather agent never schedules it, nothing here fires."
+    },
+    "blizzard": {
+      "name": "The płanetnik's night",
+      "when": "weather:blizzard",
+      "notice": "The snow comes sideways and the lanterns die one by one.",
+      "dread": 4,
+      "chatter": "blizzard",
+      "seed": [
+        "planetnik_prussian"
+      ],
+      "lasts": 1,
+      "note": "Sight is already short (weather.json visibility); the town blames a man, so the rumour has a Prussian in it."
+    },
+    "thaw": {
+      "name": "What the river gives back",
+      "when": "weather:rain_thaw (or temperature > 0 for a night after frost)",
+      "notice": "Drip from every eave; the moat ice groans. What went in over the winter is coming up.",
+      "dread": 6,
+      "chatter": "thaw",
+      "seed": [
+        "wanda_thaw"
+      ],
+      "lasts": 1,
+      "note": "Bodies put through the ice this campaign surface (a `body_found` for each, with its staging intact if it was staged): the thaw is the folklore system's audit."
+    },
+    "candlemas": {
+      "name": "Matki Boskiej Gromnicznej",
+      "when": "calendar:02-02 (Tuesday 2 February 1796; the campaign agent fixes which night that is)",
+      "notice": "Candlemas. A blessed candle burns in every window on the rows; the wolves, they say, are at the gates.",
+      "dread": 0,
+      "loyalty": {
+        "church": 2
+      },
+      "chatter": "candlemas",
+      "seed": [
+        "gromnica_wolves"
+      ],
+      "lasts": 1,
+      "effects_tonight": {
+        "window_light": 1.3,
+        "civilians_home_minutes": 30,
+        "gromnica_on_sale": true
+      },
+      "note": "Windows brighter (window_life), people out later, and the candle seller sells gromnice (items.gromnica) for one night. St Agatha's salt (items.agatha_salt) follows on 5 February."
+    }
+  },
+  "items": {
+    "_doc": "Cheap vendor items proposed for the stagings (the campaign and vendor agents add them: kit.gd TOOLS with a count; not thrown, not weapons). `vendor` is a data/vendors.json id; `price` is in coins as vendors.json price; `count` per purchase. `blurb` for stealth.json kit blurbs.",
+    "salt": {
+      "name": "a twist of salt",
+      "vendor": "ryby",
+      "price": 1,
+      "count": 3,
+      "blurb": "Wieliczka salt in a paper twist, excise paid or not. On a threshold it keeps out what the old women fear; round a body it says a witch was here."
+    },
+    "garlic": {
+      "name": "a head of garlic",
+      "vendor": "ziola",
+      "price": 1,
+      "count": 3,
+      "blurb": "Blessed, the herb woman says. In the mouth of the dead it says: whoever laid him out knew what he was."
+    },
+    "poppy": {
+      "name": "a bag of poppy seed",
+      "vendor": "ziola",
+      "price": 1,
+      "count": 2,
+      "blurb": "Baker's poppy. Scattered over a corpse it must count every seed before it rises, and dawn comes first."
+    },
+    "chalk": {
+      "name": "blessed chalk",
+      "vendor": "swiece",
+      "price": 1,
+      "count": 2,
+      "blurb": "Epiphany chalk, K+M+B over every door in the city. What is written can be rubbed out, and a door without its Kings is a house given up."
+    },
+    "stake": {
+      "name": "an aspen peg",
+      "vendor": "drewno",
+      "price": 1,
+      "count": 1,
+      "blurb": "A green aspen peg from the Kleparz yards, the tree that trembles because Judas hanged on it. Through a coat over the heart it ends a strzygoń, if you believe the market; it certainly ends a conversation."
+    },
+    "gromnica": {
+      "name": "a gromnica",
+      "vendor": "swiece",
+      "price": 1,
+      "count": 1,
+      "only": "omens.candlemas or lever:sacristan",
+      "blurb": "A thunder-candle blessed at Candlemas, kept for storms and deathbeds. Lit beside a body it says he saw it coming. Traced, it is sacrilege."
+    },
+    "agatha_salt": {
+      "name": "St Agatha's salt",
+      "vendor": "swiece",
+      "price": 1,
+      "count": 1,
+      "only": "calendar:02-05",
+      "blurb": "Bread and salt blessed on St Agatha's day against fire. Thrown into a blaze it does nothing; thrown into a blaze that then goes out, it did everything."
+    }
+  },
+  "stagings": {
+    "_doc": "Dressing a killing as the work of something else. A staging is a verb on a body the player has downed (lethal) or found, taking `time_s` seconds crouched beside it (interruptible, visible) and the `needs` items. When the body is found (by whoever finds it first), the finder believes with probability `convince` + modifiers (fog +0.15, dread >= 50 +0.15, a fireball tonight +0.15, within 30 m of a church -0.1, found by a soldier x buyers.austria, by a civilian x the weighted mean of the civilian buyers); a believed staging applies `believed` (the kill's own notoriety and crackdown are reduced as given) and seeds `seed`. A sceptic (counters.doctor when Austria has called the surgeon; the professor when found) rolls `debunk.chance` each dawn while the seed rumour is in play; on success the rumour is disproved with the staging's `exposed` effects on top of the rumour's own. `buyers`: how each faction's people read it (0 = laughs, 1 = believes). The salon never buys any of them. No staging is ever confirmed by the game.",
+    "salt_ring": {
+      "name": "A ring of salt",
+      "prompt": "lay a ring of salt",
+      "needs": {
+        "salt": 1
+      },
+      "time_s": 6,
+      "convince": 0.35,
+      "buyers": {
+        "street": 0.6,
+        "church": 0.3,
+        "underworld": 0.4,
+        "guilds": 0.3,
+        "magnates": 0.1,
+        "austria": 0.4,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.7,
+        "crackdown_delta": -1,
+        "dread": 6
+      },
+      "seed": "salt_ring_found",
+      "debunk": {
+        "chance": 0.35,
+        "doctor": "The salt lies on top of the frost, dry: it was poured after the man fell. A ring is a ring; a wound is a wound.",
+        "professor": "A circle is geometry, not theology. The excise would like to know where the salt came from."
+      },
+      "exposed": {
+        "notoriety": 4
+      }
+    },
+    "garlic_mouth": {
+      "name": "Garlic in the mouth",
+      "prompt": "put garlic in his mouth",
+      "needs": {
+        "garlic": 1
+      },
+      "time_s": 5,
+      "convince": 0.45,
+      "buyers": {
+        "street": 0.7,
+        "church": 0.4,
+        "underworld": 0.5,
+        "guilds": 0.4,
+        "magnates": 0.1,
+        "austria": 0.6,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.6,
+        "crackdown_delta": -1,
+        "dread": 10
+      },
+      "seed": "garlic_mouth_found",
+      "debunk": {
+        "chance": 0.3,
+        "doctor": "The jaw had set before the garlic went in; it bruised nothing. Whoever did this waited an hour, or came back.",
+        "professor": "A strzygoń needs no garlic. The killer needed to be believed."
+      },
+      "exposed": {
+        "notoriety": 5
+      }
+    },
+    "face_down": {
+      "name": "Laid face down",
+      "prompt": "turn him face down",
+      "needs": {},
+      "time_s": 4,
+      "convince": 0.5,
+      "buyers": {
+        "street": 0.6,
+        "church": 0.5,
+        "underworld": 0.5,
+        "guilds": 0.4,
+        "magnates": 0.2,
+        "austria": 0.5,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.7,
+        "crackdown_delta": -1,
+        "dread": 8
+      },
+      "seed": "face_down_found",
+      "debunk": {
+        "chance": 0.3,
+        "doctor": "The blood settled along his back: he lay face up an hour before someone turned him. Turned, not buried. Somebody wanted him found this way.",
+        "professor": "The dead dig in no direction. The living turn them over for an audience."
+      },
+      "exposed": {
+        "notoriety": 5
+      }
+    },
+    "heel_cut": {
+      "name": "Hamstrung",
+      "prompt": "cut the sinews at the heel",
+      "needs": {
+        "knife": 0
+      },
+      "time_s": 7,
+      "convince": 0.55,
+      "buyers": {
+        "street": 0.7,
+        "church": 0.4,
+        "underworld": 0.6,
+        "guilds": 0.4,
+        "magnates": 0.2,
+        "austria": 0.6,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.6,
+        "crackdown_delta": -1,
+        "dread": 12
+      },
+      "seed": "heel_cut_found",
+      "debunk": {
+        "chance": 0.3,
+        "doctor": "Cuts without bleeding are cuts on a dead man. The knife was the same one that killed him: a working blade, horn-handled by the width.",
+        "professor": "Cut sinews stop a man walking. They have never once stopped a tale."
+      },
+      "exposed": {
+        "notoriety": 6,
+        "crackdown": 2
+      },
+      "note": "Uses the knife the player always carries; nothing is consumed. The blade's width in the doctor's line is a hint that the surgeon can match wounds: two hamstrung bodies in one campaign raise his chance by 0.1 each."
+    },
+    "aspen_peg": {
+      "name": "An aspen peg",
+      "prompt": "drive an aspen peg through the coat",
+      "needs": {
+        "stake": 1
+      },
+      "time_s": 8,
+      "convince": 0.7,
+      "buyers": {
+        "street": 0.8,
+        "church": 0.5,
+        "underworld": 0.6,
+        "guilds": 0.4,
+        "magnates": 0.2,
+        "austria": 0.7,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.5,
+        "crackdown_delta": -2,
+        "dread": 15
+      },
+      "seed": "aspen_peg_found",
+      "debunk": {
+        "chance": 0.25,
+        "doctor": "The peg is through cloth and a rib's width of nothing. Green aspen, cut this week, from a yard that sells to anyone.",
+        "professor": "Under the decree of 1755 the Commandant is obliged to punish whoever mutilated this body, and to say publicly that it was a man. I have written to remind him."
+      },
+      "exposed": {
+        "notoriety": 8,
+        "crackdown": 3,
+        "loyalty": {
+          "church": -3
+        }
+      },
+      "note": "Loudest and best. The Church calls a traced peg desecration (its loyalty falls); the Habsburg law against posthumous magic gives the professor his best line."
+    },
+    "chalk_rubbed": {
+      "name": "The Kings wiped off",
+      "prompt": "rub the Kings off his door",
+      "needs": {},
+      "time_s": 3,
+      "convince": 0.4,
+      "buyers": {
+        "street": 0.5,
+        "church": 0.5,
+        "underworld": 0.3,
+        "guilds": 0.5,
+        "magnates": 0.2,
+        "austria": 0.2,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.9,
+        "dread": 6,
+        "hold": {
+          "type": "fear",
+          "strength": 1
+        }
+      },
+      "seed": "chalk_rubbed_found",
+      "debunk": {
+        "chance": 0.4,
+        "doctor": "Chalk. Sleet. I have nothing to add.",
+        "professor": "A sleeve did this, and the sleeve had an owner who was seen."
+      },
+      "exposed": {
+        "notoriety": 3
+      },
+      "note": "Done at a door, not a body: the night before, on a notable's house. If the man in it dies or vanishes within two nights, the staging is believed; if he lives, it is a fear hold of strength 1 on him anyway (cheaper than a dead dog, weaker). Needs no item: the chalk is already there. With `chalk` in the kit the player can also re-chalk a door, which lifts a fear hold someone else laid."
+    },
+    "candle_stub": {
+      "name": "A thunder-candle burnt out",
+      "prompt": "leave a burnt gromnica beside him",
+      "needs": {
+        "gromnica": 1
+      },
+      "time_s": 5,
+      "convince": 0.45,
+      "buyers": {
+        "street": 0.6,
+        "church": 0.7,
+        "underworld": 0.3,
+        "guilds": 0.5,
+        "magnates": 0.3,
+        "austria": 0.4,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.7,
+        "dread": 8,
+        "loyalty": {
+          "church": 2
+        }
+      },
+      "seed": "candle_stub_found",
+      "debunk": {
+        "chance": 0.35,
+        "doctor": "Tallow, not beeswax: a shop candle, never blessed. The wick was pinched, not blown.",
+        "professor": "A man who has lit a candle against death does not usually lie down beside it in the snow."
+      },
+      "exposed": {
+        "notoriety": 5,
+        "loyalty": {
+          "church": -3
+        },
+        "blasphemy": true
+      },
+      "note": "With a real gromnica (Candlemas, or the sacristan) the doctor's tallow line is unavailable and debunk chance halves. Traced with a real one it is blasphemy (rumours.json `blasphemy` effects)."
+    },
+    "coin_toll": {
+      "name": "The river king's toll",
+      "prompt": "put a coin under his tongue",
+      "needs": {
+        "coin": 1
+      },
+      "time_s": 4,
+      "convince": 0.4,
+      "buyers": {
+        "street": 0.4,
+        "church": 0.2,
+        "underworld": 0.7,
+        "guilds": 0.4,
+        "magnates": 0.2,
+        "austria": 0.5,
+        "salon": 0.1
+      },
+      "believed": {
+        "notoriety_mult": 0.6,
+        "crackdown_delta": 0,
+        "dread": 3,
+        "strength": {
+          "underworld": -2
+        }
+      },
+      "seed": "coin_toll_found",
+      "debunk": {
+        "chance": 0.3,
+        "doctor": "A coin in the cheek against the cold; half the carters do it. Nothing to read.",
+        "professor": "The river king pays his debts in silence, not silver. This was signed for him by someone who wanted a reader."
+      },
+      "exposed": {
+        "notoriety": 4
+      },
+      "note": "Not supernatural: the obol is folk custom, but the Underworld reads it as Wilk's mark. The blame goes to the river king (useful before the finale) and the Underworld notices if it happens twice (grievance +10)."
+    },
+    "poppy_scatter": {
+      "name": "Poppy over the body",
+      "prompt": "scatter poppy seed over him",
+      "needs": {
+        "poppy": 1
+      },
+      "time_s": 4,
+      "convince": 0.5,
+      "buyers": {
+        "street": 0.7,
+        "church": 0.4,
+        "underworld": 0.4,
+        "guilds": 0.4,
+        "magnates": 0.1,
+        "austria": 0.5,
+        "salon": 0.0
+      },
+      "believed": {
+        "notoriety_mult": 0.7,
+        "crackdown_delta": -1,
+        "dread": 8
+      },
+      "seed": "poppy_count_found",
+      "debunk": {
+        "chance": 0.3,
+        "doctor": "Poppy in January is a baker's, and bakers remember a pound sold after dark.",
+        "professor": "The dead count nothing. The living count what a pound of poppy costs and who paid it."
+      },
+      "exposed": {
+        "notoriety": 4
+      }
+    },
+    "_combining": "Two stagings on one body: convince = 1 - (1 - a)(1 - b), capped at 0.9; debunk chance is the higher; exposure costs stack. Three or more: the doctor's line is 'Somebody has read a great deal', convince falls to 0.3 and the professor debunks automatically."
+  },
+  "counters": {
+    "_doc": "What the Church, the occupier, the salon and the street do when dread rises. `by`: who acts. `when`: conditions (dread tier plus flags). Fires at dawn, once each unless `repeat`. `effects` apply; `text` is the dawn line. `player`: what the player can do about it (day actions or night choices), including stoke / stop where that is a real choice.",
+    "masses": {
+      "by": "church",
+      "when": [
+        "dread>=25"
+      ],
+      "repeat": true,
+      "effects": {
+        "influence": {
+          "church": 1
+        },
+        "text": "Masses for the unquiet dead at St Mary's, a złoty each; the sacristan has never been so busy."
+      },
+      "player": "A day action with the sacristan: pay for a Mass 'for whoever it was' (2 zł): Church loyalty +2, dread -5, notoriety -3 (a penitent is not a suspect)."
+    },
+    "procession": {
+      "by": "church",
+      "when": [
+        "dread>=50"
+      ],
+      "effects": {
+        "camp": [
+          "procession_tonight"
+        ],
+        "dread": -15,
+        "loyalty": {
+          "church": 3
+        },
+        "crackdown": -2,
+        "text": "The Bishop walked the Rynek with the Sacrament under a canopy and the crowd behind him singing; the soldiers stood bareheaded and hated it."
+      },
+      "player": "The procession is tonight's `procession` event, longer (the whole square) and with the Bishop: walk in it disguised (church loyalty +3), or use the emptied streets behind it. The Church's fear sets the watch back by one patrol for the night."
+    },
+    "cellar_exorcism": {
+      "by": "church",
+      "when": [
+        "dread>=50",
+        "camp:cellars_shunned"
+      ],
+      "effects": {
+        "camp": [
+          "well_grate_blessed"
+        ],
+        "dread": -10,
+        "text": "A canon in a surplice blessed the well grate and the cellar doors under the Cloth Hall with a crowd and a bucket of holy water. The grate is locked and a candle left on it."
+      },
+      "player": "The well grate (undercroft entrance door_well) is padlocked and lit for two nights; the drain grates are not. A lockpick opens it, and being seen at it is sacrilege (church loyalty -4)."
+    },
+    "sermon": {
+      "by": "church",
+      "when": [
+        "dread>=50"
+      ],
+      "effects": {
+        "dread": -10,
+        "camp": [
+          "sermon_zabobon"
+        ],
+        "text": "The Bishop preached against zabobon: there are no strzygonie, only murderers and sinners, and the pulpit expects both to confess. Superstitions spread half as fast this week."
+      },
+      "modifiers": {
+        "kind_spread_mult": 0.5,
+        "nights": 2
+      },
+      "player": "Church influence 30+ chooses the sermon's target: against zabobon (above), or against the occupier's impiety (crackdown +3, street loyalty +3, dread unchanged)."
+    },
+    "curfew": {
+      "by": "austria",
+      "when": [
+        "dread>=50",
+        "crackdown>=30"
+      ],
+      "effects": {
+        "crackdown": 8,
+        "camp": [
+          "early_curfew"
+        ],
+        "text": "The Commandant moved the Polizeistunde an hour earlier 'for the public quiet'. The Rynek is a soldier's square by nine."
+      },
+      "player": "Fewer civilians (less cover, fewer witnesses), more patrols. The curfew bell rings at 21:00 for two nights."
+    },
+    "wolf_reward": {
+      "by": "austria",
+      "when": [
+        "dread>=50",
+        "bodies>=2"
+      ],
+      "effects": {
+        "camp": [
+          "wolf_reward"
+        ],
+        "crackdown": 3,
+        "seed": [
+          "wolf_wilk"
+        ],
+        "text": "A bill on the Town Hall board: fifty gulden for 'the wolf' who kills by night. Every informer in the city has a new trade."
+      },
+      "modifiers": {
+        "trace_mult": 1.5,
+        "nights": 3
+      },
+      "player": "Planted rumours trace faster while the bill is up. Plant wolf_wilk to turn the hunt onto the river king; or tear the bill down at night (a `bill` prop: notoriety +3, street loyalty +2)."
+    },
+    "doctor": {
+      "by": "austria",
+      "when": [
+        "bodies>=1",
+        "dread>=25"
+      ],
+      "effects": {
+        "camp": [
+          "doctor_called"
+        ],
+        "text": "The regimental surgeon, a Viennese who has read van Swieten, has been ordered to view every body found before it is buried."
+      },
+      "player": "The doctor is the staging debunker (stagings[*].debunk.doctor, rolled each dawn). He is also a notable-shaped man with a weakness (proposed: `doctor`, austria, weaknesses greed and vice) whom a hold can silence: a bribed surgeon writes 'cause unknown'. Bodies moved into the river before dawn are never viewed."
+    },
+    "pamphlet": {
+      "by": "salon",
+      "when": [
+        "dread>=50",
+        "found:sniadecki|influence:salon>=30"
+      ],
+      "effects": {
+        "dread": -20,
+        "influence": {
+          "salon": 2
+        },
+        "loyalty": {
+          "church": -2,
+          "street": -1
+        },
+        "camp": [
+          "pamphlet_zabobon"
+        ],
+        "text": "Professor Śniadecki printed a leaf against comets, strzygonie and the credulity of the age, with a quotation from Bohomolec so the Bishop could not object, and did. The street called it Austrian."
+      },
+      "modifiers": {
+        "omen_dread_mult": 0.0,
+        "nights": 99
+      },
+      "player": "Needs the press. The player may commission it (a day action, Salon +3, the comet omen ends) or dissuade the professor (Salon -2, dread keeps working for you). A staged miracle after the pamphlet has half its spread."
+    },
+    "blood_slander": {
+      "by": "street",
+      "when": [
+        "dread>=60",
+        "body_near:kazimierz|rumour:golem_cellar|rumour:garlic_mouth_found"
+      ],
+      "effects": {
+        "seed": [
+          "blood_slander"
+        ],
+        "text": "Someone in the market said the word. By evening it is on the rows: the dead man was bled, and everyone knows who needs blood. (Journal: counter it.)"
+      },
+      "player": {
+        "stop": "The counter on rumours.blood_slander (the rabbi, Father Hryhorij and the professor on the Town Hall steps; Salon +3, guilds loyalty +4, church loyalty -2, notoriety +5); or Church influence 30+: the Bishop reads the surgeon's finding at Mass (church influence -5, the rumour disproved at once); or a night choice: stand between the crowd and the Kazimierz gate with the urchins' help (a `riot` at intensity 0.3 the player talks down; notoriety +8).",
+        "stoke": "Do nothing, or plant golem_cellar while it runs. The Austrians pull two patrols to Kazimierz (the Rynek is thinner for two nights: the tactical bribe). The cost is written plainly: Kazimierz unrest +25, guilds loyalty -8, `kazimierz_stoned`, and the endings' texts carry a line ('the windows on Szeroka were boarded that winter, and nobody on the Rynek had said a word'). No faction thanks the player for it; the Street's loyalty does not rise.",
+        "tone": "Per docs/GDD.md Tone: shown plainly, never as spectacle. No pogrom is depicted on screen; the dawn report and the boarded windows in Kazimierz (window_life: shutters closed, lamps out for the rest of the campaign) carry it."
+      }
+    }
+  }
+}
