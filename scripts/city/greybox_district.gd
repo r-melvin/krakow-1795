@@ -32,11 +32,13 @@ func _ready() -> void:
 	_ground_mat.albedo_color = Color(0.30, 0.28, 0.27)
 	_ground_mat.roughness = 0.9
 	_environment()
+	_weather()
 	_ground()
 	_landmarks()
 	_tenements()
 	_furniture()
 	_dressing()
+	_outer()
 	_guards()
 	_population()
 	_stealth()
@@ -107,6 +109,7 @@ func _environment() -> void:
 	e.adjustment_contrast = 1.08
 	env.environment = e
 	add_child(env)
+	env.add_to_group("world_env")        # weather.gd drives sky, fog, exposure
 
 	# Low winter moon: cool, long shadows.
 	var moon := DirectionalLight3D.new()
@@ -521,7 +524,11 @@ func _navigation() -> void:
 	nm.cell_size = 0.2            # 0.4 m radius = 2 cells exactly
 	nm.cell_height = 0.25
 	# Only the street level matters: clip geometry above 4 m so roofs and towers are not voxelised.
-	nm.filter_baking_aabb = AABB(Vector3(-45, -1, -45), Vector3(90, 5, 90))
+	# Baked 4 m wider and trimmed back by border_size, so the mesh ends exactly at +-45 m and joins the outer
+	# town's navmesh chunks (outer_city.gd) edge to edge.
+	nm.filter_baking_aabb = AABB(Vector3(-49, -1, -49), Vector3(98, 5, 98))
+	nm.border_size = 4.0
+	nm.edge_max_error = 1.0
 	nav_region = NavigationRegion3D.new()
 	nav_region.name = "NavRegion"
 	nav_region.navigation_mesh = nm
@@ -573,3 +580,17 @@ func _interiors() -> void:
 func player_spawn() -> Vector3:
 	# Player enters from the NW alley between the tenement rows.
 	return Vector3(-27, 0.2, -27)
+
+
+## The outer streets and what lies past the rows: industry, churches, synagogues, the castle (scripts/city/outer_city.gd).
+func _outer() -> void:
+	var n := Node3D.new()
+	n.set_script(load("res://scripts/city/outer_city.gd"))
+	add_child(n)
+
+
+## Snow, rain, fog, the sun by day (scripts/city/weather.gd): finds the environment, moon and probe by group / type.
+func _weather() -> void:
+	var w := Node3D.new()
+	w.set_script(load("res://scripts/city/weather.gd"))
+	add_child(w)

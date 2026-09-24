@@ -286,6 +286,19 @@ exported for the street-life scenes.
 `Window_<n>` on the sill of each openable ground- and first-floor street window (its Blender -Y, which is
 Godot +Z, points out into the street), `Furnace_<n>` at forge, foundry, brewery and cooper fires.
 
+### Weather and seasons
+
+The winter is not one fixed night. Each night the campaign picks a preset from data/weather.json
+(`Weather.set_conditions("sleet")`, or `--weather=<preset>` for testing): clear frost, light snow, blizzard,
+sleet, a rain thaw, fog, overcast, and the day looks (clear day with no snow, snow day). scripts/city/weather.gd
+drives the sky, the moon or the low winter sun (after 06:00 the sun rises and the lanterns fade), fog and exposure,
+and precipitation particles that follow the player (off indoors and under an arcade). Baked roof, sill and coping
+snow melts through a shader on the global `snow_cover`: a rain thaw takes the roofs from white to patchy wet tile
+over about six game hours, a snowfall brings the cover back, and the square collects snow in the joints of the setts
+or puddles under rain (`wetness`, which also darkens and glosses plaster, wood and tile). Weather is a stealth lever:
+rain masks footsteps (guard hearing x0.6), wind and blizzards muffle further (x0.8) and blizzard and fog shorten the
+guards' far sight, while a clear frosty night leaves every sound carrying across the square.
+
 ## Campaign (seven nights, one winter)
 
 Code: `scripts/mission/campaign.gd` (Mission.campaign), `rumours.gd`, `events.gd`, `mission_runner.gd`,
@@ -437,3 +450,39 @@ Real people appear as named characters or off-stage presences, with sources and 
 `docs/HISTORY.md`: Bishop Feliks Paweł Turski, Jan Śniadecki, Canon Sebastian Sierakowski, Count Stanisław
 Wodzicki, Filip Nereusz Lichocki, Hugo Kołłątaj, Tadeusz Kościuszko, Wojciech Bogusławski, Johann Wenzel von
 Margelik. Journal entries carry `historical: true`.
+
+### The walkable town (outer_city.gd, data/city_layout.json)
+
+`tools/gen_city_layout.py` writes `data/city_layout.json` (streets, ground patches, placements, placement points,
+reachability checks, inspection shots); `scripts/city/outer_city.gd` builds it round the Rynek. Godot metres,
++X east, +Z south; the Rynek (+-45) stays greybox_district.gd's. The carriage lanes of data/npcs.json are streets of
+the grid and nothing stands within 4 m of them.
+
+- **Walls**: a ring at x=+-100, z=-100/96 (wall segments, towers every ~32 m, a frozen moat outside with plank
+  bridges). Gates: St Florian's (x=10, north) with the Barbican beyond, Slawkowska (x=-68, north), Garbary (west,
+  z=0), Mikolajska (east, z=-10), Grodzka (south, x=-12).
+- **Old Town**: Szewska, Slawkowska, Florianska, Grodzka, Mikolajska, St Anne's and cross streets on a grid;
+  blocks of tenements back to back round courtyards, courtyard walls on the short sides (tall, or low enough to
+  vault), sien passages cutting some blocks so a yard is a way through (some are dead ends with a climb out),
+  the Maly Rynek east of St Mary's with stall points, the Collegium Maius, the campanile, a monastery enclosure.
+- **Outside**: Kleparz market (north, past the Barbican; brewery, windmill, carpenter's yard), Garbary (west;
+  tanners, the water mill on the Mlynowka, forge, bell foundry, cooper), the Vistula quays (south-west; granaries,
+  wharves, frozen-in salt barges, fish market, the kingpin's warehouse, the bathhouse), the castle gate under
+  Wawel (Wawel on the skyline), Kazimierz over the frozen Old Vistula (houses, both synagogues, the Uniate church,
+  the kingpin's townhouse on Szeroka), farmland east (fields, farmstead, manor, shrine, gallows by the road).
+- **Surfaces** (collision `surface` meta for footsteps, 4 m slabs with parallax): field-stone cobbles on the main
+  streets; rougher sunken cobbles with a centre gutter on the wall streets and alleys; flagstone strips at St Mary's
+  and St Adalbert's steps, under the Cloth Hall loggias and in front of the Town Hall; frozen packed mud with ruts
+  and puddles in the yards; dirt roads with a plank walkway (`planks`) in the suburbs; gravel on the road to Wawel;
+  snow everywhere else; drifts banked against house fronts.
+- **Gutters** follow the street lines: straight channels, mitred corners at turns, crossing slabs at junctions and
+  doorways, drains at the ends; no collision.
+- **Navigation**: the town's navmesh is baked in 48 chunks from one parse of the colliders, trimmed with
+  border_size so they join the square's region (which now ends exactly at +-45 m); ground level only.
+- **Climbing**: `climb_<kind>_<n>` collision bodies from the assets (drainpipes, first-floor sills, balconies,
+  gallery decks, ladders, shed roofs, low walls, stairs, perches, the Cloth Hall wall-walk and parapet) and the
+  collision of crates, barrels, carts, troughs, stalls, woodpiles and walls join group `climbable` with meta
+  `climb_kind` (vault, mantle, ledge, pipe). Tenement roofs have their real roof shape as collision. Perches
+  overlook the cafe, the guard post by the Cloth Hall and the brothel door.
+- **Tags**: `flammable` and `poisonable` metas on the placed props that burn or hold drink; the warehouse's
+  `CargoHook` node carries `rig`/`rig_kind`.

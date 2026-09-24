@@ -14,7 +14,10 @@ static func instance(name: String) -> Node3D:
 	if ps == null:
 		push_warning("Missing asset %s" % path)
 		return null
-	return ps.instantiate() as Node3D
+	var inst := ps.instantiate() as Node3D
+	if inst and not name.begins_with("int_"):
+		_weather_pass(inst)
+	return inst
 
 
 static func place(parent: Node, name: String, pos: Vector3, rot_y: float = 0.0, scale: float = 1.0) -> Node3D:
@@ -320,3 +323,165 @@ static func _smoke_note(pivot: Node3D, clip: String) -> void:
 	if not _smoke_seen.has(key):
 		_smoke_seen[key] = true
 		print("[smoke] anim player=%s guard=%s" % [_smoke_last["player"], _smoke_last["guard"]])
+
+
+# ------------------------------------------------------------------ weather material pass (scripts/city/weather.gd)
+## Additive, once per imported mesh (the PackedScene cache shares meshes and materials between instances):
+##  - any material named "*snow*" (and the icicle "ice") becomes a ShaderMaterial on snow_cover.gdshader that reads
+##    the global `snow_cover` and melts away with a noisy, wet rim; textures are copied so cover 1.0 looks as before.
+##  - cobble / plaster / wood / tile / stone materials are registered for wetness: darker albedo, lower roughness
+##    (a parameter pass on the shared material, so parallax and the imported tuning stay).
+##  - the cobble material also gets the wet_surface.gdshader overlay (snow in the joints, puddles) as its next_pass
+##    while there is snow or water to show (apply_wetness toggles it).
+const SNOW_SHADER := "res://assets/shaders/snow_cover.gdshader"
+const WET_SHADER := "res://assets/shaders/wet_surface.gdshader"
+const WET_PREFIXES := ["cobble", "plaster", "wood", "oak", "timber", "plank", "tile", "shingle", "stone", "brick", "sandstone", "log", "gravel"]
+
+static var _weather_meshes: Dictionary = {}     ## mesh instance id -> true (already processed)
+static var _snow_mats: Dictionary = {}          ## source material -> ShaderMaterial
+static var _wet_mats: Dictionary = {}           ## BaseMaterial3D -> [albedo_color, roughness]
+static var _ground_mats: Dictionary = {}        ## BaseMaterial3D -> overlay ShaderMaterial
+static var _snow_shader: Shader
+static var _wet_shader: Shader
+static var _wetness := 0.0
+static var _overlay_on := false
+static var weather_swapped := 0                 ## snow materials swapped (smoke / report)
+
+
+static func _weather_pass(root: Node) -> void:
+	var stack: Array = [root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		for c in n.get_children():
+			stack.append(c)
+		var mi := n as MeshInstance3D
+		if mi == null or mi.mesh == null:
+			continue
+		var mesh := mi.mesh
+		for i in mi.get_surface_override_material_count():
+			var ov := mi.get_surface_override_material(i)
+			if ov:
+				var sw := _weather_material(ov)
+				if sw != ov:
+					mi.set_surface_override_material(i, sw)
+		var id := mesh.get_instance_id()
+		if _weather_meshes.has(id):
+			continue
+		_weather_meshes[id] = true
+		for i in mesh.get_surface_count():
+			var m := mesh.surface_get_material(i)
+			if m == null:
+				continue
+			var sw := _weather_material(m)
+			if sw != m:
+				mesh.surface_set_material(i, sw)
+
+
+static func _weather_material(m: Material) -> Material:
+	var bm := m as BaseMaterial3D
+	if bm == null:
+		return m
+	var nm := bm.resource_name.to_lower()
+	if "snow" in nm or nm == "ice":
+		if not _snow_mats.has(bm):
+			_snow_mats[bm] = snow_material(bm, 0.12 if nm == "ice" else (0.08 if "~snow" in nm else 0.0))
+			weather_swapped += 1
+		return _snow_mats[bm]
+	for p in WET_PREFIXES:
+		if nm.begins_with(p):
+			register_wet(bm)
+			if p == "cobble":
+				register_ground(bm)
+			break
+	return m
+
+
+## A snow_cover.gdshader material that renders like `src` at full cover.
+static func snow_material(src: BaseMaterial3D, melt_bias := 0.0) -> ShaderMaterial:
+	if _snow_shader == null:
+		_snow_shader = load(SNOW_SHADER)
+	var sm := ShaderMaterial.new()
+	sm.resource_name = src.resource_name + "_melt"
+	sm.shader = _snow_shader
+	sm.set_shader_parameter("albedo", src.albedo_color)
+	if src.albedo_texture:
+		sm.set_shader_parameter("albedo_tex", src.albedo_texture)
+	if src.normal_enabled and src.normal_texture:
+		sm.set_shader_parameter("use_normal", true)
+		sm.set_shader_parameter("normal_tex", src.normal_texture)
+		sm.set_shader_parameter("normal_scale", src.normal_scale)
+	if src.roughness_texture:
+		sm.set_shader_parameter("rough_tex", src.roughness_texture)
+		var ch := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0), Vector4(0, 0, 0, 1), Vector4(0.33, 0.33, 0.33, 0)]
+		sm.set_shader_parameter("rough_channel", ch[clampi(src.roughness_texture_channel, 0, 4)])
+	sm.set_shader_parameter("roughness", src.roughness)
+	sm.set_shader_parameter("specular", src.metallic_specular)
+	sm.set_shader_parameter("uv1_scale", src.uv1_scale)
+	sm.set_shader_parameter("uv1_offset", src.uv1_offset)
+	sm.set_shader_parameter("melt_bias", melt_bias)
+	return sm
+
+
+## Wetness darkens and glosses `mat` (its imported albedo colour and roughness are kept as the dry values).
+static func register_wet(mat: BaseMaterial3D) -> void:
+	if mat == null or _wet_mats.has(mat):
+		return
+	var dry := [mat.albedo_color, mat.roughness]
+	for other in _wet_mats:      # a duplicate of a registered (maybe already wet) material keeps the dry values
+		if is_instance_valid(other) and other.resource_name == mat.resource_name and other.albedo_texture == mat.albedo_texture:
+			dry = (_wet_mats[other] as Array).duplicate()
+			break
+	_wet_mats[mat] = dry
+	if _wetness > 0.0:
+		_wet_one(mat, _wetness)
+
+
+## The cobble overlay (snow in the joints, puddles). Reads the material's own height map if it has one.
+static func register_ground(mat: BaseMaterial3D) -> void:
+	if mat == null or _ground_mats.has(mat):
+		return
+	if _wet_shader == null:
+		_wet_shader = load(WET_SHADER)
+	var sm := ShaderMaterial.new()
+	sm.shader = _wet_shader
+	sm.render_priority = 1
+	var hp := "res://assets/ground/cobbles_height.png"
+	var ht: Texture2D = mat.heightmap_texture if mat.heightmap_texture else (load(hp) as Texture2D if ResourceLoader.exists(hp) else null)
+	if ht:
+		sm.set_shader_parameter("has_height", true)
+		sm.set_shader_parameter("height_tex", ht)
+	sm.set_shader_parameter("uv1_scale", mat.uv1_scale)
+	sm.set_shader_parameter("uv1_offset", mat.uv1_offset)
+	_ground_mats[mat] = sm
+	register_wet(mat)
+	mat.next_pass = sm if _overlay_on else null
+
+
+static func _wet_one(mat: BaseMaterial3D, w: float) -> void:
+	var dry: Array = _wet_mats[mat]
+	var c: Color = dry[0]
+	var k := lerpf(1.0, 0.7, w)
+	mat.albedo_color = Color(c.r * k, c.g * k, c.b * k, c.a)
+	mat.roughness = float(dry[1]) * lerpf(1.0, 0.4, w)
+
+
+## Called by weather.gd when wetness or snow cover change. `overlay`: the cobble overlay is worth drawing.
+static func apply_wetness(w: float, overlay: bool) -> void:
+	w = clampf(w, 0.0, 1.0)
+	for dead in _wet_mats.keys().filter(func(m): return not is_instance_valid(m)):
+		_wet_mats.erase(dead)
+		_ground_mats.erase(dead)
+	if absf(w - _wetness) > 0.004 or (w == 0.0 and _wetness != 0.0):
+		_wetness = w
+		for mat in _wet_mats:
+			if is_instance_valid(mat):
+				_wet_one(mat, w)
+	if overlay != _overlay_on:
+		_overlay_on = overlay
+		for mat in _ground_mats:
+			if is_instance_valid(mat):
+				(mat as BaseMaterial3D).next_pass = _ground_mats[mat] if overlay else null
+
+
+static func weather_counts() -> Dictionary:
+	return {"snow": _snow_mats.size(), "wet": _wet_mats.size(), "ground": _ground_mats.size()}

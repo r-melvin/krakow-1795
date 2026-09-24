@@ -35,6 +35,8 @@ static func tg(path: String, fallback: Variant = 0.0) -> Variant:
 			d = d[p]
 		else:
 			return fallback
+	if path == "noise.hearing_distance" and (d is float or d is int):
+		return float(d) * weather_hearing_mult()        # rain / wind mask distraction sounds too (weather.gd)
 	return d
 
 
@@ -127,6 +129,7 @@ static func light_at(node: Node3D, pos: Vector3, exclude: Array = []) -> float:
 		var to_moon := dl.global_transform.basis.z.normalized()      # the light shines along -Z
 		if clear_line(space, pos, pos + to_moon * 60.0, exclude, null, true):
 			level += float(tg("light.moon", 0.25))
+			level += float(weather_state().get("daylight", 0.0)) * float(tg("light.sun", 0.6))   # the same light is the sun by day
 		break
 	return clampf(level, float(tg("light.min", 0.15)), float(tg("light.max", 1.0)))
 
@@ -172,3 +175,62 @@ static func surface_at(node: Node3D, pos: Vector3, exclude: Array = []) -> Strin
 
 static func surface_noise(s: String) -> float:
 	return float(tg("surfaces." + s, 1.0))
+
+
+# ------------------------------------------------------------------ weather (scripts/city/weather.gd)
+## Rain and wind mask footsteps (hearing x0.6 in rain / sleet, x0.8 in a blizzard or wind of 5 m/s and up);
+## blizzard and fog shorten the far cone (weather_state().visibility, data/weather.json). Clear weather: 1.0.
+
+static var _weather_script: Script
+
+
+## Weather.current() without a hard dependency (sandboxes and smoke scenes have no weather node: {}).
+static func weather_state() -> Dictionary:
+	if _weather_script == null:
+		_weather_script = load("res://scripts/city/weather.gd")
+	return _weather_script.call("current") if _weather_script else {}
+
+
+static func weather_hearing_mult() -> float:
+	var w := weather_state()
+	if w.is_empty():
+		return 1.0
+	var m := 1.0
+	var k := str(w.get("kind", ""))
+	if k == "rain" or k == "sleet":
+		m *= 0.6
+	if k == "blizzard" or float(w.get("wind_speed", 0.0)) >= 5.0:
+		m *= 0.8
+	return m
+
+
+static func weather_sight_mult() -> float:
+	var w := weather_state()
+	return clampf(float(w.get("visibility", 1.0)), 0.2, 1.0) if not w.is_empty() else 1.0
+
+
+## Scales a guard's hearing radius and hooks the sight limit into guard.sight_modifiers (once per guard).
+static func weather_apply(g: Node) -> void:
+	if g == null or not ("hearing_distance" in g):
+		return
+	if not g.has_meta("weather_hearing_base"):
+		g.set_meta("weather_hearing_base", float(g.get("hearing_distance")))
+	g.set("hearing_distance", float(g.get_meta("weather_hearing_base")) * weather_hearing_mult())
+	if not g.has_meta("weather_sight_hooked") and "sight_modifiers" in g:
+		g.set_meta("weather_sight_hooked", true)
+		(g.get("sight_modifiers") as Array).append(weather_sight_modifier)
+
+
+## guard.sight_modifiers entry: nothing past the weather's far-cone range, a softer falloff inside it; the near
+## cone (cone.near_dist) is never cut.
+static func weather_sight_modifier(g: Node3D, player: Node3D) -> float:
+	var m := weather_sight_mult()
+	if m >= 0.999 or g == null or player == null:
+		return 1.0
+	var d := g.global_position.distance_to(player.global_position)
+	if d <= float(tg("cone.near_dist", 5.0)):
+		return 1.0
+	var far := float(g.get("view_distance")) * m
+	if d >= far:
+		return 0.0
+	return 1.0 - 0.4 * (d / far) * (d / far)
