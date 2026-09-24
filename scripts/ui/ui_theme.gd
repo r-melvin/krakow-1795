@@ -353,3 +353,25 @@ static func spacer(h: float) -> Control:
 static func full_rect(c: Control) -> Control:
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	return c
+
+
+# ------------------------------------------------------------------ UI sounds (scripts/audio/sfx.gd, UI bus)
+## Called by Sfx for every Control added to the tree: buttons click (and tick on hover), tab bars and the journal
+## turn a page when shown.
+static func wire_sound(n: Control) -> void:
+	if n is BaseButton:
+		var b := n as BaseButton
+		b.pressed.connect(func() -> void: Sfx.ui("ui_click"))
+		var hover := func() -> void:
+			if is_instance_valid(b) and not b.disabled:
+				Sfx.ui("ui_hover")
+		b.mouse_entered.connect(hover)
+	elif n is TabContainer:
+		(n as TabContainer).tab_changed.connect(func(_i: int) -> void: Sfx.ui("ui_page"))
+	elif n is TabBar:
+		(n as TabBar).tab_changed.connect(func(_i: int) -> void: Sfx.ui("ui_page"))
+	elif n.get_script() != null and str((n.get_script() as Script).resource_path).ends_with("journal.gd"):
+		var turn := func() -> void:
+			if is_instance_valid(n) and n.is_visible_in_tree():
+				Sfx.ui("ui_page")
+		n.visibility_changed.connect(turn)

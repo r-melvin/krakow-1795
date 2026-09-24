@@ -11,7 +11,15 @@ extends "res://scripts/npc/walker.gd"
 ## Rigged models play "idle" / "walk" (or "fly") from their AnimationPlayer ("sit" instead of "idle" for a
 ## standing animal that has one); older static models just stand.
 
-const WALK_REF := {"horse": 1.5, "horse_harnessed": 1.5, "dog_hound": 1.2, "dog_spitz": 0.9, "cat": 0.45, "pigeon": 0.3}
+## Ground speed (m/s) each gait clip covers at playback speed 1 (stride / cycle), from assets/blender/build_animals.py
+## (HORSE_WALK / HORSE_TROT / DOG_WALKS / PIGEON_WALK). Playback speed = actual speed / this, so hooves and
+## paws stay planted instead of sliding.
+const GAIT_REF := {
+	"horse": {"walk": 1.5, "trot": 3.0}, "horse_harnessed": {"walk": 1.5, "trot": 3.0},
+	"dog_hound": {"walk": 1.125}, "dog_spitz": {"walk": 0.98}, "cat": {"walk": 0.55},
+	"pigeon": {"walk": 0.225}, "crow": {"walk": 0.25},
+}
+const TROT_ABOVE := 1.8          ## horses trot above this ground speed (the dorozka's 2 m/s is a slow trot)
 const LIFT := {"pigeon": 0.035, "crow": 0.035}   ## small birds would vanish into the parallax-mapped setts
 const DRIVERS := ["town_coachman", "npc_m_03", "npc_m_01", "figure_townsman"]
 const TURN_RATE := 0.75        ## rad/s at full speed: ~2.7 m turning radius at 2 m/s
@@ -52,6 +60,7 @@ var _angle := 0.0
 
 func _ready() -> void:
 	add_to_group("animals")
+	Footsteps.attach(self, "auto")    # hoof beats on the walk cycle, wheels, harness, calls (scripts/audio/footsteps.gd)
 	_rng.seed = hash(npc_id)
 	_home = global_position
 	_target = _home
@@ -91,7 +100,7 @@ func _pick_model() -> String:
 
 func _build() -> void:
 	model_name = _pick_model()
-	_walk_ref = WALK_REF.get(model_name, 1.0)
+	_walk_ref = GAIT_REF.get(model_name, {}).get("walk", 1.0)
 	var mesh: Node3D = Assets.instance(model_name) if model_name != "" else null
 	var box := AABB(Vector3(-0.2, 0, -0.3), Vector3(0.4, 0.4, 0.6))
 	if mesh:
@@ -362,7 +371,11 @@ func _drive(delta: float) -> void:
 	global_position += -global_transform.basis.z * _drive_speed * delta
 	_place_trailer(false)
 	if _drive_speed > 0.15:
-		_play("walk", clampf(_drive_speed / 1.5, 0.5, 2.0))
+		var g: Dictionary = GAIT_REF["horse_harnessed"]
+		if _drive_speed > TROT_ABOVE:
+			_play("trot", clampf(_drive_speed / g["trot"], 0.4, 1.6))
+		else:
+			_play("walk", clampf(_drive_speed / g["walk"], 0.3, 1.6))
 	else:
 		_play("idle")
 
@@ -405,7 +418,7 @@ func _physics_process(delta: float) -> void:
 		"wander":
 			_wander(delta)
 	if is_moving():
-		_play("walk", clampf(Vector2(velocity.x, velocity.z).length() / _walk_ref, 0.5, 2.5))
+		_play("walk", clampf(Vector2(velocity.x, velocity.z).length() / _walk_ref, 0.3, 2.5))
 	else:
 		_play(_rest_clip)
 

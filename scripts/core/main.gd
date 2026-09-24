@@ -23,6 +23,8 @@ var _pause: Control
 
 func _ready() -> void:
 	get_tree().root.theme = UiTheme.get_theme()
+	add_child(Sfx.new())          # sound library + voice pool (scripts/audio, docs/AUDIO.md)
+	add_child(Ambience.new())     # wind, murmur, crowds, taverns, bells and the hejnal
 	_ui_layer = CanvasLayer.new()
 	add_child(_ui_layer)
 	_top_layer = CanvasLayer.new()
@@ -136,6 +138,7 @@ func _smoke() -> void:
 	print("[smoke] npcs=%d animals=%d" % [get_tree().get_nodes_in_group("npcs").size(), get_tree().get_nodes_in_group("animals").size()])
 	await _smoke_schedules(player)
 	await _perf_report()
+	print("[smoke] audio ", Sfx.smoke(), "\n[smoke] audio ambience ", (get_node("Ambience") as Ambience).report())
 	await _shots(player)
 	for g in guards:
 		print("[smoke]   %-16s state=%s suspicion=%.1f pos=%s" % [g.guard_name, Guard.State.keys()[g.state], g.suspicion, g.global_position])

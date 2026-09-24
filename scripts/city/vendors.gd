@@ -182,6 +182,7 @@ func _spawn(vd: Dictionary) -> void:
 	_make_prop(v)
 	_make_lamp(v)
 	_make_fx(v)
+	_make_sound(v)
 	var ia := InteractableScript.new()
 	ia.name = "Interact"
 	ia.display_name = str(vd.get("name", "seller")).capitalize()
@@ -384,6 +385,7 @@ func _physics_process(delta: float) -> void:
 	var alarm := _watch_alarmed() if check else false
 	for v in vendors:
 		_tick(v, delta, check, alarm)
+		_sound_tick(v)
 
 
 func _tick(v: V, delta: float, check: bool, alarm: bool) -> void:
@@ -1044,3 +1046,32 @@ func _shots(dir: String) -> void:
 			(c as CanvasLayer).visible = true
 	cam.queue_free()
 	print("[smoke] vendor shots in ", dir)
+
+
+# ------------------------------------------------------------------ sound (scripts/audio/sfx.gd, docs/AUDIO.md)
+## The chestnut brazier and the beer pot crackle; the knife grinder's stone whines while his sparks fly.
+func _make_sound(v: V) -> void:
+	var fx := str(v.d.get("fx", ""))
+	var set_name: String = {"smoke": "brazier_loop", "steam": "brazier_loop", "sparks": "grinder_loop"}.get(fx, "")
+	if set_name == "" or not is_instance_valid(v.body):
+		return
+	var at: Variant = v.d.get("fx_at", [0.0, 1.0, -0.8])
+	var p := Sfx.attach_loop(v.body, set_name, -6.0 if fx == "smoke" else (-12.0 if fx == "steam" else -4.0), 20.0,
+			Vector3(float(at[0]), float(at[1]), float(at[2])))
+	if p:
+		p.stream_paused = fx == "sparks"
+		v.body.set_meta("sfx_loop", p)
+
+
+func _sound_tick(v: V) -> void:
+	if not is_instance_valid(v.body) or not v.body.has_meta("sfx_loop"):
+		return
+	var p := v.body.get_meta("sfx_loop") as AudioStreamPlayer3D
+	if p == null or not is_instance_valid(p):
+		return
+	var gone: bool = v.state == St.GONE or v.state == St.HIDDEN or not v.body.visible
+	if str(v.d.get("fx", "")) == "sparks":
+		p.stream_paused = gone or v.fx == null or not v.fx.emitting
+	else:
+		p.stream_paused = gone or v.state == St.LEAVING or v.state == St.FLEEING
+

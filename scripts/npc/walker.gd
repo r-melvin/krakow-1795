@@ -20,6 +20,7 @@ var _district: Node
 
 
 func setup_navigation(avoid_radius: float, height: float, max_speed: float) -> void:
+	Footsteps.attach(self, "auto")    # steps / hooves / calls (scripts/audio/footsteps.gd); every walker sets up here
 	agent_radius = avoid_radius
 	nav_agent = NavigationAgent3D.new()
 	nav_agent.name = "NavAgent"
