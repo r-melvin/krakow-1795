@@ -2643,7 +2643,7 @@ def build_clothes(h, rig, spec):
     # collar band
     if spec.get("collar"):
         nz = B["neck_01"][0].z
-        cl = band("collar", pts, nz - 0.03, nz + 0.045, 0.025 if spec.get("wimple") else 0.012, M(spec["collar"]), rig, "neck_01", thickness=0.018 if spec.get("wimple") else 0.012, extra_top=0.008, bones={"neck_01"})
+        cl = band("collar", pts, nz - 0.03, nz + 0.045, 0.025 if spec.get("wimple") else 0.018, M(spec["collar"]), rig, "neck_01", thickness=0.018 if spec.get("wimple") else 0.012, extra_top=0.008, bones={"neck_01"})
         set_weights(cl, {"neck_01": 0.5, "spine_03": 0.5})      # bends between head and chest instead of cutting the jaw
         out.append(cl)
 
@@ -2657,10 +2657,20 @@ def build_clothes(h, rig, spec):
                        hole=M(_dark(spec.get("waistcoat") or coat, 0.3), 0.9, tex="plain"))
 
     # breeches (hip to knee) and stockings (knee to ankle)
-    breech_top = knee_z + 0.12 if coat_len == "long" else 9.0
-    out.append(garment(h, rig, me, info, "breeches", lambda i, co, g, dom: helper(g, "helper-tights") and ((dom in LEGS_UP and knee_z - 0.03 < co.z <= breech_top) or (dom == "pelvis" and knee_z < co.z <= min(breech_top, hem - 0.05) if coat_len != "short" else (dom == "pelvis" and co.z < waist_z))), M(spec.get("breeches", "black")), 0.012))
+    # under a long coat or skirt the breeches (in the coat's colour) run up to the waist: when a figure sits, the thigh
+    # lifts out of the hanging skirt and must not show bare skin (clip audit: sit_idle showed thighs and seat)
+    breech_top = waist_z - 0.02 if coat_len == "long" else 9.0
+    def breeches_fn(i, co, g, dom):
+        if not helper(g, "helper-tights"):
+            return False
+        if coat_len == "short":
+            return (dom in LEGS_UP and knee_z - 0.03 < co.z <= breech_top) or (dom == "pelvis" and co.z < waist_z)
+        if dom in LEGS_UP:
+            return knee_z - 0.03 < co.z <= breech_top
+        return dom == "pelvis" and knee_z < co.z <= (breech_top if coat_len == "long" else hem - 0.05)
+    out.append(garment(h, rig, me, info, "breeches", breeches_fn, M(spec.get("breeches", "black")), 0.012))
     # the tights helper is open at the crotch: a fitted patch over the skin closes it
-    if coat_len != "long":
+    if True:        # the crotch patch closes the tights helper's gap for long coats too (seen when sitting)
         out.append(garment(h, rig, me, info, "breeches_in", lambda i, co, g, dom: skin_face(g) and dom in LEGS_UP | {"pelvis", "spine_01"} and knee_z + 0.05 < co.z <= min(breech_top, waist_z - 0.06), M(spec.get("breeches", "black")), 0.002, offset=0.4))
     out.append(garment(h, rig, me, info, "stockings", lambda i, co, g, dom: helper(g, "helper-tights") and (dom in CALF or (dom in LEGS_UP and co.z <= knee_z - 0.03)) and co.z > ankle_z + spec.get("boot_height", 0.12), M(spec.get("stockings", "stocking")), 0.008))
 

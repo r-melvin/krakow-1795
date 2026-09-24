@@ -58,6 +58,7 @@ var time_override := -1.0
 var daylight := 0.0
 var visibility := 1.0
 var precip_scale := 1.0
+var ground_max := 1.0
 
 var _env: Environment
 var _sky: ProceduralSkyMaterial
@@ -140,12 +141,30 @@ func _ready() -> void:
 ## The district builds the ground after this node: its (duplicated, parallax) cobble material joins the wet /
 ## snow overlay pass.
 func _late_init() -> void:
-	var cob := get_parent().get_node_or_null("Cobbles") as MultiMeshInstance3D
-	if cob and cob.multimesh and cob.multimesh.mesh:
-		var m := cob.multimesh.mesh.surface_get_material(0) as BaseMaterial3D
-		if m:
-			Assets.register_ground(m)
+	_register_paving()
 	_push_globals()
+	# the outer town builds its paving later (and in chunks): pick those slabs up too
+	for t in [2.0, 8.0, 20.0]:
+		get_tree().create_timer(t, false).timeout.connect(_register_paving)
+
+
+## Every paving MultiMesh with a parallax height map (the square's "Cobbles", outer_city.gd's "Pave_*" slabs) gets
+## the snow / puddle overlay.
+func _register_paving() -> void:
+	if not is_inside_tree():
+		return
+	for n in get_parent().find_children("*", "MultiMeshInstance3D", true, false):
+		var mmi := n as MultiMeshInstance3D
+		if mmi.global_position.y < INTERIOR_Y or mmi.multimesh == null or mmi.multimesh.mesh == null:
+			continue
+		if not (mmi.name.begins_with("Cobbles") or mmi.name.begins_with("Pave_")):
+			continue
+		var mesh := mmi.multimesh.mesh
+		if mesh.get_surface_count() == 0:
+			continue
+		var m := mesh.surface_get_material(0) as BaseMaterial3D
+		if m and m.heightmap_enabled:
+			Assets.register_ground(m)
 
 
 func _exit_tree() -> void:
@@ -209,6 +228,7 @@ func apply(c: Variant) -> void:
 	temperature = float(over.get("temperature", preset.get("temperature", 0.0)))
 	time_override = float(over.get("time_of_day", preset.get("time_of_day", -1.0)))
 	visibility = float(over.get("visibility", preset.get("visibility", 1.0)))
+	ground_max = float(over.get("ground_cover_max", preset.get("ground_cover_max", 1.0)))
 	snow_target = float(over.get("snow_target", preset.get("snow_target", 1.0)))
 	snow_rate = float(over.get("snow_rate", preset.get("snow_rate", 0.0)))
 	wet_target = float(over.get("wet_target", preset.get("wet_target", 0.0)))
@@ -244,7 +264,7 @@ func _vec2(v: Variant) -> Vector2:
 func _update_state() -> void:
 	_state = {
 		"preset": preset_name, "kind": kind, "intensity": intensity, "wind": wind, "wind_speed": wind.length(),
-		"temperature": temperature, "snow_cover": snow_cover, "wetness": wetness, "time_of_day": _time_of_day(),
+		"temperature": temperature, "snow_cover": snow_cover, "ground_snow": ground_snow(), "wetness": wetness, "time_of_day": _time_of_day(),
 		"daylight": daylight, "visibility": visibility, "precipitation": _precip_amount(),
 		"particles": particle_count(), "sounds": preset.get("sounds", []), "under_cover": _under_cover,
 	}
@@ -254,12 +274,19 @@ func _precip_amount() -> float:
 	return intensity if kind in ["snow", "blizzard", "sleet", "rain"] else 0.0
 
 
+## Snow on the paving: the cover, capped by the preset's ground_cover_max (a frosty night keeps the joints white
+## and the stone tops showing even while the roofs stay fully covered).
+func ground_snow() -> float:
+	return minf(snow_cover, ground_max)
+
+
 func _push_globals() -> void:
 	RenderingServer.global_shader_parameter_set("snow_cover", snow_cover)
+	RenderingServer.global_shader_parameter_set("ground_snow", ground_snow())
 	RenderingServer.global_shader_parameter_set("wetness", wetness)
 	RenderingServer.global_shader_parameter_set("wind", wind)
 	RenderingServer.global_shader_parameter_set("precipitation", _precip_amount())
-	Assets.apply_wetness(wetness, snow_cover > 0.02 or wetness > 0.02)
+	Assets.apply_wetness(wetness, ground_snow() > 0.02 or wetness > 0.02)
 	_sent_cover = snow_cover
 
 
@@ -745,6 +772,18 @@ class _Runner extends Node3D:
 		add_child(cam)
 		var views := [["door", Vector3(30, 2.2, -8), Vector3(31, 1.4, -15)], ["overhead", Vector3(0, 70, 45), Vector3.ZERO]]
 		var runs: Array = []
+		var only := ""
+		for a in OS.get_cmdline_user_args():
+			if a.begins_with("--weather-shot-set="):
+				only = a.trim_prefix("--weather-shot-set=")
+		if only == "ground":
+			# the paving snow at three covers: the St Mary's door and a low look along a trampled line
+			var low := ["cobbles", Vector3(-8, 0.9, -16.5), Vector3(-5, 0.0, -21.5)]
+			for c in [1.0, 0.75, 0.3]:
+				runs.append(["ground%d" % int(c * 100), {"preset": "clear_frost", "snow_cover": c, "ground_cover_max": 1.0,
+						"snow_rate": 0.0, "wetness": 0.0}, [views[0], low]])
+			await _run(cam, runs)
+			return
 		for p in ["clear_frost", "light_snow", "blizzard", "sleet", "rain_thaw", "fog", "overcast", "clear_day", "snow_day"]:
 			runs.append([p, p, views])
 		var roofs := ["roofs", Vector3(-6, 16, 10), Vector3(-6, 9, -32)]
@@ -753,6 +792,9 @@ class _Runner extends Node3D:
 		runs.append(["rain_thaw_cover30", {"preset": "rain_thaw", "snow_cover": 0.3, "snow_rate": 0.0, "wetness": 1.0},
 				views + [roofs]])
 		runs.append(["clear_frost_cover50", {"preset": "clear_frost", "snow_cover": 0.5, "wetness": 0.3}, views + [roofs]])
+		await _run(cam, runs)
+
+	func _run(cam: Camera3D, runs: Array) -> void:
 		for r in runs:
 			for v in r[2]:
 				cam.look_at_from_position(v[1], v[2])

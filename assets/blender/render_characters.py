@@ -181,6 +181,76 @@ def clip_sheet(name, clip, out):
     return sc.render.filepath
 
 
+def clip_audit(name, clips, phases=4, min_verts=12):
+    """Skin-through-cloth check under the game's retargeted clips. A body vertex counts as covered if a ray along its
+    normal hits a garment in the rest pose; in each clip phase, covered vertices whose ray hits nothing are poking out.
+    Only vertices with the cloth right behind them count (the body went through it, not out from under a hem).
+    Prints and returns {clip: [(phase, count, {bone: n})]} for phases with at least min_verts exposed."""
+    from mathutils.bvhtree import BVHTree
+    sc = scene()
+    root, objs = load(name, 0.0, 0.0)
+    body = next(o for o in objs if o.type == "MESH" and o.name.split(".")[0] == "Human" and len(o.data.vertices) > 5000)
+    cloth = [o for o in objs if o.type == "MESH" and not o.name.startswith("Human") and "eye" not in o.name.lower()
+             and not any(k in o.name for k in ("musket", "stock", "barrel", "ramrod", "sling", "scabbard", "hilt", "grip", "pike", "cane"))]
+    gname = {g.index: g.name for g in body.vertex_groups}
+    dom = []
+    for v in body.data.vertices:
+        dom.append(max(((g.weight, gname[g.group]) for g in v.groups), default=(0, "?"))[1])
+    def evaluate():
+        dg = bpy.context.evaluated_depsgraph_get()
+        eb = body.evaluated_get(dg)
+        bm_ = eb.to_mesh()
+        mw = body.matrix_world
+        pts = [(mw @ v.co, (mw.to_3x3() @ v.normal).normalized()) for v in bm_.vertices]
+        eb.to_mesh_clear()
+        verts, tris = [], []
+        for o in cloth:
+            eo = o.evaluated_get(dg)
+            m = eo.to_mesh()
+            m.calc_loop_triangles()
+            off = len(verts)
+            verts += [o.matrix_world @ v.co for v in m.vertices]
+            tris += [tuple(off + i for i in t.vertices) for t in m.loop_triangles]
+            eo.to_mesh_clear()
+        return pts, BVHTree.FromPolygons(verts, tris)
+    def hits(pts, bvh, idx=None):
+        out = set()
+        rng_ = range(len(pts)) if idx is None else idx
+        for i in rng_:
+            p, n = pts[i]
+            if bvh.ray_cast(p + n * 0.0015, n, 0.35)[0] is not None:
+                out.add(i)
+        return out
+    bpy.context.view_layer.update()
+    pts, bvh = evaluate()
+    covered = hits(pts, bvh)
+    covered = {i for i in covered if not dom[i].startswith(("hand", "index", "middle", "ring", "pinky", "thumb", "head"))}
+    res = {}
+    for clip in clips:
+        rows = []
+        for q in range(phases):
+            if not retarget_pose(sc, root, clip, q / phases):
+                break
+            pts, bvh = evaluate()
+            ok = hits(pts, bvh, covered)
+            # exposed AND the cloth sits just behind the skin (within 4 cm inward): the body passed through it. A leg
+            # that simply swung out from under a hem has no cloth right behind it and is not counted.
+            bad = set()
+            for i in covered - ok:
+                p_, n_ = pts[i]
+                if bvh.ray_cast(p_ - n_ * 0.0015, -n_, 0.04)[0] is not None:
+                    bad.add(i)
+            if len(bad) >= min_verts:
+                by = {}
+                for i in bad:
+                    by[dom[i]] = by.get(dom[i], 0) + 1
+                top = dict(sorted(by.items(), key=lambda kv: -kv[1])[:4])
+                rows.append((q, len(bad), top))
+        res[clip] = rows
+        print("[audit] %s %-14s %s" % (name, clip, "; ".join("ph%d:%d %s" % (q, c, top) for q, c, top in rows) or "clean"))
+    return res
+
+
 CLIPS = [c for c in os.environ.get("CLIPS", "").split(",") if c]
 
 
@@ -208,6 +278,13 @@ def eye_sheet(name, out):
 
 
 for name in names:
+    if os.environ.get("CLIP_AUDIT"):
+        # CLIPS=walk,sit_idle CLIP_AUDIT=1 blender -b --python render_characters.py -- <outdir> <name>
+        import json
+        r = clip_audit(name, CLIPS)
+        with open(os.path.join(OUT, name + "_clipaudit.json"), "w") as fh:
+            json.dump(r, fh)
+        continue
     if os.environ.get("EYES"):
         eye_sheet(name, OUT)
         continue

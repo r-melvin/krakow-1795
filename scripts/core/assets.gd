@@ -145,7 +145,7 @@ const BLEND := 0.2
 
 ## Clips that loop. Everything else plays once and holds its last frame (falls, deaths, transitions).
 const LOOPING := {
-	"idle": true, "idle_alert": true, "walk": true, "walk_fast": true, "jog": true, "run": true, "walk_carry": true,
+	"idle": true, "idle_alert": true, "walk": true, "walk_player": true, "walk_fast": true, "jog": true, "run": true, "walk_carry": true,
 	"carry_basket": true, "sneak": true, "crouch_idle": true, "crouch_hide": true, "prone_idle": true, "prone_crawl": true,
 	"prone_crawl_side": true, "crouch_crawl": true, "guard_sentry": true, "guard_march": true, "guard_alert_look": true,
 	"musket_aim": true, "musket_ready": true, "pistol_aim": true, "block": false, "talk_gesture_a": true, "talk_gesture_b": true,
@@ -154,8 +154,8 @@ const LOOPING := {
 
 ## Ground speed (m/s) each in-place locomotion clip was authored at (stride / stance time in build_animations.py).
 const CLIP_SPEED := {
-	"walk": 1.08, "walk_fast": 1.90, "jog": 2.57, "run": 4.84, "walk_carry": 0.85, "carry_basket": 0.94,
-	"sneak": 1.39, "guard_march": 1.78, "prone_crawl": 0.70, "prone_crawl_side": 0.35, "crouch_crawl": 0.31,
+	"walk": 0.93, "walk_player": 1.27, "walk_fast": 2.18, "jog": 2.57, "run": 4.84, "walk_carry": 0.85, "carry_basket": 0.94,
+	"sneak": 1.28, "guard_march": 1.78, "prone_crawl": 0.70, "prone_crawl_side": 0.35, "crouch_crawl": 0.31,
 }
 
 ## Gameplay state -> clip. Scripts ask Assets.clip_for("prone") instead of hard-coding clip names.
@@ -493,6 +493,13 @@ static func register_ground(mat: BaseMaterial3D) -> void:
 	if ht:
 		sm.set_shader_parameter("has_height", true)
 		sm.set_shader_parameter("height_tex", ht)
+	# the base's parallax walk, repeated in the overlay so the snow sits in the relief
+	if mat.heightmap_enabled and mat.heightmap_texture:
+		sm.set_shader_parameter("use_parallax", true)
+		sm.set_shader_parameter("heightmap_scale", mat.heightmap_scale)
+		sm.set_shader_parameter("heightmap_min_layers", mat.heightmap_min_layers if mat.heightmap_deep_parallax else 1)
+		sm.set_shader_parameter("heightmap_max_layers", mat.heightmap_max_layers if mat.heightmap_deep_parallax else 1)
+		sm.set_shader_parameter("heightmap_flip", Vector2(-1.0 if mat.heightmap_flip_tangent else 1.0, -1.0 if mat.heightmap_flip_binormal else 1.0))
 	sm.set_shader_parameter("uv1_scale", mat.uv1_scale)
 	sm.set_shader_parameter("uv1_offset", mat.uv1_offset)
 	_ground_mats[mat] = sm

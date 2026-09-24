@@ -1,5 +1,5 @@
 {
-  "_doc": "Weather presets (scripts/city/weather.gd). time_of_day: hour 0..24, or -1 to follow GameState.clock_minutes (the sun rises after 06:00). snow_cover / wetness: the value set when the preset is applied (start_*) and the value it drifts toward (target) at rate per game hour. precip: particle counts for the near box and the far ring around the camera (flakes = drifting snow billboards, streaks = rain / sleet / blizzard streaks, splash = ground rings within 12 m). visibility: guard far-cone range multiplier (perception.gd); hearing is scaled by rain (x0.6) and wind (x0.8) in perception.gd. Colours are linear RGB. sky_* / fog_* night values are blended toward the day_* values by the sun's height. fog_color / fog_emission: night distance-fog colour and volumetric self-glow (snow haze).",
+  "_doc": "Weather presets (scripts/city/weather.gd). time_of_day: hour 0..24, or -1 to follow GameState.clock_minutes (the sun rises after 06:00). snow_cover / wetness: the value set when the preset is applied (start_*) and the value it drifts toward (target) at rate per game hour. precip: particle counts for the near box and the far ring around the camera (flakes = drifting snow billboards, streaks = rain / sleet / blizzard streaks, splash = ground rings within 12 m). visibility: guard far-cone range multiplier (perception.gd); hearing is scaled by rain (x0.6) and wind (x0.8) in perception.gd. Colours are linear RGB. sky_* / fog_* night values are blended toward the day_* values by the sun's height. fog_color / fog_emission: night distance-fog colour and volumetric self-glow (snow haze). ground_cover_max: caps the snow on the paving (global ground_snow) below the roof cover.",
   "default": "clear_frost",
   "presets": {
     "clear_frost": {
@@ -27,7 +27,8 @@
       "volumetric_density": 0.018,
       "exposure": 1.1,
       "visibility": 1.0,
-      "sounds": ["frost_still", "distant_dogs"]
+      "sounds": ["frost_still", "distant_dogs"],
+      "ground_cover_max": 0.75
     },
     "light_snow": {
       "kind": "snow",

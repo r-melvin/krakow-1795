@@ -154,6 +154,10 @@ snow_cover={
 "type": "float",
 "value": 1.0
 }
+ground_snow={
+"type": "float",
+"value": 0.75
+}
 wetness={
 "type": "float",
 "value": 0.0
