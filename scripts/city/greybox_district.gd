@@ -355,6 +355,14 @@ func _furniture() -> void:
 	var capped := Assets.place(self, "well_shaft_cap", Vector3(14, 0, -9), PI * 0.5)
 	if capped == null:
 		Assets.place(self, "well", Vector3(14, 0, -9), PI * 0.5)
+	# Drain grates over the undercroft's side drains (doors grate_a/b/c in data/interiors.json): E lifts them.
+	for gp in [Vector3(-6, 0, -24.5), Vector3(24.5, 0, 8), Vector3(-10, 0, 24.5)]:
+		var grate := Assets.place(self, "drain_grate", gp, 0.0)
+		if grate:
+			var gm := grate.find_child("Grate", true, false)
+			if gm:
+				gm.set_meta("hidden_entrance", true)
+				gm.add_to_group("hidden_entrance")
 
 
 

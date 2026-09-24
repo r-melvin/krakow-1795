@@ -15,8 +15,10 @@ ROOT = os.path.join(PROJ, "assets", "models")
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[0] if args else os.path.join(PROJ, "docs", "screenshots")
 DATA = json.load(open(os.path.join(PROJ, "data", "interiors.json")))
-ENERGY = {"fire": 120, "candle": 25, "lantern": 90, "chandelier": 160, "window": 30, "stove": 50, "oven": 140, "forge": 180, "moon": 15}
-COLOUR = {"moon": (0.55, 0.66, 1.0)}
+ENERGY = {"fire": 110, "candle": 30, "sconce": 35, "rush": 14, "lantern": 70, "horn": 60, "wheel": 110, "chandelier": 120,
+          "oil": 90, "brasslamp": 80, "chainlamp": 30, "sanctuary": 10, "window": 6, "moon": 6, "shaft": 30, "stove": 40,
+          "oven": 130, "forge": 170}
+COLOUR = {"moon": (0.55, 0.66, 1.0), "window": (0.55, 0.66, 1.0), "shaft": (0.7, 0.74, 0.9), "sanctuary": (1.0, 0.35, 0.25)}
 EXTRA = {"int_stair": ((3.0, -2.5, 2.4), (0.0, 1.8, 1.2))}
 
 

@@ -63,7 +63,7 @@ PAL.update({
     "wallpaper": (0.64, 0.58, 0.40), "wall_green": (0.46, 0.54, 0.44), "wall_rose": (0.70, 0.46, 0.42),
     "curtain_red": (0.56, 0.10, 0.14), "brick_vault": (0.46, 0.24, 0.16), "coffee": (0.20, 0.11, 0.06),
     "glass_green": (0.16, 0.30, 0.18), "wine": (0.30, 0.04, 0.08), "felt_green": (0.12, 0.30, 0.18),
-    "wicker": (0.52, 0.38, 0.20), "copper_pot": (0.62, 0.34, 0.18), "earth": (0.22, 0.18, 0.14), "earth_b": (0.29, 0.23, 0.17),
+    "horn": (0.95, 0.62, 0.30), "wicker": (0.52, 0.38, 0.20), "copper_pot": (0.62, 0.34, 0.18), "earth": (0.22, 0.18, 0.14), "earth_b": (0.29, 0.23, 0.17),
 })
 PAL["sack"] = (0.56, 0.47, 0.32)
 PAL["straw_bed"] = (0.60, 0.48, 0.24)
@@ -78,6 +78,15 @@ FX = []           # particle / exit markers (fx_smoke_nn, fx_steam_nn, fx_drip_n
 BUDGET = 40000
 
 
+CEILING = {       # room -> ceiling fixture style for lantern() (default: an iron lantern)
+    "int_tavern": "wheel", "int_tavern_beerhall": "wheel", "int_tavern_inn": "horn", "int_store_warehouse": "horn",
+    "int_tavern_kawiarnia": "oil", "int_bath_lazna": "chain", "int_workshop_cooper": "horn", "int_workshop_forge": "horn",
+    "int_shop_chandler": "wheel", "int_house_kingpin": "oil", "int_flat_scholar": "none", "int_flat_burgher": "none",
+    "int_shop_tailor": "oil", "int_shop_goldsmith": "oil", "int_guard_post": "lantern", "int_undercroft": "lantern",
+}
+ROOM = [""]       # the room being built (set by the __main__ loop)
+
+
 def start():
     ba.reset()
     LAMPS.clear()
@@ -86,6 +95,8 @@ def start():
     SURF.clear()
     FX.clear()
     CTX.clear()
+    CTX["ceiling"] = CEILING.get(ROOM[0], "lantern")
+    CTX["moons"] = 0
 
 
 def post(x, y, a=0.0, z=0.0):
@@ -392,6 +403,10 @@ def fake_window(parts, side, u, z, w=0.9, h=1.3, glass="moon_glass", strength=0.
         gp = _wpos(side, u + ls * w * 0.3, n + 0.11)
         parts.append(sphere("nlamp", 0.035, (gp[0], gp[1], z + rh * 0.35), EM("night_glow", 9.0, 0.3), seg=8, rings=4))
         parts.append(sphere("nhalo", 0.07, (gp[0], gp[1], z + rh * 0.35), EM("night_glow", 1.2, 0.3), seg=8, rings=4))
+        if CTX.get("moons", 0) < 2:
+            CTX["moons"] = CTX.get("moons", 0) + 1
+            mx, my = _wpos(side, u, n + 0.5)
+            lamp("moon", (mx, my, z + h * 0.6))
         for k in range(3):
             sp = _wpos(side, u + RNG.uniform(-0.4, 0.4) * w, n + 0.105)
             parts.append(sphere("nstar", 0.008, (sp[0], sp[1], z + h * RNG.uniform(0.7, 0.92)), EM("star", 4.0, 0.3), seg=4, rings=2))
@@ -417,8 +432,30 @@ def candle(parts, x, y, z, h=0.18, r=0.022, holder=True):
 
 
 def lantern(parts, x, y, H, z, kind="lantern"):
-    """Iron lantern hanging on a chain from the ceiling at H, glass centre at z."""
+    """Ceiling light hanging from H, light centre at z. The room's light plan (CTX["ceiling"]) picks the fixture:
+    lantern (iron, glazed), horn (iron frame with dull horn panes), wheel (iron candle-wheel), oil (brass oil lamp
+    with a glass chimney), chain (a small lamp on a chain, the bathhouse), none (nothing: the room stays dark)."""
+    style = CTX.get("ceiling", "lantern") if kind == "lantern" else kind
+    if style == "none":
+        return
+    if style == "wheel":
+        return candle_wheel(parts, x, y, H, z)
+    if style == "oil":
+        return oil_lamp(parts, x, y, H, z)
+    if style == "chain":
+        return chain_lamp(parts, x, y, H, z)
     iron = M("iron", 0.6)
+    if style == "horn":
+        parts.append(cyl("chain", 0.012, H - z - 0.3, (x, y, z + 0.3), iron, verts=6))
+        parts.append(cyl("hcap", 0.15, 0.16, (x, y, z + 0.18), iron, verts=8, r2=0.03))
+        parts.append(cyl("hglass", 0.12, 0.34, (x, y, z - 0.17), EM("horn", 2.2, 0.6), verts=8))
+        for k in range(4):
+            a = math.tau * k / 4 + math.pi / 4
+            parts.append(box("hpost", (0.02, 0.02, 0.36), (x + 0.125 * math.cos(a), y + 0.125 * math.sin(a), z - 0.18), iron))
+        parts.append(cyl("hbase", 0.14, 0.04, (x, y, z - 0.2), iron, verts=8))
+        parts.append(torus("hring", 0.05, 0.01, (x, y, z + 0.38), iron, rot=(math.pi / 2, 0, 0), seg=8, mseg=3))
+        lamp("horn", (x, y, z))
+        return
     parts.append(cyl("chain", 0.012, H - z - 0.3, (x, y, z + 0.3), iron, verts=6))
     parts.append(taper_box("lcap", (0.30, 0.30, 0.14), (x, y, z + 0.22), iron, top=0.3))
     parts.append(box("lglass", (0.20, 0.20, 0.30), (x, y, z - 0.10), EM("lamp_glass", 6.0)))
@@ -427,6 +464,112 @@ def lantern(parts, x, y, H, z, kind="lantern"):
             parts.append(box("lpost", (0.03, 0.03, 0.34), (x + sx * 0.11, y + sy * 0.11, z - 0.12), iron))
     parts.append(box("lbase", (0.28, 0.28, 0.05), (x, y, z - 0.16), iron))
     lamp(kind, (x, y, z))
+
+
+def candle_wheel(parts, x, y, H, z, r=0.5, n=8):
+    """Iron candle-wheel: a hoop hung on three chains from a hook, tallow candles in drip cups round it."""
+    iron = M("iron", 0.6)
+    parts.append(torus("wheel", r, 0.02, (x, y, z), iron, seg=24, mseg=4))
+    parts.append(torus("whub", 0.08, 0.02, (x, y, z), iron, seg=10, mseg=4))
+    for k in range(4):
+        a = math.tau * k / 4
+        parts.append(cbox("wspoke", (r, 0.015, 0.015), (x + r / 2 * math.cos(a), y + r / 2 * math.sin(a), z), iron, rot=(0, 0, a)))
+    top = z + 0.7
+    for k in range(3):
+        a = math.tau * k / 3 + 0.3
+        cx, cy = x + r * math.cos(a), y + r * math.sin(a)
+        ln = math.sqrt(r * r + 0.49)
+        tilt = math.atan2(r, 0.7)
+        parts.append(cbox("wchain", (0.01, 0.01, ln), ((cx + x) / 2, (cy + y) / 2, (z + top) / 2), iron,
+                          rot=(tilt * math.sin(a), -tilt * math.cos(a), 0)))
+    parts.append(cyl("wrope", 0.012, H - top, (x, y, top), iron, verts=6))
+    for k in range(n):
+        a = math.tau * (k + 0.5) / n
+        cx, cy = x + r * math.cos(a), y + r * math.sin(a)
+        parts.append(cyl("wcup", 0.04, 0.03, (cx, cy, z + 0.01), iron, verts=8, r2=0.05))
+        parts.append(cyl("wcandle", 0.018, RNG.uniform(0.1, 0.18), (cx, cy, z + 0.04), M("tallow", 0.5), verts=6))
+        parts.append(cyl("wflame", 0.012, 0.04, (cx, cy, z + 0.2), EM("flame", 8.0), verts=6, r2=0.0))
+        parts.append(blob("wdrip", (0.03, 0.03, 0.06), (cx, cy, z - 0.04), M("tallow", 0.5), subsurf=1))
+    lamp("wheel", (x, y, z + 0.2))
+
+
+def oil_lamp(parts, x, y, H, z):
+    """Brass hanging oil lamp: a fount on three chains, a glass chimney, a smoke bell above."""
+    br = MET("brass", 0.3)
+    parts.append(cyl("ochain", 0.01, H - z - 0.6, (x, y, z + 0.6), br, verts=6))
+    parts.append(cyl("obell", 0.14, 0.12, (x, y, z + 0.5), br, verts=12, r2=0.04))
+    for k in range(3):
+        a = math.tau * k / 3
+        parts.append(cbox("ostay", (0.008, 0.008, 0.5), (x + 0.1 * math.cos(a), y + 0.1 * math.sin(a), z + 0.25), br))
+    parts.append(sphere("ofount", 0.13, (x, y, z - 0.05), br, seg=14, rings=8, zscale=0.7))
+    parts.append(cyl("ogallery", 0.07, 0.04, (x, y, z + 0.03), br, verts=10))
+    parts.append(cyl("ochimney", 0.04, 0.26, (x, y, z + 0.07), EM("lamp_glass", 5.0, 0.2), verts=10, r2=0.03))
+    parts.append(cyl("ofinial", 0.02, 0.1, (x, y, z - 0.2), br, verts=8, r2=0.0))
+    lamp("oil", (x, y, z + 0.15))
+
+
+def chain_lamp(parts, x, y, H, z):
+    """A clay oil lamp in an iron cradle on a long chain."""
+    parts.append(cyl("cchain", 0.01, H - z - 0.08, (x, y, z + 0.08), M("iron", 0.6), verts=6))
+    parts.append(torus("ccradle", 0.08, 0.01, (x, y, z), M("iron", 0.6), seg=10, mseg=3))
+    parts.append(blob("clamp", (0.16, 0.1, 0.06), (x, y, z - 0.03), M("terracotta", 0.6), subsurf=1))
+    parts.append(cyl("cflame", 0.012, 0.05, (x + 0.07, y, z + 0.02), EM("flame", 8.0), verts=6, r2=0.0))
+    lamp("chainlamp", (x + 0.07, y, z + 0.1))
+
+
+def sconce(parts, side, u, z=1.8, n=0.0):
+    """Wall sconce: an iron bracket, a tin reflector behind the flame, a drip pan and a tallow candle."""
+    iron = M("iron", 0.55)
+    parts.append(wl(side, "sbackplate", 0.1, 0.02, 0.3, u, n + 0.01, z - 0.15, iron))
+    parts.append(wl(side, "sreflector", 0.24, 0.015, 0.34, u, n + 0.03, z - 0.02, MET("pewter", 0.15), bevel=0.01, seg=1))
+    parts.append(wl(side, "sarm", 0.025, 0.2, 0.025, u, n + 0.12, z - 0.06, iron))
+    px, py = _wpos(side, u, n + 0.2)
+    parts.append(cyl("span", 0.05, 0.015, (px, py, z - 0.05), iron, verts=8))
+    parts.append(cyl("scandle", 0.018, 0.13, (px, py, z - 0.035), M("tallow", 0.5), verts=6))
+    parts.append(cyl("sflame", 0.012, 0.04, (px, py, z + 0.1), EM("flame", 8.0), verts=6, r2=0.0))
+    parts.append(blob("sdrip", (0.03, 0.03, 0.05), (px, py, z - 0.09), M("tallow", 0.5), subsurf=1))
+    lx, ly = _wpos(side, u, n + 0.24)
+    lamp("sconce", (lx, ly, z + 0.12))
+
+
+def rushlight(parts, x, y, z):
+    """Rushlight holder: an iron nip on a wooden block holding a peeled rush at a slant; a tiny flame."""
+    parts.append(cyl("rblock", 0.05, 0.05, (x, y, z), M("wood_dark"), verts=8))
+    parts.append(cyl("rstem", 0.006, 0.18, (x, y, z + 0.05), M("iron", 0.5), verts=4))
+    parts.append(cbox("rush", (0.005, 0.005, 0.3), (x + 0.07, y, z + 0.25), M("straw_bed", 0.8), rot=(0, 0.9, 0)))
+    parts.append(cyl("rflame", 0.008, 0.03, (x + 0.19, y, z + 0.33), EM("flame", 8.0), verts=4, r2=0.0))
+    lamp("rush", (x + 0.19, y, z + 0.38))
+
+
+SCONCES = {       # room -> [(side, u, z)]: wall sconces added at finish_set
+    "int_tavern": [("L", 1.4, 2.0), ("R", 1.2, 1.9), ("R", 3.4, 1.9)],
+    "int_shop": [("R", 3.6, 1.8)],
+    "int_workshop": [("B", 1.4, 1.9)],
+    "int_church": [("F", -4.5, 2.2), ("F", 4.5, 2.2)],
+    "int_salon": [("B", -1.0, 1.9), ("F", -2.6, 1.9)],
+    "int_shop_baker": [("F", -0.9, 1.9)],
+    "int_shop_shoemaker": [("B", 1.6, 1.8)],
+    "int_shop_goldsmith": [("R", 1.4, 1.7)],
+    "int_shop_apothecary": [("R", 1.8, 1.8)],
+    "int_shop_tailor": [("R", 3.5, 1.9)],
+    "int_shop_cloth": [("R", 1.0, 1.9)],
+    "int_shop_chandler": [("L", 2.2, 1.8)],
+    "int_workshop_locksmith": [("L", 1.2, 1.8)],
+    "int_workshop_cooper": [("R", 3.0, 1.9)],
+    "int_workshop_forge": [("R", 1.0, 2.0)],
+    "int_tavern_beerhall": [("L", 1.6, 1.9), ("L", 6.2, 1.9), ("R", 3.9, 1.9), ("F", -4.4, 1.9)],
+    "int_tavern_kawiarnia": [("L", 5.2, 1.9), ("R", 4.8, 1.9)],
+    "int_tavern_inn": [("R", 5.2, 1.9), ("L", 1.2, 1.9), ("F", 4.4, 1.9)],
+    "int_cellar_wine": [],
+    "int_salon_brothel": [("L", 1.0, 1.8), ("B", 0.8, 1.8)],
+    "int_flat_burgher": [("L", 4.3, 1.8)],
+    "int_flat_scholar": [],
+    "int_guard_post": [("B", 0.8, 1.9), ("F", -1.2, 1.9)],
+    "int_chapel_synagogue": [("F", -3.8, 2.0), ("F", 3.8, 2.0)],
+    "int_chapel_uniate": [],
+    "int_bath_lazna": [("L", 1.0, 1.8)],
+    "int_store_warehouse": [("L", 3.0, 2.2), ("R", 7.0, 2.2)],
+}
 
 
 def barrel(parts, x, y, z=0.0, r=0.32, h=0.85, lying=False, rot=0.0):
@@ -588,6 +731,8 @@ MANIFEST = {}
 
 
 def finish_set(name, parts, col):
+    for (side, u, z) in SCONCES.get(name, []):
+        sconce(parts, side, u, z)
     visual = join(parts, name)
     n = tris(visual) + sum(tris(k) for k in KEEP)
     for k in KEEP:
@@ -1395,6 +1540,11 @@ def int_church():
     parts.append(box("antep", (2.2, 0.04, 0.8), (0, AY - 0.57, 0.44), M("crimson", 0.7)))
     parts.append(box("aclth", (2.7, 1.2, 0.05), (0, AY, 1.36), M("linen", 0.9)))
     col.append(box("c", (2.7, 1.2, 1.4), (0, AY, 0.36)))
+    # the sanctuary lamp: red glass in a silver-gilt cup on a long chain before the altar
+    parts.append(cyl("slchain", 0.008, 7.5, (1.8, AY - 1.4, 2.8), MET("gold", 0.3), verts=4))
+    parts.append(cyl("slcup", 0.12, 0.2, (1.8, AY - 1.4, 2.6), MET("gold", 0.3), verts=10, r2=0.16))
+    parts.append(cyl("slglass", 0.07, 0.1, (1.8, AY - 1.4, 2.78), EM("icon_red", 3.0, 0.3), verts=10))
+    lamp("sanctuary", (1.8, AY - 1.4, 2.7))
     for k in range(6):
         x = -1.1 + k * 0.44
         candle(parts, x, AY + 0.3, 1.41, h=0.3 + (0.1 if k in (2, 3) else 0.0))
@@ -2686,7 +2836,8 @@ def int_tavern_kawiarnia():
     portrait(parts, "B", -0.6, 1.5, w=0.8, h=1.0, coat="crimson")
     # white tiled stove in the front left corner
     tiled_stove(parts, col, -W / 2 + 0.6, 0.9, rot=math.pi / 2, tile="tile_w", trim="stove_trim", w=0.8, d=0.8, h=2.3)
-    brass_chandelier(parts, 0.2, 3.0, H, H - 0.9, arms=6, r=0.45)
+    oil_lamp(parts, 0.2, 3.0, H, H - 1.1)
+    oil_lamp(parts, -2.4, D - 1.5, H, H - 1.3)
     for sx in (-1, 1):
         fake_window(parts, "F", sx * 2.0, 1.0, w=1.1, h=1.7)
     post(CX, D - 0.55, math.pi)                                  # the waiter at the urn
@@ -2994,6 +3145,10 @@ def int_cellar_wine():
     parts.append(box("plglass", (0.16, 0.16, 0.24), (-PW / 2 + 0.2, 3.0, 1.45), EM("lamp_glass", 6.0)))
     parts.append(taper_box("plcap", (0.22, 0.22, 0.1), (-PW / 2 + 0.2, 3.0, 1.69), M("iron", 0.6), top=0.3))
     lamp("lantern", (-PW / 2 + 0.35, 3.0, 1.5))
+    parts.append(box("udoor", (0.06, 0.8, 1.7), (-W / 2 + 0.03, 9.6, ZF), M("wood_dark", 0.8), bevel=0.01, seg=1))
+    parts.append(box("uframe", (0.04, 1.0, 1.85), (-W / 2 + 0.01, 9.6, ZF), M("brick_dark", 0.9)))
+    parts.append(torus("uring", 0.05, 0.01, (-W / 2 + 0.08, 9.3, ZF + 0.9), M("iron", 0.5), rot=(0, math.pi / 2, 0), seg=8, mseg=3))
+    exit_marker("undercroft", (-W / 2 + 0.6, 9.6, ZF), math.pi / 2)
     lantern(parts, 0.0, SY + 0.9, TOP, 1.2)
     lantern(parts, 0.0, D - 2.3, TOP, 1.4)
     CTX["surface"] = "stone"
@@ -3042,8 +3197,7 @@ def int_flat_garret():
     for k in range(3):
         parts.append(box("slat", (0.62, 0.02, 0.08), (0.3, 2.37, 0.08 + k * 0.16), M("plank_b", 0.9)))
     col.append(box("c", (0.6, 0.45, 0.5), (0.3, 2.6, 0)))
-    candle(parts, 0.2, 2.6, 0.5, h=0.05, holder=False)
-    lamp("candle", (0.2, 2.6, 0.9))
+    rushlight(parts, 0.15, 2.6, 0.5)
     parts.append(blob("crust", (0.12, 0.08, 0.05), (0.42, 2.55, 0.5), M("crust_b", 0.8), subsurf=1))
     parts.append(cyl("tincup", 0.04, 0.08, (0.45, 2.72, 0.5), M("pewter", 0.4), verts=8))
     stool(parts, 0.3, 1.9, h=0.42)
@@ -3059,8 +3213,6 @@ def int_flat_garret():
     parts.append(wl("B", "holyf", 0.14, 0.01, 0.2, -0.4, 0.025, 1.6, MET("gold", 0.4)))
     # a small window in the gable, the moon in it
     fake_window(parts, "B", 0.8, 1.2, w=0.6, h=0.7, sill=True)
-    mx, my = _wpos("B", 0.8, 0.9)
-    lamp("moon", (mx, my, 1.5))
     post_at(-W / 2 + 0.6, 2.4, 0.0, 2.4)          # asleep on the pallet
     post_at(0.3, 1.8, 0.3, 2.6)                   # on the stool at the crate
     finish_set("int_flat_garret", parts, col)
@@ -3524,7 +3676,7 @@ def int_chapel_synagogue():
             col.append(box("c", (2.2, 0.45, 0.9), (s_ * 1.4, 9.4 + k * 0.9, 0)))
     # brass chandeliers down the hall
     for y in (3.0, BY, 9.6):
-        brass_chandelier(parts, 0, y, SP + W / 2, SP + 1.0, arms=8, r=0.6)
+        brass_chandelier(parts, 0, y, SP + W / 2, SP + 1.0, arms=8, r=0.6, kind="brasslamp")
     # high round-headed windows; the women's gallery grilles over the door
     for side in "LR":
         for y in (2.8, 6.2, 9.6):
@@ -3874,8 +4026,6 @@ def int_house_kingpin():
     sl = [box("lcover", (0.44, 0.32, 0.05), (0, 0, 0), M("crimson", 0.8), bevel=0.01, seg=1),
           box("lclasp", (0.05, 0.1, 0.055), (0.2, 0, 0), M("brass", 0.3))]
     keep(place(sl, 6.2, 6.6, 0.3, 0.45), "strong_ledger")
-    candle(parts, 4.6, 7.5, 0.45, h=0.12)
-    lamp("candle", (4.6, 7.2, 1.0))
     # ---- the office: the desk with the river maps, a chair, a globe; the bookcase ajar on the secret stair
     OX, OY = 4.0, 10.4
     parts.append(box("odesk", (1.8, 0.9, 0.76), (OX, OY, 0), M("wood_dark"), bevel=0.02, seg=1))
@@ -3987,6 +4137,9 @@ def int_house_kingpin():
     parts.append(cyl("bollard", 0.08, 0.35, (BXB, CY0 + 0.4, TZ1), M("wood_dark"), verts=8))
     col.append(box("c", (1.2, 2.7, 0.4), (BXB, BYB, ZW - 0.15)))
     exit_marker("boat", (BXB, BYB, ZW + 0.3), 0.0)
+    for j in range(6):
+        parts.append(box("ugate", (0.04, 0.04, 2.0), (SHX + CW / 2 - 0.05, CY0 + 0.15 + j * 0.18, TZ1), M("iron", 0.35)))
+    exit_marker("undercroft", (SHX + CW / 2 - 0.6, CY0 + 0.6, TZ1), -math.pi / 2)
     lamp("lantern", (SHX - 1.2, CY0 + 0.5, TZ1 + 1.4))
     parts.append(cyl("lpost", 0.03, 1.2, (SHX - 1.2, CY0 + 0.5, TZ1), M("iron", 0.6), verts=6))
     parts.append(box("lglass", (0.18, 0.18, 0.26), (SHX - 1.2, CY0 + 0.5, TZ1 + 1.2), EM("lamp_glass", 6.0)))
@@ -4176,6 +4329,8 @@ def int_bath_lazna():
     col.append(cyl("c", 0.38, 0.5, (-3.6, YP + 0.7, 0), None, verts=8))
     for k in range(5):
         herb_bunch(parts, -4.6, YP + 0.5 + k * 0.5, 2.3, s=1.3)
+    for x in (-3.8, -1.2):
+        chain_lamp(parts, x, D - 1.6, 2.72, 2.05)
     # the plunge room: the cold basin with steps, the masseur's slab with oils, lamps in niches, the back door
     PX, PY = 2.8, D - 1.4
     parts.append(box("basin", (2.4, 1.8, 0.85), (PX, PY, 0), M("stone", 0.7), bevel=0.04, seg=1, wonk=0.01))
@@ -4349,6 +4504,368 @@ def int_store_warehouse():
     finish_set("int_store_warehouse", parts, col)
 
 
+# ------------------------------------------------------------------ THE UNDERCROFT: culverts and cellars under the Rynek
+def rat(x, y, z, a, i):
+    """A rat, its own mesh (`rat_<i>`) so interiors.gd can make it scurry."""
+    fur = M("coal", 0.9)
+    p = [blob("rbody", (0.07, 0.16, 0.06), (0, 0, 0.0), fur, subsurf=1),
+         blob("rhead", (0.05, 0.07, 0.045), (0, -0.1, 0.01), fur, subsurf=1),
+         cbox("rtail", (0.01, 0.2, 0.01), (0, 0.17, 0.01), M("plaster_rose", 0.7), rot=(0.2, 0, 0.3))]
+    for sx in (-1, 1):
+        p.append(sphere("rear", 0.012, (sx * 0.02, -0.12, 0.05), M("plaster_rose", 0.7), seg=6, rings=3))
+    return keep(place(p, x, y, a, z), "rat_%d" % i)
+
+
+def culvert(parts, col, x0, x1, y0, y1, spring=0.9, gaps_l=(), gaps_r=(), channel=0.9, lid=2.6, flooded=None):
+    """Brick culvert along Y: walkways either side, a channel of black water down the middle, a barrel vault.
+    gaps_l/gaps_r = [(y, w)] openings in the side walls (side drains, alcoves, doors); flooded = (ya, yb) where the
+    walkways are gone and the water runs wall to wall."""
+    W = x1 - x0
+    xc = (x0 + x1) / 2
+    wall_h = lid + 0.3
+    for (xw, gaps) in ((x0 - 0.2, gaps_l), (x1 + 0.2, gaps_r)):
+        cur = y0
+        for (gy, gw) in sorted(gaps) + [(y1 + 1e3, 0.0)]:
+            a, b = cur, min(y1, gy - gw / 2)
+            if b - a > 0.01:
+                parts.append(box("cwall", (0.4, b - a, wall_h + 0.5), (xw, (a + b) / 2, -0.5), M("brick", 0.9), bevel=0, wonk=0.02, smooth=0))
+                col.append(box("c", (0.4, b - a, wall_h + 0.5), (xw, (a + b) / 2, -0.5)))
+            if gy < y1:
+                parts.append(box("clintel", (0.4, gw, wall_h - 1.9), (xw, gy, 1.9), M("brick", 0.9), bevel=0, smooth=0))
+                col.append(box("c", (0.4, gw, wall_h - 1.9), (xw, gy, 1.9)))
+            cur = gy + gw / 2
+    ch0, ch1 = xc - channel / 2, xc + channel / 2
+    fa, fb = flooded if flooded else (y1 + 1, y1 + 1)
+    for (a, b) in ((y0, min(y1, fa)), (max(y0, fb), y1)):
+        if b - a < 0.01:
+            continue
+        for (wa, wb) in ((x0, ch0), (ch1, x1)):
+            parts.append(box("walk", (wb - wa, b - a, 0.3), ((wa + wb) / 2, (a + b) / 2, -0.3), M("floor_stone_b", 0.9), bevel=0.02, seg=1, wonk=0.01))
+            SURF.setdefault("stone", []).append(box("c", (wb - wa, b - a, 0.4), ((wa + wb) / 2, (a + b) / 2, -0.4)))
+            parts.append(box("kerb", (0.12, b - a, 0.06), ((wb if wa == x0 else wa) + (-0.06 if wa == x0 else 0.06), (a + b) / 2, -0.04), M("stone", 0.8)))
+        parts.append(box("chbed", (channel, b - a, 0.2), (xc, (a + b) / 2, -0.6), M("coal", 0.9)))
+        parts.append(box("chwater", (channel, b - a, 0.01), (xc, (a + b) / 2, -0.16), M("water", 0.02)))
+        SURF.setdefault("water", []).append(box("c", (channel, b - a, 0.4), (xc, (a + b) / 2, -0.8)))
+    if flooded:
+        a, b = max(y0, fa), min(y1, fb)
+        parts.append(box("fbed", (W, b - a, 0.2), (xc, (a + b) / 2, -0.55), M("coal", 0.9)))
+        parts.append(box("fwater", (W, b - a, 0.01), (xc, (a + b) / 2, -0.1), M("water", 0.02)))
+        SURF.setdefault("water", []).append(box("c", (W, b - a, 0.4), (xc, (a + b) / 2, -0.75)))
+    vault(parts, W, y1 - y0, spring, "brick", y0=y0, x0=xc)
+    parts.append(box("clid", (W + 0.8, y1 - y0, 0.3), (xc, (y0 + y1) / 2, lid), M("brick")))
+    col.append(box("c", (W + 0.8, y1 - y0, 0.3), (xc, (y0 + y1) / 2, lid)))
+
+
+def side_drain(parts, col, side, y, name, L=2.4, w=1.2):
+    """A side drain off the culvert wall at y, ending under a street grate: a shaft with iron bars at the top,
+    the night and a street lantern's glow above, dust in the light. Exit_<name> sits under the grate."""
+    sgn = -1 if side == "L" else 1
+    xa = sgn * 1.7
+    xb = xa + sgn * L
+    x0, x1 = min(xa, xb), max(xa, xb)
+    parts.append(box("dfloor", (L, w, 0.3), ((x0 + x1) / 2, y, -0.3), M("floor_stone_b", 0.9), wonk=0.01))
+    SURF.setdefault("stone", []).append(box("c", (L, w, 0.4), ((x0 + x1) / 2, y, -0.4)))
+    parts.append(box("dtrickle", (L, 0.25, 0.01), ((x0 + x1) / 2, y, 0.005), M("water", 0.02)))
+    for sy in (-1, 1):
+        parts.append(box("dwall", (L, 0.3, 2.2), ((x0 + x1) / 2, y + sy * (w / 2 + 0.15), -0.3), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (L, 0.3, 2.2), ((x0 + x1) / 2, y + sy * (w / 2 + 0.15), -0.3)))
+    sx0 = xb - sgn * 0.9
+    sa, sb = min(sx0, xb), max(sx0, xb)
+    parts.append(box("droof", (L - 0.9, w + 0.6, 0.3), ((x0 + x1) / 2 - sgn * 0.45, y, 1.9), M("stone_dark", 0.9)))
+    col.append(box("c", (L, w + 0.6, 0.3), ((x0 + x1) / 2, y, 1.9)))
+    parts.append(box("dend", (0.3, w + 0.6, 6.0), (xb + sgn * 0.15, y, -0.3), M("brick", 0.9), bevel=0, smooth=0))
+    col.append(box("c", (0.3, w + 0.6, 6.0), (xb + sgn * 0.15, y, -0.3)))
+    SH = 5.2
+    for sy in (-1, 1):
+        parts.append(box("swall", (0.9, 0.3, SH - 1.9), ((sa + sb) / 2, y + sy * (w / 2 + 0.15), 1.9), M("brick", 0.9), bevel=0, smooth=0))
+    parts.append(box("swall", (0.3, w + 0.6, SH - 2.2), (sa - 0.15 if sgn > 0 else sb + 0.15, y, 2.2), M("brick", 0.9), bevel=0, smooth=0))
+    for k in range(6):
+        parts.append(box("grate", (0.9, 0.04, 0.05), ((sa + sb) / 2, y - w / 2 + 0.1 + k * (w - 0.2) / 5, SH), M("iron", 0.45)))
+    parts.append(box("gframe", (1.0, w + 0.2, 0.06), ((sa + sb) / 2, y, SH + 0.05), M("iron", 0.45)))
+    parts.append(box("gsky", (1.4, w + 0.6, 0.05), ((sa + sb) / 2, y, SH + 0.5), EM("night_sky", 0.8, 0.2)))
+    parts.append(sphere("gglow", 0.18, ((sa + sb) / 2 + 0.3, y + 0.2, SH + 0.45), EM("night_glow", 3.0), seg=8, rings=4))
+    for k in range(4):
+        parts.append(cbox("rung", (0.4, 0.03, 0.03), (xb - sgn * 0.08, y, 2.2 + k * 0.7), M("iron", 0.5)))
+    lamp("shaft", ((sa + sb) / 2, y, SH - 0.8))
+    fx("dust", ((sa + sb) / 2, y, 2.8))
+    exit_marker(name, ((sa + sb) / 2, y, 0.0), 0.0)
+
+
+def int_undercroft():
+    """Under the Rynek, 1795: no sewers yet, but the medieval brick culverts that carry the gutters to the moat and
+    the river, and the cellars two and three deep under the tenements, many broken through into each other.
+    A cellar under the wine merchant's hatch; the culvert with its black channel and walkways; side drains up to
+    the street grates; the junction chamber with its rusted grille; the smugglers' cellar (casks, cards, a hidden
+    stair up into a tenement cellar); the fence's den; the alcove where bodies go, with rats; the shaft of the old
+    well; the flooded stretch with a plank; the outfall to the river with a boat and a gate to the kingpin's
+    passage. A few guttering lanterns and the grates' light; the rest is dark."""
+    start()
+    CTX.update(W=3.0, D=63.0, t=0.4, H=2.4)
+    parts, col = [], []
+    # ---- the entrance cellar under the hatch: brick vault, a ladder up to the hatch, the door we came through
+    CTX.update(W=3.0, D=3.0, t=0.4)
+    v, c = wall("F", 2.8, "brick", [(0.0, 1.1, 2.1, False)])
+    parts.append(v)
+    col += c
+    col.append(box("c", (1.2, 0.12, 2.1), (0, -0.14, 0)))
+    door_leaf(parts, 1.1, 2.1, False, -0.1)
+    parts.append(box("threshold", (1.2, 0.5, 0.04), (0, 0, 0), M("stone_dark"), bevel=0.01, seg=1))
+    for sx in (-1, 1):
+        parts.append(box("ewall", (0.4, 3.0, 3.3), (sx * 1.7, 1.5, -0.5), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (0.4, 3.0, 3.3), (sx * 1.7, 1.5, -0.5)))
+    parts.append(box("efloor", (3.0, 3.0, 0.3), (0, 1.5, -0.3), M("floor_stone", 0.9), wonk=0.01))
+    SURF.setdefault("stone", []).append(box("c", (3.0, 3.2, 0.4), (0, 1.5, -0.4)))
+    vault(parts, 3.0, 3.0, 1.2, "brick", y0=0.0)
+    parts.append(box("elid", (3.8, 3.0, 0.3), (0, 1.5, 2.8), M("brick")))
+    col.append(box("c", (3.8, 3.0, 0.3), (0, 1.5, 2.8)))
+    for k in range(7):
+        parts.append(box("lrung", (0.5, 0.04, 0.04), (-1.2, 2.2, 0.3 + k * 0.35), M("wood", 0.8)))
+    for sx in (-1, 1):
+        parts.append(cbox("lrail", (0.05, 0.05, 2.7), (-1.2 + sx * 0.25, 2.25, 1.3), M("wood", 0.8), rot=(0.05, 0, 0)))
+    parts.append(box("hatchlid", (0.9, 0.9, 0.06), (-1.2, 2.3, 2.62), M("wood_dark", 0.8)))
+    for k in range(3):
+        parts.append(box("hslit", (0.9, 0.02, 0.07), (-1.2, 2.0 + k * 0.3, 2.61), EM("night_glow", 0.8)))
+    barrel(parts, 1.0, 0.8, 0.0, r=0.3, h=0.8)
+    col.append(cyl("c", 0.32, 0.8, (1.0, 0.8, 0), None, verts=8))
+    parts.append(box("wlbr", (0.05, 0.25, 0.05), (1.2, 0.35, 1.9), M("iron", 0.6)))
+    lantern(parts, 1.2, 0.5, 1.95, 1.6)
+    # ---- culvert A: the entrance cellar opens onto it
+    CTX.update(W=3.0, D=63.0, t=0.4)
+    culvert(parts, col, -1.5, 1.5, 3.0, 28.0, gaps_l=[(19.0, 1.2)], gaps_r=[(9.0, 1.2)])
+    side_drain(parts, col, "R", 9.0, "grate_a")
+    side_drain(parts, col, "L", 19.0, "grate_b")
+    for k in range(4):
+        fx("drip", (RNG.uniform(-1.0, 1.0), 5.0 + k * 6.0, 2.0))
+    for k in range(6):
+        parts.append(blob("mud", (RNG.uniform(0.3, 0.7), RNG.uniform(0.3, 0.9), 0.02), (RNG.choice((-1, 1)) * RNG.uniform(0.7, 1.2), RNG.uniform(4, 27), 0.0), M("earth", 0.9), subsurf=1, wonk=0.05))
+    # ---- the junction chamber: the culverts meet, the rusted grille across the way on, doors west and east
+    JY0, JY1 = 28.0, 34.0
+    JW = 6.0
+    for (xw, doors) in ((-JW / 2 - 0.2, [(31.0, 1.1)]), (JW / 2 + 0.2, [(31.0, 1.1)])):
+        cur = JY0
+        for (gy, gw) in doors + [(JY1 + 1e3, 0)]:
+            a, b = cur, min(JY1, gy - gw / 2)
+            parts.append(box("jwall", (0.4, b - a, 4.6), (xw, (a + b) / 2, -0.5), M("brick", 0.9), bevel=0, smooth=0))
+            col.append(box("c", (0.4, b - a, 4.6), (xw, (a + b) / 2, -0.5)))
+            if gy < JY1:
+                parts.append(box("jlint", (0.4, gw, 2.2), (xw, gy, 1.9), M("brick", 0.9), bevel=0, smooth=0))
+                col.append(box("c", (0.4, gw, 2.2), (xw, gy, 1.9)))
+                for s_ in (-1, 1):
+                    parts.append(box("jjamb", (0.5, 0.12, 1.95), (xw, gy + s_ * (gw / 2 + 0.06), 0), M("stone", 0.8)))
+            cur = gy + gw / 2
+    for (yy, sgn) in ((JY0, -1), (JY1, 1)):
+        for sx in (-1, 1):
+            parts.append(box("jend", (JW / 2 - 1.5, 0.4, 4.6), (sx * (1.5 + (JW / 2 - 1.5) / 2), yy + sgn * 0.2, -0.5), M("brick", 0.9), bevel=0, smooth=0))
+            col.append(box("c", (JW / 2 - 1.5, 0.4, 4.6), (sx * (1.5 + (JW / 2 - 1.5) / 2), yy + sgn * 0.2, -0.5)))
+        parts.append(box("jover", (3.0, 0.4, 2.0), (0, yy + sgn * 0.2, 2.1), M("brick", 0.9), bevel=0, smooth=0))
+    parts.append(box("jfloor", (JW, JY1 - JY0, 0.3), (0, (JY0 + JY1) / 2, -0.3), M("floor_stone_b", 0.9), wonk=0.01))
+    for (wa, wb) in ((-JW / 2, -0.45), (0.45, JW / 2)):
+        SURF["stone"].append(box("c", (wb - wa, JY1 - JY0, 0.4), ((wa + wb) / 2, (JY0 + JY1) / 2, -0.4)))
+    parts.append(box("jchan", (0.9, JY1 - JY0, 0.02), (0, (JY0 + JY1) / 2, -0.005), M("water", 0.02)))
+    SURF["water"].append(box("c", (0.9, JY1 - JY0, 0.4), (0, (JY0 + JY1) / 2, -0.4)))
+    parts.append(box("jchbed", (0.9, JY1 - JY0, 0.2), (0, (JY0 + JY1) / 2, -0.6), M("coal", 0.9)))
+    vault(parts, JW, JY1 - JY0, 1.4, "brick", y0=JY0, ribs=2, rib_mat="brick_dark")
+    parts.append(box("jlid", (JW + 0.8, JY1 - JY0, 0.3), (0, (JY0 + JY1) / 2, 4.5), M("brick")))
+    col.append(box("c", (JW + 0.8, JY1 - JY0, 0.3), (0, (JY0 + JY1) / 2, 4.5)))
+    iron = M("iron", 0.35)
+    for k in range(11):
+        x = -1.4 + k * 0.28
+        if 0.6 < x < 1.2:
+            parts.append(cbox("gbent", (0.035, 0.035, 1.9), (x + 0.12, JY1 + 0.15, 0.95), M("iron", 0.35), rot=(0, 0.35, 0)))
+            continue
+        parts.append(box("grille", (0.035, 0.035, 2.0), (x, JY1 + 0.1, -0.3), M("brick_dark", 0.4)))
+    for zz in (0.4, 1.5):
+        parts.append(box("grilleh", (3.0, 0.05, 0.05), (0, JY1 + 0.1, zz), M("brick_dark", 0.4)))
+    col.append(box("c", (2.0, 0.1, 2.0), (-0.5, JY1 + 0.1, 0)))
+    lantern(parts, -1.8, 30.0, 4.5, 2.0)
+    # ---- the smugglers' cellar, west: casks, cards, a lantern, the hidden stair up into a tenement cellar
+    SX0, SX1, SY0, SY1 = -9.2, -3.4, 29.0, 33.4
+    sw = SX1 - SX0
+    for (sz, loc) in (((sw, 0.4, 3.8), ((SX0 + SX1) / 2, SY0 - 0.2, -0.5)), ((sw, 0.4, 3.8), ((SX0 + SX1) / 2, SY1 + 0.2, -0.5))):
+        parts.append(box("swall", sz, loc, M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", sz, loc))
+    for (a, b) in ((SY0, 30.8), (31.8, SY1)):
+        parts.append(box("swallw", (0.4, b - a, 3.8), (SX0 - 0.2, (a + b) / 2, -0.5), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (0.4, b - a, 3.8), (SX0 - 0.2, (a + b) / 2, -0.5)))
+    parts.append(box("slint", (0.4, 1.0, 1.4), (SX0 - 0.2, 31.3, 1.9), M("brick", 0.9)))
+    col.append(box("c", (0.4, 1.0, 1.4), (SX0 - 0.2, 31.3, 1.9)))
+    floor_region(parts, "flags", SX0, SX1, SY0, SY1)
+    parts.append(box("sfloor", (sw, SY1 - SY0, 0.3), ((SX0 + SX1) / 2, (SY0 + SY1) / 2, -0.3), M("floor_stone_b")))
+    parts.append(box("sceil", (sw + 0.4, SY1 - SY0 + 0.4, 0.3), ((SX0 + SX1) / 2, (SY0 + SY1) / 2, 2.4), M("brick_vault", 0.9)))
+    for k in range(4):
+        parts.append(box("sbeam", (0.2, SY1 - SY0, 0.22), (SX0 + 0.8 + k * 1.4, (SY0 + SY1) / 2, 2.18), M("beam"), bevel=0.02, seg=1))
+    col.append(box("c", (sw + 0.4, SY1 - SY0 + 0.4, 0.3), ((SX0 + SX1) / 2, (SY0 + SY1) / 2, 2.4)))
+    for k in range(3):
+        cask(parts, col, -8.4 + k * 1.1, SY1 - 0.65, 0.0, r=0.42, L=1.0, rot=math.pi, cradle=True, mark=True)
+    sc = [cyl("cask", 0.4 * 0.86, 0.5, (0, -0.25, 0.58), M("wood", 0.8), verts=14, r2=0.4, rot=(-math.pi / 2, 0, 0), center=True),
+          cyl("cask", 0.4, 0.5, (0, 0.25, 0.58), M("wood", 0.8), verts=14, r2=0.4 * 0.86, rot=(-math.pi / 2, 0, 0), center=True),
+          cyl("head", 0.33, 0.02, (0, -0.51, 0.58), M("wood_dark"), verts=14, rot=(math.pi / 2, 0, 0), center=True),
+          cyl("tap", 0.025, 0.14, (0, -0.57, 0.38), M("brass", 0.35), verts=6, rot=(math.pi / 2, 0, 0), center=True)]
+    for yy in (-0.4, 0.0, 0.4):
+        sc.append(cyl("hoop", 0.41, 0.05, (0, yy, 0.58), M("iron", 0.6), verts=14, rot=(math.pi / 2, 0, 0), center=True))
+    for yy in (-0.3, 0.3):
+        sc.append(box("cradle", (0.75, 0.12, 0.2), (0, yy, 0), M("wood_dark"), bevel=0.02, seg=1))
+    keep(place(sc, -4.3, SY1 - 0.8, math.pi * 0.9), "smugglers_cask")
+    col.append(box("c", (0.9, 1.1, 1.0), (-4.3, SY1 - 0.8, 0)))
+    TX, TY = -6.2, 30.6
+    table(parts, col, TX, TY, L=1.2, w=0.8, h=0.76, along_y=False, trestle=False)
+    for k in range(9):
+        parts.append(box("card", (0.06, 0.09, 0.004), (TX + RNG.uniform(-0.4, 0.4), TY + RNG.uniform(-0.25, 0.25), 0.765), M("paper", 0.6), rot=(0, 0, RNG.uniform(0, 3))))
+    for k in range(5):
+        parts.append(cyl("coin", 0.012, 0.006, (TX + RNG.uniform(-0.3, 0.3), TY + RNG.uniform(-0.2, 0.2), 0.765), MET("gold", 0.3), verts=8))
+    tankard(parts, TX + 0.4, TY + 0.2, 0.76)
+    parts.append(taper_box("tlcap", (0.22, 0.22, 0.1), (TX - 0.35, TY + 0.1, 1.08), M("iron", 0.6), top=0.3))
+    parts.append(box("tlglass", (0.16, 0.16, 0.26), (TX - 0.35, TY + 0.1, 0.82), EM("lamp_glass", 5.0)))
+    parts.append(box("tlbase", (0.2, 0.2, 0.04), (TX - 0.35, TY + 0.1, 0.78), M("iron", 0.6)))
+    lamp("lantern", (TX - 0.35, TY + 0.1, 1.0))
+    for (sx, sy) in ((TX - 0.4, TY - 0.6), (TX + 0.5, TY - 0.6), (TX, TY + 0.65)):
+        stool(parts, sx, sy)
+    for (bx, bz) in ((-8.6, 0.0), (-8.6, 0.45), (-8.6, 0.9), (-7.9, 0.0)):
+        parts.append(box("bale", (0.6, 0.5, 0.45), (bx, SY0 + 0.4, bz), M("canvas", 0.9), bevel=0.04, seg=1))
+    col.append(box("c", (1.3, 0.6, 1.35), (-8.3, SY0 + 0.4, 0)))
+    # the hidden door: a plank door standing open in the west wall, a stair going up into the dark
+    parts.append(cbox("hdoor", (0.06, 0.95, 1.85), (SX0 + 0.35, 30.5, 0.93), M("wood_dark", 0.8), rot=(0, 0, -1.1)))
+    for i in range(6):
+        parts.append(box("hstep", (0.3, 0.9, 0.2 * (i + 1)), (SX0 - 0.55 - i * 0.3, 31.3, 0), M("stone", 0.8)))
+    parts.append(box("hvoid", (0.05, 0.9, 1.8), (SX0 - 2.5, 31.3, 1.2), M("coal", 0.9)))
+    exit_marker("cellar", (SX0 + 0.5, 31.3, 0.0), math.pi / 2)
+    # ---- the fence's den, east: stolen goods, a desk with scales and a candle, a pallet behind a curtain
+    FX0, FX1, FY0, FY1 = 3.4, 9.2, 29.0, 33.4
+    fw = FX1 - FX0
+    for (sz, loc) in (((fw, 0.4, 3.8), ((FX0 + FX1) / 2, FY0 - 0.2, -0.5)), ((fw, 0.4, 3.8), ((FX0 + FX1) / 2, FY1 + 0.2, -0.5)),
+                      ((0.4, FY1 - FY0 + 0.8, 3.8), (FX1 + 0.2, (FY0 + FY1) / 2, -0.5))):
+        parts.append(box("fwall", sz, loc, M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", sz, loc))
+    floor_region(parts, "planks", FX0, FX1, FY0, FY1)
+    parts.append(box("ffloor", (fw, FY1 - FY0, 0.3), ((FX0 + FX1) / 2, (FY0 + FY1) / 2, -0.3), M("floor_stone_b")))
+    parts.append(box("fceil", (fw + 0.4, FY1 - FY0 + 0.4, 0.3), ((FX0 + FX1) / 2, (FY0 + FY1) / 2, 2.4), M("brick_vault", 0.9)))
+    col.append(box("c", (fw + 0.4, FY1 - FY0 + 0.4, 0.3), ((FX0 + FX1) / 2, (FY0 + FY1) / 2, 2.4)))
+    parts.append(box("fcurtain", (0.1, 0.5, 1.9), (3.7, 31.9, 0.05), M("sukmana", 0.9), bevel=0.03, seg=1, wonk=0.03))
+    DX, DY = 6.0, 30.0
+    parts.append(box("fdesk", (1.4, 0.7, 0.78), (DX, DY, 0), M("wood_dark"), bevel=0.02, seg=1))
+    col.append(box("c", (1.4, 0.7, 0.8), (DX, DY, 0)))
+    scales(parts, DX - 0.3, DY, 0.78, s=0.7)
+    for k in range(4):
+        parts.append(torus("ring", 0.013, 0.004, (DX + 0.2 + k * 0.05, DY - 0.1, 0.785), MET("gold", 0.25), seg=8, mseg=4))
+    parts.append(box("fledger", (0.26, 0.2, 0.04), (DX + 0.35, DY + 0.1, 0.78), M("leather_b", 0.8)))
+    candle(parts, DX + 0.55, DY - 0.15, 0.78, h=0.1)
+    lamp("candle", (DX + 0.4, DY - 0.3, 1.3))
+    chair(parts, DX, DY + 0.65, math.pi)
+    for k in range(4):
+        parts.append(cyl("csticks", 0.05, 0.4 + k * 0.05, (FX1 - 0.4, FY0 + 0.4 + k * 0.25, 0.0), MET("gold", 0.3), verts=8, r2=0.03))
+    parts.append(box("fclock", (0.3, 0.2, 0.4), (FX1 - 0.5, FY0 + 1.6, 0.6), MET("gold", 0.3), bevel=0.03, seg=1))
+    parts.append(box("fcrate", (0.6, 0.6, 0.6), (FX1 - 0.5, FY0 + 1.6, 0.0), M("wood", 0.8), bevel=0.02, seg=1))
+    parts.append(cyl("carpet", 0.18, 2.0, (FX0 + 2.5, FY1 - 0.3, 0.18), M("crimson", 0.9), verts=10, rot=(0, math.pi / 2, 0), center=True))
+    for k in range(3):
+        parts.append(box("fframe", (0.9, 0.06, 0.7), (FX1 - 0.3, FY1 - 1.4 + k * 0.1, 0.0), MET("gold", 0.35), rot=(0.15, 0, math.pi / 2)))
+    parts.append(box("fchest", (0.9, 0.5, 0.5), (FX0 + 1.0, FY1 - 0.4, 0), M("wood_dark"), bevel=0.02, seg=1))
+    parts.append(blob("fpallet", (1.6, 0.7, 0.15), (FX0 + 1.4, FY1 - 1.1, 0), M("straw_bed", 0.95), subsurf=1))
+    col.append(box("c", (2.4, 0.5, 0.6), (FX0 + 1.5, FY1 - 0.35, 0)))
+    col.append(box("c", (0.8, 2.2, 1.0), (FX1 - 0.4, FY0 + 1.1, 0)))
+    # ---- culvert B beyond the grille: the body-dump alcove, the old well, a third grate, the flooded stretch
+    culvert(parts, col, -1.5, 1.5, JY1 + 0.2, 58.0, gaps_l=[(38.5, 1.6), (50.0, 1.2)], gaps_r=[(44.0, 1.2)], flooded=(52.0, 56.0))
+    AY0, AY1 = 37.7, 39.3
+    parts.append(box("afloor", (1.6, AY1 - AY0, 0.3), (-2.5, (AY0 + AY1) / 2, -0.4), M("earth", 0.9)))
+    SURF.setdefault("mud", []).append(box("c", (1.6, AY1 - AY0, 0.4), (-2.5, (AY0 + AY1) / 2, -0.5)))
+    for (sz, loc) in (((1.6, 0.3, 2.3), (-2.5, AY0 - 0.15, -0.4)), ((1.6, 0.3, 2.3), (-2.5, AY1 + 0.15, -0.4)), ((0.3, AY1 - AY0 + 0.6, 2.3), (-3.45, (AY0 + AY1) / 2, -0.4))):
+        parts.append(box("awall", sz, loc, M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", sz, loc))
+    parts.append(box("aroof", (1.9, AY1 - AY0 + 0.6, 0.3), (-2.5, (AY0 + AY1) / 2, 1.9), M("stone_dark", 0.9)))
+    col.append(box("c", (1.9, AY1 - AY0 + 0.6, 0.3), (-2.5, (AY0 + AY1) / 2, 1.9)))
+    parts.append(blob("bundle", (0.5, 1.4, 0.3), (-2.7, 38.5, -0.1), M("sack", 0.95), subsurf=1, wonk=0.04))
+    parts.append(blob("bundle2", (0.4, 0.9, 0.25), (-2.2, 38.2, -0.1), M("linen", 0.95), subsurf=1, wonk=0.04))
+    for k in range(6):
+        parts.append(cyl("bone", 0.015, RNG.uniform(0.15, 0.35), (-2.4 + RNG.uniform(-0.5, 0.5), 38.5 + RNG.uniform(-0.6, 0.6), -0.08), M("bone", 0.6), verts=5, rot=(math.pi / 2, 0, RNG.uniform(0, 3)), center=True))
+    parts.append(blob("askull", (0.13, 0.16, 0.12), (-3.0, 39.0, -0.1), M("bone", 0.6), subsurf=2))
+    for i, (rx, ry, ra) in enumerate(((-2.0, 38.0, 0.4), (-2.9, 37.9, 2.0), (-2.3, 39.0, 4.0), (-1.1, 40.2, 1.2), (0.9, 36.4, 3.3))):
+        rat(rx, ry, 0.02 if rx > -1.5 else -0.07, ra, i)
+    # the old well: a round shaft rising to the square, iron rungs, a bucket on its rope, black water in a ring
+    WX, WY = 2.9, 44.0
+    parts.append(box("wpass", (1.0, 1.2, 0.3), (2.0, WY, -0.3), M("floor_stone_b", 0.9)))
+    SURF["stone"].append(box("c", (1.0, 1.2, 0.4), (2.0, WY, -0.4)))
+    for sy in (-1, 1):
+        parts.append(box("wpwall", (1.0, 0.3, 2.2), (2.0, WY + sy * 0.75, -0.3), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (1.0, 0.3, 2.2), (2.0, WY + sy * 0.75, -0.3)))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=1.0, depth=13.0, location=(WX + 0.6, WY, 6.0), end_fill_type="NOTHING")
+    ws = bpy.context.object
+    ws.name = "wshaft"
+    ws.data.materials.append(M("brick", 0.9))
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bm = bmesh.new()
+    bm.from_mesh(ws.data)
+    bmesh.ops.reverse_faces(bm, faces=bm.faces)
+    bm.to_mesh(ws.data)
+    bm.free()
+    bpy.ops.object.shade_smooth()
+    parts.append(ws)
+    for k in range(8):
+        a = math.tau * k / 8
+        col.append(box("c", (0.5, 0.5, 13.0), (WX + 0.6 + 1.2 * math.cos(a), WY + 1.2 * math.sin(a), -0.5)))
+    parts.append(cyl("wfloor", 1.0, 0.3, (WX + 0.6, WY, -0.3), M("floor_stone_b", 0.9), verts=16))
+    SURF["stone"].append(cyl("c", 1.0, 0.4, (WX + 0.6, WY, -0.4), None, verts=8))
+    parts.append(torus("wring", 0.55, 0.12, (WX + 0.8, WY, 0.05), M("stone", 0.8), seg=16, mseg=6))
+    parts.append(cyl("wwater", 0.5, 0.01, (WX + 0.8, WY, 0.0), M("water", 0.02), verts=16))
+    for k in range(14):
+        parts.append(cbox("wrung", (0.04, 0.35, 0.03), (WX + 1.5, WY, 0.5 + k * 0.6), M("iron", 0.45)))
+    parts.append(cyl("wrope", 0.012, 11.0, (WX + 0.8, WY, 1.0), M("straw", 0.9), verts=4))
+    parts.append(cyl("wbucket", 0.14, 0.24, (WX + 0.8, WY, 0.76), M("wood", 0.8), verts=10, r2=0.16))
+    parts.append(cyl("wtop", 1.1, 0.05, (WX + 0.6, WY, 12.4), EM("night_sky", 0.7, 0.2), verts=16))
+    lamp("shaft", (WX + 0.6, WY, 4.0))
+    fx("dust", (WX + 0.6, WY, 3.0))
+    exit_marker("well", (WX + 0.3, WY, 0.0), -math.pi / 2)
+    side_drain(parts, col, "L", 50.0, "grate_c")
+    parts.append(box("wlbr2", (0.25, 0.05, 0.05), (1.45, 45.6, 1.75), M("iron", 0.6)))
+    lantern(parts, 1.3, 45.6, 1.8, 1.45)
+    parts.append(box("plank", (0.32, 5.0, 0.05), (1.0, 54.0, 0.0), M("plank_b", 0.9), rot=(0.0, 0.03, 0.0), wonk=0.02))
+    SURF.setdefault("planks", []).append(box("c", (0.4, 5.0, 0.35), (1.0, 54.0, -0.3)))
+    for k in range(3):
+        fx("drip", (RNG.uniform(-1.0, 1.0), 40.0 + k * 6.0, 2.0))
+    # ---- the outfall: a ledge, the river through the arch, the boat, a gate into the kingpin's passage
+    OY0, OY1 = 58.0, 63.0
+    OW = 5.0
+    for sx in (-1, 1):
+        parts.append(box("owall", (0.4, OY1 - OY0, 4.2), (sx * (OW / 2 + 0.2), (OY0 + OY1) / 2, -0.8), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (0.4, OY1 - OY0, 4.2), (sx * (OW / 2 + 0.2), (OY0 + OY1) / 2, -0.8)))
+        parts.append(box("ofront", (OW / 2 - 1.5, 0.4, 4.2), (sx * (1.5 + (OW / 2 - 1.5) / 2), OY0 - 0.2, -0.8), M("brick", 0.9), bevel=0, smooth=0))
+        col.append(box("c", (OW / 2 - 1.5, 0.4, 4.2), (sx * (1.5 + (OW / 2 - 1.5) / 2), OY0 - 0.2, -0.8)))
+    parts.append(box("oledge", (OW, 1.3, 0.3), (0, OY0 + 0.65, -0.3), M("floor_stone", 0.9)))
+    SURF["stone"].append(box("c", (OW, 1.3, 0.4), (0, OY0 + 0.65, -0.4)))
+    parts.append(box("owater", (OW, OY1 - OY0 - 1.3, 0.02), (0, (OY0 + 1.3 + OY1) / 2, -0.3), M("water", 0.02)))
+    col.append(box("c", (OW, OY1 - OY0 - 1.3, 0.3), (0, (OY0 + 1.3 + OY1) / 2, -1.2)))
+    vault(parts, OW, OY1 - OY0, 1.2, "brick", y0=OY0, ribs=2, rib_mat="brick_dark")
+    parts.append(box("olid", (OW + 0.8, OY1 - OY0, 0.3), (0, (OY0 + OY1) / 2, 3.8), M("brick")))
+    col.append(box("c", (OW + 0.8, OY1 - OY0, 0.3), (0, (OY0 + OY1) / 2, 3.8)))
+    parts.append(box("oend", (OW + 0.8, 0.4, 4.6), (0, OY1 + 0.2, -0.8), M("brick", 0.9)))
+    col.append(box("c", (OW + 0.8, 0.4, 4.6), (0, OY1 + 0.2, -0.8)))
+    parts.append(arch("onight", 2.8, 2.6, 0.05, (0, OY1 - 0.03, -0.3), EM("night_sky", 0.6, 0.2), bevel=0))
+    parts.append(sphere("olamp", 0.05, (0.8, OY1 - 0.07, 0.3), EM("night_glow", 9.0), seg=6, rings=3))
+    for k in range(10):
+        parts.append(box("ogrille", (0.03, 0.05, 1.0), (-1.3 + k * 0.29, OY1 - 0.1, 1.5), M("brick_dark", 0.4)))
+    BY_ = OY0 + 3.0
+    hull = taper_box("hull", (1.0, 2.4, 0.42), (0.0, BY_, -0.45), M("wood_dark"), top=1.25, bevel=0.05, wonk=0.02)
+    edit_verts(hull, lambda co: setattr(co, "x", co.x * (1.0 - 0.7 * max(0.0, abs(co.y - BY_) - 0.7) / 0.5)))
+    parts.append(hull)
+    parts.append(box("hinside", (0.7, 1.7, 0.03), (0.0, BY_, -0.08), M("plank_b", 0.9)))
+    parts.append(cbox("oar", (0.04, 1.9, 0.04), (0.45, BY_, 0.1), M("wood", 0.8), rot=(0, 0, 0.1)))
+    parts.append(cyl("bollard", 0.08, 0.35, (-0.8, OY0 + 0.5, 0.0), M("wood_dark"), verts=8))
+    parts.append(cbox("mooring", (0.02, 1.6, 0.02), (-0.4, OY0 + 1.3, 0.1), M("straw", 0.9), rot=(0.1, 0, 0.3)))
+    col.append(box("c", (1.1, 2.5, 0.4), (0.0, BY_, -0.45)))
+    exit_marker("boat", (0.0, BY_, 0.0), 0.0)
+    # the gate in the east wall: the kingpin's passage comes in here
+    for k in range(6):
+        parts.append(box("kgate", (0.04, 0.04, 2.0), (OW / 2 - 0.05, OY0 + 0.2 + k * 0.18, 0.0), M("iron", 0.35)))
+    parts.append(box("kgateh", (0.05, 1.0, 0.05), (OW / 2 - 0.05, OY0 + 0.65, 1.2), M("iron", 0.35)))
+    exit_marker("kingpin", (OW / 2 - 0.6, OY0 + 0.65, 0.0), -math.pi / 2)
+    lantern(parts, -1.5, OY0 + 0.6, 3.6, 1.9)
+    CTX["surface"] = "stone"
+    post_at(DX, DY + 0.65, DX, DY)                     # the fence at his desk
+    post_at(TX - 0.4, TY - 0.6, TX, TY)                # smuggler at cards
+    post_at(TX + 0.5, TY - 0.6, TX, TY)                # the other smuggler
+    post_at(-2.2, 31.0, -3.4, 31.0)                    # the guard dog at the smugglers' door
+    post_at(0.9, 26.0, 0.9, 3.0)                       # a lookout on the walkway, watching back up the culvert
+    finish_set("int_undercroft", parts, col)
+
+
 SETS = {"int_stair": int_stair, "int_tavern": int_tavern, "int_shop": int_shop, "int_workshop": int_workshop,
         "int_church": int_church, "int_salon": int_salon,
         "int_shop_baker": int_shop_baker, "int_shop_shoemaker": int_shop_shoemaker, "int_shop_goldsmith": int_shop_goldsmith,
@@ -4359,11 +4876,12 @@ SETS = {"int_stair": int_stair, "int_tavern": int_tavern, "int_shop": int_shop, 
         "int_cellar_wine": int_cellar_wine, "int_salon_brothel": int_salon_brothel,
         "int_flat_garret": int_flat_garret, "int_flat_burgher": int_flat_burgher, "int_flat_scholar": int_flat_scholar,
         "int_guard_post": int_guard_post, "int_chapel_synagogue": int_chapel_synagogue, "int_chapel_uniate": int_chapel_uniate,
-        "int_house_kingpin": int_house_kingpin, "int_bath_lazna": int_bath_lazna, "int_store_warehouse": int_store_warehouse}
+        "int_undercroft": int_undercroft, "int_house_kingpin": int_house_kingpin, "int_bath_lazna": int_bath_lazna, "int_store_warehouse": int_store_warehouse}
 
 if __name__ == "__main__":
     want = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else list(SETS)
     for n in want:
+        ROOM[0] = n
         SETS[n]()
     print("[interiors] %d rooms: %s" % (len(MANIFEST), ", ".join("%s %d" % (k, v[0]) for k, v in MANIFEST.items())))
     print("[interiors] done")

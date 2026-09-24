@@ -185,7 +185,7 @@
         24.3
       ],
       "facing": 0.0,
-      "serve": 2.05,
+      "serve": 2.35,
       "closing": "",
       "prop": "vendor_chestnut_cart",
       "prop_at": [
@@ -241,7 +241,22 @@
         "I'm here all night, and I see who comes and goes. The south-east corner past St Adalbert's is busier after midnight than at noon."
       ],
       "personality": "drunk-philosopher",
-      "temper": 0.2
+      "temper": 0.2,
+      "cart": {
+        "axle": [
+          0.06,
+          0.3
+        ],
+        "grip": [
+          0.69,
+          0.85
+        ],
+        "wheel_r": 0.29,
+        "arrive": [
+          -2.5,
+          26.3
+        ]
+      }
     },
     {
       "id": "szlifierz",
@@ -260,7 +275,7 @@
         -26.25
       ],
       "facing": 3.14159,
-      "serve": 1.9,
+      "serve": 2.5,
       "closing": "22:00",
       "prop": "vendor_grinder",
       "prop_at": [
@@ -298,7 +313,38 @@
         "The watch changes at the Town Hall at ten. For the time it takes to pass the word, nobody is looking at the north row."
       ],
       "personality": "cynical-merchant",
-      "temper": 0.5
+      "temper": 0.5,
+      "cart": {
+        "axle": [
+          -0.5,
+          0.25
+        ],
+        "grip": [
+          0.5,
+          0.855
+        ],
+        "wheel_r": 0.24,
+        "arrive": [
+          22.0,
+          -26.4
+        ]
+      },
+      "pitches": [
+        [
+          14.2,
+          -26.25,
+          3.14159
+        ],
+        [
+          8.2,
+          -26.3,
+          3.14159
+        ]
+      ],
+      "stop_secs": [
+        70,
+        110
+      ]
     },
     {
       "id": "ryby",
@@ -317,7 +363,7 @@
         25.0
       ],
       "facing": 0.0,
-      "serve": 2.0,
+      "serve": 2.4,
       "closing": "",
       "prop": "vendor_fish_barrow",
       "prop_at": [
@@ -366,7 +412,22 @@
         "There's a cellar door at the south-east corner, past St Adalbert's. Things go in there that never come out by daylight."
       ],
       "personality": "stern",
-      "temper": 0.7
+      "temper": 0.7,
+      "cart": {
+        "axle": [
+          0.05,
+          0.3
+        ],
+        "grip": [
+          0.77,
+          0.85
+        ],
+        "wheel_r": 0.29,
+        "arrive": [
+          3.5,
+          26.3
+        ]
+      }
     },
     {
       "id": "grzaniec",

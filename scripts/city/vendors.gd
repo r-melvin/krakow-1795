@@ -1220,9 +1220,12 @@ func _push_shots(dir: String) -> void:
 		var v := vendor(id)
 		if v == null or v.state != St.PUSH:
 			continue
-		for view in [["side", Vector3(3.0, 1.2, -0.7), Vector3(0, 0.75, -0.75)], ["34", Vector3(2.3, 1.7, -3.2), Vector3(0, 0.8, -0.7)]]:
+		for view in [["side", Vector3(3.0, 1.2, -0.7), Vector3(0, 0.75, -0.75)], ["34", Vector3(2.3, 1.7, -3.2), Vector3(0, 0.8, -0.7)], ["rear34", Vector3(2.0, 1.7, 2.0), Vector3(0, 0.8, -0.6)]]:
 			var bt: Transform3D = v.body.global_transform
-			cam.look_at_from_position(bt * (view[1] as Vector3), bt * (view[2] as Vector3))
+			var eye := view[1] as Vector3
+			if (bt * Vector3(-eye.x, eye.y, eye.z)).length() < (bt * eye).length():
+				eye.x = -eye.x                # shoot from the square's side, not from inside a facade
+			cam.look_at_from_position(bt * eye, bt * (view[2] as Vector3))
 			for f in 3:
 				await get_tree().process_frame
 			get_viewport().get_texture().get_image().save_png("%s/vendor_push_%s_%s.png" % [dir, id, view[0]])

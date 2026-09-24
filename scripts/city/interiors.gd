@@ -20,6 +20,7 @@ extends Node3D
 ## `-- --interior-shot=DIR[:room,room]` (needs a window) saves a view of every room (or the listed ones).
 
 const FlickerLight := preload("res://scripts/city/flicker.gd")
+const Distraction := preload("res://scripts/stealth/distraction.gd")
 const DATA := "res://data/interiors.json"
 const LAYOUT := "res://data/city_layout.json"
 const DEPTH := -200.0
@@ -28,17 +29,33 @@ const COLS := 6
 const TENEMENT_DOOR_X := {"tenement_b": -2.0, "tenement_e": -2.0}   ## door offset where it is not centred
 const TENEMENT_FRONT := 4.0          ## half the tenement depth: facade plane in module space
 const SPAWN_IN := 1.8                ## metres inside the door where the player lands
-const LAMPS := {                     ## kind -> [colour, energy, range, shadow, flicker amount]
-	"lantern": [Color(1.0, 0.68, 0.36), 2.6, 7.5, true, 0.08],
-	"fire": [Color(1.0, 0.52, 0.22), 3.2, 8.0, true, 0.22],
-	"candle": [Color(1.0, 0.72, 0.42), 0.9, 4.0, false, 0.12],
-	"chandelier": [Color(1.0, 0.74, 0.46), 4.0, 12.0, true, 0.06],
-	"window": [Color(1.0, 0.70, 0.45), 1.0, 3.5, false, 0.0],
-	"stove": [Color(1.0, 0.50, 0.22), 1.4, 4.5, false, 0.18],
-	"oven": [Color(1.0, 0.46, 0.18), 3.0, 7.0, true, 0.2],
-	"forge": [Color(1.0, 0.42, 0.14), 3.8, 9.0, true, 0.25],
-	"moon": [Color(0.55, 0.66, 1.0), 0.6, 4.5, false, 0.0],
+## Light plan per fixture kind (lamp_<kind>_<nn> empties from build_interiors.py):
+## [colour, energy, range, flicker amount, flicker speed, douseable, shadow priority (0 = never casts)]
+## Every flame is in "flame_lights" (stealth light sampling); douseable ones get a Distraction.LampPost so E puts
+## them out, meta `douseable` and group "douseable". Each room gives its one best fixture (highest priority) to
+## the shadow budget ("shadow_capable"); all other interior lights never cast shadows.
+const LAMPS := {
+	"candle": [Color(1.0, 0.70, 0.40), 1.8, 5.0, 0.28, 5.0, true, 1],
+	"sconce": [Color(1.0, 0.70, 0.40), 2.0, 5.5, 0.22, 5.0, true, 2],
+	"rush": [Color(1.0, 0.66, 0.36), 1.0, 3.5, 0.35, 6.0, true, 1],
+	"lantern": [Color(1.0, 0.68, 0.36), 2.4, 6.5, 0.10, 6.0, true, 5],
+	"horn": [Color(1.0, 0.62, 0.30), 2.1, 6.5, 0.10, 6.0, true, 5],
+	"wheel": [Color(1.0, 0.70, 0.40), 3.4, 9.0, 0.16, 5.0, true, 7],
+	"chandelier": [Color(1.0, 0.74, 0.46), 3.4, 10.0, 0.10, 5.0, true, 7],
+	"oil": [Color(1.0, 0.76, 0.50), 2.8, 8.0, 0.05, 3.0, true, 6],
+	"brasslamp": [Color(1.0, 0.72, 0.44), 2.4, 8.0, 0.12, 5.0, true, 6],
+	"chainlamp": [Color(1.0, 0.64, 0.34), 1.5, 4.5, 0.15, 6.0, true, 3],
+	"sanctuary": [Color(1.0, 0.36, 0.26), 0.7, 3.5, 0.15, 4.0, false, 0],
+	"fire": [Color(1.0, 0.52, 0.22), 3.0, 7.0, 0.22, 7.0, false, 4],
+	"stove": [Color(1.0, 0.48, 0.20), 1.2, 3.5, 0.18, 7.0, false, 0],
+	"oven": [Color(1.0, 0.46, 0.18), 3.0, 6.5, 0.20, 7.0, false, 6],
+	"forge": [Color(1.0, 0.42, 0.14), 3.8, 9.0, 0.25, 8.0, false, 8],
+	"window": [Color(0.55, 0.64, 0.95), 0.25, 3.0, 0.0, 0.0, false, 0],
+	"moon": [Color(0.55, 0.66, 1.0), 0.25, 3.0, 0.0, 0.0, false, 0],
+	"shaft": [Color(0.70, 0.74, 0.90), 0.7, 5.0, 0.0, 0.0, false, 0],
 }
+const NOT_FLAME := ["window", "moon", "shaft"]
+const ENERGY_SCALE := 0.6            ## in-engine exposure runs hot indoors: pools at tables, dark corners
 
 var portals: Array = []
 
@@ -76,8 +93,10 @@ func _ready() -> void:
 		_load(str(k), true)
 	for d in doors:
 		_door(d["id"], d["pos"], d["rot"], d["room"], d["auto"], d["size"])
-		if d.has("frame") and not _doors.is_empty() and String(_doors.back().name) == d["id"]:
-			_doors.back().set_meta("frame", d["frame"])
+		if not _doors.is_empty() and String(_doors.back().name) == d["id"]:
+			for mk in ["frame", "spawn", "spawn_yaw", "prompt"]:
+				if d.has(mk):
+					_doors.back().set_meta(mk, d[mk])
 	_build_ui()
 	var shot := _arg("--interior-shot=")
 	if shot != "":
@@ -162,6 +181,8 @@ func _unload(key: String) -> void:
 func _rigs(inst: Node3D, info: Dictionary) -> void:
 	var floor_kind: String = str(info.get("floor", "planks"))
 	var props: Dictionary = info.get("props", {})
+	var best: OmniLight3D = null
+	var best_pri := 0
 	for n in inst.find_children("*", "", true, false):
 		var nm := String(n.name)
 		if n is StaticBody3D:
@@ -169,7 +190,13 @@ func _rigs(inst: Node3D, info: Dictionary) -> void:
 			if info.get("wet", false):
 				n.set_meta("wet", true)
 		elif nm.begins_with("lamp_") and n is Node3D:
-			_lamp(n, nm.get_slice("_", 1))
+			var l := _lamp(n, nm.get_slice("_", 1))
+			var pri: int = LAMPS.get(nm.get_slice("_", 1), LAMPS["candle"])[6]
+			if pri > best_pri:
+				best_pri = pri
+				best = l
+		elif nm.begins_with("rat_") and n is Node3D:
+			_scurry(n as Node3D)
 		elif nm.begins_with("fx_") and n is Node3D:
 			n.add_child(_particles(nm.get_slice("_", 1)))
 		elif nm.begins_with("Exit_") and n is Node3D:
@@ -183,22 +210,49 @@ func _rigs(inst: Node3D, info: Dictionary) -> void:
 				for mk in m:
 					n.set_meta(mk, m[mk])
 				n.add_to_group("interior_props")
+	if best:
+		best.add_to_group("shadow_capable")      # the one shadow this room may cast (scripts/city/shadow_budget.gd)
+		best.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
 
 
-func _lamp(n: Node3D, kind: String) -> void:
+func _lamp(n: Node3D, kind: String) -> OmniLight3D:
 	var cfg: Array = LAMPS.get(kind, LAMPS["candle"])
 	var l := OmniLight3D.new()
-	if float(cfg[4]) > 0.0:
+	l.name = "light"
+	if float(cfg[3]) > 0.0:
 		l.set_script(FlickerLight)
-		l.set("amount", cfg[4])
-		l.set("speed", 4.0 if kind == "candle" else 7.0)
+		l.set("amount", cfg[3])
+		l.set("speed", cfg[4])
 	l.light_color = cfg[0]
-	l.light_energy = cfg[1]
+	l.light_energy = cfg[1] * ENERGY_SCALE
 	l.omni_range = cfg[2]
-	l.omni_attenuation = 1.2
-	l.shadow_enabled = cfg[3]
-	l.light_specular = 0.4
+	l.omni_attenuation = 1.6
+	l.shadow_enabled = false
+	l.light_specular = 0.3
 	n.add_child(l)
+	if not kind in NOT_FLAME:
+		l.add_to_group("flame_lights")
+	if cfg[5]:
+		l.set_meta("douseable", true)
+		l.add_to_group("douseable")
+		n.set_meta("douseable", true)
+		var lp := Distraction.LampPost.new()
+		lp.name = "douse"
+		lp.light = l
+		n.add_child(lp)
+		lp.position = Vector3(0, -1.0, 0) if n.global_position.y - (n.get_parent() as Node3D).global_position.y > 2.2 else Vector3.ZERO
+	return l
+
+
+## Rats: a nervous little run back and forth, a pause, again.
+func _scurry(r: Node3D) -> void:
+	var home := r.position
+	var tw := r.create_tween().set_loops()
+	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * randf_range(0.3, 0.7)
+	tw.tween_interval(randf_range(0.5, 2.5))
+	tw.tween_property(r, "position", home + dir, 0.35).set_trans(Tween.TRANS_SINE)
+	tw.tween_interval(randf_range(0.8, 3.0))
+	tw.tween_property(r, "position", home, 0.5).set_trans(Tween.TRANS_SINE)
 
 
 ## Tobacco haze over the card table, steam off the bathhouse stones, drips in the kingpin's tunnel.
@@ -229,6 +283,15 @@ func _particles(kind: String) -> CPUParticles3D:
 			p.initial_velocity_min = 0.0
 			p.initial_velocity_max = 0.0
 			return p
+		"dust":
+			q.size = Vector2(0.05, 0.05)
+			p.amount = 40
+			p.lifetime = 6.0
+			p.emission_box_extents = Vector3(0.4, 1.4, 0.4)
+			p.gravity = Vector3(0, -0.03, 0)
+			p.initial_velocity_min = 0.0
+			p.initial_velocity_max = 0.05
+			p.color = Color(0.9, 0.9, 1.0, 0.35)
 		"steam":
 			q.size = Vector2(0.9, 0.9)
 			p.amount = 28
@@ -296,9 +359,15 @@ func _door_specs() -> Array:
 				"size": Vector3(1.8, 2.4, 1.2)})
 	for e in data.get("landmarks", []):
 		var at: Array = e["pos"]
-		out.append({"id": str(e["id"]), "pos": Vector3(float(at[0]), 0, float(at[1])), "rot": float(e.get("rot", 0.0)),
+		var d := {"id": str(e["id"]), "pos": Vector3(float(at[0]), 0, float(at[1])), "rot": float(e.get("rot", 0.0)),
 				"room": room_key(str(e["set"]), str(e.get("variant", ""))), "auto": bool(e.get("auto", true)),
-				"size": _v3(e.get("size", [1.8, 2.4, 1.2]))})
+				"size": _v3(e.get("size", [1.8, 2.4, 1.2]))}
+		if e.has("spawn"):
+			d["spawn"] = _v3(e["spawn"])
+			d["spawn_yaw"] = float(e.get("spawn_yaw", 0.0))
+		if e.has("prompt"):
+			d["prompt"] = str(e["prompt"])
+		out.append(d)
 	var placed := {}
 	for pl in _read_json(LAYOUT).get("place", []):
 		var a := str(pl.get("a", ""))
@@ -376,7 +445,7 @@ func _physics_process(delta: float) -> void:
 	if exiting:
 		_prompt.text = "E  leave" if str(a.get_meta("dest")) == "" else "E  %s" % _exit_title(a)
 	else:
-		_prompt.text = "E  enter the %s" % title(str(a.get_meta("room")))
+		_prompt.text = "E  %s" % a.get_meta("prompt") if a.has_meta("prompt") else "E  enter the %s" % title(str(a.get_meta("room")))
 	_prompt.visible = not _busy
 	if _busy or _cooldown > 0.0:
 		return
@@ -419,11 +488,25 @@ func _go_in(player: CharacterBody3D, door: Area3D) -> void:
 	_return = {"pos": Vector3(door.global_position.x, 0.1, door.global_position.z) + out * 0.9, "yaw": atan2(-out.x, -out.z)}
 	var key := str(door.get_meta("room"))
 	_show(key)
-	_teleport(player, (_rooms[key]["origin"] as Vector3) + Vector3(0, 0.05, -SPAWN_IN), 0.0)
+	var sp: Array = _spawn(door)
+	_teleport(player, sp[0], sp[1])
+
+
+## Where a door puts the player: [position, yaw]. Doors may carry a room-space `spawn` (street grates, the well).
+func _spawn(door: Area3D) -> Array:
+	var o: Vector3 = _rooms[str(door.get_meta("room"))]["origin"]
+	if door.has_meta("spawn"):
+		return [o + (door.get_meta("spawn") as Vector3) + Vector3(0, 0.05, 0), float(door.get_meta("spawn_yaw", 0.0))]
+	return [o + Vector3(0, 0.05, -SPAWN_IN), 0.0]
 
 
 func _go_out(player: CharacterBody3D, a: Area3D = null) -> void:
 	var dest := _destination(a)
+	if dest.has("room"):
+		# through a hidden door into another room: the way home stays the door we first came in by
+		_show(str(dest["room"]))
+		_teleport(player, dest["pos"], dest["yaw"])
+		return
 	if dest.is_empty():
 		if _return.is_empty():
 			_return = {"pos": get_parent().call("player_spawn") if get_parent().has_method("player_spawn") else Vector3(0, 0.2, 0), "yaw": 0.0}
@@ -438,6 +521,9 @@ func _destination(a: Area3D) -> Dictionary:
 	if a == null or str(a.get_meta("dest", "")) == "":
 		return {}
 	var ex: Dictionary = data.get("rooms", {}).get(str(a.get_meta("room")), {}).get("exits", {}).get(str(a.get_meta("dest")), {})
+	var into: Variant = ex.get("room", null)
+	if into is String and _rooms.has(into) and ex.get("at", null) is Array:
+		return {"room": into, "pos": (_rooms[into]["origin"] as Vector3) + _v3(ex["at"]) + Vector3(0, 0.05, 0), "yaw": float(ex.get("yaw", 0.0))}
 	var pos: Variant = ex.get("pos", null)
 	if pos is Array and (pos as Array).size() >= 2:
 		return {"pos": Vector3(float(pos[0]), 0.2, float(pos[1])), "yaw": float(ex.get("yaw", 0.0))}
@@ -565,7 +651,7 @@ func _go_in_now(player: CharacterBody3D, door: Area3D) -> void:
 	_return = {"pos": Vector3(door.global_position.x, 0.1, door.global_position.z) + out * 0.9, "yaw": atan2(-out.x, -out.z)}
 	var key := str(door.get_meta("room"))
 	_show(key)
-	player.global_position = (_rooms[key]["origin"] as Vector3) + Vector3(0, 0.05, -SPAWN_IN)
+	player.global_position = _spawn(door)[0]
 	player.velocity = Vector3.ZERO
 
 
@@ -629,6 +715,18 @@ func _smoke() -> void:
 	var gp: Node3D = _rooms.get("int_guard_post", {}).get("node", null)
 	var ledger := gp != null and gp.find_child("ledger", true, false) != null
 	print("[smoke] interiors posts=%d props=%d ledger=%s" % [posts, tagged, ledger])
+	var flames := 0
+	var douse := 0
+	var shadow := 0
+	for k in _rooms:
+		var rn: Node3D = _rooms[k]["node"]
+		if rn == null:
+			continue
+		for l in rn.find_children("light", "OmniLight3D", true, false):
+			flames += 1 if l.is_in_group("flame_lights") else 0
+			douse += 1 if l.is_in_group("douseable") else 0
+			shadow += 1 if l.is_in_group("shadow_capable") else 0
+	print("[smoke] interiors lights flame=%d douseable=%d shadow_capable=%d (one per room)" % [flames, douse, shadow])
 	# Go through the first door without the fade, stand inside for a moment, come back out.
 	var player := get_tree().get_first_node_in_group("player") as CharacterBody3D
 	var result := "skipped"
@@ -660,6 +758,7 @@ func _view(key: String) -> Array:
 func _shot_room(key: String, path: String, v: Array = []) -> void:
 	var prev := get_viewport().get_camera_3d()
 	var was := _inside
+	var fresh: bool = _rooms[key]["node"] == null
 	_show(key)
 	var o: Vector3 = _rooms[key]["origin"]
 	if v.is_empty():
@@ -669,7 +768,8 @@ func _shot_room(key: String, path: String, v: Array = []) -> void:
 	add_child(cam)
 	cam.look_at_from_position(o + v[0], o + v[1])
 	cam.make_current()
-	for i in 12:
+	for i in (60 if fresh else 14):          # a freshly instanced room compiles its shaders first
+		cam.make_current()           # other shot scripts may grab the view meanwhile
 		await get_tree().process_frame
 	get_viewport().get_texture().get_image().save_png(path)
 	print("[smoke] interior screenshot ", path)

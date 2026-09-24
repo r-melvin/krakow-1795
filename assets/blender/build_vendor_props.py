@@ -20,6 +20,7 @@ import random
 import sys
 
 import bmesh
+import bpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("build_assets", os.path.join(HERE, "build_assets.py"))
@@ -53,14 +54,46 @@ def tube(name, pts, r, mat, n=6):
     return _bm_obj(name, bm, mat)
 
 
+WHEELS = []          # (hub, [parts]) of the cart being built: exported as separate child nodes that vendors.gd spins
+
+
 def wheel(parts, x, y, zc, R, mat, spokes=4, tyre=True):
-    """Cart wheel turning about X: rim torus, spokes, hub."""
-    parts.append(torus("rim", R, 0.028, (x, y, zc), mat, rot=(0, PI / 2, 0), seg=12, mseg=4))
+    """Cart wheel turning about X: rim torus, spokes, hub. Collected in WHEELS (origin at the hub) instead of `parts`."""
+    w = [torus("rim", R, 0.028, (x, y, zc), mat, rot=(0, PI / 2, 0), seg=12, mseg=4)]
     if tyre:
-        parts.append(torus("tyre", R + 0.012, 0.014, (x, y, zc), M("iron", 0.5), rot=(0, PI / 2, 0), seg=12, mseg=3))
+        w.append(torus("tyre", R + 0.012, 0.014, (x, y, zc), M("iron", 0.5), rot=(0, PI / 2, 0), seg=12, mseg=3))
     for k in range(spokes):
-        parts.append(cbox("spoke", (0.025, 0.025, 2 * R), (x, y, zc), mat, rot=(PI * k / spokes, 0, 0)))
-    parts.append(cyl("hub", 0.05, 0.1, (x, y, zc), mat, verts=8, rot=(0, PI / 2, 0), center=True))
+        w.append(cbox("spoke", (0.025, 0.025, 2 * R), (x, y, zc), mat, rot=(PI * k / spokes, 0, 0)))
+    w.append(cyl("hub", 0.05, 0.1, (x, y, zc), mat, verts=8, rot=(0, PI / 2, 0), center=True))
+    WHEELS.append(((x, y, zc), w))
+
+
+def grip(parts, x, y0, y1, z0, z1, mat):
+    """Turned hand-grip on the end of a shaft (a thicker round the hands close on)."""
+    parts.append(tube("grip", [(x, y0, z0), (x, y1, z1)], 0.03, mat, n=8))
+
+
+def export_cart(name, parts):
+    """Body joined into one mesh; each wheel a child object named wheel_<n> with its origin on its hub."""
+    body = join(parts, name)
+    wheels = []
+    for k, (hub, wp) in enumerate(WHEELS):
+        wo = join(wp, "wheel_%d" % k)
+        bpy.ops.object.select_all(action="DESELECT")
+        wo.select_set(True)
+        bpy.context.view_layer.objects.active = wo
+        bpy.context.scene.cursor.location = hub
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+        ba.auto_uv(wo)
+        wheels.append(wo)
+    WHEELS.clear()
+    for wo in wheels:
+        wo.parent = body
+        wo.matrix_parent_inverse = body.matrix_world.inverted()
+    total = ba.tris(body) + sum(ba.tris(w) for w in wheels)
+    export(name, body)
+    ba.TRI_LOG[name] = total
+    print("[vendor_props] %s tris incl. wheels %d" % (name, total))
 
 
 def fish(name, x, y, z, yaw, L=0.26):
@@ -132,7 +165,8 @@ def vendor_chestnut_cart():
     for sx in (-1, 1):
         wheel(parts, sx * 0.6, 0.06, 0.3, 0.28, wd)
         parts.append(cbox("leg", (0.04, 0.04, 0.5), (sx * 0.45, -0.22, 0.25), wd))
-        parts.append(tube("handle", [(sx * 0.3, 0.26, 0.52), (sx * 0.3, 0.64, 0.64)], 0.022, wd))
+        parts.append(tube("handle", [(sx * 0.3, 0.26, 0.52), (sx * 0.3, 0.64, 0.835)], 0.022, wd))
+        grip(parts, sx * 0.3, 0.62, 0.76, 0.825, 0.875, w)
     parts.append(cyl("axle", 0.025, 1.2, (0, 0.06, 0.3), wd, verts=6, rot=(0, PI / 2, 0), center=True))
     parts.append(box("stove", (0.56, 0.44, 0.36), (0, 0, 0.55), iron))
     parts.append(box("door", (0.2, 0.012, 0.09), (0, -0.226, 0.62), glow("coal_glow", (1.0, 0.32, 0.06), 5.0)))
@@ -151,7 +185,7 @@ def vendor_chestnut_cart():
     for k in range(4):
         parts.append(cyl("cone", 0.012, 0.15, (-0.45 + (k % 2) * 0.06, -0.1 + (k // 2) * 0.1, 0.55 + 0.02 * k), paper, verts=7, r2=0.055))
     parts.append(ba._lumpy("sack", 0.13, (0.43, 0.02, 0.63), M("sacking"), zscale=0.9, amp=0.12, seed=1403, seg=8, rings=5, zmin=0.55))
-    export("vendor_chestnut_cart", join(parts, "vendor_chestnut_cart"))
+    export_cart("vendor_chestnut_cart", parts)
 
 
 def vendor_grinder():
@@ -163,7 +197,8 @@ def vendor_grinder():
     wheel(parts, 0.0, -0.5, 0.25, 0.23, wd)
     parts.append(cyl("axle", 0.02, 0.36, (0, -0.5, 0.25), iron, verts=6, rot=(0, PI / 2, 0), center=True))
     for sx in (-1, 1):
-        parts.append(tube("rail", [(sx * 0.16, -0.5, 0.26), (sx * 0.2, 0.0, 0.52), (sx * 0.24, 0.45, 0.70)], 0.024, wd))
+        parts.append(tube("rail", [(sx * 0.16, -0.5, 0.26), (sx * 0.2, 0.0, 0.56), (sx * 0.24, 0.45, 0.84)], 0.024, wd))
+        grip(parts, sx * 0.24, 0.43, 0.56, 0.83, 0.88, w)
         parts.append(cbox("leg", (0.035, 0.035, 0.46), (sx * 0.19, 0.12, 0.23), wd))
         parts.append(cbox("post", (0.05, 0.05, 0.42), (sx * 0.09, -0.05, 0.72), w))
     parts.append(box("deck", (0.42, 0.34, 0.04), (0, -0.05, 0.5), w))
@@ -180,7 +215,7 @@ def vendor_grinder():
     parts.append(cyl("drip_can", 0.06, 0.12, (0.0, -0.05, 1.1), M("tin"), verts=8, r2=0.045))
     parts.append(box("toolbox", (0.3, 0.16, 0.1), (-0.02, 0.3, 0.64), wd, rot=(0.25, 0, 0)))
     parts.append(cbox("blade", (0.02, 0.2, 0.004), (0.0, 0.3, 0.72), M("iron", 0.3), rot=(0.25, 0, 0)))
-    export("vendor_grinder", join(parts, "vendor_grinder"))
+    export_cart("vendor_grinder", parts)
 
 
 def vendor_fish_barrow():
@@ -194,7 +229,8 @@ def vendor_fish_barrow():
         wheel(parts, sx * 0.53, 0.05, 0.3, 0.28, wd)
         parts.append(box("side", (0.03, 0.72, 0.12), (sx * 0.47, 0, 0.57), w))
         parts.append(cbox("leg", (0.04, 0.04, 0.52), (sx * 0.4, -0.3, 0.26), wd))
-        parts.append(tube("handle", [(sx * 0.32, 0.34, 0.55), (sx * 0.32, 0.72, 0.66)], 0.022, wd))
+        parts.append(tube("handle", [(sx * 0.32, 0.34, 0.55), (sx * 0.32, 0.72, 0.835)], 0.022, wd))
+        grip(parts, sx * 0.32, 0.70, 0.84, 0.825, 0.875, w)
     parts.append(box("front", (0.95, 0.03, 0.12), (0, -0.35, 0.57), w))
     parts.append(cyl("axle", 0.025, 1.1, (0, 0.05, 0.3), wd, verts=6, rot=(0, PI / 2, 0), center=True))
     parts.append(cyl("basket", 0.26, 0.16, (-0.12, -0.02, 0.57), M("wicker"), verts=12, r2=0.3))
@@ -214,7 +250,7 @@ def vendor_fish_barrow():
     parts.append(box("lamp_base", (0.14, 0.14, 0.03), (-0.42, -0.5, 1.44), M("iron", 0.5)))
     parts.append(box("lamp_horn", (0.11, 0.11, 0.17), (-0.42, -0.5, 1.47), glow("lamp_glow", (1.0, 0.72, 0.38), 4.0)))
     parts.append(cyl("lamp_cap", 0.1, 0.07, (-0.42, -0.5, 1.64), M("iron", 0.5), verts=4, r2=0.02))
-    export("vendor_fish_barrow", join(parts, "vendor_fish_barrow"))
+    export_cart("vendor_fish_barrow", parts)
 
 
 def vendor_beer_can():

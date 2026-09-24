@@ -1350,12 +1350,12 @@
   "undercroft": {
     "room": "int_undercroft",
     "entrances": {
-      "well_grate": "door_grate_well",
-      "cloth_hall_grate": "door_grate_cloth_hall",
-      "laundry_grate": "door_grate_laundry",
-      "outfall": "door_undercroft_outfall"
+      "well_grate": "door_well",
+      "cloth_hall_grate": "grate_b",
+      "laundry_grate": "grate_c",
+      "outfall": "grate_a"
     },
-    "note": "Symbolic ids until the interiors agent reports the real door names; the runner falls back to a message when a door is missing."
+    "note": "Real door ids from data/interiors.json landmarks (door_well = the padlocked east well, grate_a/b/c = drain grates on the Rynek, door_undercroft_hatch = the wine merchant's cellar). The runner falls back to a message when a door is missing."
   },
   "side_quests": {
     "fences_ledger": {
