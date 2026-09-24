@@ -34,5 +34,10 @@ if has characters; then
   CH=$(blender -b --python-expr "import sys; sys.path.insert(0,'assets/blender'); import build_characters as b; print('NAMES', ' '.join(b.ALL))" 2>/dev/null | sed -n 's/^NAMES //p')
   echo "$CH" | tr ' ' '\n' | xargs -P "$JOBS" -I{} sh -c 'blender -b --python assets/blender/build_characters.py -- {} >/dev/null 2>&1 || echo "FAILED character: {}"'
 fi
-if has import;      then echo "== godot import";                        godot --headless --import --path . >/dev/null 2>&1 || true; fi
+if has import; then
+  echo "== godot import (twice: the second pass applies tools/import_settings.py texture settings)"
+  tools/with_cpu.sh godot --headless --import --path . >/dev/null 2>&1 || true
+  python3 tools/import_settings.py
+  tools/with_cpu.sh godot --headless --import --path . >/dev/null 2>&1 || true
+fi
 echo "== done in $(( $(date +%s) - t0 )) s"
