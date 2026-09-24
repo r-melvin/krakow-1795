@@ -3,6 +3,11 @@
 Run:  blender -b --python assets/blender/render_animals.py -- [--out /path/prefix] [--clip walk] [--frame 9]
 Writes <prefix>_lineup.png (animals) and <prefix>_vehicles.png (carriage and cart with their horses in the slots).
 Default prefix: docs/screenshots/animals.
+
+Sheets: blender -b --python assets/blender/render_animals.py -- --sheet horse --clip walk --speed 1.5 --out /tmp/h
+writes <out>_<model>_<clip>.png: 8 frames across the clip, side view (top row) and front view (bottom row), over a
+0.25 m checker. With --speed the model is carried forward at that ground speed (m/s at playback speed 1), so a
+planted hoof or paw must stay on the same checker square while it is on the ground.
 """
 import bpy
 import math
@@ -172,7 +177,102 @@ def vehicles():
     stage(x, 3.2, x / 2, PREFIX + "_vehicles.png")
 
 
+def sheet(model, clip, speed, n=8):
+    import numpy as np
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    sc = bpy.context.scene
+    sc.render.fps = 30
+    r, objs = load(model, (0, 0, 0))
+    rig = next((o for o in objs if o.type == "ARMATURE"), None)
+    act = None
+    if rig and rig.animation_data:
+        for t in rig.animation_data.nla_tracks:
+            t.mute = True
+        act = next((a for a in bpy.data.actions if a.name.split("|")[-1] == clip), None)
+        if act:
+            rig.animation_data.action = act
+            if getattr(act, "slots", None):
+                rig.animation_data.action_slot = act.slots[0]
+    f0, f1 = (act.frame_range if act else (1, 2))
+    mn, mx = bbox(objs)
+    size = max(mx.x - mn.x, mx.y - mn.y, mx.z - mn.z)
+    # checker ground
+    g = bpy.data.meshes.new("ground")
+    g.from_pydata([(-60, -60, 0), (60, -60, 0), (60, 60, 0), (-60, 60, 0)], [], [(0, 1, 2, 3)])
+    go = bpy.data.objects.new("ground", g)
+    sc.collection.objects.link(go)
+    gm = bpy.data.materials.new("checker")
+    if gm.node_tree is None:
+        gm.use_nodes = True
+    nt = gm.node_tree
+    ck = nt.nodes.new("ShaderNodeTexChecker")
+    ck.inputs["Scale"].default_value = 480.0          # 120 m / 480 = 0.25 m squares
+    ck.inputs["Color1"].default_value = (0.42, 0.42, 0.44, 1)
+    ck.inputs["Color2"].default_value = (0.30, 0.30, 0.32, 1)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    nt.links.new(tc.outputs["UV"], ck.inputs["Vector"])
+    g.uv_layers.new()
+    nt.links.new(ck.outputs["Color"], nt.nodes["Principled BSDF"].inputs["Base Color"])
+    g.materials.append(gm)
+    L = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
+    L.data.energy = 3.5
+    L.rotation_euler = (0.7, 0.15, 0.9)
+    sc.collection.objects.link(L)
+    w = bpy.data.worlds.new("w")
+    sc.world = w
+    if w.node_tree is None:
+        w.use_nodes = True
+    w.node_tree.nodes["Background"].inputs[0].default_value = (0.6, 0.62, 0.68, 1)
+    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
+    sc.collection.objects.link(cam)
+    sc.camera = cam
+    cam.data.type = "ORTHO"
+    cam.data.ortho_scale = size * 1.02
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 12
+    sc.cycles.use_denoising = True
+    sc.render.resolution_x = sc.render.resolution_y = 480
+    tmp = PREFIX + "_tmp.png"
+    rows = []
+    for view in ("side", "front"):
+        tiles = []
+        for i in range(n):
+            f = f0 + (f1 - f0) * i / n
+            sc.frame_set(int(f), subframe=f - int(f))
+            dy = -speed * (f - f0) / 30.0          # model front is -Y: travel that way
+            r.location = (0, dy, 0)
+            c = Vector((0, dy + (mn.y + mx.y) / 2, size * 0.42))
+            tilt = math.radians(12)          # a little from above, so the checker shows under the feet
+            if view == "side":
+                cam.location = c + Vector((size * 3 * math.cos(tilt), 0, size * 3 * math.sin(tilt)))
+                cam.rotation_euler = (math.radians(90) - tilt, 0, math.radians(90))
+            else:
+                cam.location = c + Vector((0, -size * 3 * math.cos(tilt), size * 3 * math.sin(tilt)))
+                cam.rotation_euler = (math.radians(90) - tilt, 0, 0)
+            sc.render.filepath = tmp
+            bpy.ops.render.render(write_still=True)
+            im = bpy.data.images.load(tmp)
+            a = np.array(im.pixels[:], np.float32).reshape(im.size[1], im.size[0], 4)
+            bpy.data.images.remove(im)
+            tiles.append(a)
+        rows.append(np.concatenate(tiles, axis=1))
+    full = np.concatenate(rows[::-1], axis=0)      # pixels are bottom-up: side row on top
+    out = bpy.data.images.new("sheet", full.shape[1], full.shape[0])
+    out.pixels.foreach_set(full.ravel())
+    path = "%s_%s_%s.png" % (PREFIX, model, clip)
+    out.filepath_raw = path
+    out.file_format = "PNG"
+    out.save()
+    os.remove(tmp)
+    print("[render] sheet", path, "frames %d-%d" % (f0, f1))
+
+
 if __name__ == "__main__":
     os.makedirs(os.path.dirname(PREFIX), exist_ok=True)
-    lineup()
-    vehicles()
+    if "--sheet" in sys.argv:
+        for m in arg("--sheet", "horse").split(","):
+            sheet(m, CLIP, float(arg("--speed", "0")))
+    else:
+        lineup()
+        vehicles()

@@ -174,6 +174,8 @@ def normalise(rig, meshes, target, measure="withers", shoulder_bone=None, head_b
     """measure: 'withers' (height of the back above the front legs), 'height' (overall), 'length' (along Y).
     yaw (radians) overrides the automatic facing (head bone ahead of the body centre -> -Y)."""
     objs = ([rig] if rig else []) + meshes
+    if rig:            # measure the rest pose, not whatever frame the imported clips leave the rig in
+        rig.data.pose_position = "REST"
     for o in objs:     # glTF importers wrap things in empties with the unit/axis conversion; bake it in
         if o.parent and o.parent not in objs:
             mw = o.matrix_world.copy()
@@ -236,6 +238,8 @@ def normalise(rig, meshes, target, measure="withers", shoulder_bone=None, head_b
                         k.handle_right.y *= rs
     select(objs, rig or meshes[0])
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if rig:
+        rig.data.pose_position = "POSE"
     log("  normalised: measured %.3f -> %.2f m (scale %.4f, yaw %.0f deg), bbox %s" % (cur, target, s, math.degrees(yaw), tuple(round(v, 2) for v in (world_bbox(meshes)[1] - world_bbox(meshes)[0]))))
     return s
 
@@ -529,64 +533,153 @@ def load_horse():
     return rig, body
 
 
+# Gait timing shared with scripts/npc/animal.gd (GAIT_REF): ground speed at playback speed 1 = stride / cycle.
+HORSE_WALK = {"frames": 32, "stride": 1.60, "duty": 0.62}     # 1.067 s cycle -> 1.50 m/s
+HORSE_TROT = {"frames": 21, "stride": 2.10, "duty": 0.42}     # 0.70 s cycle  -> 3.00 m/s
+HORSE_IDLE_FRAMES = 240                                       # 8 s: weight shifts between the hind legs
+
+
+def _yz(v):
+    return Vector((v.y, v.z))
+
+
+def _ang(d):
+    return math.atan2(d.y, d.x)
+
+
+class LegIK:
+    """Sagittal-plane (YZ) IK for a three-bone leg: bone 0 from the body pivot, bone 1 to the knee/hock, bone 2
+    the cannon + pastern + hoof. The cannon's world angle is chosen per frame; bones 0 and 1 are solved so the hoof
+    lands exactly on its target, on the branch nearest the rest pose (so knees and hocks bend the anatomical way).
+    Returns armature-space X rotations per bone, relative to their parents (key_pose composes them)."""
+
+    def __init__(self, rig, names, end=None):
+        """names: 3 bones (pivot bone, knee/hock bone, cannon) or 2 bones (upper, lower: plain two-bone IK).
+        end: rest contact point (armature space) if the hoof / paw lies beyond the last bone's tail."""
+        self.names = names
+        b = [rig.data.bones[n] for n in names]
+        self.p0 = _yz(b[0].head_local)
+        pts = [_yz(x.head_local) for x in b] + [_yz(end) if end is not None else _yz(b[-1].tail_local)]
+        self.n = len(names)
+        self.l = [(pts[i + 1] - pts[i]).length for i in range(self.n)]
+        self.rest = [_ang(pts[i + 1] - pts[i]) for i in range(self.n)]
+        self.hoof = pts[-1]
+
+    def solve(self, hoof, cannon_delta=0.0, body=None):
+        """body: (y, z) translation of the root the leg hangs from (the pivot moves with it)."""
+        self.p = self.p0 + (body if body is not None else Vector((0.0, 0.0)))
+        if self.n == 2:
+            return self._two(hoof, self.l[0], self.l[1], [0, 1], None)
+        phi2 = self.rest[2] + cannon_delta
+        top = hoof - Vector((math.cos(phi2), math.sin(phi2))) * self.l[2]
+        return self._two(top, self.l[0], self.l[1], [0, 1], phi2)
+
+    def _two(self, top, l0, l1, idx, phi2):
+        d = top - self.p
+        dist = max(abs(l0 - l1) + 1e-4, min(l0 + l1 - 1e-4, d.length))
+        base = _ang(d)
+        ca = (l0 ** 2 + dist ** 2 - l1 ** 2) / (2 * l0 * dist)
+        a = math.acos(max(-1.0, min(1.0, ca)))
+        best = None
+        for s in (1, -1):
+            phi0 = base + s * a
+            p1 = self.p + Vector((math.cos(phi0), math.sin(phi0))) * l0
+            phi1 = _ang(top - p1)
+            dev = abs(_wrap(phi0 - self.rest[0])) + abs(_wrap(phi1 - self.rest[1]))
+            if best is None or dev < best[0]:
+                best = (dev, phi0, phi1)
+        _, phi0, phi1 = best
+        w = [_wrap(phi0 - self.rest[0]), _wrap(phi1 - self.rest[1])]
+        out = {self.names[0]: rx(w[0]), self.names[1]: rx(w[1] - w[0])}
+        if phi2 is not None:
+            out[self.names[2]] = rx(_wrap(phi2 - self.rest[2]) - w[1])
+        return out
+
+
+def _wrap(a):
+    return (a + math.pi) % math.tau - math.pi
+
+
+def _hoof_path(ik, p, stride, duty, lift, flex):
+    """Hoof target and cannon flex for gait phase p (0 = touchdown). Stance: planted, sliding back at exactly
+    the ground speed (stride * duty over duty of the cycle). Swing: eased forward, lifted, cannon folded."""
+    half = stride * duty / 2
+    if p < duty:
+        t = p / duty
+        y = -half + 2 * half * t                    # body moves -Y, so the planted hoof moves +Y relative to it
+        return ik.hoof + Vector((y, 0.0)), 0.0
+    t = (p - duty) / (1 - duty)
+    e = 0.5 - 0.5 * math.cos(math.pi * t)
+    y = half - 2 * half * e
+    s = math.sin(math.pi * t)
+    return ik.hoof + Vector((y, lift * s ** 0.8)), flex * math.sin(math.pi * min(1.0, t * 1.15))
+
+
 def horse_anims(rig):
+    """Idle (weight shifting between the hind legs, head, ears, tail) and a four-beat walk and two-beat trot,
+    all hoof-planted by LegIK. Rig: Bone (hip->withers, parent of the front legs and neck), Bone.001 neck,
+    Bone.002 head, Bone.001_L/R ears, Bone.003/.004 tail, front legs Bone_L/R(.001 forearm, .002 cannon),
+    hind legs Bone_L/R.003 (.004 gaskin, .005 cannon)."""
     clear_anim(rig)
+    legs = {"LF": LegIK(rig, FRONT[0]), "RF": LegIK(rig, FRONT[1]), "LH": LegIK(rig, HIND[0]), "RH": LegIK(rig, HIND[1])}
 
-    def leg_angles(p, front):
-        """p: gait phase 0..1 for this leg. Stance 0..0.62 sweeps the leg back, swing lifts and brings it forward.
-        Returns (upper, middle, lower) rotations about X (positive swings the part backwards)."""
-        A = 0.30 if front else 0.26
-        duty = 0.62
-        if p < duty:
-            t = p / duty
-            up = -A + 2 * A * t
-            lift = 0.0
-        else:
-            t = (p - duty) / (1 - duty)
-            up = A - 2 * A * (0.5 - 0.5 * math.cos(math.pi * t))
-            lift = math.sin(math.pi * t)
-        if front:   # knee (carpus) folds back during swing, fetlock follows
-            return up, -0.10 * lift, 1.25 * lift
-        return up, -0.55 * lift, 0.95 * lift        # stifle forward, hock flexes back
+    def gait(spec, phase, nod):
+        n = spec["frames"]
 
-    frames = list(range(1, 34))       # 32-frame loop (frame 33 == frame 1)
-    phase = {"LH": 0.0, "LF": 0.25, "RH": 0.5, "RF": 0.75}
+        def pose(f):
+            t = (f - 1) / n
+            r = {}
+            for k, ik in legs.items():
+                front = k.endswith("F")
+                p = (t - phase[k]) % 1.0
+                hoof, flex = _hoof_path(ik, p, spec["stride"], spec["duty"], 0.13 if front else 0.10, 1.05 if front else 0.45)
+                r.update(ik.solve(hoof, flex))
+            r["Bone.001"] = rx(nod * math.sin(t * math.tau * 2 + 0.6))       # head nods with each forelimb
+            r["Bone.002"] = rx(-nod * 0.6 * math.sin(t * math.tau * 2 + 0.6))
+            r["Bone.003"] = rz(0.06 * math.sin(t * math.tau))
+            r["Bone.004"] = rz(0.10 * math.sin(t * math.tau - 0.8))
+            return r, None
+        return pose
 
-    def walk(f):
-        t = (f - 1) / 32
-        r = {}
-        for (chain, key) in ((FRONT[0], "LF"), (FRONT[1], "RF"), (HIND[0], "LH"), (HIND[1], "RH")):
-            a, b, c = leg_angles((t - phase[key]) % 1.0, key.endswith("F"))
-            # rotations compose down the chain: each bone's armature-space delta is relative to its parent
-            r[chain[0]] = rx(a)
-            r[chain[1]] = rx(b)
-            r[chain[2]] = rx(c)
-        r["Bone.001"] = rx(0.05 * math.sin(t * math.tau * 2))           # head nods twice a stride
-        r["Bone.002"] = rx(-0.04 * math.sin(t * math.tau * 2))
-        r["Bone.003"] = rz(0.08 * math.sin(t * math.tau))
-        r["Bone.004"] = rz(0.12 * math.sin(t * math.tau - 0.8))
-        return r, None
-
-    walk_act = keyed_action(rig, "walk", frames, walk)
+    # four-beat lateral walk: LH, LF, RH, RF, each 25 % apart
+    walk = keyed_action(rig, "walk", list(range(1, HORSE_WALK["frames"] + 2)),
+                        gait(HORSE_WALK, {"LH": 0.0, "LF": 0.25, "RH": 0.5, "RF": 0.75}, 0.06))
+    # two-beat diagonal trot: LF + RH, then RF + LH
+    trot = keyed_action(rig, "trot", list(range(1, HORSE_TROT["frames"] + 2)),
+                        gait(HORSE_TROT, {"LF": 0.0, "RH": 0.0, "RF": 0.5, "LH": 0.5}, 0.03))
 
     def idle(f):
-        t = (f - 1) / 120
-        s = math.sin(t * math.tau)
-        r = {"Bone.001": rx(0.035 * s), "Bone.002": rx(0.03 * math.sin(t * math.tau * 2)),
-             "Bone.003": rz(0.18 * max(0.0, math.sin(t * math.tau * 3)) ** 3),
-             "Bone.004": rz(0.30 * max(0.0, math.sin(t * math.tau * 3 - 0.5)) ** 3),
-             "Bone.001_L": rx(0.25 * max(0.0, math.sin(t * math.tau * 2 + 1.0)) ** 8),
-             "Bone.001_R": rx(0.25 * max(0.0, math.sin(t * math.tau * 1 + 2.5)) ** 8),
-             "Bone_R.004": rx(-0.06), "Bone_R.005": rx(0.12)}      # rests a hind leg
+        t = (f - 1) / HORSE_IDLE_FRAMES          # 0..1 over 8 s
+        # which hind leg rests: right for the first half, left for the second, 0.6 s blends
+        def smooth(x):
+            x = max(0.0, min(1.0, x))
+            return x * x * (3 - 2 * x)
+        wr = smooth((0.45 - abs(t - 0.25)) / 0.075) if t < 0.5 else 0.0
+        wl = smooth((0.45 - abs(t - 0.75)) / 0.075) if t >= 0.5 else 0.0
+        r = {}
+        for k, ik in legs.items():
+            w = wr if k == "RH" else (wl if k == "LH" else 0.0)
+            # resting hind: hoof drawn a little forward and up onto its toe, fetlock and hock eased
+            hoof = ik.hoof + Vector((-0.06 * w, 0.035 * w))
+            r.update(ik.solve(hoof, 0.32 * w))
+        # the planted legs take the weight: hips tip towards the resting side (a small roll of the tail root)
+        graze = smooth((math.sin(t * math.tau * 2 - 1.2) - 0.55) / 0.3)       # head lowers twice per cycle
+        r["Bone.001"] = rx(0.10 * graze + 0.015 * math.sin(t * math.tau * 8))
+        r["Bone.002"] = rx(0.12 * graze)
+        r["Bone.001_L"] = rx(0.35 * max(0.0, math.sin(t * math.tau * 5 + 1.0)) ** 12)
+        r["Bone.001_R"] = rx(0.35 * max(0.0, math.sin(t * math.tau * 3 + 2.5)) ** 12)
+        sw = max(0.0, math.sin(t * math.tau * 4)) ** 6
+        r["Bone.003"] = rz(0.20 * sw * math.sin(t * math.tau * 16))
+        r["Bone.004"] = rz(0.32 * sw * math.sin(t * math.tau * 16 - 0.7))
         return r, None
 
-    idle_act = keyed_action(rig, "idle", list(range(1, 122, 4)), idle)
-    for a in (idle_act, walk_act):
-        for fc in action_fcurves(a):
-            for k in fc.keyframe_points:
-                k.interpolation = "BEZIER" if a is idle_act else "LINEAR"
+    idle_act = keyed_action(rig, "idle", list(range(1, HORSE_IDLE_FRAMES + 2, 2)), idle)
+    for fc in action_fcurves(idle_act):
+        for k in fc.keyframe_points:
+            k.interpolation = "BEZIER"
     push_nla(rig, idle_act, "idle")
-    push_nla(rig, walk_act, "walk")
+    push_nla(rig, walk, "walk")
+    push_nla(rig, trot, "trot")
 
 
 def horse():
@@ -1065,6 +1158,113 @@ def _tail_radius(rig, mesh, k):
     reshape(mesh, lambda i, p: p.lerp(radial(p, a, b, k), w[i]) if w[i] > 0 else p)
 
 
+
+# Quaternius walks slide: their planted paws move at 0.1-0.9 m/s within one stance (measured), front and hind
+# disagreeing. The dogs and the cat get a four-beat IK walk like the horse instead (same LegIK and hoof path).
+DOG_WALKS = {"dog_hound": {"frames": 24, "stride": 0.90, "duty": 0.60, "lift": 0.07},     # 0.8 s -> 1.125 m/s
+             "dog_spitz": {"frames": 22, "stride": 0.72, "duty": 0.60, "lift": 0.06},     # 0.73 s -> 0.98 m/s
+             "cat": {"frames": 22, "stride": 0.40, "duty": 0.62, "lift": 0.035}}          # 0.73 s -> 0.55 m/s
+
+
+def _paw_point(rig, mesh, bone):
+    vg = mesh.vertex_groups.get(bone)
+    best = None
+    for v in mesh.data.vertices:
+        if vg and any(g.group == vg.index and g.weight > 0.5 for g in v.groups):
+            co = mesh.matrix_world @ v.co
+            if best is None or co.z < best.z:
+                best = co
+    return rig.matrix_world.inverted() @ best
+
+
+def merge_paw_weights(mesh):
+    """Quaternius paws hang off root-level IK bones (IKFrontLeg / FF, IKBackLeg / FFB) that their own clips
+    animate. Our clips drive the leg bones, so fold those weights into the lower-leg groups: the paw then rides
+    rigidly on the leg like the horse's hoof."""
+    for side in ("L", "R"):
+        for src, dst in ((("IKFrontLeg.", "FF."), "FrontLowerLeg."), (("IKBackLeg.", "FFB."), "BackLowerLeg.")):
+            d = mesh.vertex_groups.get(dst + side)
+            srcs = [mesh.vertex_groups.get(s_ + side) for s_ in src]
+            srcs = [g for g in srcs if g]
+            if not d or not srcs:
+                continue
+            idx = {g.index for g in srcs}
+            for v in mesh.data.vertices:
+                w = sum(g.weight for g in v.groups if g.group in idx)
+                if w > 0:
+                    cur = next((g.weight for g in v.groups if g.group == d.index), 0.0)
+                    d.add([v.index], min(1.0, cur + w), "REPLACE")
+            for g in srcs:
+                mesh.vertex_groups.remove(g)
+
+
+def quaternius_walk(name, rig, mesh):
+    """Replaces the Quaternius walk and idle with IK clips (paws planted) and drops their gallop."""
+    merge_paw_weights(mesh)
+    spec = DOG_WALKS[name]
+    legs = {}
+    for side in ("L", "R"):
+        legs[side + "F"] = LegIK(rig, ["FrontUpperLeg." + side, "FrontLowerLeg." + side], _paw_point(rig, mesh, "FrontLowerLeg." + side))
+        legs[side + "H"] = LegIK(rig, ["BackLeg." + side, "BackUpperLeg." + side, "BackLowerLeg." + side], _paw_point(rig, mesh, "BackLowerLeg." + side))
+    phase = {"LH": 0.0, "LF": 0.25, "RH": 0.5, "RF": 0.75}
+    tails = [b.name for b in rig.data.bones if b.name.startswith("Tail")]
+    n = spec["frames"]
+
+    def pose(f):
+        t = (f - 1) / n
+        r = {}
+        for k, ik in legs.items():
+            front = k.endswith("F")
+            hoof, flex = _hoof_path(ik, (t - phase[k]) % 1.0, spec["stride"], spec["duty"], spec["lift"] * (1.0 if front else 0.85), 0.0 if front else 0.35)
+            r.update(ik.solve(hoof, flex))
+        r["Neck1"] = rx(0.05 * math.sin(t * math.tau * 2 + 0.6))
+        r["Head"] = rx(-0.03 * math.sin(t * math.tau * 2 + 0.6))
+        r["Torso3"] = rz(0.03 * math.sin(t * math.tau))
+        for i, tb in enumerate(tails[1:4]):
+            r[tb] = rz(0.12 * math.sin(t * math.tau - 0.6 * i))
+        return r, None
+
+    ears = [b.name for b in rig.data.bones if b.name.startswith("Ear2")]
+    idle_n = 180                                                  # 6 s
+
+    def idle(f):
+        t = (f - 1) / idle_n
+        # weight rocks forward and back and settles; the paws stay put (IK against the moved root)
+        body = Vector((0.012 * math.sin(t * math.tau), 0.004 * math.sin(t * math.tau * 3)))
+        r = {}
+        for k, ik in legs.items():
+            r.update(ik.solve(ik.hoof, 0.0, body))
+        look = math.sin(t * math.tau * 2) * max(0.0, math.sin(t * math.tau))
+        r["Neck1"] = rz(0.25 * look) @ rx(0.04 * math.sin(t * math.tau * 2 + 1))
+        r["Head"] = rz(0.15 * look) @ rx(-0.06 * max(0.0, math.sin(t * math.tau * 3)) ** 4)
+        for i, e in enumerate(ears):
+            r[e] = rx(0.3 * max(0.0, math.sin(t * math.tau * (5 + 2 * i) + i)) ** 14)
+        for i, tb in enumerate(tails[1:5]):
+            r[tb] = rz(0.10 * math.sin(t * math.tau * 4 - 0.5 * i))
+        return r, {"Body": Vector((0.0, body.x, body.y))}
+
+    ad = rig.animation_data
+    for tr in list(ad.nla_tracks):
+        if tr.name in ("idle", "run"):
+            old = tr.strips[0].action if tr.strips else None
+            ad.nla_tracks.remove(tr)
+            if old:
+                bpy.data.actions.remove(old)
+    ia = keyed_action(rig, "idle", list(range(1, idle_n + 2, 3)), idle, with_loc=True)
+    for fc in action_fcurves(ia):
+        for k in fc.keyframe_points:
+            k.interpolation = "BEZIER"
+    push_nla(rig, ia, "idle")
+    for tr in list(ad.nla_tracks):
+        if tr.name == "walk":
+            old = tr.strips[0].action if tr.strips else None
+            ad.nla_tracks.remove(tr)
+            if old:
+                bpy.data.actions.remove(old)
+    act = keyed_action(rig, "walk", list(range(1, n + 2)), pose)
+    push_nla(rig, act, "walk")
+
+
 def dog_hound():
     """Ogar polski: black saddle and tan points, long drop ears, deep chest, sabre tail, longer muzzle."""
     rig, mesh = load_quaternius(Q_WOLF, DOG_CLIPS)
@@ -1088,6 +1288,7 @@ def dog_hound():
     bake_fur_material("dog_hound", mesh, seed=11, streak=7, contrast=0.28)
     attach_armature(mesh, rig)
     reground(rig, [mesh])
+    quaternius_walk("dog_hound", rig, mesh)
     rig.name = "dog_hound_rig"
     rig_export("dog_hound", rig, [mesh])
 
@@ -1117,6 +1318,7 @@ def dog_spitz():
     bake_fur_material("dog_spitz", mesh, seed=12, streak=12, contrast=0.35)
     attach_armature(mesh, rig)
     reground(rig, [mesh])
+    quaternius_walk("dog_spitz", rig, mesh)
     rig.name = "dog_spitz_rig"
     rig_export("dog_spitz", rig, [mesh])
 
@@ -1222,6 +1424,7 @@ def cat():
     bpy.ops.object.join()
     attach_armature(mesh, rig)
     reground(rig, [mesh])
+    quaternius_walk("cat", rig, mesh)
     cat_sit(rig)
     rig.name = "cat_rig"
     rig_export("cat", rig, [mesh])
@@ -1251,6 +1454,9 @@ def cat_sit(rig):
 
 
 # ------------------------------------------------------------------ birds
+PIGEON_WALK = {"frames": 12, "stride": 0.09, "duty": 0.6}     # 0.4 s -> 0.225 m/s
+
+
 def pigeon():
     """mujtaba-io's rigged pigeon (CC0). It is modelled in flight (wings spread, its "idle" is a glide), so the
     ground clips are keyed here: wings rolled and swept back along the flanks, head-bobbing walk. Untextured:
@@ -1281,14 +1487,24 @@ def pigeon():
         look = 0.35 * math.sin(t * math.tau) * (1 if (t % 1) < 0.5 else 0.4)
         return folded({"neck-bone": rz(look), "face-bone": rx(0.15 * max(0.0, math.sin(t * math.tau * 2)) ** 4)}), None
 
+    legs = {sd: LegIK(rig, ["%s-upper-leg-bone" % sd, "%s-lower-leg-bone" % sd], _paw_point(rig, body, "%s-lower-leg-bone" % sd))
+            for sd in ("left", "right")}
+    n = PIGEON_WALK["frames"]
+
     def walk(f):
-        t = (f - 1) / 12
-        bob = math.sin(t * math.tau)
-        return folded({"thorax-bone": rx(0.05 * bob), "neck-bone": rx(0.35 * max(0.0, bob)),
-                       "left-upper-leg-bone": rx(0.5 * bob), "right-upper-leg-bone": rx(-0.5 * bob)}), None
+        t = (f - 1) / n
+        r = {}
+        for sd, ph in (("left", 0.0), ("right", 0.5)):
+            p = (t - ph) % 1.0
+            hoof, _ = _hoof_path(legs[sd], p, PIGEON_WALK["stride"], PIGEON_WALK["duty"], 0.012, 0.0)
+            r.update(legs[sd].solve(hoof))
+        # the head thrusts forward on each step and holds still against the ground while the body catches up
+        saw = ((t * 2) % 1.0)
+        thrust = 0.35 * (1 - saw) if saw < 0.3 else 0.35 * (saw - 0.3) / 0.7
+        return folded({**r, "neck-bone": rx(-0.3 + thrust), "face-bone": rx(0.3 - thrust)}), None
 
     idle_act = keyed_action(rig, "idle", list(range(1, 62, 3)), idle)
-    walk_act = keyed_action(rig, "walk", list(range(1, 14)), walk)
+    walk_act = keyed_action(rig, "walk", list(range(1, n + 2)), walk)
     push_nla(rig, idle_act, "idle")
     push_nla(rig, walk_act, "walk")
     if fly:
@@ -1327,9 +1543,93 @@ def crow():
     body = bpy.data.objects["raven_mesh"]
     img = bpy.data.images.get("raven")
     body.data.materials[0] = principled("crow_feathers", (0.8, 0.8, 0.8), 0.55, img, spec=0.5)
+    for m in body.modifiers:           # the mirror left an open seam down the back
+        if m.type == "MIRROR":
+            m.use_mirror_merge = True
+            m.merge_threshold = 0.02
     rename_clips(rig, {"idle": ["stand"], "fly": ["fly"]})
     normalise(rig, [body], 0.45, "length", head_bone="beak")
+    # The source "stand" is one frozen, crouched frame with the wings hanging to the ground like a cape. Build the
+    # ground pose from the rest pose instead: wings folded down the flanks with the primaries laid back over the
+    # tail, legs straight; idle and walk are keyed on top of it.
+    for tr in list(rig.animation_data.nla_tracks):
+        if tr.name == "idle":
+            act = tr.strips[0].action if tr.strips else None
+            rig.animation_data.nla_tracks.remove(tr)
+            if act:
+                bpy.data.actions.remove(act)
+    fold = {}
+    for sd in ("L", "R"):
+        chain = ["Bone.001_" + sd, "Bone.001_%s.003" % sd, "Bone.001_%s.001" % sd, "Bone.001_%s.004" % sd,
+                 "Bone.001_%s.002" % sd, "Bone.001_%s.005" % sd]
+        side = 1.0 if rig.data.bones[chain[0]].head_local.x > 0 else -1.0
+        targets = [Vector((side * 0.15, 0.45, -0.9)), Vector((side * 0.12, 0.7, -0.6)),
+                   Vector((side * 0.05, 1.0, 0.10)), Vector((side * 0.02, 1.0, 0.0)),
+                   Vector((-side * 0.03, 1.0, -0.12)), Vector((-side * 0.06, 1.0, -0.16))]
+        prev = Matrix.Identity(3)
+        for bn, tgt in zip(chain, targets):
+            b = rig.data.bones[bn]
+            W = (b.tail_local - b.head_local).normalized().rotation_difference(tgt.normalized()).to_matrix()
+            fold[bn] = prev.inverted() @ W
+            prev = W
+
+    def with_fold(r):
+        out = dict(fold)
+        out.update(r)
+        return out
+
+    def idle(f):
+        t = (f - 1) / 120
+        peck = max(0.0, math.sin(t * math.tau * 2 - 1.0)) ** 6
+        look = 0.5 * math.sin(t * math.tau) * (1 if (t % 0.5) < 0.3 else 0.3)
+        return with_fold({"Bone": rz(look) @ rx(-0.6 * peck), "Bone.001": rx(-0.15 * peck),
+                          "Bone.004": rx(0.3 * max(0.0, math.sin(t * math.tau * 3)) ** 10)}), None
+
+    def walk(f):
+        t = (f - 1) / 16
+        s_ = math.sin(t * math.tau)
+        return with_fold({"leg.L": rx(-0.45 * s_), "leg.R": rx(0.45 * s_),
+                          "leg.001.L": rx(0.4 * max(0.0, s_)), "leg.001.R": rx(0.4 * max(0.0, -s_)),
+                          "Bone": rx(-0.2 * math.sin(t * math.tau * 2)), "Bone.001": rz(0.05 * s_)}), None
+    ia = keyed_action(rig, "idle", list(range(1, 122, 3)), idle)
+    for fc in action_fcurves(ia):
+        for k in fc.keyframe_points:
+            k.interpolation = "BEZIER"
+    push_nla(rig, ia, "idle")
+    push_nla(rig, keyed_action(rig, "walk", list(range(1, 18)), walk), "walk")
     rig_export("crow", rig, [body])
+
+
+def layered_clip(rig, base, name, frames, fn, step=2):
+    """New clip = the base action's first-frame pose with bone-local rotations from fn(t) layered on top.
+    fn returns {bone: [(axis, angle), ...]} (axes in the bone's own space)."""
+    from mathutils import Quaternion
+    rig.animation_data.action = base
+    if getattr(base, "slots", None):
+        rig.animation_data.action_slot = base.slots[0]
+    bpy.context.scene.frame_set(int(base.frame_range[0]))
+    basep = {}
+    bpy.context.view_layer.update()
+    for pb in rig.pose.bones:
+        pb.rotation_mode = "QUATERNION"
+        basep[pb.name] = (pb.rotation_quaternion.copy(), pb.location.copy(), pb.scale.copy())
+    act = bpy.data.actions.new(name)
+    rig.animation_data.action = act
+    for f in list(range(1, frames + 1, step)) + [frames + 1]:
+        t = (f - 1) / frames
+        d = fn(t)
+        for pb in rig.pose.bones:
+            q, loc, sc = basep[pb.name]
+            for ax, ang in d.get(pb.name, []):
+                q = q @ Quaternion({"X": (1, 0, 0), "Y": (0, 1, 0), "Z": (0, 0, 1)}[ax], ang)
+            pb.rotation_quaternion = q
+            pb.location = loc
+            pb.scale = sc
+            pb.keyframe_insert("rotation_quaternion", frame=f)
+            pb.keyframe_insert("location", frame=f)
+    rig.animation_data.action = None
+    push_nla(rig, act, name)
+    return act
 
 
 def hawk():
@@ -1348,6 +1648,15 @@ def hawk():
     for o in list(bpy.data.objects):
         if o.type == "EMPTY":
             bpy.data.objects.remove(o)
+    # modelled climbing steeply (body ~70 degrees nose-up): pitch it level for cruising flight
+    h, r0 = rig.data.bones["head"].head_local, rig.data.bones["spine"].head_local
+    v = h - r0
+    e = math.atan2(v.z, -v.y) - math.radians(8)         # leave it a touch nose-up, as in a glide
+    select([rig, body], rig)
+    rig.matrix_world = Matrix.Rotation(e, 4, "X") @ rig.matrix_world    # (glTF objects use quaternion rotation)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    reground(rig, [body])
+    log("  hawk levelled by %.0f deg" % math.degrees(e))
     rig_export("hawk", rig, [body])
 
 

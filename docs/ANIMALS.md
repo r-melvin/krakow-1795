@@ -54,13 +54,13 @@ people.
 
 | glb | Source | Scale | Clips | Tris |
 |---|---|---|---|---|
-| `horse` | Daniels/ChadM horse | 1.60 m at the withers | idle, walk (keyed here) | 14,986 |
-| `horse_harnessed` | same + procedural harness | 1.60 m | idle, walk | 16,478 |
-| `dog_hound` | Quaternius Wolf, reshaped (ogar polski: drop ears, deep chest, low sabre tail), fur | 0.62 m | idle, walk, run | 12,000 |
-| `dog_spitz` | Quaternius Husky, reshaped (wolfspitz: ruff, plume curled over the back), fur | 0.50 m | idle, walk, run | 12,000 |
-| `cat` | Quaternius Husky rig reshaped into a cat (flat face, round skull, tabby fur, whiskers) | 0.25 m at the shoulder | idle, walk, sit (keyed here) | 9,060 |
+| `horse` | Daniels/ChadM horse | 1.60 m at the withers | idle, walk, trot (keyed here) | 14,986 |
+| `horse_harnessed` | same + procedural harness | 1.60 m | idle, walk, trot | 16,478 |
+| `dog_hound` | Quaternius Wolf, reshaped (ogar polski: drop ears, deep chest, low sabre tail), fur | 0.62 m | idle, walk (IK) | 12,000 |
+| `dog_spitz` | Quaternius Husky, reshaped (wolfspitz: ruff, plume curled over the back), fur | 0.50 m | idle, walk (IK) | 12,000 |
+| `cat` | Quaternius Husky rig reshaped into a cat (flat face, round skull, tabby fur, whiskers) | 0.25 m at the shoulder | idle, walk (IK), sit | 9,060 |
 | `pigeon` | mujtaba-io pigeon | 0.30 m long | idle, walk (keyed here), fly | 1,010 |
-| `crow` | Teh_Bucket raven | 0.45 m long | idle, fly | 2,380 |
+| `crow` | Teh_Bucket raven | 0.45 m long | idle, walk (layered here), fly | 2,380 |
 | `hawk` | Sherkiz hawk | 0.55 m long | fly, idle (= fly) | 9,956 |
 | `carriage` | procedural dorożka, textured | 1.5 m track, 0.66 m rear wheels | - | 6,136 |
 | `horse_cart` | procedural ladder cart, textured | 0.62 m wheels | - | 3,252 |
@@ -74,8 +74,23 @@ NLA tracks named like the humans' clips, a `<name>-colonly` box, textures embedd
 `driver_seat`, `lamp_L`/`lamp_R`, and `wheel_*` objects with their origin on the hub.
 
 Build notes:
-- The horse's walk is a 4-beat gait keyed per leg chain (32 frames at 30 fps, ~1.5 m/s at speed 1), with a head
-  nod twice per stride and a tail swing; idle breathes, flicks ears and tail and rests a hind leg.
+- **Gaits are hoof-planted by IK** (`LegIK` in build_animals.py): per frame each leg's hoof / paw target follows a
+  stance phase that slides back at exactly the ground speed and an eased, lifted swing; the upper bones are solved
+  in the sagittal plane on the branch nearest the rest pose, so front knees fold back and hocks fold the right way.
+  Measured planted-foot speeds match the design (horse walk 1.50, trot 3.00; hound 1.12, spitz 0.98, cat 0.55,
+  pigeon 0.22 m/s). `scripts/npc/animal.gd` `GAIT_REF` holds the same numbers and sets playback speed =
+  ground speed / reference, so nothing slides in game.
+- Horse: four-beat lateral walk (LH, LF, RH, RF, 25 % apart; 32 frames, stride 1.6 m), two-beat diagonal trot
+  (21 frames, stride 2.1 m; the dorozka trots above 1.8 m/s), idle of 8 s with the resting hind leg changing
+  sides (hoof drawn forward onto the toe), head lowering and raising, ear flicks, tail swishes.
+- Dogs and cat: the Quaternius walk/idle slid (planted paws moving 0.1-0.9 m/s within one stance) and their paws
+  hang off separately animated IK bones, so those weights are folded into the lower-leg bones and the walk and
+  idle are rebuilt with the same IK (idle: weight rocking with paws planted, look-around, ear flicks, tail);
+  the gallop was dropped. Crow: the source "stand" is a single frozen frame; idle (head turns, pecks, tail
+  flicks) and a walk are keyed on a new ground pose (the source "stand" hung the wings to the ground like a cape;
+  the wings are now folded down the flanks with the primaries over the tail). Pigeon: IK step with the head
+  thrust and hold. Hawk: the source is modelled climbing steeply; it is pitched level, and `normalise()` now
+  measures every model in its rest pose (the hawk had been grounded in a clip pose and floated 1.2 m up).
 - The harness is fitted to the mesh: collar, hames, back pad with terrets and girth, traces, bridle with
   blinkers and bit, reins over the neck to the driver. Pieces are skinned to the neck, head or spine bone.
 - The pigeon was modelled flying; its ground pose folds the wings along the flanks, and its walk bobs the head.
