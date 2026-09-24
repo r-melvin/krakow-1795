@@ -75,6 +75,13 @@ The seven institutions of the occupier remain the spine; taking one still change
    arm's length, a person is arrested or leaves the city with their lever, a bureau is raided and shut for two days,
    the finale gains bodyguards or an ending closes. Every sleep costs a day; the journal shows the calendar and the
    days left.
+6. **Safe houses by loyalty.** One per faction, opened by loyalty and lost with it: the printer's garret, the red
+   lantern's back room, the salon upstairs, a guild widow's house, the sacristy loft, the magnate's palace, a room at
+   the Russian resident's, the Prussian agent's lodging, a corrupt sergeant's room at the police post. Each has a bed
+   (sleep, save), a stash, a table where letters arrive, a coat rail with that faction's disguise, and its own kind of
+   safety: the post is the last place the watch looks but the informers see who enters, the embassy is
+   extraterritorial and Russia bills you for it, the sacristy is locked at night, the brothel never sleeps. A raided
+   house is shut for two days. Where you wake sets the morning's news and openings.
 
 ### Mission loop (3D stealth / puzzle)
 - Vision cones, light/shadow, noise. Suspicion meter per guard (calm → curious → searching → alarm).
