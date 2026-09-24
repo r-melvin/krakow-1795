@@ -350,7 +350,10 @@ func _furniture() -> void:
 	for c in [[Vector3(-8, 0, 12), 0.2], [Vector3(8, 0, -13), -0.5]]:
 		Assets.place(self, "crate_stack", c[0], c[1])
 	Assets.place(self, "well", Vector3(-12, 0, 9), 0.0)
-	Assets.place(self, "well", Vector3(14, 0, -9), PI * 0.5)
+	# the east well is capped with a padlocked lid: one of the ways down into the undercroft
+	var capped := Assets.place(self, "well_shaft_cap", Vector3(14, 0, -9), PI * 0.5)
+	if capped == null:
+		Assets.place(self, "well", Vector3(14, 0, -9), PI * 0.5)
 
 
 
