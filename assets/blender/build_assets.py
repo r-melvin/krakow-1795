@@ -2906,18 +2906,120 @@ def st_adalbert():
 
 # ------------------------------------------------------------------ street furniture
 def market_stall():
+    """Market stall: counter and four posts carrying a striped canvas that sags between its ridge pole and eave bars,
+    ripples, bellies under a snow load and hangs a scalloped valance front and back (double-sided cloth; materials
+    cloth_awning_* get the hem flutter in scripts/city/dressing.gd). On the counter: slumped sacks tied at the neck,
+    a crate and loaves under a draped cloth."""
     reset()
+    wd = M("wood_dark")
     parts = [box("counter", (2.4, 1.2, 1.1), (0, 0, 0), M("wood"), bevel=0.03, seg=1, wonk=0.04),
-             box("counter_top", (2.7, 1.5, 0.10), (0, 0, 1.1), M("wood_dark"), bevel=0.02, seg=1, wonk=0.02)]
+             box("counter_top", (2.7, 1.5, 0.10), (0, 0, 1.1), wd, bevel=0.02, seg=1, wonk=0.02)]
     for x in (-1.15, 1.15):
         for y in (-0.55, 0.55):
-            parts.append(cyl("post", 0.07, 2.4, (x, y, 0), M("wood_dark"), verts=8, bevel=0.01, seg=1))
-    parts.append(roof("awning", 3.0, 2.0, 0.7, (0, 0, 2.3), M("canvas"), sag=0.12, flare=0.25, cuts=4, bevel=0.02))
-    for i in range(3):
-        parts.append(box("stripe", (0.3, 1.9, 0.03), (-0.9 + i * 0.9, 0, 2.31), M("canvas_stripe"), bevel=0))
-    parts.append(blob("sack", (0.55, 0.45, 0.45), (-0.7, 0.1, 1.18), M("canvas")))
-    parts.append(box("crate", (0.6, 0.45, 0.35), (0.6, 0.1, 1.18), M("wood_dark"), bevel=0.02, seg=1, wonk=0.02))
-    parts.append(blob("loaf", (0.3, 0.2, 0.15), (0.0, 0.2, 1.18), M("zupan_gold")))
+            parts.append(cyl("post", 0.07, 2.4, (x, y, 0), wd, verts=8, bevel=0.01, seg=1))
+    L, HW, ZR, ZE = 3.0, 1.0, 2.95, 2.38            # canvas length, half width, ridge and eave heights
+    bm = bmesh.new()
+    for x in (-1.15, 1.15):
+        _tube(bm, (x, -HW, ZE - 0.03), (x, HW, ZE - 0.03), 0.04, 0.04, 6)      # cross beams on the posts
+        _tube(bm, (x, 0, ZE - 0.03), (x, 0, ZR - 0.02), 0.035, 0.035, 6)       # king posts
+    _tube(bm, (-1.2, 0, ZR - 0.02), (1.2, 0, ZR - 0.02), 0.03, 0.03, 6)         # ridge pole
+    for y in (-HW, HW):
+        _tube(bm, (-1.2, y, ZE - 0.02), (1.2, y, ZE - 0.02), 0.025, 0.025, 6)   # eave bars
+    parts.append(_bm_obj("frame", bm, wd))
+
+    def surf(x, s, side):
+        """Canvas point: s from ridge (0) to eave (1) on side -1 (front) / +1 (back)."""
+        ax = abs(x)
+        span = math.sin(math.pi * s)
+        sag = 0.08 * span * max(0.0, 1.0 - (x / 1.15) ** 2)
+        droop = 0.12 * max(0.0, ax - 1.15) / 0.35 * (0.4 + 0.6 * s)             # overhang past the beams flops
+        rip = 0.007 * math.sin(x * 15.0 + s * 4.0 + side) * span
+        return Vector((x, side * HW * s, ZR + (ZE - ZR) * s - sag - droop + rip))
+    n_stripe = 8
+    stripe = lambda c: int((c.x + L / 2) / (L / n_stripe)) % 2 == 1
+    rng = random.Random(501)
+    for side in (-1, 1):
+        nu, nv = 16, 6
+        bm = bmesh.new()
+        grid = [[bm.verts.new(surf(-L / 2 + L * i / nu, j / nv, side)) for j in range(nv + 1)] for i in range(nu + 1)]
+        _grid_faces(bm, grid, up=True)
+        dup = bmesh.ops.duplicate(bm, geom=list(bm.faces))
+        under = [g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)]
+        bmesh.ops.reverse_faces(bm, faces=under)
+        for v in {v for f in under for v in f.verts}:
+            v.co.z -= 0.002
+        cv = _bm_obj("canvas", bm, M("cloth_awning_canvas"))
+        parts.append(_two_mat(cv, M("cloth_awning_stripe"), stripe))
+        # scalloped valance hanging from the eave
+        bm = bmesh.new()
+        vu, vv = 32, 3
+        grid = []
+        for i in range(vu + 1):
+            x = -L / 2 + L * i / vu
+            e = surf(x, 1.0, side)
+            fr = ((x + L / 2) / (L / n_stripe)) % 1.0
+            hem = 0.12 + 0.09 * math.sin(math.pi * fr)
+            grid.append([bm.verts.new((x, side * (HW + 0.008 * math.sin(x * 8.0) * j / vv), e.z - 0.005 - hem * j / vv))
+                         for j in range(vv + 1)])
+        _grid_faces(bm, grid)
+        dup = bmesh.ops.duplicate(bm, geom=list(bm.faces))
+        bmesh.ops.reverse_faces(bm, faces=[g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)])
+        val = _bm_obj("valance", bm, M("cloth_awning_canvas"))
+        parts.append(_two_mat(val, M("cloth_awning_stripe"), stripe))
+        # snow lying in the belly of each slope, thinning to nothing at its edges
+        bm = bmesh.new()
+        su, sv = 10, 5
+        grid = []
+        for i in range(su + 1):
+            col = []
+            for j in range(sv + 1):
+                x = -1.05 + 2.1 * i / su
+                sj = 0.18 + 0.66 * j / sv
+                th = 0.055 * math.sin(math.pi * i / su) * math.sin(math.pi * j / sv) * (0.75 + 0.5 * rng.random())
+                p_ = surf(x, sj, side)
+                col.append(bm.verts.new((p_.x, p_.y, p_.z + 0.004 + th)))
+            grid.append(col)
+        _grid_faces(bm, grid, up=True)
+        parts.append(_bm_obj("snow", bm, M("snow")))
+    # sacks slumped on the counter, tied at the neck
+    for k, (x, y, r) in enumerate(((-0.85, 0.15, 0.24), (-0.45, 0.25, 0.2), (-0.62, -0.25, 0.17))):
+        parts.append(_lumpy("sack", r, (x, y, 1.2 + r * 0.9), M("sacking"), zscale=1.15, amp=0.12, seed=510 + k,
+                            seg=10, rings=6, zmin=1.2))
+        top = 1.2 + r * 0.9 + r * 1.15 * 0.95
+        parts.append(cyl("sack_neck", r * 0.28, 0.1, (x, y, top - 0.03), M("sacking"), verts=8, r2=r * 0.12))
+        parts.append(cyl("sack_tie", r * 0.2, 0.025, (x, y, top + 0.01), M("sacking"), verts=8))
+    parts.append(box("crate", (0.6, 0.45, 0.35), (0.6, 0.1, 1.2), wd, bevel=0.02, seg=1, wonk=0.02))
+    for k in range(3):
+        parts.append(_lumpy("loaf", 0.1, (0.05 + k * 0.17, -0.15, 1.24), M("crust"), zscale=0.6, amp=0.06, seed=520 + k,
+                            seg=8, rings=5, zmin=1.2))
+    # a linen cloth thrown over the crate and loaves, hanging down the counter front
+    bm = bmesh.new()
+    cu_, cv_ = 12, 11
+
+    def goods(x, y):
+        h = 1.2
+        if abs(x - 0.6) < 0.34 and abs(y - 0.1) < 0.26:
+            h = max(h, 1.55 + 0.012)
+        if abs(x - 0.22) < 0.3 and abs(y + 0.15) < 0.14:
+            h = max(h, 1.31)
+        return h
+    grid = []
+    for i in range(cu_ + 1):
+        col = []
+        for j in range(cv_ + 1):
+            x = -0.15 + 1.2 * i / cu_
+            y = -0.8 + 1.2 * j / cv_
+            yy = max(y, -0.74)
+            h = max(goods(x + dx, yy + dy) - 0.06 * (abs(dx) + abs(dy)) / 0.08
+                    for dx in (-0.08, 0.0, 0.08) for dy in (-0.08, 0.0, 0.08))
+            z = h + 0.008 + 0.01 * math.sin(x * 23.0 + y * 17.0)
+            if y < -0.74:                                           # over the counter edge: hangs, with folds
+                z = 1.2 - (-0.74 - y) * 3.2
+                yy = -0.755 - 0.02 * math.sin(x * 20.0)
+            col.append(bm.verts.new((x, yy, z)))
+        grid.append(col)
+    _grid_faces(bm, grid, up=True)
+    parts.append(_bm_obj("goods_cloth", bm, M("linen")))
     export("market_stall", join(parts, "market_stall"), box("c", (2.4, 1.2, 1.1), (0, 0, 0)))
 
 
@@ -5662,9 +5764,11 @@ def gravel_path():
 # ------------------------------------------------------------------ cloth: laundry and awnings as draped panels
 PAL.update({"cloth_laundry_linen": (0.92, 0.90, 0.84), "cloth_laundry_undyed": (0.74, 0.68, 0.56),
             "cloth_laundry_indigo": (0.16, 0.22, 0.42), "cloth_laundry_red": (0.66, 0.12, 0.10),
-            "cloth_laundry_frozen": (0.84, 0.86, 0.88), "slush_trod": (1.0, 1.0, 1.0)})
+            "cloth_laundry_frozen": (0.84, 0.86, 0.88), "slush_trod": (1.0, 1.0, 1.0),
+            "cloth_awning_canvas": (0.76, 0.66, 0.50), "cloth_awning_stripe": (0.58, 0.22, 0.20)})
 TEX_OF.update({"cloth_laundry_linen": "cloth", "cloth_laundry_undyed": "cloth", "cloth_laundry_indigo": "cloth",
-               "cloth_laundry_red": "cloth", "cloth_laundry_frozen": "cloth", "slush_trod": "slush"})
+               "cloth_laundry_red": "cloth", "cloth_laundry_frozen": "cloth", "slush_trod": "slush",
+               "cloth_awning_canvas": "cloth", "cloth_awning_stripe": "cloth"})
 TINT.update({"slush_trod": (1.0, 1.0, 1.0)})
 
 
@@ -5841,9 +5945,9 @@ def awning_striped():
     bmesh.ops.reverse_faces(bm, faces=under)
     for v in {v for f in under for v in f.verts}:
         v.co.z -= 0.002
-    canvas = _bm_obj("canvas", bm, M("canvas"))
+    canvas = _bm_obj("canvas", bm, M("cloth_awning_canvas"))
     stripe = lambda c: int((c.x + W / 2) / (W / n)) % 2 == 1
-    _two_mat(canvas, M("canvas_stripe"), stripe)
+    _two_mat(canvas, M("cloth_awning_stripe"), stripe)
     parts = [canvas]
     # valance: a strip hanging from the front bar, its hem cut in one scallop per stripe, a slight flutter
     bm = bmesh.new()
@@ -5861,8 +5965,8 @@ def awning_striped():
     _grid_faces(bm, grid)
     dup = bmesh.ops.duplicate(bm, geom=list(bm.faces))
     bmesh.ops.reverse_faces(bm, faces=[g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)])
-    val = _bm_obj("valance", bm, M("canvas"))
-    _two_mat(val, M("canvas_stripe"), stripe)
+    val = _bm_obj("valance", bm, M("cloth_awning_canvas"))
+    _two_mat(val, M("cloth_awning_stripe"), stripe)
     parts.append(val)
     # snow lying in the belly: a cushion that follows the sagging canvas and thins to nothing at its edges
     bm = bmesh.new()

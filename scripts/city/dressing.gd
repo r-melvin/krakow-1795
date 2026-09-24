@@ -51,6 +51,7 @@ func _ready() -> void:
 	_clutter()
 	_weeds()
 	_feather_slush(self)
+	_awnings()
 	add_child(preload("res://scripts/city/vendors.gd").new())     # street sellers and hawkers (data/vendors.json)
 	add_child(preload("res://scripts/city/window_life.gd").create(portals, _boards))   # windows, chimneys (data/window_life.json)
 	add_child(preload("res://scripts/city/street_life.gd").new())   # night life and crime (data/street_life.json)
@@ -307,9 +308,30 @@ func _clutter() -> void:
 const CLOTH_SWAY := "res://assets/shaders/cloth_sway.gdshader"
 static var _sway_mats := {}          ## imported cloth_laundry* material -> ShaderMaterial (shared by both lines)
 
+## Awning and stall valances: only cloth below the eave (line_h, model space) moves, swinging out along Z.
+const AWNING_SWAY := {"line_sag": 0.0, "line_len": 1.0, "calm_amp": 0.08, "wind_gain": 0.05,
+		"sway_dir": Vector3(0, 0, 1), "phase_axis": Vector3(1, 0, 0), "translucency": 0.3}
+
 ## Swap every cloth_laundry* surface under `root` for the sway shader, carrying the imported textures over.
 ## The wind amplitude comes from the global `wind` parameter that Weather drives; frozen pieces are stiff.
 func _laundry(root: Node) -> void:
+	_sway(root, "cloth_laundry", {})
+
+
+## The café / shop awnings (eave 0.5 m below their wall-top origin) and the market stalls that the district's
+## _furniture() placed before us (eave at 2.38 m).
+func _awnings() -> void:
+	for c in find_children("*", "Node3D", false, false):
+		if c.scene_file_path.ends_with("/awning_striped.glb"):
+			_sway(c, "cloth_awning", AWNING_SWAY.merged({"line_h": -0.505}))
+	var district := get_parent()
+	if district:
+		for c in district.get_children():
+			if c.scene_file_path.ends_with("/market_stall.glb"):
+				_sway(c, "cloth_awning", AWNING_SWAY.merged({"line_h": 2.37}))
+
+
+func _sway(root: Node, prefix: String, params: Dictionary) -> void:
 	if root == null:
 		return
 	for c in root.find_children("*", "MeshInstance3D", true, false):
@@ -318,10 +340,13 @@ func _laundry(root: Node) -> void:
 			continue
 		for i in mesh.get_surface_count():
 			var m := mesh.surface_get_material(i) as BaseMaterial3D
-			if m == null or not m.resource_name.begins_with("cloth_laundry"):
+			if m == null or not m.resource_name.begins_with(prefix):
 				continue
 			if not _sway_mats.has(m):
-				_sway_mats[m] = _sway_material(m)
+				var sm := _sway_material(m)
+				for k in params:
+					sm.set_shader_parameter(k, params[k])
+				_sway_mats[m] = sm
 			mesh.surface_set_material(i, _sway_mats[m])
 
 
@@ -507,6 +532,8 @@ func _shots(dir: String) -> void:
 		["laundry_close", Vector3(-26.0, 2.0, -27.5), Vector3(-28.2, 2.3, -31.0)],
 		["laundry_south", Vector3(-26.0, 2.0, 27.0), Vector3(-28.2, 2.3, 30.6)],
 		["cafe_awning", Vector3(-20.2, 2.4, 22.6), Vector3(-22.0, 3.4, 28.0)],
+		["stalls_west", Vector3(-9.0, 2.2, -8.5), Vector3(-12.0, 2.0, -14.5)],
+		["stalls_east", Vector3(15.5, 2.1, 21.0), Vector3(10.5, 1.9, 13.0)],
 		["adalbert", Vector3(12.5, 2.0, 21.0), Vector3(17.5, 1.5, 19.0)],
 		["hedge_close", Vector3(39.4, 1.5, -12.2), Vector3(41.2, 0.45, -15.6)],
 		["slush_cafe_door", Vector3(-16.6, 1.6, 25.2), Vector3(-18.0, 0.0, 27.8)],
