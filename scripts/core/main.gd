@@ -279,6 +279,14 @@ func _perf_report() -> void:
 	print("[smoke] perf agents ", counts)
 
 
+## `--closeup-yaw=<deg>` swings the player close-up camera round the player (0 = the default front view).
+func _closeup_yaw() -> float:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--closeup-yaw="):
+			return float(a.trim_prefix("--closeup-yaw="))
+	return 0.0
+
+
 func _shots(player: Player) -> void:
 	var dir := ""
 	for a in OS.get_cmdline_user_args():
@@ -302,7 +310,7 @@ func _shots(player: Player) -> void:
 	for shot in [["stmarys_door", Vector3(30, 2.2, -8), Vector3(31, 1.4, -15)], ["stalls", Vector3(-6, 2.0, -8), Vector3(-11, 1.2, -13)],
 			["townhall_corner", Vector3(-8, 2.0, 22), Vector3(-14, 1.2, 17)], ["cloth_hall_passage", Vector3(0, 1.8, 12), Vector3(0, 1.2, 6)],
 			["dragon", Vector3(-30, 2.5, 30), Vector3(-38, 1.5, 36)], ["delivery_alley", Vector3(19, 2.4, 9), Vector3(25, 1.3, 16)],
-			["player_closeup", player.global_position + Vector3(0.6, 1.7, -2.2), player.global_position + Vector3(0, 1.45, 0)]]:
+			["player_closeup", player.global_position + Vector3(0.6, 1.7, -2.2).rotated(Vector3.UP, deg_to_rad(_closeup_yaw())), player.global_position + Vector3(0, 1.45, 0)]]:
 		cam.position = shot[1]
 		cam.look_at_from_position(shot[1], shot[2])
 		for i in 4:

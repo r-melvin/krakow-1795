@@ -296,6 +296,18 @@ def eye_sheet(name, out):
     print("[render]", sc.render.filepath)
 
 
+if os.environ.get("ROW"):
+    # ROW=<label> blender -b --python render_characters.py -- <outdir> a b c ...: the figures side by side, front view
+    sc = scene()
+    sc.render.resolution_x, sc.render.resolution_y = 2700, 900
+    for i, n in enumerate(names):
+        load(n, i * 0.75, 0.0)
+    w = (len(names) - 1) * 0.75
+    cam(sc, (w / 2, -6.2, 1.0), (w / 2, 0, 0.9), lens=50)
+    sc.render.filepath = os.path.join(OUT, "row_%s.png" % os.environ["ROW"])
+    bpy.ops.render.render(write_still=True)
+    names = []
+
 for name in names:
     if os.environ.get("CLIP_AUDIT"):
         # CLIPS=walk,sit_idle CLIP_AUDIT=1 blender -b --python render_characters.py -- <outdir> <name>
