@@ -362,6 +362,73 @@ class Takers extends Node:
 			queue_free()
 
 
+## Draws `item`'s icon centred on the canvas origin (callers set draw_set_transform for position and size, ~30 px
+## radius at scale 1). `k` (the kit, or null) tints the lethal knife, the lit torch and the pistol's reload.
+static func draw_icon(ci: CanvasItem, item: String, k: Node) -> void:
+	var ink := Color(0.93, 0.88, 0.76)
+	var c := Vector2.ZERO
+	match item:
+		"knife":
+			var blade := Color(0.85, 0.2, 0.15) if (k != null and k.lethal) else Color(0.86, 0.87, 0.9)
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-2, 4), c + Vector2(2, 4), c + Vector2(1, -16), c + Vector2(-1, -18)]), blade)
+			ci.draw_line(c + Vector2(-7, 5), c + Vector2(7, 5), ink, 2.0)
+			ci.draw_line(c + Vector2(0, 6), c + Vector2(0, 16), Color(0.45, 0.28, 0.15), 4.0)
+		"cudgel":
+			ci.draw_line(c + Vector2(-10, 13), c + Vector2(8, -11), Color(0.55, 0.36, 0.2), 5.0)
+			ci.draw_circle(c + Vector2(9, -12), 5, Color(0.5, 0.32, 0.18))
+		"pistol":
+			var col := ink if (k == null or k.pistol_loaded) else Color(ink, 0.4)
+			ci.draw_line(c + Vector2(-14, -5), c + Vector2(10, -5), col, 4.0)
+			ci.draw_line(c + Vector2(6, -4), c + Vector2(12, 10), Color(0.5, 0.32, 0.18), 6.0)
+			if k != null and not k.pistol_loaded and k.reload_left > 0.0:
+				ci.draw_arc(c, 22, -PI * 0.5, -PI * 0.5 + TAU * k.reload_progress(), 32, Color(0.9, 0.7, 0.3), 3.0, true)
+		"musket":
+			ci.draw_line(c + Vector2(-17, 12), c + Vector2(17, -12), Color(0.5, 0.32, 0.18), 4.0)
+			ci.draw_line(c + Vector2(0, 0), c + Vector2(19, -13), Color(0.6, 0.6, 0.64), 2.0)
+		"cosh":
+			ci.draw_line(c + Vector2(-9, 12), c + Vector2(2, -2), Color(0.45, 0.3, 0.18), 4.0)
+			ci.draw_circle(c + Vector2(6, -7), 8, Color(0.62, 0.55, 0.42))
+		"torch":
+			ci.draw_line(c + Vector2(-6, 14), c + Vector2(3, -6), Color(0.45, 0.3, 0.18), 5.0)
+			if (k != null and k.torch_lit):
+				ci.draw_circle(c + Vector2(5, -11), 7, Color(1.0, 0.6, 0.2))
+				ci.draw_circle(c + Vector2(5, -12), 4, Color(1.0, 0.9, 0.5))
+			else:
+				ci.draw_circle(c + Vector2(4, -9), 5, Color(0.2, 0.18, 0.16))
+		"tinderbox":
+			ci.draw_rect(Rect2(c + Vector2(-12, -6), Vector2(24, 14)), Color(0.55, 0.56, 0.6))
+			ci.draw_line(c + Vector2(-10, -9), c + Vector2(10, -9), Color(0.9, 0.7, 0.3), 2.0)
+		"poison":
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, 14), c + Vector2(6, 14), c + Vector2(6, 0), c + Vector2(2, -4),
+					c + Vector2(2, -12), c + Vector2(-2, -12), c + Vector2(-2, -4), c + Vector2(-6, 0)]), Color(0.35, 0.6, 0.35))
+			ci.draw_circle(c + Vector2(0, 7), 3, Color(0.1, 0.12, 0.1))
+		"lockpick":
+			ci.draw_line(c + Vector2(-12, 8), c + Vector2(10, -6), ink, 2.0)
+			ci.draw_line(c + Vector2(10, -6), c + Vector2(13, -2), ink, 2.0)
+			ci.draw_circle(c + Vector2(-12, 8), 4, Color(0.6, 0.6, 0.64))
+		"stone":
+			ci.draw_circle(c + Vector2(-5, 3), 7, Color(0.6, 0.58, 0.55))
+			ci.draw_circle(c + Vector2(6, 5), 5, Color(0.5, 0.48, 0.46))
+		"coin":
+			ci.draw_circle(c, 10, Color(0.85, 0.68, 0.3))
+			ci.draw_arc(c, 7, 0, TAU, 20, Color(0.6, 0.45, 0.15), 1.5, true)
+		"bottle":
+			ci.draw_colored_polygon(PackedVector2Array([c + Vector2(-6, 15), c + Vector2(6, 15), c + Vector2(6, -2), c + Vector2(2, -7),
+					c + Vector2(2, -15), c + Vector2(-2, -15), c + Vector2(-2, -7), c + Vector2(-6, -2)]), Color(0.25, 0.5, 0.3))
+		"food":
+			ci.draw_arc(c, 9, 0, TAU, 24, Color(0.78, 0.52, 0.24), 6.0, true)
+		"smoke":
+			for o in [Vector2(-7, 4), Vector2(5, 5), Vector2(-1, -5), Vector2(8, -4)]:
+				ci.draw_circle(c + o, 7, Color(0.7, 0.7, 0.72, 0.85))
+		"flash":
+			var pts := PackedVector2Array()
+			for i in 16:
+				var r := 15.0 if i % 2 == 0 else 6.0
+				var a := TAU * i / 16.0
+				pts.append(c + Vector2(cos(a), sin(a)) * r)
+			ci.draw_colored_polygon(pts, Color(1.0, 0.95, 0.7))
+
+
 # ------------------------------------------------------------------ HUD indicator
 
 ## Bottom-left: the current item as a small drawn icon and its count (no words). Knife red when lethal; the pistol
@@ -402,67 +469,10 @@ class Indicator extends Control:
 		var c := Vector2(30, 30)
 		draw_circle(c, 27, Color(0.05, 0.04, 0.03, 0.55))
 		draw_arc(c, 27, 0, TAU, 40, Color(0.72, 0.58, 0.32, 0.8), 1.5, true)
+		draw_set_transform(c)
+		load("res://scripts/stealth/kit.gd").draw_icon(self, str(k.current), k)
+		draw_set_transform(Vector2.ZERO)
 		var ink := Color(0.93, 0.88, 0.76)
-		match str(k.current):
-			"knife":
-				var blade := Color(0.85, 0.2, 0.15) if k.lethal else Color(0.86, 0.87, 0.9)
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-2, 4), c + Vector2(2, 4), c + Vector2(1, -16), c + Vector2(-1, -18)]), blade)
-				draw_line(c + Vector2(-7, 5), c + Vector2(7, 5), ink, 2.0)
-				draw_line(c + Vector2(0, 6), c + Vector2(0, 16), Color(0.45, 0.28, 0.15), 4.0)
-			"cudgel":
-				draw_line(c + Vector2(-10, 13), c + Vector2(8, -11), Color(0.55, 0.36, 0.2), 5.0)
-				draw_circle(c + Vector2(9, -12), 5, Color(0.5, 0.32, 0.18))
-			"pistol":
-				var col := ink if k.pistol_loaded else Color(ink, 0.4)
-				draw_line(c + Vector2(-14, -5), c + Vector2(10, -5), col, 4.0)
-				draw_line(c + Vector2(6, -4), c + Vector2(12, 10), Color(0.5, 0.32, 0.18), 6.0)
-				if not k.pistol_loaded and k.reload_left > 0.0:
-					draw_arc(c, 22, -PI * 0.5, -PI * 0.5 + TAU * k.reload_progress(), 32, Color(0.9, 0.7, 0.3), 3.0, true)
-			"musket":
-				draw_line(c + Vector2(-17, 12), c + Vector2(17, -12), Color(0.5, 0.32, 0.18), 4.0)
-				draw_line(c + Vector2(0, 0), c + Vector2(19, -13), Color(0.6, 0.6, 0.64), 2.0)
-			"cosh":
-				draw_line(c + Vector2(-9, 12), c + Vector2(2, -2), Color(0.45, 0.3, 0.18), 4.0)
-				draw_circle(c + Vector2(6, -7), 8, Color(0.62, 0.55, 0.42))
-			"torch":
-				draw_line(c + Vector2(-6, 14), c + Vector2(3, -6), Color(0.45, 0.3, 0.18), 5.0)
-				if k.torch_lit:
-					draw_circle(c + Vector2(5, -11), 7, Color(1.0, 0.6, 0.2))
-					draw_circle(c + Vector2(5, -12), 4, Color(1.0, 0.9, 0.5))
-				else:
-					draw_circle(c + Vector2(4, -9), 5, Color(0.2, 0.18, 0.16))
-			"tinderbox":
-				draw_rect(Rect2(c + Vector2(-12, -6), Vector2(24, 14)), Color(0.55, 0.56, 0.6))
-				draw_line(c + Vector2(-10, -9), c + Vector2(10, -9), Color(0.9, 0.7, 0.3), 2.0)
-			"poison":
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-6, 14), c + Vector2(6, 14), c + Vector2(6, 0), c + Vector2(2, -4),
-						c + Vector2(2, -12), c + Vector2(-2, -12), c + Vector2(-2, -4), c + Vector2(-6, 0)]), Color(0.35, 0.6, 0.35))
-				draw_circle(c + Vector2(0, 7), 3, Color(0.1, 0.12, 0.1))
-			"lockpick":
-				draw_line(c + Vector2(-12, 8), c + Vector2(10, -6), ink, 2.0)
-				draw_line(c + Vector2(10, -6), c + Vector2(13, -2), ink, 2.0)
-				draw_circle(c + Vector2(-12, 8), 4, Color(0.6, 0.6, 0.64))
-			"stone":
-				draw_circle(c + Vector2(-5, 3), 7, Color(0.6, 0.58, 0.55))
-				draw_circle(c + Vector2(6, 5), 5, Color(0.5, 0.48, 0.46))
-			"coin":
-				draw_circle(c, 10, Color(0.85, 0.68, 0.3))
-				draw_arc(c, 7, 0, TAU, 20, Color(0.6, 0.45, 0.15), 1.5, true)
-			"bottle":
-				draw_colored_polygon(PackedVector2Array([c + Vector2(-6, 15), c + Vector2(6, 15), c + Vector2(6, -2), c + Vector2(2, -7),
-						c + Vector2(2, -15), c + Vector2(-2, -15), c + Vector2(-2, -7), c + Vector2(-6, -2)]), Color(0.25, 0.5, 0.3))
-			"food":
-				draw_arc(c, 9, 0, TAU, 24, Color(0.78, 0.52, 0.24), 6.0, true)
-			"smoke":
-				for o in [Vector2(-7, 4), Vector2(5, 5), Vector2(-1, -5), Vector2(8, -4)]:
-					draw_circle(c + o, 7, Color(0.7, 0.7, 0.72, 0.85))
-			"flash":
-				var pts := PackedVector2Array()
-				for i in 16:
-					var r := 15.0 if i % 2 == 0 else 6.0
-					var a := TAU * i / 16.0
-					pts.append(c + Vector2(cos(a), sin(a)) * r)
-				draw_colored_polygon(pts, Color(1.0, 0.95, 0.7))
 		if not (str(k.current) in ALWAYS):
 			var n: int = 0 if k.current == "pistol" and not k.pistol_loaded else k.count(k.current)
 			if k.current == "pistol":

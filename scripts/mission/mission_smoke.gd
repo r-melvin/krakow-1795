@@ -77,6 +77,8 @@ func talk(id: String, behind := false, dist := 1.3) -> bool:
 	if npc == null:
 		return false
 	for attempt in 6:
+		if not is_instance_valid(npc) or not npc.is_inside_tree():
+			return false                      # carried off or freed mid-approach (events: corpse_carried)
 		var fwd: Vector3 = -npc.global_transform.basis.z
 		fwd.y = 0.0
 		fwd = fwd.normalized()

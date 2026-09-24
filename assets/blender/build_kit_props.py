@@ -197,11 +197,84 @@ def kit_lockpick():
     export("kit_lockpick", join(parts, "kit_lockpick"))
 
 
+def _cord(name, pts, r=0.004):
+    """A cord along a polyline (frusta), as build_vendor_props.tube."""
+    import bmesh
+    bm = bmesh.new()
+    for a, b in zip(pts, pts[1:]):
+        ba._tube(bm, a, b, r, r, 5)
+    return ba._bm_obj(name, bm, M("twine", 0.9))
+
+
+def bundle():
+    """The mission bundle: a parcel of printed sheets, ~40 x 12 x 30 cm (standing, flat side to the carrier's back),
+    wrapped in tarred sackcloth with folded ends and creases, tied crosswise with cord and knotted on the face, a corner
+    of paper showing. Origin at the bottom centre; Godot +Z (Blender -Y) is the outer face."""
+    reset()
+    ba.PAL.setdefault("oilcloth", (0.36, 0.30, 0.20))
+    ba.TEX_OF.setdefault("oilcloth", "cloth")
+    ba.TINT.setdefault("oilcloth", (0.62, 0.52, 0.38))
+    W, D, H = 0.40, 0.12, 0.30
+    cloth = M("oilcloth", 0.95)
+    parts = [box("wrap", (W, D, H), (0, 0, 0), cloth, bevel=0.02, seg=2, wonk=0.012)]
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(parts[0].data)
+    bmesh.ops.subdivide_edges(bm, edges=[e for e in bm.edges if e.calc_length() > 0.05], cuts=2, use_grid_fill=True)
+    bm.to_mesh(parts[0].data)
+    bm.free()
+
+    def creases(co):
+        # soft sag of the wrapped sheets and a few pinched creases across the faces
+        co.y *= 1.0 + 0.06 * math.sin(co.x * 21.0 + 0.7) * (1.0 if abs(co.z - H / 2) < H * 0.45 else 0.3)
+        co.z += 0.004 * math.sin(co.x * 37.0) * (1 if co.z > H * 0.9 else 0)
+    edit_verts(parts[0], creases)
+    # folded end flaps (the cloth tucked over each end like a parcel)
+    for sx in (-1, 1):
+        f = cbox("flap", (0.004, D * 0.96, H * 0.7), (sx * (W / 2 + 0.002), 0, H * 0.45), cloth, rot=(0.0, 0.0, 0.0))
+
+        def tri(co, sx=sx):
+            t = (co.z - H * 0.1) / (H * 0.7)
+            co.y *= max(0.15, 1.0 - 0.8 * max(0.0, t - 0.2))
+        edit_verts(f, tri)
+        parts.append(f)
+    # a crease strip down the front where the cloth overlaps
+    parts.append(cbox("overlap", (W * 0.98, 0.005, 0.03), (0, -D / 2 - 0.002, H * 0.62), cloth, rot=(0.05, 0, 0.02)))
+    # cord: once round the long way, once round the short way, a knot where they cross on the face
+    e = 0.006
+    parts.append(_cord("cord_a", [(-W / 2 - e, -D / 2 - e, H * 0.5), (W / 2 + e, -D / 2 - e, H * 0.5), (W / 2 + e, D / 2 + e, H * 0.5),
+                                  (-W / 2 - e, D / 2 + e, H * 0.5), (-W / 2 - e, -D / 2 - e, H * 0.5)]))
+    parts.append(_cord("cord_b", [(0.04, -D / 2 - e, -0.002), (0.04, -D / 2 - e, H + e), (0.04, D / 2 + e, H + e),
+                                  (0.04, D / 2 + e, -0.002), (0.04, -D / 2 - e, -0.002)]))
+    parts.append(sphere("knot", 0.014, (0.04, -D / 2 - 0.01, H * 0.5), M("twine", 0.9), seg=6, rings=4))
+    parts.append(_cord("tail", [(0.04, -D / 2 - 0.012, H * 0.5), (0.06, -D / 2 - 0.018, H * 0.42), (0.05, -D / 2 - 0.016, H * 0.33)], 0.003))
+    # a corner of printed paper slipping out of the top fold
+    ba.PAL.setdefault("paper_kit", (0.88, 0.84, 0.72))
+    parts.append(cbox("sheet", (0.12, 0.003, 0.09), (-0.12, -D / 2 + 0.01, H + 0.02), M("paper_kit", 0.8), rot=(0.25, 0.15, 0.3)))
+    parts.append(cbox("print", (0.08, 0.002, 0.012), (-0.12, -D / 2 + 0.006, H + 0.035), M("black", 0.9), rot=(0.25, 0.15, 0.3)))
+    export("bundle", join(parts, "bundle"))
+
+
+def satchel():
+    """A leather satchel worn at the hip: a stiff bag with a flap and buckle, a short length of strap rising from each
+    side (the strap over the shoulder is implied by the coat). Origin at the top centre of the bag's back (where it
+    hangs), Godot +Z (Blender -Y) outward."""
+    reset()
+    lea = M("leather_kit", 0.8)
+    parts = [box("bag", (0.26, 0.08, 0.2), (0, -0.04, -0.21), lea, bevel=0.02, seg=2, wonk=0.006),
+             cbox("flap", (0.265, 0.012, 0.13), (0, -0.085, -0.07), lea, rot=(0.08, 0, 0)),
+             cbox("strap_l", (0.03, 0.006, 0.16), (0.12, -0.04, 0.05), lea),
+             cbox("strap_r", (0.03, 0.006, 0.16), (-0.12, -0.04, 0.05), lea),
+             cbox("buckle", (0.035, 0.008, 0.03), (0, -0.093, -0.13), M("brass_kit", 0.35)),
+             cbox("tongue", (0.02, 0.01, 0.06), (0, -0.095, -0.16), lea)]
+    export("satchel", join(parts, "satchel"))
+
+
 BUILDS = [("kit_knife", kit_knife), ("kit_cudgel", kit_cudgel), ("kit_pistol", kit_pistol), ("kit_musket", kit_musket),
           ("kit_stone", kit_stone), ("kit_bottle", kit_bottle), ("kit_coin", kit_coin), ("kit_food", kit_food),
           ("kit_smoke", kit_smoke), ("kit_flash", kit_flash), ("kit_pouch", kit_pouch),
           ("kit_cosh", kit_cosh), ("kit_torch", kit_torch), ("kit_tinderbox", kit_tinderbox), ("kit_poison", kit_poison),
-          ("kit_lockpick", kit_lockpick)]
+          ("kit_lockpick", kit_lockpick), ("bundle", bundle), ("satchel", satchel)]
 
 if __name__ == "__main__":
     only = ba._cli_list("--only")

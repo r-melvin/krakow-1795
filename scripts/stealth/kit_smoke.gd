@@ -6,6 +6,7 @@ extends "res://scripts/stealth/stealth_smoke.gd"
 ##   [smoke] kit knife=ok parry=ok pistol=ok smoke=ok flash=ok throw_coin=ok pickup=ok vault=ok mantle=ok hang=ok
 ##           climb=ok drop_roll=ok
 ##   [smoke] kit poison=ok torch=ok rig_drop=ok cosh=ok
+##   [smoke] kit held=<items> inventory=ok wheel=ok blood splats=<n>
 ##   [smoke] camera keyhole=ok listen=ok lockpick=<ok|fail> qte=ok
 ## `--kit-shot=/dir` (windowed): kit_parry_side, kit_smoke_cloud, kit_flash, kit_vault_midair, kit_hang_sill,
 ## kit_roof_view, kit_keyhole.
@@ -15,6 +16,9 @@ const PickupScript := preload("res://scripts/stealth/pickup.gd")
 const FpViewScript := preload("res://scripts/stealth/fp_view.gd")
 const TraversalScript := preload("res://scripts/stealth/traversal.gd")
 const VerbsScript := preload("res://scripts/stealth/verbs.gd")
+const InventoryScript := preload("res://scripts/ui/inventory.gd")
+const WheelScript := preload("res://scripts/ui/weapon_wheel.gd")
+const BloodScript := preload("res://scripts/stealth/blood.gd")
 
 var K: Dictionary = {}
 
@@ -36,7 +40,12 @@ func _ok(key: String) -> String:
 func _run_kit() -> void:
 	await get_tree().process_frame
 	print("[smoke] kit sandbox tests start at frame %d" % Engine.get_process_frames())
-	var tests: Array[Callable] = [t_knife, t_parry, t_pistol, t_smoke, t_flash, t_coin, t_pickup, t_traversal, t_camera, t_finale]
+	if "--grip-shot" in OS.get_cmdline_user_args() and shot_dir != "":
+		DirAccess.make_dir_recursive_absolute(shot_dir)
+		print(await t_grip_shots(60))
+		get_tree().quit()
+		return
+	var tests: Array[Callable] = [t_knife, t_parry, t_pistol, t_smoke, t_flash, t_coin, t_pickup, t_traversal, t_camera, t_finale, t_hold_ui]
 	if shot_dir != "":
 		DirAccess.make_dir_recursive_absolute(shot_dir)
 		tests.append(t_kit_shots)
@@ -50,9 +59,12 @@ func _run_kit() -> void:
 	for k in keys:
 		parts.append("%s=%s" % [k, _ok(k)])
 	print("[smoke] kit " + " ".join(parts))
+	print("[smoke] kit held=%s inventory=%s wheel=%s blood splats=%d" % [K.get("held", "-"), _ok("inventory"), _ok("wheel"), int(K.get("splats", 0))])
 	print("[smoke] kit poison=%s torch=%s rig_drop=%s cosh=%s" % [_ok("poison"), _ok("torch"), _ok("rig_drop"), _ok("cosh")])
 	print("[smoke] camera keyhole=%s listen=%s lockpick=%s qte=%s" % [_ok("keyhole"), _ok("listen"), _ok("lockpick"), _ok("qte")])
 	print("[smoke] kit done at frame %d" % Engine.get_process_frames())
+	if "--kit-only" in OS.get_cmdline_user_args():
+		get_tree().quit()
 
 
 func _free(w: Dictionary) -> void:
@@ -508,6 +520,146 @@ func t_finale(idx: int) -> String:
 	return "[smoke] kit finale verbs=%d %s" % [n, " ".join(notes)]
 
 
+# ------------------------------------------------------------------ held props, inventory, wheel, blood
+
+func _splats(w: Dictionary) -> int:
+	var n := 0
+	for sp in get_tree().get_nodes_in_group("blood_splat"):
+		if (w["root"] as Node3D).is_ancestor_of(sp):
+			n += 1
+	return n
+
+
+func t_hold_ui(idx: int) -> String:
+	var w := make_world(idx)
+	var p: Player = w["player"]
+	var root: Node3D = w["root"]
+	wall(w, Vector3(0, 1.5, -2.6), Vector3(6, 3, 0.3))
+	await wait_s(0.2)
+	# every kit item in the hand in turn
+	var held := PackedStringArray()
+	for it in ["knife", "cosh", "cudgel", "pistol", "torch", "stone", "bottle", "coin", "smoke", "flash"]:
+		if not p.kit.has(it):
+			p.kit.add(it, 1)
+		p.kit.select(it)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		if p.held_item() == it and p.held_prop() != null:
+			held.append(it)
+	K["held"] = ",".join(held)
+	# inventory: equip, drop
+	var inv := InventoryScript.new()
+	inv.player = p
+	inv.pause = false
+	(w["vp"] as Node).add_child(inv)
+	await get_tree().process_frame
+	inv.open()
+	inv.select_item("pistol")
+	inv.equip()
+	var equipped: bool = p.kit.current == "pistol"
+	var stones0: int = p.kit.count("stone")
+	inv.select_item("stone")
+	inv.drop()
+	await get_tree().process_frame
+	var dropped := false
+	for pk in get_tree().get_nodes_in_group("kit_pickup"):
+		if root.is_ancestor_of(pk) and pk.item == "stone":
+			dropped = true
+	K["inventory"] = inv.is_open() and inv.items().size() >= 8 and equipped and p.kit.count("stone") == stones0 - 1 and dropped
+	inv.close()
+	# wheel: a hold opens it (time x0.25), release equips the highlighted item; a tap does not
+	var wh := WheelScript.new()
+	wh.player = p
+	wh.sandbox = true
+	(w["vp"] as Node).add_child(wh)
+	await get_tree().process_frame
+	wh.press()
+	await wait_s(0.1)
+	var early: bool = wh.is_wheel_open
+	await wait_s(0.3)
+	var opened: bool = wh.is_wheel_open and wh.time_scale_applied == 0.25
+	wh.highlight("smoke")
+	wh.release()
+	K["wheel"] = not early and opened and p.kit.current == "smoke" and not wh.is_wheel_open and wh.time_scale_applied == 1.0
+	# blood: a knife slash and a pistol ball on a guard by the wall
+	var g := guard(w, "Blood guard", [Vector3(0, 0, -1.4)], PI)
+	await wait_s(0.2)
+	p.kit.select("knife")
+	tp(w, Vector3(0, 0, -0.3), Vector3(0, 1, -1.4))
+	await wait_s(0.1)
+	var r := p.attack()
+	await wait_s(0.3)
+	var blade: bool = p.held_prop() != null and p.held_prop().has_meta("blood")
+	var cosh_before := _splats(w)
+	# a cosh gives none
+	var g2 := guard(w, "Cosh guard", [Vector3(8, 0, 0)], 0.0)
+	await wait_s(0.2)
+	p.kit.select("cosh")
+	tp(w, Vector3(8, 0, 1.0), Vector3(8, 1, 0))
+	await wait_s(0.05)
+	p.attack()
+	await wait_s(0.3)
+	K["splats"] = cosh_before
+	var clean: bool = _splats(w) == cosh_before
+	var stain: bool = g._figure.has_meta("blood_stain")
+	_free(w)
+	return "[smoke] kit hold_ui held=%s inventory equip=%s drop=%s wheel early=%s opened=%s picked=%s blood slash=%s splats=%d blade=%s coat=%s cosh_clean=%s" % [
+			",".join(held), equipped, dropped, early, opened, p.kit.current, r, cosh_before, blade, stain, clean]
+
+
+## `--kit-shot=dir --grip-shot`: each held item in turn with the grips of data/stealth.json and, per item, the
+## variants in GRIP_TRIALS (kit_grip_<item>_<n>.png), to tune kit.grips by eye.
+const GRIP_TRIALS := {}   ## item -> [grip, ...] to try beside the data one
+
+
+func t_grip_shots(idx: int) -> String:
+	var w := make_world(idx, {}, true)
+	var p: Player = w["player"]
+	var root: Node3D = w["root"]
+	_shot_env(root)
+	lantern(w, Vector3(1.5, 0, 1.5), false, true)
+	var cam := _cam(w)
+	tp(w, Vector3(0, 0, 0), Vector3(0, 1, -4))
+	await wait_s(0.4)
+	var out := PackedStringArray()
+	var poses := {"knife": ["knife_parry", 0.0], "pistol": ["pistol_aim", 0.5], "torch": ["idle", 1.0], "cudgel": ["idle", 1.0],
+			"cosh": ["idle", 1.0], "bottle": ["idle", 1.0], "stone": ["idle", 1.0], "musket": ["idle", 1.0]}
+	var base: Dictionary = Perception_tg("kit.grips", {})
+	for it in poses:
+		var trials: Array = [base.get(it, base.get("default", {}))] + GRIP_TRIALS.get(it, [])
+		for n in trials.size():
+			var grips := base.duplicate(true)
+			grips[it] = trials[n]
+			(w["watch"] as Node).overrides["kit.grips"] = grips
+			if not p.kit.has(it):
+				p.kit.add(it, 1)
+			p.kit.select(it)
+			if it == "torch":
+				p.kit.torch_lit = true
+			p._hand_item = "?"
+			p._update_hand_prop()
+			p.set_physics_process(false)
+			p._freeze_clip(p._figure, poses[it][0], poses[it][1])
+			await get_tree().process_frame
+			var fwd := -p._figure.global_transform.basis.z
+			var right := p._figure.global_transform.basis.x
+			var hand := p.global_position + Vector3(0, 1.1, 0) + right * 0.25 + fwd * 0.2
+			if it == "pistol":
+				hand = p.global_position + Vector3(0, 1.45, 0) + fwd * 0.55 + right * 0.05
+			_look(cam, hand + fwd * 0.9 + right * 0.8 + Vector3(0, 0.15, 0), hand)
+			out.append(await _shot(w, "kit_grip_%s_%d" % [it, n], str(trials[n])))
+			_look(cam, hand + right * 1.1 + Vector3(0, 0.1, 0), hand)
+			out.append(await _shot(w, "kit_grip_%s_%d_side" % [it, n], ""))
+			p.set_physics_process(true)
+			Assets.clear_action(p._figure)
+	_free(w)
+	return "[smoke] kit grip shots " + " ".join(out)
+
+
+static func Perception_tg(path: String, fb: Variant) -> Variant:
+	return load("res://scripts/stealth/perception.gd").tg(path, fb)
+
+
 # ------------------------------------------------------------------ screenshots
 
 func _cam(w: Dictionary) -> Camera3D:
@@ -634,5 +786,62 @@ func t_kit_shots(idx: int) -> String:
 	p.ai_interact_hold = false
 	p.ai_crouch = false
 	await wait_s(0.4)
+	# 8. held props: knife (knife guard pose), pistol (aimed), torch (lit, upright), close from the front-right
+	tp(w, Vector3(-3.0, 0, 1.0), Vector3(-3.0, 1, -3))
+	await wait_s(0.3)
+	for hold in [["knife", "knife_parry", 0.0], ["pistol", "pistol_aim", 0.5], ["torch", "idle", 1.0]]:
+		if not p.kit.has(hold[0]):
+			p.kit.add(hold[0], 1)
+		p.kit.select(hold[0])
+		if hold[0] == "torch":
+			p.kit.torch_lit = true
+			p.kit.changed.emit()
+		await wait_s(0.2)
+		p.set_physics_process(false)
+		p._freeze_clip(p._figure, hold[1], hold[2])
+		var fwd := -p._figure.global_transform.basis.z
+		var right := p._figure.global_transform.basis.x
+		var hand := p.global_position + Vector3(0, 1.15, 0) + right * 0.2 + fwd * 0.25
+		_look(cam, hand + fwd * 1.3 + right * 0.9 + Vector3(0, 0.25, 0), hand)
+		out.append(await _shot(w, "kit_held_" + str(hold[0]), "held=%s" % p.held_item()))
+		p.set_physics_process(true)
+		Assets.clear_action(p._figure)
+	# 9. a splatter: a knife thrust into a guard facing the 3.2 m wall of the yard
+	p.kit.select("knife")
+	lantern(w, Vector3(19.5, 0, 1.5), false, true)
+	var gb := guard(w, "Splatter guard", [Vector3(17, 0, -0.5)], 0.0)
+	await wait_s(0.2)
+	p.kit.lethal = true
+	tp(w, Vector3(17, 0, 0.5), Vector3(17, 1, -0.5))
+	await wait_s(0.05)
+	p.attack()
+	await wait_s(1.6)
+	tp(w, Vector3(23, 0, 3))
+	_look(cam, L(w, Vector3(18.6, 1.6, 2.4)), L(w, Vector3(17, 0.6, -0.9)))
+	out.append(await _shot(w, "kit_blood_splatter", "splats=%d" % _splats(w)))
+	p.kit.lethal = false
+	# 10. the weapon wheel and 11. the inventory, over the player's view
+	p._camera.current = true
+	tp(w, Vector3(2, 0, 8), Vector3(2, 1, 0))
+	var wh := WheelScript.new()
+	wh.player = p
+	wh.sandbox = true
+	(w["vp"] as Node).add_child(wh)
+	await get_tree().process_frame
+	wh.open_wheel()
+	wh.highlight("smoke")
+	await wait_s(0.2)
+	out.append(await _shot(w, "kit_wheel", "items=%d" % wh.items().size()))
+	wh.close_wheel()
+	var inv := InventoryScript.new()
+	inv.player = p
+	inv.pause = false
+	(w["vp"] as Node).add_child(inv)
+	await get_tree().process_frame
+	inv.open()
+	inv.select_item("pistol")
+	await wait_s(0.2)
+	out.append(await _shot(w, "kit_inventory", "items=%d" % inv.items().size()))
+	inv.close()
 	_free(w)
 	return "[smoke] kit screenshots " + " ".join(out)

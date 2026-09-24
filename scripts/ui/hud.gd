@@ -67,6 +67,9 @@ func _ready() -> void:
 	add_child(StealthCues.new())
 	# Kit indicator bottom left: the current item's icon and count (scripts/stealth/kit.gd Indicator).
 	add_child(preload("res://scripts/stealth/kit.gd").Indicator.new())
+	# Inventory (I) and the weapon wheel (hold Tab; a tap still opens the journal): their own layers.
+	add_child(preload("res://scripts/ui/inventory.gd").new())
+	add_child(preload("res://scripts/ui/weapon_wheel.gd").new())
 	# Minimap bottom right (scripts/ui/minimap.gd, M toggles it); the full map is the journal's Map tab.
 	add_child(preload("res://scripts/ui/minimap.gd").new())
 	# Mission block: current objective top right, purse, interact prompt, one-line messages, curfew banner.
