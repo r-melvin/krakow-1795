@@ -1141,6 +1141,124 @@ def define_clips():
                               K(0.04, **dict(aim_pistol, hzR=1.53, hyR=0.64, wyR=-0.75, wzR=0.65, kyR=0.65, kzR=0.75, sp=-4, st=28, hy=-0.03, hp=-6)),
                               K(0.22, **dict(aim_pistol, hzR=1.47, hyR=0.68, wyR=-0.15, kzR=0.15, hy=-0.02)), K(0.65, **aim_pistol)])
 
+    # ---------------------------------------------------------------- kit: knife, powder, pistol reload (kit.gd)
+    # knife: low guard, a fast forehand slash across at chest height (0.35 s), a high cross parry, drawing from the belt
+    seq("knife_slash", 0.35, [
+        K(0.0, **knife),
+        K(0.08, pt=-18, st=-16, **G("R", (-0.34, 0.20, 1.22), (-0.6, 0.6, 0.5), (0, 0.3, -1))),
+        K(0.16, pt=10, st=16, sp=10, hy=0.10, fyL=0.30, fzL=AZ + 0.04, **G("R", (0.10, 0.56, 1.24), (0.8, 0.5, 0.1), (0, 0.2, -1))),
+        K(0.24, pt=16, st=22, fyL=0.34, fzL=AZ, **G("R", (0.24, 0.36, 1.10), (0.7, 0.1, -0.4), (0.1, 0.6, -0.8))),
+        K(0.35, **knife),
+    ])
+    kparry = dict(knife, hy=-0.04, sp=-2, hp=-6, **G("R", (-0.10, 0.36, 1.56), (1, 0.2, 0.25), (0, 0.4, 1)), **H("L", (0.18, 0.42, 1.30), fL=40))
+    seq("knife_parry", 0.5, [K(0.0, **knife), K(0.1, **kparry), K(0.2, **dict(kparry, hy=-0.08, hzR=1.62, pt=-8)), K(0.5, **knife)])
+    seq("knife_draw", 0.5, [
+        K(0.0, **STAND),
+        K(0.18, st=10, gz=0.8, gp=18, **G("R", (-0.14, 0.02, 0.98), (0, -0.2, -1), (0.4, 0.6, 0))),
+        K(0.32, **G("R", (-0.18, 0.12, 1.02), (0, 0.6, 0.8), (0, 0.8, -0.6))),
+        K(0.5, **knife),
+    ])
+    # powder charge: pinch from the pouch at the left hip, an overarm lob with the right hand
+    seq("throw_powder", 0.6, [
+        K(0.0, **fight),
+        K(0.12, st=10, gz=0.6, gp=20, **H("R", (0.06, 0.10, 0.98)), **H("L", (0.16, 0.06, 0.96))),
+        K(0.26, pt=-24, st=-20, sp=-4, hy=-0.04, **G("R", (-0.26, -0.10, 1.72), (0, 0.3, 1), (0, -0.6, 0.5)), **H("L", (0.24, 0.40, 1.40))),
+        K(0.36, pt=14, st=18, sp=16, hy=0.14, fyL=0.34, fzL=AZ + 0.05, **G("R", (-0.06, 0.66, 1.62), (0, 0.9, 0.3), (0, 0.3, -1), fR=20, thR=10)),
+        K(0.44, fyL=0.38, fzL=AZ, **G("R", (0.0, 0.62, 1.20), (0, 0.8, -0.5), (0, -0.4, -0.9), fR=10, thR=10)),
+        K(0.6, **fight),
+    ])
+    # muzzle-loader: pistol upright in the left hand, the right bites the cartridge, pours, rams three times, returns
+    load_hold = dict(STAND, hz=-0.02, gz=0.9, gp=26, sp=10, **G("L", (0.06, 0.34, 1.12), (0, 0.1, 1), (0, 1, 0), fL=80, thL=30))
+    seq("pistol_reload", 2.4, [
+        K(0.0, **dict(load_hold, **H("R", (-0.16, 0.10, 1.00)))),
+        K(0.30, **H("R", (-0.02, 0.22, 1.56), fR=70)),
+        K(0.55, **H("R", (0.02, 0.34, 1.30), fR=60)),
+        K(0.80, **H("R", (0.02, 0.36, 1.46), fR=80)),
+        K(1.05, **H("R", (0.02, 0.36, 1.28), fR=80)),
+        K(1.30, **H("R", (0.02, 0.36, 1.46), fR=80)),
+        K(1.55, **H("R", (0.02, 0.36, 1.28), fR=80)),
+        K(1.80, **H("R", (0.02, 0.36, 1.46), fR=80)),
+        K(2.10, **H("R", (-0.12, 0.20, 1.06))),
+        K(2.4, **dict(load_hold, **H("R", (-0.16, 0.10, 1.00)))),
+    ])
+    # a guard's blow turned aside: the musket flies up and wide, he reels a step back and recovers his guard
+    seq("block_stagger", 1.0, [
+        K(0.0, **STAND),
+        K(0.08, hy=-0.04, pt=18, st=16, sp=-16, hp=-18, afR=110, aaR=40, eR=20, afL=60, aaL=30, eL=40, gz=0),
+        K(0.26, hy=-0.18, hz=-0.08, fyR=-0.34, fzR=AZ + 0.08, aR=10, sp=-10, pt=12, afR=90, aaR=50),
+        K(0.42, hy=-0.30, fyR=-0.42, fzR=AZ, aR=0, fyL=-0.10, sp=-4, afR=60, aaR=40, eR=40),
+        K(0.66, hy=-0.34, hz=-0.10, sp=10, hp=6, afR=30, aaR=20, eR=50, afL=30, aaL=15),
+        K(1.0, **dict(STAND, hy=-0.34, fyR=-0.42, fyL=-0.10, hz=-0.04, sp=6)),
+    ])
+
+    # ---------------------------------------------------------------- kit: traversal (traversal.gd moves the root)
+    # vault: hands plant on the top (~1 m), the legs swing through tucked to the side, a light landing
+    seq("vault_low", 0.55, [
+        K(0.0, **dict(STAND, sp=18, hz=-0.06, **H("L", (0.24, 0.40, 1.10)), **H("R", (-0.24, 0.40, 1.10)))),
+        K(0.12, sp=34, hz=-0.02, **H("L", (0.22, 0.34, 0.62)), **H("R", (-0.20, 0.34, 0.62))),
+        K(0.26, pl=-18, sl=-10, sp=28, ikL=0, ikR=0, tfL=80, tfR=95, kL=90, kR=110, ttL=10, aL=-10, aR=-10,
+          **H("L", (0.24, 0.02, 0.30)), **H("R", (-0.10, 0.10, 0.36))),
+        K(0.40, pl=-6, sl=-4, sp=14, ikL=0, ikR=0, tfL=40, tfR=30, kL=50, kR=40, **FREE("R"), afR=40, aaR=30, eR=30,
+          **H("L", (0.30, -0.10, 0.70))),
+        K(0.55, **dict(STAND, hz=-0.08, sp=10, afL=20, afR=20, eL=20, eR=20)),
+    ])
+    # mantle: arms reach over the edge, pull, one knee comes up onto it, then the body stands on the top
+    seq("vault_high", 0.95, [
+        K(0.0, **dict(STAND, hz=-0.10, sp=8, afL=40, afR=40, eL=30, eR=30)),
+        K(0.15, **dict(STAND, ikL=0, ikR=0, tfL=10, tfR=4, kL=20, kR=10, aL=-30, aR=-30, sp=4, gz=0.6, gp=30,
+                       **H("L", (0.24, 0.30, 2.00)), **H("R", (-0.24, 0.30, 2.00)))),
+        K(0.40, ikL=0, ikR=0, tfL=40, tfR=10, kL=70, kR=30, sp=24, **H("L", (0.24, 0.34, 1.40)), **H("R", (-0.24, 0.34, 1.40))),
+        K(0.62, ikL=0, ikR=0, tfL=100, tfR=30, kL=120, kR=50, sp=40, hz=-0.10, **H("L", (0.26, 0.24, 0.84)), **H("R", (-0.26, 0.24, 0.84))),
+        K(0.80, **dict(CROUCH, sp=24, **H("L", (0.26, 0.30, 0.50)), **H("R", (-0.26, 0.30, 0.50)))),
+        K(0.95, **dict(STAND, hz=-0.06)),
+    ])
+    hang = dict(STAND, ikL=0, ikR=0, tfL=8, tfR=14, kL=18, kR=26, aL=-34, aR=-30, sp=-4, np=-10, hp=-8, gz=0.5, gp=12,
+                **H("L", (0.20, 0.16, 2.04), fL=85, thL=40), **H("R", (-0.20, 0.16, 2.04), fR=85, thR=40))
+    seq("ledge_hang", 1.0, [K(0.0, **dict(hang, kL=40, kR=50, tfL=24, tfR=30)), K(0.3, **dict(hang, kL=10, kR=16)), K(1.0, **hang)])
+    seq("ledge_shimmy", 0.6, [
+        K(0.0, **hang),
+        K(0.15, pl=6, sl=4, hxL=0.34, hzL=2.06, tfL=18, taL=12),
+        K(0.30, pl=0, sl=0, hxL=0.30, hxR=-0.10, hzR=2.06, taL=4, tfR=18, taR=10),
+        K(0.45, hxR=-0.18, taR=4),
+        K(0.6, **hang),
+    ])
+    seq("ledge_climb", 1.0, [
+        K(0.0, **hang),
+        K(0.28, sp=10, tfL=30, tfR=16, kL=50, kR=30, eL=90, eR=90, **H("L", (0.22, 0.26, 1.42)), **H("R", (-0.22, 0.26, 1.42))),
+        K(0.52, sp=40, hz=-0.06, tfL=100, tfR=20, kL=120, kR=40, **H("L", (0.26, 0.22, 0.86)), **H("R", (-0.26, 0.22, 0.86))),
+        K(0.74, **dict(CROUCH, sp=30, **H("L", (0.26, 0.30, 0.46)), **H("R", (-0.26, 0.30, 0.46)))),
+        K(1.0, **dict(STAND, hz=-0.04)),
+    ])
+    seq("drop_hang", 0.5, [
+        K(0.0, **hang),
+        K(0.2, **dict(STAND, ikL=0, ikR=0, tfL=14, tfR=20, kL=30, kR=36, aL=-20, aR=-20, afL=120, afR=120, aaL=30, aaR=30, eL=20, eR=20, gz=0)),
+        K(0.5, **dict(STAND, ikL=0, ikR=0, tfL=24, tfR=18, kL=44, kR=40, aL=-10, aR=-10, afL=60, afR=60, aaL=50, aaR=50, eL=30, eR=30)),
+    ])
+    # slide: feet first on the hip, the lead leg straight, the trailing hand skims the cobbles, then back up
+    slide = dict(STAND, ikL=0, ikR=0, pp=-58, hz=-0.66, hy=-0.20, sp=30, np=20, tfL=78, tfR=50, kL=6, kR=70, ttR=20, aL=10, aR=-10,
+                 afL=50, eL=30, **H("R", (-0.36, -0.30, 0.10), fR=20), gz=0.7, gp=0)
+    seq("slide_under", 0.75, [
+        K(0.0, **dict(STAND, sp=14, hz=-0.10)),
+        K(0.14, **dict(slide, hz=-0.50, pp=-40)),
+        K(0.50, **slide),
+        K(0.75, **dict(CROUCH, hy=0.10)),
+    ])
+    # tipping a vial into a tankard at waist height: a glance round, the hand over the cup, a small pour, away
+    seq("pour_small", 1.4, [
+        K(0.0, **STAND),
+        K(0.25, ht=30, gz=0.6, gt=30, **H("R", (-0.06, 0.30, 1.02), fR=60)),
+        K(0.55, ht=0, gt=0, gp=30, sp=10, **G("R", (-0.02, 0.36, 1.00), (0.2, 0.3, -0.9), (0, 1, 0), fR=60, thR=30)),
+        K(0.95, **G("R", (-0.02, 0.36, 1.00), (0.6, 0.2, -0.7), (0, 1, 0), fR=60, thR=30)),
+        K(1.15, ht=-25, gt=-25, gp=10, **H("R", (-0.16, 0.14, 0.98))),
+        K(1.4, **STAND),
+    ])
+    # climbing a drainpipe / ivy: hand over hand, knees high, feet pressing the wall
+    pipe = dict(STAND, ikL=0, ikR=0, sp=6, gz=0.6, gp=20)
+    CLIPS["climb_pipe"] = (0.9, keyed(complete(pipe), [
+        K(0.0, **dict(pipe, tfL=70, kL=100, tfR=20, kR=40, **H("L", (0.10, 0.28, 2.00)), **H("R", (-0.10, 0.28, 1.50)))),
+        K(0.45, **dict(pipe, tfL=20, kL=40, tfR=70, kR=100, **H("L", (0.10, 0.28, 1.50)), **H("R", (-0.10, 0.28, 2.00)))),
+    ], loop=True, length=0.9), True)
+
     # ---------------------------------------------------------------- musket (guards; the musket is welded to hand_r)
     # Austrian 1790s manual order: shoulder, make ready (musket upright before the right shoulder, cock), present,
     # fire, recover to the priming position at the right hip, prime and load, ram at the muzzle.

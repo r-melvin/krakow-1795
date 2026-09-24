@@ -246,6 +246,7 @@ def M(key, rough=None, tex=None, nstr=None):
         nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
     _mats[ck] = m
     MAT_KEY[m.name] = key
+    MAT_INFO[m.name] = (key, tex, rough)
     return m
 
 
@@ -308,7 +309,7 @@ def body_type(name):
     return "average"
 
 
-def apply_body(name, spec):
+def apply_body(name, spec, quiet=False):
     """Weight and muscle from the role (see body_type), plus shape targets: a belly and waist for the rotund,
     hollow chest and narrow waist for the gaunt, and a flatter chest than MakeHuman's athletic default for all.
     Women take the same spread with muscle capped at 0.45. Garments are cut from the shaped helpers afterwards,
@@ -317,6 +318,12 @@ def apply_body(name, spec):
     macro = dict(spec.get("macro", {}))
     female = macro.get("gender", 0.5) < 0.5
     kind = spec.get("body") or body_type(name)
+    if spec.get("fixed_body"):          # hand-built leaders: keep their macro sliders
+        weight, muscle = macro.get("weight", 0.5), macro.get("muscle", 0.4)
+        targets = dict(spec.get("targets", {}))
+        if not quiet:
+            log("body %s: %s (fixed) weight %.2f muscle %.2f" % (name, kind, weight, muscle))
+        return dict(spec, macro=macro, targets=targets, body=kind)
     wr, mr = {"gaunt": ((0.15, 0.3), (0.2, 0.35)), "rotund": ((0.75, 0.95), (0.3, 0.5)),
               "fit": ((0.45, 0.6), (0.55, 0.7)), "average": ((0.3, 0.7), (0.25, 0.55))}[kind]
     weight = round(rng.uniform(*wr), 2)
@@ -337,7 +344,8 @@ def apply_body(name, spec):
         shape = {"torso-vshape-decr": 0.05}
     for k, v in shape.items():
         targets.setdefault(k, v)
-    log("body %s: %s weight %.2f muscle %.2f" % (name, kind, weight, muscle))
+    if not quiet:
+        log("body %s: %s weight %.2f muscle %.2f" % (name, kind, weight, muscle))
     return dict(spec, macro=macro, targets=targets, body=kind)
 
 
@@ -664,10 +672,35 @@ def buttons(surf, rig, z_lo, z_hi, n, mat, bones_by_z, x=0.0, hole=None):
     return out
 
 
+EYE_BACK = 0.0022       # m the eyeballs sit back into the sockets
+EYE_SCALE = 0.955
+
+
+def seat_eyes():
+    """After all face targets: sit each eyeball a little deeper and smaller, so the lid margins cover the iris edge
+    (strong eye/cheek sliders otherwise leave the cornea proud of the lids). Edits the basis and any shape keys."""
+    eye = next((o for o in bpy.data.objects if o.type == "MESH" and "high-poly" in o.name), None)
+    if eye is None or os.environ.get("KRAKOW_EYE_SEAT") == "0":       # =0: old placement, for before/after checks
+        return
+    me = eye.data
+    layers = [kb.data for kb in me.shape_keys.key_blocks] if me.shape_keys else [me.vertices]
+    for data in layers:
+        for side in (1, -1):
+            idx = [i for i, v in enumerate(data) if v.co.x * side > 0]
+            if not idx:
+                continue
+            cs = [data[i].co for i in idx]
+            c = Vector((sum(p.x for p in cs), sum(p.y for p in cs), sum(p.z for p in cs))) / len(cs)
+            for i in idx:
+                data[i].co = c + (data[i].co - c) * EYE_SCALE + Vector((0.0, EYE_BACK, 0.0))
+    me.update()
+    log("eyes seated: back %.1f mm, scale %.2f, shape keys %s" % (EYE_BACK * 1000, EYE_SCALE, bool(me.shape_keys)))
+
+
 def eye_shadow(rig):
     """Dark translucent shell over the upper front of each eyeball: the upper lid's shadow, baked."""
     eye = next((o for o in bpy.data.objects if o.type == "MESH" and "high-poly" in o.name), None)
-    if eye is None:
+    if eye is None or os.environ.get("KRAKOW_EYE_SEAT") == "0":       # =0: old placement, for before/after checks
         return None
     sh = eye.copy()
     sh.data = eye.data.copy()
@@ -1880,7 +1913,7 @@ def build_hat(hat, spec, rig, pts, top_z, extra=()):
         k = int(round((-0.22 * math.pi) % math.tau / math.tau * n)) % n
         base = F.at(k, zs[k] + 0.03, r0[k] + 0.022)
         rng = random.Random(spec.get("seed", 3))
-        for i in range(6):
+        for i in range(0 if spec.get("plain_cap") else 6):
             d = Vector((0.15 + rng.uniform(-0.25, 0.25), 0.25 + rng.uniform(-0.15, 0.35), 1.0)) + F.radial(k) * 0.3
             L = 0.22 + rng.uniform(-0.05, 0.08)
             dd = d.normalized()
@@ -1893,8 +1926,20 @@ def build_hat(hat, spec, rig, pts, top_z, extra=()):
             e.data.materials.append(M("navy", 0.4)); e.name = "feather_eye"
             _weight_to_bone(e, rig, "head")
             out.append(e)
+        if spec.get("cockade"):
+            kc = int(round((-0.62 * math.pi) % math.tau / math.tau * n)) % n
+            ck = F.at(kc, zs[kc] + 0.035, r0[kc] + 0.026)
+            nrm = F.radial(kc)
+            ax1 = nrm.cross(Vector((0, 0, 1))).normalized()
+            ax2 = nrm.cross(ax1).normalized()
+            for rr, colk, dn in ((0.022, "white_coat", 0.0), (0.014, "crimson", 0.002)):
+                bm = bmesh.new()
+                ringp = [ck + nrm * dn + ax1 * (rr * math.cos(math.tau * i / 20)) * (1 + 0.08 * math.sin(i * math.pi)) + ax2 * (rr * math.sin(math.tau * i / 20))
+                         for i in range(20)]
+                _grid(bm, [ringp], closed=True, cap_top=ck + nrm * (dn + 0.003))
+                out.append(_mk("hat_cockade", bm, M(colk, 0.6, tex="plain"), rig, angle=80, uv=0.1, solid=0.002))
         # ribbons from the back of the band
-        for i, rk in enumerate(("facing_red", "sky_blue", "dress_green", "saffron")):
+        for i, rk in enumerate(() if spec.get("plain_cap") else ("facing_red", "sky_blue", "dress_green", "saffron")):
             kk = (n // 4 + (i - 1.5) * 2) % n
             kk = int(kk)
             p0 = F.at(kk, zs[kk] + 0.02, r0[kk] + 0.02)
@@ -2503,6 +2548,14 @@ def build_clothes(h, rig, spec):
                 bm.free()
 
     # ---- extra props
+    if any(spec.get(k) for k in ("cape", "rochet", "vest", "knife", "icehook", "pistol", "star", "jabot", "buckles", "moustache",
+                                 "forelock", "earring", "rings")):
+        from mathutils.kdtree import KDTree
+        kd2 = KDTree(len(pts))
+        for i_, (p_, d_) in enumerate(pts):
+            kd2.insert(p_, i_)
+        kd2.balance()
+        out += leader_props(spec, rig, pts, surf, B, waist_z, knee_z, top_z, kd2, [d_ for (p_, d_) in pts])
     if spec.get("hawk"):
         _hawk(rig, pts)
     if spec.get("apron"):
@@ -2557,6 +2610,7 @@ def build_clothes(h, rig, spec):
             _weight_to_bone(o, rig, "pelvis")
             out.append(o)
     out += GARMENT_EXTRA
+    DRAPE_CTX.update({"me": me, "pts": pts, "top_z": top_z})
     # hanging pieces over the skirt share its skinning so legs cannot poke through them either
     for o in out:
         if not o:
@@ -2982,19 +3036,52 @@ FACE_TARGETS = ["nose-hump-incr", "nose-hump-decr", "nose-scale-vert-incr", "nos
                 "head-scale-horiz-incr", "head-scale-horiz-decr", "head-fat-incr", "head-fat-decr"]
 
 
-def face_variety(seed, n=5, amount=0.35):
-    rng = random.Random(seed)
-    out = {}
-    for t in rng.sample(FACE_TARGETS, n):
-        out[t] = round(rng.uniform(0.1, amount), 2)
-    # extra groups if present on disk
-    for group in ("eyes", "mouth", "cheek", "forehead", "ears"):
-        d = os.path.join(TARGETS, group)
-        if os.path.isdir(d) and rng.random() < 0.7:
-            files = [f for f in os.listdir(d) if f.endswith(".target.gz") and "-decr" in f or f.endswith(".target.gz") and "-incr" in f]
-            if files:
-                out[rng.choice(files).replace(".target.gz", "")] = round(rng.uniform(0.1, 0.35), 2)
-    return out
+def _lr(t):
+    return ("l-" + t, "r-" + t)
+
+
+# Face sliders: (axis, target(s) for +, target(s) for -, masculine side). Every character gets a value on every axis
+# (a seeded gauss, so no two faces share a recipe); women are held back on the masculine side of an axis.
+FACE_AXES = [
+    ("nose_hump", "nose-hump-incr", "nose-hump-decr", +1), ("nose_len", "nose-scale-vert-incr", "nose-scale-vert-decr", +1),
+    ("nose_width", "nose-scale-horiz-incr", "nose-scale-horiz-decr", +1), ("nose_tip", "nose-point-width-incr", "nose-point-width-decr", +1),
+    ("nose_up", "nose-point-up", "nose-point-down", 0), ("nose_flare", "nose-flaring-incr", "nose-flaring-decr", 0),
+    ("nose_greek", "nose-greek-incr", "nose-greek-decr", 0), ("nose_curve", "nose-curve-convex", "nose-curve-concave", 0),
+    ("chin_prom", "chin-prominent-incr", "chin-prominent-decr", +1), ("chin_width", "chin-width-incr", "chin-width-decr", +1),
+    ("chin_height", "chin-height-incr", "chin-height-decr", 0), ("jaw", "chin-bones-incr", "chin-bones-decr", +1),
+    ("chin_cleft", "chin-cleft-incr", "chin-cleft-decr", +1), ("head_w", "head-scale-horiz-incr", "head-scale-horiz-decr", +1),
+    ("head_fat", "head-fat-incr", "head-fat-decr", 0), ("head_sq", "head-square", "head-oval", +1),
+    ("head_round", "head-round", "head-triangular", 0), ("head_diamond", "head-diamond", "head-invertedtriangular", 0),
+    ("mouth_w", "mouth-scale-horiz-incr", "mouth-scale-horiz-decr", 0), ("lip_up", "mouth-upperlip-volume-incr", "mouth-upperlip-volume-decr", -1),
+    ("lip_low", "mouth-lowerlip-volume-incr", "mouth-lowerlip-volume-decr", -1), ("mouth_angle", "mouth-angles-up", "mouth-angles-down", 0),
+    ("philtrum", "mouth-philtrum-volume-incr", "mouth-philtrum-volume-decr", 0),
+    ("eye_scale", _lr("eye-scale-incr"), _lr("eye-scale-decr"), -1), ("eye_bag", _lr("eye-bag-incr"), _lr("eye-bag-decr"), 0),
+    ("eye_open", _lr("eye-height2-incr"), _lr("eye-height2-decr"), -1), ("eye_spacing", _lr("eye-trans-out"), _lr("eye-trans-in"), 0),
+    ("eye_tilt", _lr("eye-corner1-up"), _lr("eye-corner1-down"), 0), ("cheekbones", _lr("cheek-bones-incr"), _lr("cheek-bones-decr"), 0),
+    ("cheek_vol", _lr("cheek-volume-incr"), _lr("cheek-volume-decr"), 0), ("forehead", "forehead-scale-vert-incr", "forehead-scale-vert-decr", 0),
+    ("temples", "forehead-temple-incr", "forehead-temple-decr", 0), ("brow_angle", "eyebrows-angle-up", "eyebrows-angle-down", 0),
+    ("brow_ridge", "eyebrows-trans-forward", "eyebrows-trans-backward", +1), ("ears", _lr("ear-scale-incr"), _lr("ear-scale-decr"), 0),
+    ("ear_flap", _lr("ear-flap-incr"), _lr("ear-flap-decr"), 0), ("ear_lobe", _lr("ear-lobe-incr"), _lr("ear-lobe-decr"), 0),
+    ("neck", "neck-scale-horiz-incr", "neck-scale-horiz-decr", +1),
+]
+FACE_AMP = 0.75
+
+
+def face_variety(key, female=False):
+    """Seeded face: a value on every FACE_AXES slider -> MakeHuman targets, plus the slider vector for the audit."""
+    rng = random.Random(_seed(key, 7))
+    vec, out = [], {}
+    for axis, plus, minus, masc in FACE_AXES:
+        v = max(-1.0, min(1.0, rng.gauss(0.0, 0.5)))
+        if female and masc > 0:
+            v = min(v, 0.15) - 0.15            # softer jaw, chin, brow and nose
+        elif female and masc < 0:
+            v = max(v, -0.2) + 0.1             # fuller lips, larger eyes
+        vec.append(v)
+        tg = plus if v > 0 else minus
+        for t in (tg if isinstance(tg, tuple) else (tg,)):
+            out[t] = round(abs(v) * FACE_AMP, 3)
+    return out, vec
 
 
 def pick_skin(macro, gender_f, seed=0):
@@ -3011,6 +3098,743 @@ def pick_skin(macro, gender_f, seed=0):
     return name
 
 
+# ------------------------------------------------------------------ grime, wear and weathering by role
+FILTHY_ROLES = ("beggar", "urchin")
+LABOUR_ROLES = ("porter", "blacksmith", "raftsman", "ferryman", "boatman", "carter", "tanner", "dyer", "peasant", "washerwoman",
+                "journeyman", "cellarman", "maltster", "coachman", "lamplighter", "smuggler", "market_woman", "horse_dealer",
+                "salt_trader", "night_watchman", "tavern_maid", "baker", "brewer", "distiller", "ruthenian", "falconer", "pedlar")
+RICH_ROLES = ("noble", "magnate", "bishop", "banker", "governor", "envoy", "hostess", "burgomaster", "mayor", "judge", "councillor",
+              "jeweller", "goldsmith", "silversmith", "figure_merchant", "cloth_merchant", "prussian", "sejm", "advocate", "agent")
+DRUNK_ROLES = ("cellarman", "distiller", "tavern_keeper", "innkeeper", "boatman", "raftsman", "smuggler", "brewer")
+OUTDOOR_ROLES = LABOUR_ROLES + ("watchman", "guard", "cossack", "hajduk", "officer", "sergeant", "polizei", "beggar", "urchin",
+                                "peasant", "falconer", "student", "customs", "informer", "npc_")
+INDOOR_ROLES = ("innkeeper", "tavern_keeper", "tavern_maid", "apothecary", "tailor", "bookseller", "printer", "professor", "scholar",
+                "notary", "moneylender", "gem_cutter", "jeweller", "hostess", "bishop", "priest")
+
+
+def grime_profile(name, spec):
+    """Role -> how dirty: level 0..1 plus flags (patches, holes, soot, sweat, fade, ruddy, pox, teeth, snow, wine)."""
+    rng = random.Random(_seed(name, 11))
+    if spec.get("grime") is not None:
+        lv = spec["grime"]
+    elif any(k in name for k in FILTHY_ROLES):
+        lv = 1.0
+    elif any(k in name for k in LABOUR_ROLES):
+        lv = 0.7
+    elif any(k in name for k in RICH_ROLES):
+        lv = 0.12
+    elif any(k in name for k in ("watchman", "guard", "officer", "hajduk", "cossack", "sergeant", "polizei")):
+        lv = 0.3
+    else:
+        lv = round(rng.uniform(0.25, 0.55), 2)
+    poor = lv >= 0.65
+    return {
+        "level": lv, "poor": poor, "holes": lv >= 0.95, "patches": poor or (lv > 0.45 and rng.random() < 0.4),
+        "soot": poor or spec.get("apron") == "leather" or spec.get("ink"), "sweat": poor, "fade": lv > 0.4 and rng.random() < 0.6 + 0.3 * lv,
+        "ruddy": spec.get("drunk") or any(k in name for k in DRUNK_ROLES) or (poor and rng.random() < 0.5),
+        "pox": spec.get("pox", rng.random() < 0.1 and lv > 0.2), "teeth": spec.get("teeth", lv >= 0.65 and rng.random() < 0.6),
+        "stubble": spec.get("stubble", False), "scar": spec.get("scar"),
+        "snow": bool(spec.get("snow")), "wine": lv < 0.2 and rng.random() < 0.7,
+        "skin_grime": lv >= 0.65 or spec.get("drunk"),
+    }
+
+
+MAT_INFO = {}            # material name -> (key, tex, rough)
+
+
+def _variant(mat, suffix, colour_fn):
+    """A copy of a cloth material with its colour changed (mud, soot, faded...). Same texture, so it reads as a stain."""
+    key, tex, rough = MAT_INFO.get(mat.name, (MAT_KEY.get(mat.name), None, None))
+    if key is None or key not in COL:
+        return None
+    vk = key + "~" + suffix
+    if vk not in COL:
+        COL[vk] = tuple(max(0.0, min(1.0, c)) for c in colour_fn(COL[key]))
+    return M(vk, rough, tex=tex if tex != "plain" else ("plain" if key in NOT_CLOTH else None))
+
+
+def _lerp3(a, b, t):
+    return tuple(x + (y - x) * t for x, y in zip(a, b))
+
+
+def _lum(c):
+    return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
+
+
+GRIME_COL = {
+    "mud": lambda c: _lerp3(c, (0.19, 0.14, 0.09), 0.6),
+    "slush": lambda c: _lerp3(c, (0.24, 0.22, 0.19), 0.35),
+    "soot": lambda c: _lerp3(c, (0.07, 0.065, 0.06), 0.55),
+    "sweat": lambda c: tuple(x * f for x, f in zip(c, (0.74, 0.70, 0.56))),
+    "fade": lambda c: _lerp3(c, (_lum(c) * 1.05 + 0.08,) * 3, 0.35),
+    "snow": lambda c: (0.86, 0.88, 0.93),
+    "dust": lambda c: _lerp3(c, (0.52, 0.48, 0.40), 0.35),
+    "wine": lambda c: _lerp3(c, (0.24, 0.03, 0.07), 0.75),
+    "grease": lambda c: _lerp3(c, (0.12, 0.10, 0.07), 0.4),
+}
+PATCH_KEYS = ["sukmana", "brown_coat", "grey_coat", "dun", "rust", "olive", "charcoal", "buff"]
+
+
+def _set_faces(obj, faces, mat):
+    if not faces or mat is None:
+        return
+    me = obj.data
+    if mat.name not in [m.name for m in me.materials if m]:
+        me.materials.append(mat)
+    idx = [m.name if m else "" for m in me.materials].index(mat.name)
+    for f in faces:
+        me.polygons[f].material_index = idx
+
+
+def _stitches(obj, edges, rig, key):
+    """Dark running stitches along the given edges (vertex index pairs), 2 mm wide, skinned like the cloth."""
+    me = obj.data
+    names = {g.index: g.name for g in obj.vertex_groups}
+    me.calc_normals_split() if hasattr(me, "calc_normals_split") else None
+    bm = bmesh.new()
+    src = []
+    for k, (a, b) in enumerate(edges):
+        if k % 2:                                     # dashed
+            continue
+        va, vb = me.vertices[a], me.vertices[b]
+        n = (va.normal + vb.normal).normalized()
+        t = (vb.co - va.co)
+        if t.length < 1e-5:
+            continue
+        side = t.cross(n).normalized() * 0.001
+        pa, pb = va.co + n * 0.0016, vb.co + n * 0.0016
+        vs = [bm.verts.new(p) for p in (pa - side, pb - side, pb + side, pa + side)]
+        bm.faces.new(vs)
+        src += [a, b, b, a]
+    if not bm.faces:
+        bm.free()
+        return None
+    o = _mk("stitch_" + obj.name, bm, M(_dark(key, 0.3), 1.0, tex="plain"), rig, bone=None, angle=80, uv=0.2, recalc=False)
+    for g in obj.vertex_groups:
+        o.vertex_groups.new(name=g.name)
+    for vi, si in enumerate(src):
+        for g in me.vertices[si].groups:
+            o.vertex_groups[names[g.group]].add([vi], g.weight, "REPLACE")
+    am = o.modifiers.new("arm", "ARMATURE")
+    am.object = rig
+    o.parent = rig
+    return o
+
+
+def apply_grime(name, spec, objs, rig, ctx):
+    """Stains as per-face material variants (glTF keeps one primitive per material, so no shader tricks are needed):
+    mud and slush splashes in the lowest 25 cm, soot and grease on cuffs, collars and aprons, sweat under the arms and at
+    the neck, faded dye on the upper back and shoulders, snow on shoulders and hat tops, dust on shoes, a wine stain on
+    the rich; patches with stitches and worn knees on the poor, holes and frayed hems on beggars. Seeded per name."""
+    G = grime_profile(name, spec)
+    lv = G["level"]
+    rng = random.Random(_seed(name, 12))
+    off = rng.uniform(0, 100)
+    B = ctx["B"]
+    knee = ctx["knee_z"]
+    extra = []
+    armpits = [B["upperarm_l"][0] + Vector((0.0, 0.0, -0.06)), B["upperarm_r"][0] + Vector((0.0, 0.0, -0.06))]
+    neck = B["neck_01"][0]
+    wine_at = Vector((rng.uniform(-0.08, 0.08), -0.2, ctx["waist_z"] + rng.uniform(-0.05, 0.12)))
+    CLOTH = ("coat", "coat_skirt", "skirt", "breeches", "stockings", "cuffs", "collar", "apron", "sash", "lapel", "waistcoat",
+             "front_edge", "pocket_flap")
+    FEET = ("boot_leg", "boot_foot", "boot_top")
+    for o in objs:
+        if not o or o.type != "MESH" or not o.data.materials:
+            continue
+        base = o.name.split(".")[0]
+        mat = o.data.materials[0]
+        me = o.data
+        is_hat = base.startswith("hat") or base in ("zucchetto", "phrygian")
+        if not (base in CLOTH or base in FEET or is_hat):
+            continue
+        def stain(c, n):
+            """Stain key for a point on the cloth ("dead" = worn through), or None."""
+            # low-frequency blobs: splashes ~8 cm, fading ~25 cm
+            nz = mnoise.noise(Vector((c.x * 11 + off, c.y * 11, c.z * 11))) + 0.35 * mnoise.noise(Vector((c.x * 25, c.y * 25 + off, c.z * 25)))
+            nz2 = mnoise.noise(Vector((c.x * 3.5 - off, c.y * 3.5, c.z * 3.5)))
+            if is_hat:
+                return "snow" if (G["snow"] and n.z > 0.6 and nz > 0.15) else None
+            if G["holes"] and base == "breeches" and abs(c.z - knee) < 0.05 and n.y < -0.3 and nz > -0.2:
+                return "dead"
+            if G["holes"] and base in ("coat", "skirt", "coat_skirt") and c.z < hem_z + 0.035 and \
+                    mnoise.noise(Vector((c.x * 40 + off, c.y * 40, 0))) > 0.0 + (c.z - hem_z) * 12:
+                return "dead"
+            if c.z < 0.25 and base != "sash":
+                t = (0.25 - c.z) / 0.25
+                if lv > 0.2 and nz > 0.55 - 0.9 * t * lv:
+                    return "mud"
+                if lv > 0.15 and t > 0.55 and nz > 0.3 - 0.6 * t:
+                    return "slush"
+            if base in FEET and lv < 0.3 and nz > 0.45 and spec.get("dust"):
+                return "dust"
+            if G["soot"] and base in ("cuffs", "collar", "apron") and nz > 0.1 - 0.3 * lv:
+                return "soot" if lv > 0.8 or spec.get("apron") == "leather" else "grease"
+            if G["sweat"] and base == "coat" and (min((c - a_).length for a_ in armpits) < 0.07 + 0.03 * nz or ((c - neck).length < 0.09 and nz > -0.1)):
+                return "sweat"
+            if G["fade"] and base in ("coat", "skirt", "coat_skirt") and c.z > ctx["waist_z"] + 0.12 and c.y > -0.02 and nz2 > -0.1:
+                return "fade"
+            if G["snow"] and base in ("coat", "collar") and n.z > 0.7 and nz > 0.1:
+                return "snow"
+            if G["wine"] and base in ("coat", "waistcoat", "skirt", "lapel") and (c - wine_at).length < 0.025 + 0.012 * nz and n.y < 0:
+                return "wine"
+            return None
+        hem_z = min(v.co.z for v in me.vertices)
+        # soft edges without extra geometry: faces bordering a stain get a half-strength variant of it
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bm.faces.ensure_lookup_table()
+        bm.normal_update()
+        keys = {f.index: stain(f.calc_center_median(), f.normal) for f in bm.faces}
+        halo = {}
+        for f in bm.faces:
+            if keys[f.index] is not None:
+                continue
+            for e in f.edges:
+                for g in e.link_faces:
+                    k = keys[g.index]
+                    if k not in (None, "dead") and k != "snow":
+                        halo[f.index] = k + "_edge"
+        bm.free()
+        keys.update(halo)
+        sets = {}
+        dead = []
+        for fi, k in keys.items():
+            if k == "dead":
+                dead.append(fi)
+            elif k:
+                sets.setdefault(k, []).append(fi)
+        for key, faces in sets.items():
+            if key.endswith("_edge"):
+                fn = GRIME_COL[key[:-5]]
+                _set_faces(o, faces, _variant(mat, key, lambda c, fn=fn: _lerp3(c, fn(c), 0.45)))
+            else:
+                _set_faces(o, faces, _variant(mat, key, GRIME_COL[key]))
+        # patches (rectangles on elbows, knees, skirt front) with stitched edges
+        if G["patches"] and base in ("coat", "breeches", "skirt", "coat_skirt"):
+            spots = []
+            if base == "coat":
+                for sd in ("l", "r"):
+                    if rng.random() < 0.6:
+                        spots.append((B["lowerarm_" + sd][0], 0.05, 0.06))
+            elif base == "breeches":
+                for sd in ("l", "r"):
+                    if rng.random() < 0.6:
+                        spots.append((B["calf_" + sd][0] + Vector((0, -0.06, 0.03)), 0.045, 0.05))
+            else:
+                if rng.random() < 0.7:
+                    spots.append((Vector((rng.uniform(-0.15, 0.15), -0.2, knee + rng.uniform(0.0, 0.25))), 0.06, 0.07))
+            pk = rng.choice(PATCH_KEYS)
+            pmat = _variant(mat, "patch_" + pk, lambda c, pk=pk: _lerp3(COL[pk], c, 0.25))
+            for (p, hw, hh) in spots:
+                faces = [f.index for f in me.polygons if abs(f.center.x - p.x) < hw and abs(f.center.z - p.z) < hh
+                         and ((f.center.y < p.y + 0.05) if base != "coat" else (f.center - p).length < 0.12)]
+                if not faces:
+                    continue
+                _set_faces(o, faces, pmat)
+                fs = set(faces)
+                bmx = bmesh.new()
+                bmx.from_mesh(me)
+                bmx.edges.ensure_lookup_table()
+                edges = []
+                for e in bmx.edges:
+                    lf = [lf.index for lf in e.link_faces]
+                    if len(lf) == 2 and ((lf[0] in fs) != (lf[1] in fs)):
+                        edges.append((e.verts[0].index, e.verts[1].index))
+                bmx.free()
+                st = _stitches(o, edges, rig, MAT_KEY.get(mat.name, "charcoal"))
+                if st:
+                    extra.append(st)
+        if dead:
+            bm = bmesh.new()
+            bm.from_mesh(me)
+            bm.faces.ensure_lookup_table()
+            bmesh.ops.delete(bm, geom=[bm.faces[i] for i in set(dead)], context="FACES")
+            bm.to_mesh(me)
+            bm.free()
+    log("grime %s: level %.2f %s" % (name, lv, " ".join(k for k, v in G.items() if v is True)))
+    return extra
+
+
+def weather_skin(name, spec, h, me, pts, top_z, rig):
+    """Baked overlay on this character's copy of the skin texture: ruddy cheeks and nose (drinkers, outdoor workers),
+    grime on hands and face (labourers, beggars), pox scars (10 %), and gaps in the teeth of the poor. Painted in UV
+    space by splatting at the UVs of the body vertices in each region."""
+    import numpy as np
+    G = grime_profile(name, spec)
+    if not (G["ruddy"] or G["skin_grime"] or G["pox"] or G["teeth"] or G["stubble"] or G["scar"] or G["level"] > 0.4):
+        return
+    img = None
+    for m in h.data.materials:
+        if m and m.node_tree:
+            for nd in m.node_tree.nodes:
+                if nd.type == "TEX_IMAGE" and nd.image and not any(k in nd.image.name.lower() for k in ("normal", "bump", "spec", "rough")):
+                    if img is None or nd.image.size[0] > img.size[0]:
+                        img = nd.image
+    rng = random.Random(_seed(name, 13))
+    names = [g.name for g in h.vertex_groups]
+    uv = me.uv_layers.active
+    if img is not None and uv is not None:
+        W, H = img.size
+        a = np.empty(W * H * 4, np.float32)
+        img.pixels.foreach_get(a)
+        a = a.reshape(H, W, 4)
+        vuv = {}
+        for lp in me.loops:
+            vuv.setdefault(lp.vertex_index, uv.data[lp.index].uv.copy())
+        hw, hd, hcx, hcy = head_box(pts, top_z)
+        brow = top_z - 0.095
+        # per-vertex weights for each overlay, painted by filling the UV triangles of the body faces, then blurred
+        bones = set(b.name for b in rig.data.bones)
+        cheeks = [Vector((hcx + sx * 0.043, hcy - 0.075, brow - 0.055)) for sx in (-1, 1)]
+        nose_tip = None
+        fv = []
+        wr, wd, wp, ws, wc = {}, {}, {}, {}, {}
+        scar = None
+        if G["scar"] == "brow":
+            scar = (Vector((hcx + 0.035, hcy - 0.1, brow + 0.025)), Vector((hcx + 0.02, hcy - 0.1, brow - 0.03)))
+        elif G["scar"] == "cheek":
+            scar = (Vector((hcx - 0.06, hcy - 0.07, brow - 0.03)), Vector((hcx - 0.035, hcy - 0.09, brow - 0.09)))
+        for v in me.vertices:
+            g = {names[x.group]: x.weight for x in v.groups}
+            if g.get("body", 0) < 0.5 or g.get("HelperGeometry", 0) > 0.01 or g.get("JointCubes", 0) > 0.01:
+                continue
+            dom = max(((w, n) for n, w in g.items() if n in bones), default=(0, None))[1]
+            co = v.co
+            if dom == "head":
+                front = co.y < hcy - 0.03 and brow - 0.16 < co.z < brow + 0.03
+                if front:
+                    fv.append(v.index)
+                    if nose_tip is None or co.y < nose_tip.y and abs(co.x - hcx) < 0.01 and co.z < brow - 0.02:
+                        nose_tip = co.copy()
+                if G["ruddy"]:
+                    d = min((co - c).length for c in cheeks)
+                    wr[v.index] = math.exp(-(d / 0.022) ** 2)
+                if G["stubble"] and front and co.z < brow - 0.07 and not (abs(co.x - hcx) < 0.02 and brow - 0.1 < co.z < brow - 0.083):
+                    ws[v.index] = 0.5 + 0.5 * max(0.0, min(1.0, (brow - 0.08 - co.z) / 0.03))
+                if scar is not None:
+                    a_, b_ = scar
+                    ab = b_ - a_
+                    t_ = max(0.0, min(1.0, (co - a_).dot(ab) / ab.length_squared))
+                    d_ = (co - (a_ + ab * t_)).length
+                    if d_ < 0.01:
+                        wc[v.index] = math.exp(-(d_ / 0.0035) ** 2)
+                if G["skin_grime"] and front:
+                    wd[v.index] = max(0.0, 0.25 + 0.6 * mnoise.noise(co * 18)) * (0.4 + 0.6 * G["level"])
+            elif dom and (dom.startswith("hand") or dom.split("_")[0] in ("index", "middle", "ring", "pinky", "thumb")):
+                if G["skin_grime"] or G["level"] > 0.4:
+                    wd[v.index] = (0.35 + 0.65 * G["level"]) * (0.7 + 0.3 * mnoise.noise(co * 25))
+        if G["ruddy"] and nose_tip is not None:
+            for vi in fv:
+                d = (me.vertices[vi].co - nose_tip).length
+                wr[vi] = max(wr.get(vi, 0.0), math.exp(-(d / 0.014) ** 2))
+        if G["pox"] and fv:
+            pits = [me.vertices[rng.choice(fv)].co for _ in range(45)]
+            for vi in fv:
+                co = me.vertices[vi].co
+                wp[vi] = max(math.exp(-((co - p).length / 0.0025) ** 2) for p in pits)
+        def paint(weights):
+            buf = np.zeros((H, W), np.float32)
+            if not weights:
+                return buf
+            for f in me.polygons:
+                vs = f.vertices
+                w = [weights.get(i, 0.0) for i in vs]
+                if max(w) < 0.02:
+                    continue
+                uvs = [uv.data[li].uv for li in f.loop_indices]
+                for k in range(1, len(vs) - 1):
+                    tri = (0, k, k + 1)
+                    P = np.array([[uvs[i].x * W, uvs[i].y * H] for i in tri])
+                    x0, y0 = np.floor(P.min(0)).astype(int)
+                    x1, y1 = np.ceil(P.max(0)).astype(int) + 1
+                    x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, W), min(y1, H)
+                    if x1 <= x0 or y1 <= y0:
+                        continue
+                    yy, xx = np.mgrid[y0:y1, x0:x1] + 0.5
+                    (ax, ay), (bx, by), (cx, cy) = P
+                    den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+                    if abs(den) < 1e-9:
+                        continue
+                    l1 = ((by - cy) * (xx - cx) + (cx - bx) * (yy - cy)) / den
+                    l2 = ((cy - ay) * (xx - cx) + (ax - cx) * (yy - cy)) / den
+                    l3 = 1 - l1 - l2
+                    inside = (l1 >= -0.01) & (l2 >= -0.01) & (l3 >= -0.01)
+                    val = l1 * w[tri[0]] + l2 * w[tri[1]] + l3 * w[tri[2]]
+                    sub = buf[y0:y1, x0:x1]
+                    np.maximum(sub, np.where(inside, val, 0.0), out=sub)
+            return buf
+        def blur(buf, r):
+            for _ in range(3):
+                for ax in (0, 1):
+                    acc = np.zeros_like(buf)
+                    for d in range(-r, r + 1):
+                        acc += np.roll(buf, d, axis=ax)
+                    buf = acc / (2 * r + 1)
+            return buf
+        red = blur(paint(wr), max(1, W // 700))
+        dirt = blur(paint(wd), max(1, W // 900))
+        pox = paint(wp)
+        stub = blur(paint(ws), max(1, W // 1200))
+        scr = paint(wc)
+        if stub.any():
+            grain = np.random.default_rng(_seed(name, 14)).random((H, W)).astype(np.float32)
+            stub = stub * (0.55 + 0.45 * (grain > 0.45))
+        rgb = a[..., :3]
+        if red.any():
+            rgb *= 1.0 - red[..., None] * np.array([-0.10, 0.20, 0.22], np.float32) * 1.2
+        if dirt.any():
+            rgb *= 1.0 - dirt[..., None] * np.array([0.32, 0.38, 0.45], np.float32)
+        if pox.any():
+            rgb *= 1.0 - pox[..., None] * np.array([0.12, 0.2, 0.2], np.float32)
+        if stub.any():
+            rgb *= 1.0 - stub[..., None] * np.array([0.30, 0.30, 0.27], np.float32)
+        if scr.any():
+            rgb[:] = rgb * (1 - scr[..., None] * 0.6) + scr[..., None] * 0.6 * np.array([0.78, 0.55, 0.52], np.float32)
+        a[..., :3] = np.clip(rgb, 0, 1)
+        img.pixels.foreach_set(a.ravel())
+        img.name = img.name + "_w" + name[-6:]
+        img.pack()
+    # gaps in the teeth
+    if G["teeth"]:
+        teeth = next((o for o in bpy.data.objects if o.type == "MESH" and "teeth" in o.name.lower()), None)
+        if teeth:
+            tm = teeth.data
+            ys = [v.co.y for v in tm.vertices]
+            zs = sorted(v.co.z for v in tm.vertices)
+            zmid = zs[len(zs) // 2]
+            front = min(ys)
+            bm = bmesh.new()
+            bm.from_mesh(tm)
+            kill = set()
+            for _ in range(rng.choice((1, 2))):
+                x0 = rng.choice((-1, 1)) * rng.uniform(0.004, 0.013)
+                upper = rng.random() < 0.6
+                for f in bm.faces:
+                    c = f.calc_center_median()
+                    if abs(c.x - x0) < 0.0035 and c.y < front + 0.012 and ((c.z > zmid) == upper):
+                        kill.add(f)
+            bmesh.ops.delete(bm, geom=list(kill), context="FACES")
+            bm.to_mesh(tm)
+            bm.free()
+
+
+def audit():
+    """Uniqueness audit of the whole roster (builds nothing): seed-derived face sliders, body, skin, hair, hat, coat and
+    grime per character, and every same-sex pair closer than AUDIT_MIN in that space."""
+    rows = []
+    for name, spec in ALL.items():
+        female = spec.get("macro", {}).get("gender", 0.5) < 0.5
+        s = apply_body(name, spec, quiet=True)
+        if spec.get("face_variety", True):
+            _, vec = face_variety(name, female)
+        else:                                   # hand-tuned face: read its targets back onto the slider axes
+            tg = spec.get("targets", {})
+            first = lambda t: t[0] if isinstance(t, tuple) else t
+            vec = [(tg.get(first(pl), 0.0) - tg.get(first(mi), 0.0)) / FACE_AMP for _, pl, mi, _m in FACE_AXES]
+        skin = spec.get("skin") or pick_skin(s["macro"], female, spec.get("seed", _seed(name) & 0xffff))
+        g = grime_profile(name, spec)["level"]
+        rows.append((name, female, vec, s["body"], s["macro"]["weight"], s["macro"]["muscle"], skin, spec.get("hair"), spec.get("hat"),
+                     spec.get("coat"), g))
+    near = []
+    dmin = 1e9
+    for i in range(len(rows)):
+        for j in range(i + 1, len(rows)):
+            a, b = rows[i], rows[j]
+            if a[1] != b[1]:
+                continue
+            face = math.sqrt(sum((x - y) ** 2 for x, y in zip(a[2], b[2])))
+            body = 2.0 * (abs(a[4] - b[4]) + abs(a[5] - b[5]))
+            cat = 0.5 * sum(x != y for x, y in zip(a[6:10], b[6:10])) + abs(a[10] - b[10])
+            d = face + body + cat
+            dmin = min(dmin, d)
+            if d < AUDIT_MIN:
+                near.append((d, a[0], b[0]))
+    for r in rows:
+        print("[audit] %-32s %s %-7s w%.2f m%.2f %-26s hair=%-11s hat=%-12s coat=%-12s grime=%.2f face=%s" % (
+            r[0], "F" if r[1] else "M", r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], ",".join("%+.1f" % x for x in r[2][:6]) + ",..."))
+    kinds = {}
+    for r in rows:
+        kinds[r[3]] = kinds.get(r[3], 0) + 1
+    print("[audit] %d characters, body types %s, closest same-sex pair distance %.2f, near-duplicates (< %.1f): %d" % (
+        len(rows), kinds, dmin, AUDIT_MIN, len(near)))
+    for d, a, b in sorted(near):
+        print("[audit]   NEAR %.2f  %s ~ %s" % (d, a, b))
+
+
+AUDIT_MIN = 2.0
+
+
+# ------------------------------------------------------------------ leader props (capes, rochet, vest, belt kit, face details)
+def _weight_nearest(o, kd, doms, rig):
+    """Skin a prop vertex by vertex to the dominant bone of the nearest body point."""
+    for g in list(o.vertex_groups):
+        o.vertex_groups.remove(g)
+    groups = {}
+    for v in o.data.vertices:
+        _, i, _ = kd.find(o.matrix_world @ v.co)
+        bn = doms[i] or "spine_03"
+        if bn not in groups:
+            groups[bn] = o.vertex_groups.new(name=bn)
+        groups[bn].add([v.index], 1.0, "REPLACE")
+    if not any(m.type == "ARMATURE" for m in o.modifiers):
+        am = o.modifiers.new("arm", "ARMATURE")
+        am.object = rig
+    o.parent = rig
+
+
+def _loft_rings(name, rings, mat, rig, solid=0.004, close_front=True, cut_front=0.0, uv=0.4):
+    bm = bmesh.new()
+    rows = [[Vector(p) for p in r] for r in rings]
+    if cut_front:
+        n = len(rows[0])
+        keep = [k for k in range(n) if not (abs(rows[0][k].x) < cut_front and rows[0][k].y < 0)]
+        # rotate so the gap sits at the ends of an open strip
+        start = next(k for k in range(n) if k in keep and (k - 1) % n not in keep)
+        order = [(start + i) % n for i in range(n) if (start + i) % n in keep]
+        rows = [[r[k] for k in order] for r in rows]
+        _grid(bm, rows, closed=False)
+    else:
+        _grid(bm, rows, closed=True)
+    return _mk(name, bm, mat, rig, bone=None, angle=60, uv=uv, solid=solid, solid_off=1.0)
+
+
+def leader_props(spec, rig, pts, surf, B, waist_z, knee_z, top_z, kd, doms):
+    out = []
+    nz = B["neck_01"][0].z
+    TORSO = {"spine_01", "spine_02", "spine_03", "pelvis", "clavicle_l", "clavicle_r", "neck_01"}
+    SHOULDER = TORSO | {"upperarm_l", "upperarm_r"}
+    surf_v = [p for (p, d) in surf]
+    hw, hd, hcx, hcy = head_box(pts, top_z)
+    brow = top_z - 0.095
+    # shoulder cape: mozzetta (to the elbow) or delia (fur-trimmed, to the hip)
+    if spec.get("cape"):
+        col, L, fur = spec["cape"]
+        rings = []
+        steps = 7
+        for i in range(steps + 1):
+            t = i / steps
+            z = nz - 0.005 - L * t
+            pad = 0.02 + 0.03 * t + 0.03 * t * t
+            r = silhouette_ring(pts, max(z, B["spine_03"][0].z - 0.02), pad + max(0.0, B["spine_03"][0].z - 0.02 - z) * 0.35, 40, slab=0.03, bones=SHOULDER)
+            r = [(x, y, z) for (x, y, _z) in r]
+            rings.append(r)
+        o = _loft_rings("cape", rings, M(col), rig, solid=0.005, cut_front=0.02)
+        _weight_nearest(o, kd, doms, rig)
+        out.append(o)
+        if fur:
+            z = nz - 0.005 - L
+            zz = B["spine_03"][0].z - 0.02
+            ex = max(0.0, zz - z) * 0.35
+            r0 = [(x, y, z - 0.005) for (x, y, _z) in silhouette_ring(pts, zz, 0.02 + 0.06 + 0.03 + ex + 0.004, 40, slab=0.03, bones=SHOULDER)]
+            r1 = [(x, y, z + 0.05) for (x, y, _z) in silhouette_ring(pts, zz, 0.02 + 0.05 + 0.03 + ex - 0.01, 40, slab=0.03, bones=SHOULDER)]
+            f = _loft_rings("cape_fur", [r0, r1], M(fur, tex="fur"), rig, solid=0.012, cut_front=0.02, uv=0.2)
+            _weight_nearest(f, kd, doms, rig)
+            out.append(f)
+            c0 = silhouette_ring(pts, nz - 0.01, 0.035, 40, slab=0.03, bones=SHOULDER)
+            c1 = silhouette_ring(pts, nz + 0.04, 0.03, 40, slab=0.03, bones={"neck_01", "head"})
+            fc = _loft_rings("cape_collar", [c0, c1], M(fur, tex="fur"), rig, solid=0.012, cut_front=0.03, uv=0.2)
+            _weight_nearest(fc, kd, doms, rig)
+            out.append(fc)
+    # rochet: white linen tunic from the chest to the knee, lace hem
+    if spec.get("rochet"):
+        rings = []
+        z0, z1 = B["spine_03"][0].z + 0.02, knee_z + 0.08
+        for i in range(9):
+            t = i / 8
+            z = z0 + (z1 - z0) * t
+            sl = [(p, d) for (p, d) in surf if abs(p.z - z) < 0.03]
+            r = silhouette_ring(sl or pts, z, 0.012 + 0.03 * t * t, 44, slab=0.03)
+            rings.append(r)
+        last = rings[-1]
+        lace = [(p[0], p[1], p[2] - (0.03 if k % 2 == 0 else 0.012)) for k, p in enumerate(last)]
+        rings.append(lace)
+        o = _loft_rings("rochet", rings, M(spec["rochet"]), rig, solid=0.003)
+        _weight_nearest(o, kd, doms, rig)
+        skirt_weights(o, rig, DRAPE_CTX)
+        out.append(o)
+    # sheepskin vest over the shirt, open at the front
+    if spec.get("vest"):
+        rings = []
+        z0, z1 = waist_z - 0.1, B["upperarm_l"][0].z - 0.05
+        for i in range(7):
+            z = z0 + (z1 - z0) * i / 6
+            sl = [(p, d) for (p, d) in surf if abs(p.z - z) < 0.03 and d in TORSO]
+            rings.append(silhouette_ring(sl or pts, z, 0.012, 40, slab=0.03, bones=TORSO))
+        o = _loft_rings("vest", rings, M(spec["vest"], tex="fur"), rig, solid=0.012, cut_front=0.05, uv=0.25)
+        _weight_nearest(o, kd, doms, rig)
+        out.append(o)
+    # belt kit: knife sheath, ice-hook, pistol butt
+    def at_waist(angle, dz=0.0, pad=0.02):
+        ring = silhouette_ring(surf, waist_z + dz, pad, 48, slab=0.03)
+        k = int(round((angle % math.tau) / math.tau * 48)) % 48
+        return Vector(ring[k])
+    def box(name, size, loc, mat, rot=(0, 0, 0)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=loc, rotation=rot)
+        b = bpy.context.object
+        b.scale = size
+        bpy.ops.object.transform_apply(scale=True, rotation=True)
+        bv = b.modifiers.new("b", "BEVEL"); bv.width = min(size) * 0.3; bv.segments = 2
+        bpy.ops.object.modifier_apply(modifier="b")
+        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(40))
+        b.data.materials.append(mat); b.name = name
+        _weight_to_bone(b, rig, "pelvis")
+        out.append(b)
+        return b
+    if spec.get("knife"):
+        p = at_waist(math.radians(-60), -0.09, 0.025)
+        box("knife_sheath", (0.025, 0.012, 0.16), p, M("leather", 0.5), rot=(0.1, 0.25, 0))
+        box("knife_grip", (0.018, 0.018, 0.07), p + Vector((0.01, 0, 0.11)), M("wood_dark", 0.6), rot=(0.1, 0.25, 0))
+    if spec.get("icehook"):
+        p = at_waist(math.radians(200), -0.06, 0.03)
+        bm = bmesh.new()
+        path = [p + Vector((0, 0, -0.18 * t)) for t in (0, 0.3, 0.6, 0.85)]
+        path += [path[-1] + Vector((0.02 * math.sin(a), -0.02 * (1 - math.cos(a)), -0.02 * math.sin(a) * 0.3)) for a in (0.8, 1.6, 2.4)]
+        _sweep(bm, path, _circle(0.0045, 6))
+        o = _mk("ice_hook", bm, M("iron", 0.45), rig, bone="pelvis", angle=60, uv=0.1)
+        out.append(o)
+    if spec.get("pistol"):
+        p = at_waist(math.radians(-110), 0.02, 0.03)
+        box("pistol_butt", (0.03, 0.022, 0.09), p + Vector((0, -0.005, 0.03)), M("wood_dark", 0.5), rot=(0.5, 0, 0.3))
+        box("pistol_cap", (0.034, 0.026, 0.02), p + Vector((0, -0.02, 0.075)), M("brass", 0.3), rot=(0.5, 0, 0.3))
+    # order's star on the left breast
+    if spec.get("star"):
+        z = B["spine_03"][0].z + 0.02
+        y = _surface_y(surf_v, 0.09, z) or -0.15
+        c = Vector((0.09, y - 0.004, z))
+        bm = bmesh.new()
+        ring = []
+        for i in range(16):
+            a = math.tau * i / 16
+            r = 0.035 if i % 2 == 0 else 0.014
+            ring.append(c + Vector((r * math.cos(a), 0, r * math.sin(a))))
+        _grid(bm, [ring], closed=True, cap_top=c + Vector((0, -0.004, 0)))
+        o = _mk("order_star", bm, M("silver", 0.25), rig, bone="spine_03", angle=30, uv=0.1, solid=0.002)
+        out.append(o)
+    # jabot: lace frill falling from the stock
+    if spec.get("jabot"):
+        rows = []
+        for i in range(6):
+            t = i / 5
+            z = nz - 0.02 - 0.12 * t
+            y = (_surface_y(surf_v, 0.0, z) or -0.14) - 0.01 - 0.012 * t
+            w = 0.025 + 0.02 * t
+            rows.append([Vector((x, y - 0.006 * math.cos(x * 180), z)) for x in (-w, -w / 2, 0, w / 2, w)])
+        bm = bmesh.new()
+        _grid(bm, rows, closed=False)
+        o = _mk("jabot", bm, M(spec["jabot"]), rig, bone="spine_03", angle=80, uv=0.2, solid=0.002)
+        out.append(o)
+    # silver shoe buckles
+    if spec.get("buckles"):
+        for sd in ("l", "r"):
+            b = B["ball_" + sd][0]
+            box("shoe_buckle", (0.035, 0.008, 0.026), b + Vector((0, -0.035, 0.03)), M("silver", 0.25), rot=(-0.6, 0, 0))
+            _weight_to_bone(out[-1], rig, "foot_" + sd)
+            out[-1].vertex_groups.remove(out[-1].vertex_groups["pelvis"])
+    # drooping moustache
+    if spec.get("moustache"):
+        sl = [p for (p, d) in pts if d == "head" and abs(p.x - hcx) < 0.006 and brow - 0.10 < p.z < brow - 0.06]
+        nose_base = min(sl, key=lambda p: p.y) if sl else Vector((hcx, hcy - 0.1, brow - 0.08))
+        z0 = brow - 0.083
+        lip = [p for (p, d) in pts if d == "head" and abs(p.z - z0) < 0.005 and abs(p.x - hcx) < 0.03]
+        for sx in (-1, 1):
+            path = []
+            for i in range(7):
+                t = i / 6
+                x = hcx + sx * (0.004 + 0.03 * t)
+                z = z0 - 0.004 * t - 0.035 * max(0.0, t - 0.55) ** 1.2
+                cand = [p for p in lip if abs(p.x - x) < 0.006] or lip
+                y = (min(p.y for p in cand) if cand else nose_base.y + 0.01) - 0.004
+                path.append(Vector((x, y, z)))
+            bm = bmesh.new()
+            _sweep(bm, path, _circle(0.005, 6, 0.6), scale=lambda t: 1.0 - 0.75 * t)
+            o = _mk("moustache", bm, M(spec["moustache"], 0.9, tex="fur"), rig, bone="head", angle=80, uv=0.05)
+            out.append(o)
+    # forelock (oseledets) on a shaved head
+    if spec.get("forelock"):
+        top = Vector((hcx, hcy + 0.01, top_z + 0.004))
+        path = [top + Vector((0.015 * t, 0.0, 0.004 - 0.02 * t * t)) for t in (0, 0.25, 0.5)]
+        path += [top + Vector((0.03 + 0.03 * t, -0.01 * t, -0.02 - 0.08 * t)) for t in (0.2, 0.5, 0.8, 1.0)]
+        bm = bmesh.new()
+        _sweep(bm, path, _circle(0.007, 6, 0.5), scale=lambda t: 1.0 - 0.7 * t)
+        o = _mk("forelock", bm, M(spec["forelock"], 0.8, tex="fur"), rig, bone="head", angle=80, uv=0.05)
+        out.append(o)
+    # gold earring in the left lobe
+    if spec.get("earring"):
+        sl = [p for (p, d) in pts if d == "head" and brow - 0.09 < p.z < brow - 0.04 and p.x > hcx]
+        lobe = max(sl, key=lambda p: p.x - 0.5 * abs(p.y - hcy)) if sl else Vector((hcx + hw / 2, hcy, brow - 0.07))
+        bpy.ops.mesh.primitive_torus_add(major_radius=0.008, minor_radius=0.0015, major_segments=16, minor_segments=6,
+                                         location=lobe + Vector((0.003, 0.0, -0.011)), rotation=(0, math.pi / 2, 0))
+        e = bpy.context.object
+        e.data.materials.append(M("brass", 0.2)); e.name = "earring"
+        _weight_to_bone(e, rig, "head")
+        out.append(e)
+    # rings on both hands
+    if spec.get("rings"):
+        for sd in ("l", "r"):
+            h0 = B["ring_01_" + sd][0] if "ring_01_" + sd in B else B["hand_" + sd][1]
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.0095, minor_radius=0.0022, major_segments=12, minor_segments=5, location=h0)
+            r = bpy.context.object
+            r.data.materials.append(M("brass", 0.2)); r.name = "finger_ring"
+            _weight_to_bone(r, rig, "ring_01_" + sd if "ring_01_" + sd in B else "hand_" + sd)
+            out.append(r)
+    return out
+
+
+def hand_prop(rig, kind, spec):
+    """Props held in the hand, built in the arms-down rest pose: a cane (right), a scythe pike (right), spectacles (left)."""
+    bpy.context.view_layer.update()
+    parts = []
+    if kind in ("cane", "pike"):
+        hand = (rig.matrix_world @ rig.pose.bones["hand_r"].matrix).to_translation()
+        x, y = hand.x - 0.01, hand.y - 0.02
+        top = hand.z + (0.06 if kind == "cane" else 0.75)
+        bot = 0.0 if kind == "cane" else 0.02
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.011 if kind == "cane" else 0.016, depth=top - bot, location=(x, y, (top + bot) / 2))
+        c = bpy.context.object
+        c.data.materials.append(M("wood_dark", 0.5)); c.name = kind + "_shaft"
+        parts.append(c)
+        if kind == "cane":
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=10, ring_count=6, radius=0.02, location=(x, y, top + 0.01))
+            k = bpy.context.object
+            k.data.materials.append(M(spec.get("cane_knob", "silver"), 0.25)); k.name = "cane_knob"
+            parts.append(k)
+        else:
+            # scythe blade straightened on the shaft (kosynier pike), iron ferrule and a lashing
+            bm = bmesh.new()
+            pts_ = []
+            for i in range(9):
+                t = i / 8
+                w = 0.035 * (1 - t) ** 0.8 + 0.002
+                pts_.append((Vector((x - w * 0.2, y, top + 0.55 * t)), Vector((x + w, y, top + 0.55 * t + 0.02 * (1 - t)))))
+            _grid(bm, [[a for a, b in pts_], [b for a, b in pts_]], closed=False)
+            blade = _mk("pike_blade", bm, M("steel", 0.3), rig, bone=None, angle=30, uv=0.1, solid=0.003)
+            parts.append(blade)
+            bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.02, depth=0.09, location=(x, y, top - 0.02))
+            f = bpy.context.object
+            f.data.materials.append(M("iron", 0.45)); f.name = "pike_ferrule"
+            parts.append(f)
+        bone = "hand_r"
+    else:
+        hand = (rig.matrix_world @ rig.pose.bones["hand_l"].matrix).to_translation()
+        c = hand + Vector((0.01, -0.05, -0.06))
+        for sx in (-1, 1):
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.014, minor_radius=0.0012, major_segments=16, minor_segments=4,
+                                             location=c + Vector((sx * 0.017, 0, 0)), rotation=(math.pi / 2, 0, 0))
+            t = bpy.context.object
+            t.data.materials.append(M("steel", 0.25)); t.name = "spectacles"
+            parts.append(t)
+        bone = "hand_l"
+    for o in parts:
+        bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+        bpy.ops.object.shade_smooth()
+        for g in list(o.vertex_groups):
+            o.vertex_groups.remove(g)
+        for m in list(o.modifiers):
+            o.modifiers.remove(m)
+        _weight_to_bone(o, rig, bone)
+
+
 def build(name, spec):
     log("=== building", name)
     spec = apply_body(name, spec)
@@ -3020,10 +3844,11 @@ def build(name, spec):
         spec = dict(spec, skin=pick_skin(spec.get("macro", {}), spec.get("macro", {}).get("gender", 0.5) < 0.5, spec.get("seed", _seed(name) & 0xffff)))
     if spec.get("hat") in ("bonnet", "kerchief", "cap", "wimple") and not spec.get("veil"):
         spec = dict(spec, hair=None)
-    elif spec.get("hat") in ("fur", "konfederatka", "krakuska", "biretta") and not spec.get("veil"):
+    elif spec.get("hat") in ("fur", "konfederatka", "krakuska", "biretta") and not spec.get("veil") and not spec.get("bald"):
         spec = dict(spec, hair="short01")
-    if spec.get("seed") is not None or spec.get("face_variety", True):
-        spec = dict(spec, targets=dict(face_variety(spec.get("seed", _seed(name) & 0xffff)), **spec.get("targets", {})))
+    if spec.get("face_variety", True):
+        fv, _ = face_variety(name, spec.get("macro", {}).get("gender", 0.5) < 0.5)
+        spec = dict(spec, targets=dict(fv, **spec.get("targets", {})))
     h = make_body(spec)
     skin = os.path.join(USER, "skins", spec.get("skin", "young_caucasian_male"), spec.get("skin", "young_caucasian_male") + ".mhmat")
     HumanService.set_character_skin(skin, h, skin_type="GAMEENGINE")
@@ -3042,12 +3867,18 @@ def build(name, spec):
             o.name = "veil"
             o.data.materials.clear()
             o.data.materials.append(M("veil"))
+    seat_eyes()
     eye_shadow(rig)
     clothes = build_clothes(h, rig, spec)
+    clothes += apply_grime(name, spec, clothes, rig, DRAPE_CTX)
+    weather_skin(name, spec, h, DRAPE_CTX["me"], DRAPE_CTX["pts"], DRAPE_CTX["top_z"], rig)
     log("garments", [c.name for c in clothes])
     rest_arms_down(rig)
     if spec.get("musket"):
         _musket(rig)
+    for kind in ("cane", "pike", "spectacles"):
+        if spec.get(kind):
+            hand_prop(rig, kind, spec)
     make_animations(rig)
     tris = {o.name: sum(len(pl.vertices) - 2 for pl in o.data.polygons) for o in bpy.data.objects if o.type == "MESH"}
     hat_t = sum(t for n_, t in tris.items() if n_.startswith(("hat", "feather", "zucchetto", "phrygian")))
@@ -3259,6 +4090,77 @@ CAST = {
     "cast_child_f": {"macro": {"gender": 0.1, "age": 0.14, "muscle": 0.4, "weight": 0.45, "height": 0.5},
                      "hair": "bob02", "hair_tint": "dark_brown", "brows": "eyebrow009", "coat": "dress_plum", "coat_len": "long", "collar": "cream", "sash": "cream",
                      "boots": "black", "boot_height": 0.10, "hat": "bonnet", "hat_colour": "cream", "buttons": False, "max_tex": 1024},
+    # ---- faction leaders and the finale boss: hand-tuned faces (no face_variety), fixed bodies, signature props
+    "hist_turski": {"macro": {"gender": 0.95, "age": 0.815, "muscle": 0.35, "weight": 0.8, "height": 0.45}, "fixed_body": True, "body": "rotund",
+                    "face_variety": False, "skin": "old_caucasian_male", "hair": "short01", "hair_tint": "grey", "brows": "eyebrow006",
+                    "targets": {"head-fat-incr": 0.4, "neck-double-incr": 0.5, "nose-scale-vert-incr": 0.3, "nose-hump-incr": 0.2, "l-eye-bag-incr": 0.6,
+                                "r-eye-bag-incr": 0.6, "mouth-angles-down": 0.3, "chin-prominent-decr": 0.2, "head-age-incr": 0.5, "stomach-pregnant-incr": 0.6},
+                    "coat": "purple", "coat_len": "long", "collar": "cream", "rochet": "wimple", "cape": ("crimson", 0.2, None), "zucchetto": "red_cap",
+                    "cross": True, "cane": True, "cane_knob": "brass", "buttons": "long", "button_colour": "purple", "boots": "black", "boot_height": 0.10,
+                    "hat": None, "grime": 0.1},
+    "hist_sniadecki": {"macro": {"gender": 0.95, "age": 0.61, "muscle": 0.35, "weight": 0.28, "height": 0.6}, "fixed_body": True, "body": "gaunt",
+                       "face_variety": False, "skin": "young_caucasian_male2", "hair": "ponytail01", "hair_tint": "grey", "brows": "eyebrow002",
+                       "targets": {"forehead-scale-vert-incr": 0.6, "head-scale-vert-incr": 0.3, "nose-scale-vert-incr": 0.3, "nose-point-width-decr": 0.4,
+                                   "chin-prominent-incr": 0.3, "l-cheek-bones-incr": 0.4, "r-cheek-bones-incr": 0.4, "head-oval": 0.4, "eyebrows-angle-up": 0.3,
+                                   "l-cheek-volume-decr": 0.3, "r-cheek-volume-decr": 0.3},
+                       "coat": "charcoal", "coat_len": "mid", "cuffs": "charcoal", "collar": "cream", "waistcoat": "grey_coat", "breeches": "black",
+                       "stockings": "black", "boots": "black", "boot_height": 0.10, "hat": None, "spectacles": True, "ink": True, "button_colour": "pewter",
+                       "grime": 0.25},
+    "hist_wodzicki": {"macro": {"gender": 1.0, "age": 0.55, "muscle": 0.6, "weight": 0.45, "height": 0.78}, "fixed_body": True, "body": "fit",
+                      "face_variety": False, "skin": "young_caucasian_male", "hair": "short04", "hair_tint": "dark_brown", "brows": "eyebrow003",
+                      "targets": {"chin-bones-incr": 0.4, "chin-prominent-incr": 0.35, "nose-hump-incr": 0.25, "head-square": 0.3, "l-cheek-bones-incr": 0.3,
+                                  "r-cheek-bones-incr": 0.3, "eyebrows-trans-forward": 0.2, "mouth-scale-horiz-decr": 0.2, "nose-scale-vert-incr": 0.2},
+                      "coat": "wine", "coat_len": "long", "sash": "zupan_gold", "collar": "zupan_gold", "breeches": "zupan_gold", "stockings": "zupan_gold",
+                      "cape": ("ottoman_green", 0.34, "fur"), "sword": True, "boots": "tan_boot", "boot_height": 0.35, "hat": None, "buttons": "long",
+                      "button_colour": "brass", "grime": 0.12},
+    "hist_lichocki": {"macro": {"gender": 0.92, "age": 0.66, "muscle": 0.3, "weight": 0.85, "height": 0.45}, "fixed_body": True, "body": "rotund",
+                      "face_variety": False, "skin": "middleage_caucasian_male", "hair": "ponytail01", "hair_tint": "white", "brows": "eyebrow004",
+                      "targets": {"head-fat-incr": 0.5, "head-round": 0.5, "neck-double-incr": 0.4, "nose-point-width-incr": 0.3, "nose-scale-vert-decr": 0.2,
+                                  "chin-prominent-decr": 0.3, "l-cheek-volume-incr": 0.4, "r-cheek-volume-incr": 0.4, "mouth-lowerlip-volume-incr": 0.3,
+                                  "stomach-pregnant-incr": 0.7, "measure-waist-circ-incr": 0.4},
+                      "coat": "brown_coat", "coat_len": "mid", "cuffs": "brown_coat", "collar": "cream", "waistcoat": "dun", "jabot": "cream",
+                      "chain": True, "buckles": True, "breeches": "black", "stockings": "stocking", "boots": "black", "boot_height": 0.10, "hat": None,
+                      "button_colour": "silver", "grime": 0.1},
+    "hist_kmita": {"macro": {"gender": 1.0, "age": 0.69, "muscle": 0.62, "weight": 0.6, "height": 0.6}, "fixed_body": True, "body": "fit",
+                   "face_variety": False, "skin": "middleage_caucasian_male", "hair": None, "bald": True, "brows": "eyebrow007",
+                   "targets": {"head-square": 0.5, "chin-bones-incr": 0.4, "chin-width-incr": 0.3, "nose-flaring-incr": 0.4, "nose-scale-horiz-incr": 0.4,
+                               "nose-hump-incr": 0.3, "l-eye-bag-incr": 0.4, "r-eye-bag-incr": 0.4, "eyebrows-trans-forward": 0.4, "mouth-angles-down": 0.3,
+                               "l-cheek-bones-incr": 0.3, "r-cheek-bones-incr": 0.3},
+                   "forelock": "grey", "moustache": "grey", "hat": "krakuska", "hat_colour": "red_cap", "plain_cap": True, "cockade": True,
+                   "coat": "sukmana", "coat_len": "long", "collar": "sukmana", "sash": "facing_red", "pike": True, "scar": "cheek", "stubble": True,
+                   "boots": "leather", "boot_height": 0.30, "buttons": False, "grime": 0.75},
+    "hist_jedrek": {"macro": {"gender": 0.95, "age": 0.58, "muscle": 0.55, "weight": 0.3, "height": 0.55}, "fixed_body": True, "body": "gaunt",
+                    "face_variety": False, "skin": "young_caucasian_male", "hair": "short02", "hair_tint": "brown", "brows": "eyebrow001",
+                    "targets": {"l-cheek-bones-incr": 0.5, "r-cheek-bones-incr": 0.5, "l-cheek-volume-decr": 0.4, "r-cheek-volume-decr": 0.4,
+                                "nose-hump-incr": 0.4, "nose-scale-vert-incr": 0.2, "chin-prominent-incr": 0.2, "l-eye-scale-decr": 0.3, "r-eye-scale-decr": 0.3,
+                                "head-oval": 0.3, "mouth-scale-horiz-decr": 0.2},
+                    "hat": "cap", "hat_colour": "grey_coat", "coat": "stocking", "coat_len": "short", "collar": "stocking", "vest": "buff",
+                    "sash": "leather", "breeches": "brown_coat", "stockings": "grey_coat", "boots": "leather", "boot_height": 0.42, "knife": True,
+                    "icehook": True, "stubble": True, "buttons": False, "grime": 0.8},
+    "hist_margelik": {"macro": {"gender": 0.95, "age": 0.654, "muscle": 0.4, "weight": 0.55, "height": 0.6}, "fixed_body": True, "body": "average",
+                      "face_variety": False, "skin": "middleage_caucasian_male", "hair": "ponytail01", "hair_tint": "white", "brows": "eyebrow005",
+                      "targets": {"nose-scale-vert-incr": 0.4, "nose-point-width-decr": 0.3, "nose-greek-incr": 0.3, "chin-prominent-incr": 0.3,
+                                  "head-scale-horiz-decr": 0.2, "mouth-scale-horiz-decr": 0.3, "mouth-upperlip-volume-decr": 0.3,
+                                  "mouth-lowerlip-volume-decr": 0.3, "eyebrows-angle-down": 0.3, "l-eye-height2-decr": 0.3, "r-eye-height2-decr": 0.3},
+                      "coat": "charcoal", "coat_len": "mid", "cuffs": "charcoal", "collar": "black", "waistcoat": "black", "star": True, "cane": True,
+                      "cane_knob": "brass", "breeches": "black", "stockings": "stocking", "boots": "black", "boot_height": 0.32, "hat": "tricorne",
+                      "button_colour": "silver", "grime": 0.1},
+    "hist_kingpin": {"macro": {"gender": 1.0, "age": 0.69, "muscle": 0.6, "weight": 0.8, "height": 0.6}, "fixed_body": True, "body": "rotund",
+                     "face_variety": False, "skin": "middleage_caucasian_male", "hair": "short04", "hair_tint": "grey", "brows": "eyebrow007",
+                     "targets": {"nose-trans-in": 0.5, "nose-curve-convex": 0.4, "nose-flaring-incr": 0.4, "nose-scale-horiz-incr": 0.4,
+                                 "eyebrows-trans-forward": 0.6, "l-eye-scale-decr": 0.5, "r-eye-scale-decr": 0.5, "head-square": 0.4, "head-fat-incr": 0.3,
+                                 "chin-width-incr": 0.4, "neck-scale-horiz-incr": 0.5, "l-ear-flap-incr": 0.4, "r-ear-flap-incr": 0.4, "stomach-pregnant-incr": 0.4},
+                     "pox": True, "scar": "brow", "earring": True, "rings": True, "coat": "green_coat", "coat_len": "mid", "cuffs": "green_coat",
+                     "collar": "saffron", "vest": "buff", "sash": "crimson", "pistol": True, "breeches": "charcoal", "stockings": "grey_coat",
+                     "boots": "black", "boot_height": 0.42, "hat": None, "button_colour": "brass", "grime": 0.35},
+    "cast_bodyguard_1": {"macro": {"gender": 1.0, "age": 0.55, "muscle": 0.75, "weight": 0.7, "height": 0.72}, "fixed_body": True, "body": "fit",
+                         "targets": {"head-square": 0.4, "neck-scale-horiz-incr": 0.5}, "hair": "short04", "hair_tint": "black", "brows": "eyebrow007",
+                         "coat": "charcoal", "coat_len": "mid", "cuffs": "black", "collar": "black", "breeches": "black", "stockings": "grey_coat",
+                         "boots": "black", "boot_height": 0.40, "hat": "fur", "hat_colour": "black", "sash": "leather", "knife": True, "grime": 0.35},
+    "cast_bodyguard_2": {"macro": {"gender": 1.0, "age": 0.62, "muscle": 0.7, "weight": 0.78, "height": 0.68}, "fixed_body": True, "body": "rotund",
+                         "targets": {"head-round": 0.4, "nose-flaring-incr": 0.5}, "hair": "short02", "hair_tint": "auburn", "brows": "eyebrow003",
+                         "coat": "black", "coat_len": "long", "collar": "charcoal", "boots": "black", "boot_height": 0.40, "hat": "fur", "hat_colour": "fur",
+                         "sash": "black", "pistol": True, "stubble": True, "buttons": False, "grime": 0.4},
 }
 
 TOWNSFOLK = {
@@ -3434,7 +4336,7 @@ DISTRICT = {
     "dist_distiller": {"macro": {"gender": 0.93, "age": 0.6, "muscle": 0.45, "weight": 0.55, "height": 0.5}, "targets": {"nose-point-width-incr": 0.4, "nose-scale-vert-incr": 0.2},
                        "hair": "short04", "hair_tint": "grey", "brows": "eyebrow004", "coat": "olive", "coat_len": "mid", "collar": "leather", "cuffs": "leather", "apron": "leather",
                        "breeches": "charcoal", "stockings": "grey_coat", "boots": "black", "boot_height": 0.12, "hat": None, "button_colour": "brass", "max_tex": 1024},
-    "dist_cellarman": {"macro": {"gender": 1.0, "age": 0.36, "muscle": 0.8, "weight": 0.6, "height": 0.5, "race": {"caucasian": 0.95, "asian": 0.05, "african": 0.0}},
+    "dist_cellarman": {"drunk": True, "macro": {"gender": 1.0, "age": 0.36, "muscle": 0.8, "weight": 0.6, "height": 0.5, "race": {"caucasian": 0.95, "asian": 0.05, "african": 0.0}},
                        "targets": {"head-square": 0.4, "chin-prominent-incr": 0.2}, "hair": "short01", "hair_tint": "black", "brows": "eyebrow007",
                        "coat": "charcoal", "coat_len": "short", "collar": "charcoal", "apron": "leather", "breeches": "leather", "stockings": "grey_coat",
                        "boots": "black", "boot_height": 0.30, "hat": "cap", "hat_colour": "red_cap", "buttons": False, "max_tex": 1024},
@@ -3583,6 +4485,9 @@ if __name__ == "__main__":
     only = None
     if "--" in sys.argv:
         only = sys.argv[sys.argv.index("--") + 1:]
+    if only == ["--audit"]:
+        audit()
+        sys.exit(0)
     for name, spec in ALL.items():
         if only and name not in only and not (only == ["cast"] and name.startswith("cast_")) and not (only == ["npc"] and name.startswith("npc_")) and not (only == ["townsfolk"] and name.startswith("town_")) and not (only == ["district"] and name.startswith("dist_")) and not (only == ["base"] and (name.startswith("figure_") or name == "watchman")):
             continue

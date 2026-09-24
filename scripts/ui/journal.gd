@@ -673,7 +673,7 @@ func _fill_storylines() -> void:
 		_section(_right, "Overheard")
 		for h in heard:
 			_hint_row(_right, h)
-
+	_fill_rumours(_right)
 
 func _story_row(parent: Control, e: Dictionary, status: String) -> void:
 	var box := VBoxContainer.new()
@@ -708,6 +708,41 @@ func _unknown_row(parent: Control, e: Dictionary) -> void:
 
 # --- People
 
+## The whisper network as the player knows it: what is said, whether it is known true or false, how far it
+## has reached, and whether the player planted it.
+func _fill_rumours(parent: Control) -> void:
+	var rum: Dictionary = Mission.journal.get("rumours", {})
+	if rum.is_empty():
+		return
+	_section(parent, "Rumours")
+	parent.add_child(_t("What the city is saying. Reach grows each dawn; a false word can be traced back to its source.", 14, UiTheme.TEXT_DIM, "italic"))
+	var ids := rum.keys()
+	ids.sort_custom(func(a, b) -> bool: return float(rum[a].get("reach", 0.0)) > float(rum[b].get("reach", 0.0)))
+	for id in ids:
+		var r: Dictionary = rum[id]
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 1)
+		var top := HBoxContainer.new()
+		var t := _t(str(r.get("text", id)), 17, UiTheme.TEXT)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top.add_child(t)
+		var tag := ""
+		match str(r.get("truth", "unknown")):
+			"true": tag = "true"
+			"false": tag = "false"
+			_: tag = "unproven"
+		if bool(r.get("planted", false)):
+			tag += "  ·  yours"
+		var reach := int(round(float(r.get("reach", 0.0)) * 100.0))
+		tag += "  ·  %d%%" % reach
+		top.add_child(UiTheme.label(tag, 13, UiTheme.BAD if str(r.get("truth", "")) == "false" else UiTheme.BRASS, "bold"))
+		box.add_child(top)
+		if str(r.get("gloss", "")) != "":
+			box.add_child(_t(str(r["gloss"]), 14, UiTheme.TEXT_DIM, "italic"))
+		parent.add_child(box)
+		_hair(parent)
+
+
 func _fill_people() -> void:
 	var people: Dictionary = Mission.journal["people"]
 	if people.is_empty():
@@ -732,6 +767,17 @@ func _fill_people() -> void:
 		box.add_child(top)
 		if str(p.get("role", "")) != "":
 			box.add_child(_t(str(p["role"]), 16, UiTheme.TEXT))
+		var marks: Array = []
+		if bool(p.get("historical", false)):
+			marks.append("historical person")
+		if bool(p.get("leader", false)) or str(p.get("leader", "")) not in ["", "false"]:
+			marks.append("faction leader")
+		if bool(p.get("heir", false)):
+			marks.append("your named heir")
+		if bool(p.get("found", false)):
+			marks.append("found")
+		if not marks.is_empty():
+			box.add_child(_t("  ·  ".join(marks), 14, UiTheme.BRASS, "italic"))
 		if _intel()["enforcers"].has(ids[i]):
 			box.add_child(_t("●  Knows your face: no cloak will fool this one.", 15, UiTheme.BAD, "bold"))
 		box.add_child(_t("Last seen at %s, %s, night %d." % [p.get("where", "?"), p.get("t", "?"), int(p.get("night", 1))],

@@ -3,7 +3,7 @@ Run: blender -b --python assets/blender/render_characters.py -- <outdir> name1 n
 import bpy, math, os, sys
 from mathutils import Vector
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODELS = os.path.join(ROOT, "assets", "models")
+MODELS = os.environ.get("MODELS_DIR") or os.path.join(ROOT, "assets", "models")
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = args[0] if args else os.path.join(ROOT, "docs", "screenshots")
 names = args[1:] or ["watchman"]
@@ -11,7 +11,15 @@ names = args[1:] or ["watchman"]
 def scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
-    sc.render.engine = "BLENDER_EEVEE"
+    # RENDER_ENGINE=CYCLES renders on the CPU (for when Eevee's EGL context fails on the GPU driver)
+    if os.environ.get("RENDER_ENGINE", "").upper() == "CYCLES":
+        sc.render.engine = "CYCLES"
+        sc.cycles.device = "CPU"
+        sc.cycles.samples = int(os.environ.get("CYCLES_SAMPLES", "24"))
+        sc.cycles.use_denoising = True
+        sc.cycles.max_bounces = 4
+    else:
+        sc.render.engine = "BLENDER_EEVEE"
     sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
     sc.world.node_tree.nodes["Background"].inputs[0].default_value = (0.42, 0.47, 0.56, 1)
     sc.world.node_tree.nodes["Background"].inputs[1].default_value = 0.6
@@ -176,7 +184,33 @@ def clip_sheet(name, clip, out):
 CLIPS = [c for c in os.environ.get("CLIPS", "").split(",") if c]
 
 
+def eye_sheet(name, out):
+    """Tight close-up of both eyes, front and three-quarter (EYES=1): checks the lids cover the iris edge."""
+    sc = scene()
+    sc.render.resolution_x, sc.render.resolution_y = 1600, 600
+    root, objs = load(name, 0.0, 0.0)
+    root2, objs2 = load(name, 0.19, math.radians(35))
+    bpy.context.view_layer.update()
+    eyes = [o for o in objs if o.type == "MESH" and "high-poly" in o.name]
+    z, x0 = 1.6, 0.0
+    if eyes:
+        dg = bpy.context.evaluated_depsgraph_get()
+        ev = eyes[0].evaluated_get(dg)
+        m = ev.to_mesh()
+        ps = [eyes[0].matrix_world @ v.co for v in m.vertices]
+        ev.to_mesh_clear()
+        z = sum(p.z for p in ps) / len(ps)
+        x0 = sum(p.x for p in ps) / len(ps)
+    cam(sc, (x0 + 0.095, -1.25, z), (x0 + 0.095, 0, z), lens=135)
+    sc.render.filepath = os.path.join(out, name + "_eyes.png")
+    bpy.ops.render.render(write_still=True)
+    print("[render]", sc.render.filepath)
+
+
 for name in names:
+    if os.environ.get("EYES"):
+        eye_sheet(name, OUT)
+        continue
     if os.environ.get("ONLY_CLIPS"):
         # CLIPS=walk_fast,run ONLY_CLIPS=1 blender -b --python render_characters.py -- <outdir> <name>
         for clip in CLIPS:
@@ -206,6 +240,10 @@ for name in names:
     cam(sc, (0.30, -0.78, 1.60), (0.0, 0, 1.55), lens=85)
     sc.render.filepath = os.path.join(OUT, name + "_face.png"); bpy.ops.render.render(write_still=True)
     print("[render]", sc.render.filepath)
+    if os.environ.get("QUICK", "1") == "1":       # turnaround + face only (set QUICK=0 for the hat/detail/walk sheets)
+        for clip in CLIPS:
+            clip_sheet(name, clip, OUT)
+        continue
     # headwear sheet: front, three-quarter, side, back, and three-quarter from above
     sc = scene()
     sc.render.resolution_x, sc.render.resolution_y = 2600, 620
