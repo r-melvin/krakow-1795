@@ -1,5 +1,5 @@
 extends Node
-## Look preview for art-direction review, active only with `-- --look=<painterly|ink_wash|cel|puppet|grime>`:
+## Look preview for art-direction review, active only with `-- --look=<painterly|ink_wash|cel|puppet|grime|oil>`:
 ## a full-screen canvas layer running assets/shaders/looks/canvas/<name>.gdshader over the finished 3D frame,
 ## under the UI. Changes nothing when the flag is absent.
 
