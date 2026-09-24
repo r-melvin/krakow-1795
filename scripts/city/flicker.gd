@@ -8,6 +8,7 @@ extends OmniLight3D
 @export var wander := 0.025      ## metres the flame moves about its socket (candle 2-3 cm; lantern 1 cm; brazier 6 cm)
 @export var gusts := true        ## occasional draughts: a sharper dip and a lurch of the flame
 var _home := Vector3.ZERO
+var _home_set := false
 var _gust := 0.0
 var _gust_next := 0.0
 var doused_left := 0.0
@@ -19,7 +20,6 @@ var _seed := 0.0
 func _ready() -> void:
 	_base = light_energy
 	_seed = randf() * 100.0
-	_home = position
 	_gust_next = randf_range(3.0, 12.0)
 
 
@@ -40,6 +40,9 @@ func _process(delta: float) -> void:
 		_gust = maxf(_gust - delta * 1.8, 0.0)
 	light_energy = _base * (1.0 + amount * n) * (1.0 - 0.35 * _gust)
 	if wander > 0.0:
+		if not _home_set:          # taken on the first frame, after whoever placed the light has set its position
+			_home = position
+			_home_set = true
 		var w := Vector3(sin(_t * 0.9 + _seed) + 0.5 * sin(_t * 3.7 + _seed * 2.1),
 				0.4 * sin(_t * 1.3 + _seed * 0.7) - 0.6 * _gust,
 				cos(_t * 1.1 + _seed * 1.3) + 0.5 * sin(_t * 4.3 + _seed))

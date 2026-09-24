@@ -194,3 +194,8 @@ radiance cubemap is 128 px, incremental.
   see them, which is correct for how faint they are, and the bolt's light on the town is the flash light.
 - Cloud shadows on the ground are not cast (the directional light's energy is the weather's, not modulated by
   cloud density under the sun).
+
+## Sun elevation range
+weather.gd publishes `sun_elevation` clamped to -18 degrees (astronomical night). Below about -20 the shader's
+below-horizon sun depth term overflows and the radiance cubemap floods the town white through SDFGI sky light;
+the January arc reaches -40 in the small hours, so the clamp stays until the depth term is bounded in the shader.
