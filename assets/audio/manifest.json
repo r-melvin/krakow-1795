@@ -148,12 +148,36 @@
    ],
    "loop": true
   },
+  "cloth_rustle": {
+   "cat": "sfx",
+   "desc": "coat and cloth rustle on the player's movement",
+   "files": [
+    "cloth_rustle_1",
+    "cloth_rustle_2",
+    "cloth_rustle_3",
+    "cloth_rustle_4",
+    "cloth_rustle_5",
+    "cloth_rustle_6"
+   ],
+   "loop": false
+  },
   "coachman_hoo": {
    "cat": "sfx",
    "desc": "coachman calling \"Hooo!\" to the horses (non-verbal)",
    "files": [
     "coachman_hoo_1",
     "coachman_hoo_2"
+   ],
+   "loop": false
+  },
+  "coat_swish": {
+   "cat": "sfx",
+   "desc": "coat tails swishing on a sprint",
+   "files": [
+    "coat_swish_1",
+    "coat_swish_2",
+    "coat_swish_3",
+    "coat_swish_4"
    ],
    "loop": false
   },
@@ -262,6 +286,17 @@
    "desc": "door creaking open",
    "files": [
     "door_open"
+   ],
+   "loop": false
+  },
+  "drag": {
+   "cat": "sfx",
+   "desc": "body dragging over the ground (prone crawl): long cloth-on-stone scrape",
+   "files": [
+    "drag_1",
+    "drag_2",
+    "drag_3",
+    "drag_4"
    ],
    "loop": false
   },
@@ -382,7 +417,11 @@
     "hoof_trot_1",
     "hoof_trot_2",
     "hoof_trot_3",
-    "hoof_trot_4"
+    "hoof_trot_4",
+    "hoof_trot_5",
+    "hoof_trot_6",
+    "hoof_trot_7",
+    "hoof_trot_8"
    ],
    "loop": false
   },
@@ -393,7 +432,11 @@
     "hoof_walk_1",
     "hoof_walk_2",
     "hoof_walk_3",
-    "hoof_walk_4"
+    "hoof_walk_4",
+    "hoof_walk_5",
+    "hoof_walk_6",
+    "hoof_walk_7",
+    "hoof_walk_8"
    ],
    "loop": false
   },
@@ -544,20 +587,25 @@
   },
   "scuff": {
    "cat": "sfx",
-   "desc": "shoe scuffing on stone when turning",
+   "desc": "shoe scuffing on stone when turning or sneaking",
    "files": [
     "scuff_1",
     "scuff_2",
-    "scuff_3"
+    "scuff_3",
+    "scuff_4",
+    "scuff_5",
+    "scuff_6"
    ],
    "loop": false
   },
   "scuff_snow": {
    "cat": "sfx",
-   "desc": "foot sliding in snow",
+   "desc": "foot sliding in snow, mud or straw",
    "files": [
     "scuff_snow_1",
-    "scuff_snow_2"
+    "scuff_snow_2",
+    "scuff_snow_3",
+    "scuff_snow_4"
    ],
    "loop": false
   },
@@ -596,113 +644,360 @@
    ],
    "loop": false
   },
-  "step_bare": {
-   "cat": "sfx",
-   "desc": "barefoot / rag-wrapped foot: soft slap",
+  "step_cobbles_bare": {
+   "cat": "step",
+   "desc": "bare on cobbles: heel thud + cobbles roll",
    "files": [
-    "step_bare_1",
-    "step_bare_2",
-    "step_bare_3",
-    "step_bare_4"
+    "step_cobbles_bare_1",
+    "step_cobbles_bare_2",
+    "step_cobbles_bare_3",
+    "step_cobbles_bare_4",
+    "step_cobbles_bare_5",
+    "step_cobbles_bare_6",
+    "step_cobbles_bare_7",
+    "step_cobbles_bare_8",
+    "step_cobbles_bare_9",
+    "step_cobbles_bare_10"
    ],
    "loop": false
   },
-  "step_boot": {
-   "cat": "sfx",
-   "desc": "guard's hobnailed boot on hard ground: heavy heel, nail clack",
+  "step_cobbles_boot": {
+   "cat": "step",
+   "desc": "boot on cobbles: heel thud + cobbles roll",
    "files": [
-    "step_boot_1",
-    "step_boot_2",
-    "step_boot_3",
-    "step_boot_4"
+    "step_cobbles_boot_1",
+    "step_cobbles_boot_2",
+    "step_cobbles_boot_3",
+    "step_cobbles_boot_4",
+    "step_cobbles_boot_5",
+    "step_cobbles_boot_6",
+    "step_cobbles_boot_7",
+    "step_cobbles_boot_8",
+    "step_cobbles_boot_9",
+    "step_cobbles_boot_10"
    ],
    "loop": false
   },
-  "step_cobbles": {
-   "cat": "sfx",
-   "desc": "footstep on bright stone click, short decay, a little grit",
+  "step_cobbles_shoe": {
+   "cat": "step",
+   "desc": "shoe on cobbles: heel thud + cobbles roll",
    "files": [
-    "step_cobbles_1",
-    "step_cobbles_2",
-    "step_cobbles_3",
-    "step_cobbles_4"
+    "step_cobbles_shoe_1",
+    "step_cobbles_shoe_2",
+    "step_cobbles_shoe_3",
+    "step_cobbles_shoe_4",
+    "step_cobbles_shoe_5",
+    "step_cobbles_shoe_6",
+    "step_cobbles_shoe_7",
+    "step_cobbles_shoe_8",
+    "step_cobbles_shoe_9",
+    "step_cobbles_shoe_10"
    ],
    "loop": false
   },
-  "step_flags": {
-   "cat": "sfx",
-   "desc": "footstep on flagstones: lower stone ring, smooth",
+  "step_flags_bare": {
+   "cat": "step",
+   "desc": "bare on flags: heel thud + flags roll",
    "files": [
-    "step_flags_1",
-    "step_flags_2",
-    "step_flags_3",
-    "step_flags_4"
+    "step_flags_bare_1",
+    "step_flags_bare_2",
+    "step_flags_bare_3",
+    "step_flags_bare_4",
+    "step_flags_bare_5",
+    "step_flags_bare_6",
+    "step_flags_bare_7",
+    "step_flags_bare_8",
+    "step_flags_bare_9",
+    "step_flags_bare_10"
    ],
    "loop": false
   },
-  "step_gravel": {
-   "cat": "sfx",
-   "desc": "footstep on many micro-clicks",
+  "step_flags_boot": {
+   "cat": "step",
+   "desc": "boot on flags: heel thud + flags roll",
    "files": [
-    "step_gravel_1",
-    "step_gravel_2",
-    "step_gravel_3",
-    "step_gravel_4"
+    "step_flags_boot_1",
+    "step_flags_boot_2",
+    "step_flags_boot_3",
+    "step_flags_boot_4",
+    "step_flags_boot_5",
+    "step_flags_boot_6",
+    "step_flags_boot_7",
+    "step_flags_boot_8",
+    "step_flags_boot_9",
+    "step_flags_boot_10"
    ],
    "loop": false
   },
-  "step_heel": {
-   "cat": "sfx",
-   "desc": "women's heeled shoe: sharp click",
+  "step_flags_shoe": {
+   "cat": "step",
+   "desc": "shoe on flags: heel thud + flags roll",
    "files": [
-    "step_heel_1",
-    "step_heel_2",
-    "step_heel_3",
-    "step_heel_4"
+    "step_flags_shoe_1",
+    "step_flags_shoe_2",
+    "step_flags_shoe_3",
+    "step_flags_shoe_4",
+    "step_flags_shoe_5",
+    "step_flags_shoe_6",
+    "step_flags_shoe_7",
+    "step_flags_shoe_8",
+    "step_flags_shoe_9",
+    "step_flags_shoe_10"
    ],
    "loop": false
   },
-  "step_mud": {
-   "cat": "sfx",
-   "desc": "footstep on wet squelch: swept resonance, low thump, suction pop",
+  "step_gravel_bare": {
+   "cat": "step",
+   "desc": "bare on gravel: heel thud + gravel roll",
    "files": [
-    "step_mud_1",
-    "step_mud_2",
-    "step_mud_3",
-    "step_mud_4"
+    "step_gravel_bare_1",
+    "step_gravel_bare_2",
+    "step_gravel_bare_3",
+    "step_gravel_bare_4",
+    "step_gravel_bare_5",
+    "step_gravel_bare_6",
+    "step_gravel_bare_7",
+    "step_gravel_bare_8",
+    "step_gravel_bare_9",
+    "step_gravel_bare_10"
    ],
    "loop": false
   },
-  "step_planks": {
-   "cat": "sfx",
-   "desc": "footstep on hollow wooden tone ~180 Hz",
+  "step_gravel_boot": {
+   "cat": "step",
+   "desc": "boot on gravel: heel thud + gravel roll",
    "files": [
-    "step_planks_1",
-    "step_planks_2",
-    "step_planks_3",
-    "step_planks_4"
+    "step_gravel_boot_1",
+    "step_gravel_boot_2",
+    "step_gravel_boot_3",
+    "step_gravel_boot_4",
+    "step_gravel_boot_5",
+    "step_gravel_boot_6",
+    "step_gravel_boot_7",
+    "step_gravel_boot_8",
+    "step_gravel_boot_9",
+    "step_gravel_boot_10"
    ],
    "loop": false
   },
-  "step_snow": {
-   "cat": "sfx",
-   "desc": "footstep on crunch of micro-grains over a low thud",
+  "step_gravel_shoe": {
+   "cat": "step",
+   "desc": "shoe on gravel: heel thud + gravel roll",
    "files": [
-    "step_snow_1",
-    "step_snow_2",
-    "step_snow_3",
-    "step_snow_4"
+    "step_gravel_shoe_1",
+    "step_gravel_shoe_2",
+    "step_gravel_shoe_3",
+    "step_gravel_shoe_4",
+    "step_gravel_shoe_5",
+    "step_gravel_shoe_6",
+    "step_gravel_shoe_7",
+    "step_gravel_shoe_8",
+    "step_gravel_shoe_9",
+    "step_gravel_shoe_10"
    ],
    "loop": false
   },
-  "step_straw": {
-   "cat": "sfx",
-   "desc": "footstep on soft rustle",
+  "step_mud_bare": {
+   "cat": "step",
+   "desc": "bare on mud: heel thud + mud roll",
    "files": [
-    "step_straw_1",
-    "step_straw_2",
-    "step_straw_3",
-    "step_straw_4"
+    "step_mud_bare_1",
+    "step_mud_bare_2",
+    "step_mud_bare_3",
+    "step_mud_bare_4",
+    "step_mud_bare_5",
+    "step_mud_bare_6",
+    "step_mud_bare_7",
+    "step_mud_bare_8",
+    "step_mud_bare_9",
+    "step_mud_bare_10"
+   ],
+   "loop": false
+  },
+  "step_mud_boot": {
+   "cat": "step",
+   "desc": "boot on mud: heel thud + mud roll",
+   "files": [
+    "step_mud_boot_1",
+    "step_mud_boot_2",
+    "step_mud_boot_3",
+    "step_mud_boot_4",
+    "step_mud_boot_5",
+    "step_mud_boot_6",
+    "step_mud_boot_7",
+    "step_mud_boot_8",
+    "step_mud_boot_9",
+    "step_mud_boot_10"
+   ],
+   "loop": false
+  },
+  "step_mud_shoe": {
+   "cat": "step",
+   "desc": "shoe on mud: heel thud + mud roll",
+   "files": [
+    "step_mud_shoe_1",
+    "step_mud_shoe_2",
+    "step_mud_shoe_3",
+    "step_mud_shoe_4",
+    "step_mud_shoe_5",
+    "step_mud_shoe_6",
+    "step_mud_shoe_7",
+    "step_mud_shoe_8",
+    "step_mud_shoe_9",
+    "step_mud_shoe_10"
+   ],
+   "loop": false
+  },
+  "step_planks_bare": {
+   "cat": "step",
+   "desc": "bare on planks: heel thud + planks roll",
+   "files": [
+    "step_planks_bare_1",
+    "step_planks_bare_2",
+    "step_planks_bare_3",
+    "step_planks_bare_4",
+    "step_planks_bare_5",
+    "step_planks_bare_6",
+    "step_planks_bare_7",
+    "step_planks_bare_8",
+    "step_planks_bare_9",
+    "step_planks_bare_10"
+   ],
+   "loop": false
+  },
+  "step_planks_boot": {
+   "cat": "step",
+   "desc": "boot on planks: heel thud + planks roll",
+   "files": [
+    "step_planks_boot_1",
+    "step_planks_boot_2",
+    "step_planks_boot_3",
+    "step_planks_boot_4",
+    "step_planks_boot_5",
+    "step_planks_boot_6",
+    "step_planks_boot_7",
+    "step_planks_boot_8",
+    "step_planks_boot_9",
+    "step_planks_boot_10"
+   ],
+   "loop": false
+  },
+  "step_planks_shoe": {
+   "cat": "step",
+   "desc": "shoe on planks: heel thud + planks roll",
+   "files": [
+    "step_planks_shoe_1",
+    "step_planks_shoe_2",
+    "step_planks_shoe_3",
+    "step_planks_shoe_4",
+    "step_planks_shoe_5",
+    "step_planks_shoe_6",
+    "step_planks_shoe_7",
+    "step_planks_shoe_8",
+    "step_planks_shoe_9",
+    "step_planks_shoe_10"
+   ],
+   "loop": false
+  },
+  "step_snow_bare": {
+   "cat": "step",
+   "desc": "bare on snow: heel thud + snow roll",
+   "files": [
+    "step_snow_bare_1",
+    "step_snow_bare_2",
+    "step_snow_bare_3",
+    "step_snow_bare_4",
+    "step_snow_bare_5",
+    "step_snow_bare_6",
+    "step_snow_bare_7",
+    "step_snow_bare_8",
+    "step_snow_bare_9",
+    "step_snow_bare_10"
+   ],
+   "loop": false
+  },
+  "step_snow_boot": {
+   "cat": "step",
+   "desc": "boot on snow: heel thud + snow roll",
+   "files": [
+    "step_snow_boot_1",
+    "step_snow_boot_2",
+    "step_snow_boot_3",
+    "step_snow_boot_4",
+    "step_snow_boot_5",
+    "step_snow_boot_6",
+    "step_snow_boot_7",
+    "step_snow_boot_8",
+    "step_snow_boot_9",
+    "step_snow_boot_10"
+   ],
+   "loop": false
+  },
+  "step_snow_shoe": {
+   "cat": "step",
+   "desc": "shoe on snow: heel thud + snow roll",
+   "files": [
+    "step_snow_shoe_1",
+    "step_snow_shoe_2",
+    "step_snow_shoe_3",
+    "step_snow_shoe_4",
+    "step_snow_shoe_5",
+    "step_snow_shoe_6",
+    "step_snow_shoe_7",
+    "step_snow_shoe_8",
+    "step_snow_shoe_9",
+    "step_snow_shoe_10"
+   ],
+   "loop": false
+  },
+  "step_straw_bare": {
+   "cat": "step",
+   "desc": "bare on straw: heel thud + straw roll",
+   "files": [
+    "step_straw_bare_1",
+    "step_straw_bare_2",
+    "step_straw_bare_3",
+    "step_straw_bare_4",
+    "step_straw_bare_5",
+    "step_straw_bare_6",
+    "step_straw_bare_7",
+    "step_straw_bare_8",
+    "step_straw_bare_9",
+    "step_straw_bare_10"
+   ],
+   "loop": false
+  },
+  "step_straw_boot": {
+   "cat": "step",
+   "desc": "boot on straw: heel thud + straw roll",
+   "files": [
+    "step_straw_boot_1",
+    "step_straw_boot_2",
+    "step_straw_boot_3",
+    "step_straw_boot_4",
+    "step_straw_boot_5",
+    "step_straw_boot_6",
+    "step_straw_boot_7",
+    "step_straw_boot_8",
+    "step_straw_boot_9",
+    "step_straw_boot_10"
+   ],
+   "loop": false
+  },
+  "step_straw_shoe": {
+   "cat": "step",
+   "desc": "shoe on straw: heel thud + straw roll",
+   "files": [
+    "step_straw_shoe_1",
+    "step_straw_shoe_2",
+    "step_straw_shoe_3",
+    "step_straw_shoe_4",
+    "step_straw_shoe_5",
+    "step_straw_shoe_6",
+    "step_straw_shoe_7",
+    "step_straw_shoe_8",
+    "step_straw_shoe_9",
+    "step_straw_shoe_10"
    ],
    "loop": false
   },
@@ -726,7 +1021,7 @@
   },
   "ui_click": {
    "cat": "ui",
-   "desc": "UI click: a small wooden tick",
+   "desc": "UI click: a soft, muted wooden tick",
    "files": [
     "ui_click"
    ],
@@ -734,7 +1029,7 @@
   },
   "ui_hover": {
    "cat": "ui",
-   "desc": "UI hover: a faint high tick",
+   "desc": "UI hover: a faint soft tick",
    "files": [
     "ui_hover"
    ],
@@ -762,7 +1057,7 @@
   },
   "wheel_loop": {
    "cat": "sfx",
-   "desc": "iron-tyred wheels on cobbles at 2 m/s: rumble, spoke-rate clacks, rattle, creak (4 s loop)",
+   "desc": "iron-tyred wheels on cobbles at 2 m/s: rumble, felloe-joint clacks locked to each wheel's rotation (front 3 turns, rear 2 turns per loop), sett bumps, rattle, creak (4.71 s loop)",
    "files": [
     "wheel_loop"
    ],
@@ -841,11 +1136,11 @@
   },
   "bell_great": {
    "cat": "bell",
-   "dur": 11.0,
+   "dur": 16.0,
    "file": "res://assets/audio/bell_great.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.1,
+   "rms_db": -14.4,
    "set": "bell_great"
   },
   "bell_peal": {
@@ -854,57 +1149,57 @@
    "file": "res://assets/audio/bell_peal.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -13.0,
+   "rms_db": -12.8,
    "set": "bell_peal"
   },
   "bell_sigismund": {
    "cat": "bell",
-   "dur": 13.0,
+   "dur": 18.0,
    "file": "res://assets/audio/bell_sigismund.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -14.0,
+   "rms_db": -14.5,
    "set": "bell_sigismund"
   },
   "bell_small_1": {
    "cat": "bell",
-   "dur": 6.0,
+   "dur": 9.0,
    "file": "res://assets/audio/bell_small_1.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -15.8,
+   "rms_db": -15.5,
    "set": "bell_small"
   },
   "bell_small_2": {
    "cat": "bell",
-   "dur": 6.0,
+   "dur": 9.0,
    "file": "res://assets/audio/bell_small_2.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.0,
+   "rms_db": -16.8,
    "set": "bell_small"
   },
   "bell_small_3": {
    "cat": "bell",
-   "dur": 6.0,
+   "dur": 9.0,
    "file": "res://assets/audio/bell_small_3.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -14.6,
+   "rms_db": -15.3,
    "set": "bell_small"
   },
   "bell_townhall": {
    "cat": "bell",
-   "dur": 5.0,
+   "dur": 7.0,
    "file": "res://assets/audio/bell_townhall.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -20.3,
+   "rms_db": -18.2,
    "set": "bell_townhall"
   },
   "bell_uniate": {
    "cat": "bell",
-   "dur": 3.5,
+   "dur": 5.0,
    "file": "res://assets/audio/bell_uniate.ogg",
    "loop": false,
    "peak_db": -1.0,
@@ -1034,8 +1329,62 @@
    "file": "res://assets/audio/city_murmur_loop.ogg",
    "loop": true,
    "peak_db": -1.0,
-   "rms_db": -11.2,
+   "rms_db": -12.9,
    "set": "city_murmur_loop"
+  },
+  "cloth_rustle_1": {
+   "cat": "sfx",
+   "dur": 0.296,
+   "file": "res://assets/audio/cloth_rustle_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.4,
+   "set": "cloth_rustle"
+  },
+  "cloth_rustle_2": {
+   "cat": "sfx",
+   "dur": 0.381,
+   "file": "res://assets/audio/cloth_rustle_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.6,
+   "set": "cloth_rustle"
+  },
+  "cloth_rustle_3": {
+   "cat": "sfx",
+   "dur": 0.388,
+   "file": "res://assets/audio/cloth_rustle_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.0,
+   "set": "cloth_rustle"
+  },
+  "cloth_rustle_4": {
+   "cat": "sfx",
+   "dur": 0.397,
+   "file": "res://assets/audio/cloth_rustle_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "cloth_rustle"
+  },
+  "cloth_rustle_5": {
+   "cat": "sfx",
+   "dur": 0.385,
+   "file": "res://assets/audio/cloth_rustle_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.3,
+   "set": "cloth_rustle"
+  },
+  "cloth_rustle_6": {
+   "cat": "sfx",
+   "dur": 0.275,
+   "file": "res://assets/audio/cloth_rustle_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.1,
+   "set": "cloth_rustle"
   },
   "coachman_hoo_1": {
    "cat": "sfx",
@@ -1054,6 +1403,42 @@
    "peak_db": -1.0,
    "rms_db": -10.1,
    "set": "coachman_hoo"
+  },
+  "coat_swish_1": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/coat_swish_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -12.6,
+   "set": "coat_swish"
+  },
+  "coat_swish_2": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/coat_swish_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.3,
+   "set": "coat_swish"
+  },
+  "coat_swish_3": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/coat_swish_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.5,
+   "set": "coat_swish"
+  },
+  "coat_swish_4": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/coat_swish_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.3,
+   "set": "coat_swish"
   },
   "coin_chink_1": {
    "cat": "sfx",
@@ -1133,7 +1518,7 @@
    "file": "res://assets/audio/crowd_jeer_1.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -11.3,
+   "rms_db": -12.2,
    "set": "crowd_jeer"
   },
   "crowd_jeer_2": {
@@ -1142,7 +1527,7 @@
    "file": "res://assets/audio/crowd_jeer_2.ogg",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -12.2,
+   "rms_db": -13.1,
    "set": "crowd_jeer"
   },
   "crowd_talk_loop": {
@@ -1151,7 +1536,7 @@
    "file": "res://assets/audio/crowd_talk_loop.ogg",
    "loop": true,
    "peak_db": -1.0,
-   "rms_db": -12.4,
+   "rms_db": -13.3,
    "set": "crowd_talk_loop"
   },
   "dog_bark_1": {
@@ -1270,6 +1655,42 @@
    "peak_db": -1.0,
    "rms_db": -11.5,
    "set": "door_open"
+  },
+  "drag_1": {
+   "cat": "sfx",
+   "dur": 0.7,
+   "file": "res://assets/audio/drag_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -12.8,
+   "set": "drag"
+  },
+  "drag_2": {
+   "cat": "sfx",
+   "dur": 0.7,
+   "file": "res://assets/audio/drag_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -11.9,
+   "set": "drag"
+  },
+  "drag_3": {
+   "cat": "sfx",
+   "dur": 0.7,
+   "file": "res://assets/audio/drag_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -11.9,
+   "set": "drag"
+  },
+  "drag_4": {
+   "cat": "sfx",
+   "dur": 0.7,
+   "file": "res://assets/audio/drag_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.0,
+   "set": "drag"
   },
   "drum_beat_1": {
    "cat": "sfx",
@@ -1484,7 +1905,7 @@
    "file": "res://assets/audio/hoof_soft_1.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -14.5,
+   "rms_db": -15.2,
    "set": "hoof_soft"
   },
   "hoof_soft_2": {
@@ -1493,7 +1914,7 @@
    "file": "res://assets/audio/hoof_soft_2.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -14.5,
+   "rms_db": -15.2,
    "set": "hoof_soft"
   },
   "hoof_soft_3": {
@@ -1502,7 +1923,7 @@
    "file": "res://assets/audio/hoof_soft_3.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -15.0,
+   "rms_db": -15.3,
    "set": "hoof_soft"
   },
   "hoof_trot_1": {
@@ -1511,7 +1932,7 @@
    "file": "res://assets/audio/hoof_trot_1.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -15.1,
+   "rms_db": -15.5,
    "set": "hoof_trot"
   },
   "hoof_trot_2": {
@@ -1520,7 +1941,7 @@
    "file": "res://assets/audio/hoof_trot_2.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.2,
+   "rms_db": -15.9,
    "set": "hoof_trot"
   },
   "hoof_trot_3": {
@@ -1529,7 +1950,7 @@
    "file": "res://assets/audio/hoof_trot_3.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.3,
+   "rms_db": -16.1,
    "set": "hoof_trot"
   },
   "hoof_trot_4": {
@@ -1538,7 +1959,43 @@
    "file": "res://assets/audio/hoof_trot_4.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -16.4,
+   "rms_db": -14.5,
+   "set": "hoof_trot"
+  },
+  "hoof_trot_5": {
+   "cat": "sfx",
+   "dur": 0.28,
+   "file": "res://assets/audio/hoof_trot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.3,
+   "set": "hoof_trot"
+  },
+  "hoof_trot_6": {
+   "cat": "sfx",
+   "dur": 0.28,
+   "file": "res://assets/audio/hoof_trot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.9,
+   "set": "hoof_trot"
+  },
+  "hoof_trot_7": {
+   "cat": "sfx",
+   "dur": 0.28,
+   "file": "res://assets/audio/hoof_trot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.9,
+   "set": "hoof_trot"
+  },
+  "hoof_trot_8": {
+   "cat": "sfx",
+   "dur": 0.28,
+   "file": "res://assets/audio/hoof_trot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.7,
    "set": "hoof_trot"
   },
   "hoof_walk_1": {
@@ -1546,8 +2003,8 @@
    "dur": 0.32,
    "file": "res://assets/audio/hoof_walk_1.wav",
    "loop": false,
-   "peak_db": -1.2,
-   "rms_db": -16.2,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
    "set": "hoof_walk"
   },
   "hoof_walk_2": {
@@ -1556,7 +2013,7 @@
    "file": "res://assets/audio/hoof_walk_2.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.3,
+   "rms_db": -16.4,
    "set": "hoof_walk"
   },
   "hoof_walk_3": {
@@ -1565,7 +2022,7 @@
    "file": "res://assets/audio/hoof_walk_3.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -15.9,
+   "rms_db": -16.0,
    "set": "hoof_walk"
   },
   "hoof_walk_4": {
@@ -1574,7 +2031,43 @@
    "file": "res://assets/audio/hoof_walk_4.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.1,
+   "rms_db": -16.1,
+   "set": "hoof_walk"
+  },
+  "hoof_walk_5": {
+   "cat": "sfx",
+   "dur": 0.32,
+   "file": "res://assets/audio/hoof_walk_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.1,
+   "set": "hoof_walk"
+  },
+  "hoof_walk_6": {
+   "cat": "sfx",
+   "dur": 0.32,
+   "file": "res://assets/audio/hoof_walk_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.4,
+   "set": "hoof_walk"
+  },
+  "hoof_walk_7": {
+   "cat": "sfx",
+   "dur": 0.32,
+   "file": "res://assets/audio/hoof_walk_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.5,
+   "set": "hoof_walk"
+  },
+  "hoof_walk_8": {
+   "cat": "sfx",
+   "dur": 0.32,
+   "file": "res://assets/audio/hoof_walk_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.5,
    "set": "hoof_walk"
   },
   "horse_snort_1": {
@@ -1619,7 +2112,7 @@
    "file": "res://assets/audio/horse_stamp_2.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -18.6,
+   "rms_db": -17.6,
    "set": "horse_stamp"
   },
   "horse_whinny_1": {
@@ -1808,7 +2301,7 @@
    "file": "res://assets/audio/prayer_murmur_loop.ogg",
    "loop": true,
    "peak_db": -1.0,
-   "rms_db": -11.2,
+   "rms_db": -12.5,
    "set": "prayer_murmur_loop"
   },
   "punch_1": {
@@ -1901,6 +2394,33 @@
    "rms_db": -13.5,
    "set": "scuff"
   },
+  "scuff_4": {
+   "cat": "sfx",
+   "dur": 0.26,
+   "file": "res://assets/audio/scuff_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.1,
+   "set": "scuff"
+  },
+  "scuff_5": {
+   "cat": "sfx",
+   "dur": 0.26,
+   "file": "res://assets/audio/scuff_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.8,
+   "set": "scuff"
+  },
+  "scuff_6": {
+   "cat": "sfx",
+   "dur": 0.26,
+   "file": "res://assets/audio/scuff_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.4,
+   "set": "scuff"
+  },
   "scuff_snow_1": {
    "cat": "sfx",
    "dur": 0.3,
@@ -1917,6 +2437,24 @@
    "loop": false,
    "peak_db": -1.0,
    "rms_db": -13.7,
+   "set": "scuff_snow"
+  },
+  "scuff_snow_3": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/scuff_snow_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.4,
+   "set": "scuff_snow"
+  },
+  "scuff_snow_4": {
+   "cat": "sfx",
+   "dur": 0.3,
+   "file": "res://assets/audio/scuff_snow_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
    "set": "scuff_snow"
   },
   "shutter_open_1": {
@@ -1982,365 +2520,1895 @@
    "rms_db": -18.2,
    "set": "splash_slops"
   },
-  "step_bare_1": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_bare_1.wav",
+  "step_cobbles_bare_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_1.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.2,
-   "set": "step_bare"
+   "rms_db": -22.2,
+   "set": "step_cobbles_bare"
   },
-  "step_bare_2": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_bare_2.wav",
+  "step_cobbles_bare_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_10.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -18.7,
-   "set": "step_bare"
+   "rms_db": -23.1,
+   "set": "step_cobbles_bare"
   },
-  "step_bare_3": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_bare_3.wav",
+  "step_cobbles_bare_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_2.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.2,
-   "set": "step_bare"
+   "rms_db": -18.2,
+   "set": "step_cobbles_bare"
   },
-  "step_bare_4": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_bare_4.wav",
+  "step_cobbles_bare_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_3.wav",
    "loop": false,
    "peak_db": -1.0,
-   "rms_db": -17.4,
-   "set": "step_bare"
+   "rms_db": -19.2,
+   "set": "step_cobbles_bare"
   },
-  "step_boot_1": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_boot_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -15.4,
-   "set": "step_boot"
-  },
-  "step_boot_2": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_boot_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -14.8,
-   "set": "step_boot"
-  },
-  "step_boot_3": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_boot_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -15.7,
-   "set": "step_boot"
-  },
-  "step_boot_4": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_boot_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -15.6,
-   "set": "step_boot"
-  },
-  "step_cobbles_1": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_cobbles_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -20.5,
-   "set": "step_cobbles"
-  },
-  "step_cobbles_2": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_cobbles_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -22.1,
-   "set": "step_cobbles"
-  },
-  "step_cobbles_3": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_cobbles_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -20.9,
-   "set": "step_cobbles"
-  },
-  "step_cobbles_4": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_cobbles_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -21.5,
-   "set": "step_cobbles"
-  },
-  "step_flags_1": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_flags_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -17.2,
-   "set": "step_flags"
-  },
-  "step_flags_2": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_flags_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -19.9,
-   "set": "step_flags"
-  },
-  "step_flags_3": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_flags_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -17.8,
-   "set": "step_flags"
-  },
-  "step_flags_4": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_flags_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -18.9,
-   "set": "step_flags"
-  },
-  "step_gravel_1": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_gravel_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -18.6,
-   "set": "step_gravel"
-  },
-  "step_gravel_2": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_gravel_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -16.5,
-   "set": "step_gravel"
-  },
-  "step_gravel_3": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_gravel_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -16.6,
-   "set": "step_gravel"
-  },
-  "step_gravel_4": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_gravel_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -18.1,
-   "set": "step_gravel"
-  },
-  "step_heel_1": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_heel_1.wav",
-   "loop": false,
-   "peak_db": -1.5,
-   "rms_db": -23.8,
-   "set": "step_heel"
-  },
-  "step_heel_2": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_heel_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -21.8,
-   "set": "step_heel"
-  },
-  "step_heel_3": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_heel_3.wav",
-   "loop": false,
-   "peak_db": -3.5,
-   "rms_db": -25.8,
-   "set": "step_heel"
-  },
-  "step_heel_4": {
-   "cat": "sfx",
-   "dur": 0.36,
-   "file": "res://assets/audio/step_heel_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -22.6,
-   "set": "step_heel"
-  },
-  "step_mud_1": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_mud_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -14.0,
-   "set": "step_mud"
-  },
-  "step_mud_2": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_mud_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -14.7,
-   "set": "step_mud"
-  },
-  "step_mud_3": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_mud_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -13.9,
-   "set": "step_mud"
-  },
-  "step_mud_4": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_mud_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -14.7,
-   "set": "step_mud"
-  },
-  "step_planks_1": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_planks_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -14.5,
-   "set": "step_planks"
-  },
-  "step_planks_2": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_planks_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -13.5,
-   "set": "step_planks"
-  },
-  "step_planks_3": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_planks_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -13.2,
-   "set": "step_planks"
-  },
-  "step_planks_4": {
-   "cat": "sfx",
-   "dur": 0.34,
-   "file": "res://assets/audio/step_planks_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -16.6,
-   "set": "step_planks"
-  },
-  "step_snow_1": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_snow_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -16.3,
-   "set": "step_snow"
-  },
-  "step_snow_2": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_snow_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -17.9,
-   "set": "step_snow"
-  },
-  "step_snow_3": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_snow_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -17.0,
-   "set": "step_snow"
-  },
-  "step_snow_4": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_snow_4.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -16.9,
-   "set": "step_snow"
-  },
-  "step_straw_1": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_straw_1.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -18.4,
-   "set": "step_straw"
-  },
-  "step_straw_2": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_straw_2.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -17.1,
-   "set": "step_straw"
-  },
-  "step_straw_3": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_straw_3.wav",
-   "loop": false,
-   "peak_db": -1.0,
-   "rms_db": -19.7,
-   "set": "step_straw"
-  },
-  "step_straw_4": {
-   "cat": "sfx",
-   "dur": 0.42,
-   "file": "res://assets/audio/step_straw_4.wav",
+  "step_cobbles_bare_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_4.wav",
    "loop": false,
    "peak_db": -1.0,
    "rms_db": -19.8,
-   "set": "step_straw"
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_bare_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.7,
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_bare_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.4,
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_bare_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.8,
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_bare_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_8.wav",
+   "loop": false,
+   "peak_db": -2.1,
+   "rms_db": -21.6,
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_bare_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.4,
+   "set": "step_cobbles_bare"
+  },
+  "step_cobbles_boot_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.9,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.1,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.4,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.5,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.5,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.3,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.3,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.7,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_boot_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_cobbles_boot"
+  },
+  "step_cobbles_shoe_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.2,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.0,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.5,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.6,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.8,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.8,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_cobbles_shoe"
+  },
+  "step_cobbles_shoe_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_cobbles_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.0,
+   "set": "step_cobbles_shoe"
+  },
+  "step_flags_bare_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -22.7,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -22.8,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.2,
+   "rms_db": -21.3,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -21.9,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -21.3,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -24.4,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -22.7,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -22.1,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -22.3,
+   "set": "step_flags_bare"
+  },
+  "step_flags_bare_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.1,
+   "rms_db": -21.1,
+   "set": "step_flags_bare"
+  },
+  "step_flags_boot_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.6,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.8,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -21.4,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.5,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.6,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.1,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.9,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_flags_boot"
+  },
+  "step_flags_boot_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.6,
+   "set": "step_flags_boot"
+  },
+  "step_flags_shoe_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.2,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.5,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.5,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.7,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.5,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.6,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.8,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.0,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_flags_shoe"
+  },
+  "step_flags_shoe_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_flags_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.4,
+   "rms_db": -19.2,
+   "set": "step_flags_shoe"
+  },
+  "step_gravel_bare_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.7,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.0,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.3,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.1,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.0,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.6,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.9,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_bare_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.8,
+   "set": "step_gravel_bare"
+  },
+  "step_gravel_boot_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.6,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.3,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.0,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.8,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.4,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.9,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.4,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_boot_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.4,
+   "set": "step_gravel_boot"
+  },
+  "step_gravel_shoe_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.9,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.7,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.0,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.0,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.7,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.0,
+   "set": "step_gravel_shoe"
+  },
+  "step_gravel_shoe_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_gravel_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.2,
+   "set": "step_gravel_shoe"
+  },
+  "step_mud_bare_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.9,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.5,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.6,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.0,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.9,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.6,
+   "set": "step_mud_bare"
+  },
+  "step_mud_bare_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.4,
+   "set": "step_mud_bare"
+  },
+  "step_mud_boot_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.2,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.3,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.3,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.1,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.9,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.1,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.1,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.5,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.7,
+   "set": "step_mud_boot"
+  },
+  "step_mud_boot_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.4,
+   "set": "step_mud_boot"
+  },
+  "step_mud_shoe_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.2,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.9,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.3,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.4,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.5,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.1,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_mud_shoe"
+  },
+  "step_mud_shoe_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_mud_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.2,
+   "set": "step_mud_shoe"
+  },
+  "step_planks_bare_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.3,
+   "rms_db": -17.8,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.2,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.7,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.8,
+   "rms_db": -18.6,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.0,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.0,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_7.wav",
+   "loop": false,
+   "peak_db": -2.4,
+   "rms_db": -19.9,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.4,
+   "set": "step_planks_bare"
+  },
+  "step_planks_bare_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_bare_9.wav",
+   "loop": false,
+   "peak_db": -2.7,
+   "rms_db": -19.5,
+   "set": "step_planks_bare"
+  },
+  "step_planks_boot_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.1,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.7,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.1,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.7,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.9,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_planks_boot"
+  },
+  "step_planks_boot_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
+   "set": "step_planks_boot"
+  },
+  "step_planks_shoe_1": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.9,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_10": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.1,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_2": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.1,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_3": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.8,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_4": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.0,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_5": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_6": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.8,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_7": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.7,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_8": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.0,
+   "set": "step_planks_shoe"
+  },
+  "step_planks_shoe_9": {
+   "cat": "step",
+   "dur": 0.3,
+   "file": "res://assets/audio/step_planks_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.6,
+   "set": "step_planks_shoe"
+  },
+  "step_snow_bare_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.4,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.9,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.4,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.2,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.4,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.6,
+   "set": "step_snow_bare"
+  },
+  "step_snow_bare_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.3,
+   "set": "step_snow_bare"
+  },
+  "step_snow_boot_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.7,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.6,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.9,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_snow_boot"
+  },
+  "step_snow_boot_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_snow_boot"
+  },
+  "step_snow_shoe_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.0,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.2,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.2,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.4,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.1,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.5,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.3,
+   "set": "step_snow_shoe"
+  },
+  "step_snow_shoe_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_snow_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.9,
+   "set": "step_snow_shoe"
+  },
+  "step_straw_bare_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.3,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -17.1,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.5,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -20.3,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.6,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.7,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.1,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -19.3,
+   "set": "step_straw_bare"
+  },
+  "step_straw_bare_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_bare_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.9,
+   "set": "step_straw_bare"
+  },
+  "step_straw_boot_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.1,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.6,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.8,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.2,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.4,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.6,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.9,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.8,
+   "set": "step_straw_boot"
+  },
+  "step_straw_boot_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_boot_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -13.9,
+   "set": "step_straw_boot"
+  },
+  "step_straw_shoe_1": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_1.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.9,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_10": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_10.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_2": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_2.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.5,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_3": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_3.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_4": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_4.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -18.4,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_5": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_5.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.7,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_6": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_6.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -14.6,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_7": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_7.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_8": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_8.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -16.8,
+   "set": "step_straw_shoe"
+  },
+  "step_straw_shoe_9": {
+   "cat": "step",
+   "dur": 0.42,
+   "file": "res://assets/audio/step_straw_shoe_9.wav",
+   "loop": false,
+   "peak_db": -1.0,
+   "rms_db": -15.0,
+   "set": "step_straw_shoe"
   },
   "stone_land_1": {
    "cat": "sfx",
@@ -2375,25 +4443,25 @@
    "file": "res://assets/audio/tavern_loop.ogg",
    "loop": true,
    "peak_db": -1.0,
-   "rms_db": -14.5,
+   "rms_db": -13.4,
    "set": "tavern_loop"
   },
   "ui_click": {
    "cat": "ui",
-   "dur": 0.08,
+   "dur": 0.06,
    "file": "res://assets/audio/ui_click.wav",
    "loop": false,
-   "peak_db": -2.1,
-   "rms_db": -16.3,
+   "peak_db": -8.8,
+   "rms_db": -21.2,
    "set": "ui_click"
   },
   "ui_hover": {
    "cat": "ui",
-   "dur": 0.04,
+   "dur": 0.035,
    "file": "res://assets/audio/ui_hover.wav",
    "loop": false,
-   "peak_db": -1.2,
-   "rms_db": -13.9,
+   "peak_db": -14.6,
+   "rms_db": -27.4,
    "set": "ui_hover"
   },
   "ui_page_1": {
@@ -2452,11 +4520,11 @@
   },
   "wheel_loop": {
    "cat": "sfx",
-   "dur": 4.0,
+   "dur": 4.712,
    "file": "res://assets/audio/wheel_loop.ogg",
    "loop": true,
    "peak_db": -1.0,
-   "rms_db": -17.6,
+   "rms_db": -17.9,
    "set": "wheel_loop"
   },
   "wheel_mud_loop": {

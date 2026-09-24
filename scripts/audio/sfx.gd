@@ -120,6 +120,11 @@ static func event(name: String) -> Dictionary:
 	ev["pitch"] = 1.0
 	ev["secs"] = 0.0
 	ev["also"] = []
+	var pre: Dictionary = _data.get("prefix_events", {})
+	for k in pre:
+		if name.begins_with(str(k)):
+			ev.merge(pre[k], true)
+			break
 	var evs: Dictionary = _data.get("events", {})
 	if evs.has(name):
 		ev.merge(evs[name], true)
@@ -380,6 +385,8 @@ func _play3d(name: String, pos: Vector3, vol: float, pv: float, pitch: float, fo
 	var pvv := float(ev["pitch_var"]) if pv < 0.0 else pv
 	p.pitch_scale = clampf(float(ev["pitch"]) * pitch * (1.0 + _rng.randf_range(-pvv, pvv)), 0.3, 3.0)
 	p.set_meta("base_db", float(ev["volume_db"]) + vol)
+	p.set_meta("lp_near", float(ev.get("lp_near", _data.get("occlusion", {}).get("lp_near", 10.0))))
+	p.set_meta("lp_far_hz", float(ev.get("lp_far_hz", _data.get("occlusion", {}).get("lp_far_hz", 6000.0))))
 	_occlude(p, lpos)
 	p.play()
 	var dur := float(_sounds[fname]["dur"]) / p.pitch_scale
@@ -489,7 +496,18 @@ func _occlude(p: AudioStreamPlayer3D, lpos: Variant) -> void:
 			blocked = not hit.is_empty() and (hit["position"] as Vector3).distance_to(src) > 1.2
 	var occ_db := float(oc.get("volume_db", -8.0)) if blocked else 0.0
 	p.set_meta("occ_db", occ_db)
-	p.attenuation_filter_cutoff_hz = float(oc.get("cutoff_hz", 900)) if blocked else float(oc.get("clear_cutoff_hz", 14000))
+	var clear := float(oc.get("clear_cutoff_hz", 14000))
+	var cut := float(oc.get("cutoff_hz", 900)) if blocked else clear
+	# distance low-pass: clear up to lp_near metres, falling (log-linear) to lp_far_hz at the max distance, so far
+	# voices (other people's steps) read as distant rather than just quieter
+	if lpos != null:
+		var d := (lpos as Vector3).distance_to(p.global_position)
+		var near := float(p.get_meta("lp_near", oc.get("lp_near", 10.0)))
+		var far_hz := float(p.get_meta("lp_far_hz", oc.get("lp_far_hz", 6000.0)))
+		if d > near and p.max_distance > near:
+			var k := clampf((d - near) / (p.max_distance - near), 0.0, 1.0)
+			cut = minf(cut, exp(lerpf(log(clear), log(far_hz), k)))
+	p.attenuation_filter_cutoff_hz = cut
 	p.volume_db = float(p.get_meta("base_db", 0.0)) + occ_db
 
 

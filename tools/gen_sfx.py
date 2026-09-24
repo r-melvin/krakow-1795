@@ -408,7 +408,7 @@ def noisy_formant(r, n, track):
 
 
 def babble(r, n, voices, fmax=3200.0, men=0.6, rate=5.5, gap=(0.3, 1.6), phrase=(0.8, 2.8), level_spread=9.0,
-           f0_scale=1.0, monotone=False):
+           f0_scale=1.0, monotone=False, breath=1.0):
     """Granular crowd talk: each voice speaks phrases of vowel syllables (formant-filtered glottal saw), with
     consonant dips and the odd fricative. Returns the sum of `voices` voices at spread levels."""
     out = np.zeros(n)
@@ -433,8 +433,8 @@ def babble(r, n, voices, fmax=3200.0, men=0.6, rate=5.5, gap=(0.3, 1.6), phrase=
                     break
                 L = i1 - i0
                 decl = 1.0 - 0.12 * (st - t) / max(pd, 0.1)
-                wob = 0.0 if monotone else r.uniform(-0.12, 0.14)
-                f0[i0:i1] = base * decl * (1 + wob + np.linspace(0, r.uniform(-0.08, 0.08), L))
+                wob = r.uniform(-0.04, 0.04) if monotone else r.uniform(-0.2, 0.22)
+                f0[i0:i1] = base * decl * (1 + wob + np.linspace(r.uniform(-0.05, 0.05), r.uniform(-0.15, 0.15), L))
                 e = np.sin(np.linspace(0, math.pi, L)) ** 0.6
                 amp[i0:i1] = np.maximum(amp[i0:i1], e * r.uniform(0.6, 1.0))
                 vow[i0:i1] = r.integers(0, len(VKEYS))
@@ -445,7 +445,8 @@ def babble(r, n, voices, fmax=3200.0, men=0.6, rate=5.5, gap=(0.3, 1.6), phrase=
             t = pe + r.uniform(*gap)
         amp = lp(amp, 30, 1)
         amp = np.maximum(amp, 0)
-        src = saw(lp(f0, 20, 1), jitter=0.006 * ctrl(r, n, 40))
+        src = saw(lp(f0, 20, 1), jitter=0.03 * ctrl(r, n, 60) + 0.015 * noise(r, n))
+        src = src * 0.55 + noise(r, n) * 0.35 * breath          # breath: speech heard across a square is mostly noise
         # per-frame formants from the vowel index at the frame centre (smoothed by the frame overlap)
         tbl = np.stack([vowel(k, scale) for k in VKEYS])
 
@@ -531,29 +532,94 @@ def _impact(r, surface, weight=1.0):
     return x
 
 
-def footstep(r, surface, weight=1.0, toe=(0.35, 0.6), dur=0.36):
-    n = secs(dur)
-    out = np.zeros(n)
-    mix(out, _impact(r, surface, weight), 0.0)
-    mix(out, _impact(r, surface, weight * 0.6), r.uniform(0.045, 0.075), r.uniform(*toe))
+SURFACES = ["cobbles", "flags", "snow", "mud", "gravel", "planks", "straw"]
+SHOES = ["shoe", "boot", "bare"]
+STEP_VARIANTS = 10
+# toe / roll layer: band centre (Hz), q, level, decay (s) per surface
+ROLL = {"cobbles": (2600, 1.1, 0.40, 0.030), "flags": (1800, 1.0, 0.35, 0.028), "snow": (3000, 0.8, 0.30, 0.060),
+        "mud": (900, 1.2, 0.45, 0.050), "gravel": (3400, 0.9, 0.30, 0.045), "planks": (1500, 1.0, 0.30, 0.030),
+        "straw": (3200, 0.7, 0.55, 0.070)}
+# heel thud per shoe: (f lo, f hi, decay s, level)
+HEEL = {"boot": (62, 82, 0.024, 1.0), "shoe": (80, 105, 0.018, 0.8), "bare": (95, 120, 0.014, 0.6)}
+
+
+def _heel_layer(r, n, surface, shoe):
+    """Heel strike: a short low thud (60-120 Hz, fast decay) plus the surface's own contact sound."""
+    f_lo, f_hi, tau, lvl = HEEL[shoe]
+    soft = surface in ("snow", "mud", "straw")
+    th = thud(n, r.uniform(f_lo, f_hi), tau * (1.6 if soft else 1.0), 0.35, 0.002 if soft else 0.0008) * lvl
+    th += lp(burst(r, n, 0.006), 350) * 0.35 * lvl
+    hard_k = {"boot": 1.0, "shoe": 0.7, "bare": 0.25}[shoe]
+    x = np.zeros(n)
+    if surface == "cobbles":
+        x += hp(burst(r, n, 0.0009), 2200) * 0.8 * hard_k
+        x += modes(r, n, [r.uniform(1800, 3200), r.uniform(3300, 4600), r.uniform(1100, 1500)], [0.5, 0.25, 0.25],
+                   [0.016, 0.009, 0.02]) * hard_k
+        x += grains(r, n, r.integers(8, 15), 0.03, 0.05, 2000, 6000, 0.0008, 0.0025) * 0.5        # grit tail
+    elif surface == "flags":
+        x += bp(burst(r, n, 0.004), 1400, 0.6) * 1.1 * max(hard_k, 0.75)                         # clean slap
+        x += modes(r, n, [r.uniform(900, 1300)], [0.15], [0.022]) * hard_k
+    elif surface == "snow":
+        x += grains(r, n, r.integers(130, 200), 0.004, r.uniform(0.10, 0.14), 1500, 6000, 0.0005, 0.0015,
+                    skew=2.6, amp_pow=1.5) * 0.7
+        th = lp(th, 300) * 0.7            # snow swallows the heel
+    elif surface == "mud":
+        c0, c1 = r.uniform(230, 300), r.uniform(650, 850)
+
+        def g(tc, f):
+            return g_bp(1.0, 3.0)(f / (c0 + (c1 - c0) * np.clip(tc / 0.1, 0, 1))) * g_lp(1500, 2)(f)
+        x += stft_filter(noise(r, n), g) * env(n, 0.008, 0.05) * 1.0
+        mix(x, chirp(secs(0.03), 380, r.uniform(900, 1200), 0.01) * 0.3, r.uniform(0.15, 0.2))      # suction pop
+    elif surface == "gravel":
+        x += grains(r, n, r.integers(50, 90), 0.0, r.uniform(0.08, 0.11), 1800, 7000, 0.0006, 0.0025, skew=2.8,
+                    amp_pow=2.2) * (0.6 if shoe == "bare" else 0.9)
+    elif surface == "planks":
+        f0 = r.uniform(150, 250)
+        x += modes(r, n, [f0, f0 * 2.4, f0 * 3.9], [0.7, 0.3, 0.12], [0.07, 0.035, 0.018]) * max(hard_k, 0.4)
+        x += hp(burst(r, n, 0.0015), 1000) * 0.3 * hard_k
+    elif surface == "straw":
+        am = np.clip(ctrl(r, n, 90, -0.3, 1.0), 0, None) ** 2
+        x += bp(noise(r, n), 3200, 0.5) * env(n, 0.01, 0.07) * am * 0.8
+    if shoe == "boot" and surface in ("cobbles", "flags", "gravel"):
+        x += grains(r, n, 4, 0.001, 0.015, 3000, 6000, 0.002, 0.006) * 0.35                     # hobnails
+    if shoe == "bare" and surface in ("cobbles", "flags", "planks"):
+        x += bp(burst(r, n, 0.003), 1500, 0.8) * 0.7                                             # skin slap
+    return th + x
+
+
+def _roll_layer(r, n, surface, shoe):
+    """Toe / roll: a brighter scuff (1-4 kHz) shaped by the surface."""
+    c, q, lvl, tau = ROLL[surface]
+    c *= r.uniform(0.85, 1.15) * (0.8 if shoe == "bare" else 1.0)
+    x = bp(noise(r, n), c, q) * env(n, 0.006, tau) * lvl
+    if surface == "snow" and r.uniform() < 0.5:                  # dry-cold squeak
+        m = secs(0.045)
+        f = curve(m, [(0, r.uniform(1500, 1800)), (0.045, r.uniform(2000, 2400))])
+        sq = np.sin(TAU * np.cumsum(f) / SR) + 0.4 * np.sin(2 * TAU * np.cumsum(f) / SR)
+        mix(x, sq * np.hanning(m) * 0.12, 0.01)
+    if surface == "gravel":
+        x += grains(r, n, 25, 0.0, 0.05, 2000, 6000) * 0.3
+    if surface == "planks" and r.uniform() < 0.25:
+        mix(x, _creak(r, 0.18, (140, 200)) * 0.12, 0.02)
+    return x * {"bare": 0.6, "shoe": 1.0, "boot": 1.1}[shoe]
+
+
+def footstep(r, surface, shoe):
+    soft = surface in ("snow", "mud", "straw")
+    n = secs(0.42 if soft else 0.3)
+    out = _heel_layer(r, n, surface, shoe)
+    roll_at = r.uniform(0.045, 0.08) * (1.15 if shoe == "boot" else 1.0)
+    mix(out, _roll_layer(r, secs(0.2), surface, shoe), roll_at)
     return out
 
 
-for _s, _d in [("cobbles", "bright stone click, short decay, a little grit"),
-               ("flags", "flagstones: lower stone ring, smooth"),
-               ("snow", "crunch of micro-grains over a low thud"),
-               ("mud", "wet squelch: swept resonance, low thump, suction pop"),
-               ("gravel", "many micro-clicks"),
-               ("planks", "hollow wooden tone ~180 Hz"),
-               ("straw", "soft rustle")]:
-    snd("step_" + _s, n=4, desc="footstep on " + _d)(lambda r, i, s=_s: footstep(r, s, dur=0.42 if s in ("snow", "mud", "straw") else 0.34))
-snd("step_boot", n=4, desc="guard's hobnailed boot on hard ground: heavy heel, nail clack")(
-    lambda r, i: footstep(r, "boot", 1.3, (0.4, 0.55)))
-snd("step_heel", n=4, desc="women's heeled shoe: sharp click")(lambda r, i: footstep(r, "heel", 1.0, (0.15, 0.3)))
-snd("step_bare", n=4, desc="barefoot / rag-wrapped foot: soft slap")(lambda r, i: footstep(r, "bare", 1.0, (0.4, 0.6)))
+for _s in SURFACES:
+    for _sh in SHOES:
+        snd("step_%s_%s" % (_s, _sh), n=STEP_VARIANTS, cat="step",
+            desc="%s on %s: heel thud + %s roll" % (_sh, _s, _s))(lambda r, i, s=_s, sh=_sh: footstep(r, s, sh))
 
 
-@snd("scuff", n=3, desc="shoe scuffing on stone when turning")
+@snd("scuff", n=6, desc="shoe scuffing on stone when turning or sneaking")
 def _scuff(r, i):
     n = secs(0.26)
     c0, c1 = r.uniform(1800, 2600), r.uniform(700, 1100)
@@ -565,11 +631,43 @@ def _scuff(r, i):
     return x + grains(r, n, 25, 0.02, 0.2, 2000, 6000) * 0.4
 
 
-@snd("scuff_snow", n=2, desc="foot sliding in snow")
+@snd("scuff_snow", n=4, desc="foot sliding in snow, mud or straw")
 def _scuff_snow(r, i):
     n = secs(0.3)
     x = grains(r, n, 220, 0.0, 0.26, 1500, 6000, 0.0005, 0.0015, skew=1.3, amp_pow=1.5)
     return x + bp(noise(r, n), 2500, 0.7) * env_pts(n, [(0, 0), (0.05, 0.25), (0.28, 0)])
+
+
+@snd("drag", n=4, desc="body dragging over the ground (prone crawl): long cloth-on-stone scrape")
+def _drag(r, i):
+    n = secs(0.7)
+    c = curve(n, [(0, 700), (0.35, 1200), (0.7, 800)])
+
+    def g(tc, f):
+        idx = np.clip((tc[:, 0] * SR).astype(int), 0, n - 1)
+        return g_bp(1.0, 0.9)(f / c[idx][:, None])
+    x = stft_filter(noise(r, n), g) * env_pts(n, [(0, 0), (0.12, 1), (0.5, 0.7), (0.7, 0)])
+    x *= 0.7 + 0.3 * np.abs(ctrl(r, n, 25))
+    return x + grains(r, n, 30, 0.05, 0.6, 1500, 5000, skew=1.0) * 0.3
+
+
+@snd("cloth_rustle", n=6, desc="coat and cloth rustle on the player's movement")
+def _rustle(r, i):
+    n = secs(r.uniform(0.25, 0.4))
+    am = np.clip(ctrl(r, n, 60, -0.2, 1.0), 0, None) ** 1.5
+    x = bp(noise(r, n), r.uniform(1800, 3000), 0.6) * am
+    return x * env_pts(n, [(0, 0), (0.05, 1), (n / SR * 0.7, 0.6), (n / SR, 0)])
+
+
+@snd("coat_swish", n=4, desc="coat tails swishing on a sprint")
+def _swish(r, i):
+    n = secs(0.3)
+    c = curve(n, [(0, 600), (0.15, 1600), (0.3, 900)])
+
+    def g(tc, f):
+        idx = np.clip((tc[:, 0] * SR).astype(int), 0, n - 1)
+        return g_bp(1.0, 1.3)(f / c[idx][:, None])
+    return stft_filter(noise(r, n), g) * np.hanning(n)
 
 
 # ====================================================================== horses and vehicles
@@ -578,6 +676,7 @@ def _hoof(r, weight=1.0, soft=False, click=1.0):
     n = secs(0.25)
     x = modes(r, n, [r.uniform(600, 720), r.uniform(780, 900), r.uniform(1150, 1400)], [1.0, 0.7, 0.35],
               [0.035, 0.028, 0.015])
+    x += bp(burst(r, n, 0.004), r.uniform(650, 850), 2.5) * 0.9          # the hollow of the hoof wall
     x += thud(n, r.uniform(90, 110), 0.05) * 0.8 * weight
     if soft:
         x = lp(x, 500)
@@ -585,24 +684,24 @@ def _hoof(r, weight=1.0, soft=False, click=1.0):
             return g_bp(1.0, 2.5)(f / (250 + 500 * np.clip(tc / 0.1, 0, 1)))
         x += stft_filter(noise(r, n), g) * env(n, 0.01, 0.05) * 0.8
     else:
-        x += hp(burst(r, n, 0.0012), 1500) * 0.35 * click
-        x += modes(r, n, [r.uniform(2700, 3300)], [0.12 * click], [0.02])
+        x += hp(burst(r, n, 0.001), 1800) * 0.25 * click
+        x += modes(r, n, [r.uniform(2700, 3300)], [0.08 * click], [0.018])
     return x
 
 
-@snd("hoof_walk", n=4, desc="walking hoof on cobbles: impact + hollow horn resonance, two-part clop")
+@snd("hoof_walk", n=8, desc="walking hoof on cobbles: impact + hollow horn resonance, two-part clop")
 def _hoof_walk(r, i):
     out = np.zeros(secs(0.32))
     mix(out, _hoof(r), 0.0)
-    mix(out, _hoof(r, 0.7), r.uniform(0.025, 0.045), r.uniform(0.4, 0.6))
+    mix(out, _hoof(r, 0.7), r.uniform(0.05, 0.08), r.uniform(0.45, 0.65))    # hind hoof follows the fore
     return out
 
 
-@snd("hoof_trot", n=4, desc="trotting hoof: single sharp clop with a flam")
+@snd("hoof_trot", n=8, desc="trotting hoof: single sharp clop with a flam")
 def _hoof_trot(r, i):
     out = np.zeros(secs(0.28))
     mix(out, _hoof(r, 1.1, click=1.3), 0.0)
-    mix(out, _hoof(r, 0.9, click=1.1), r.uniform(0.008, 0.014), 0.7)
+    mix(out, _hoof(r, 0.9, click=1.1), r.uniform(0.02, 0.035), 0.6)     # the diagonal pair, a hair apart
     return out
 
 
@@ -639,27 +738,35 @@ def _creak(r, dur=0.4, f=(90, 140)):
     return x * np.sin(np.linspace(0, math.pi, n)) ** 1.5
 
 
-@snd("wheel_loop", loop=True, fmt="ogg", desc="iron-tyred wheels on cobbles at 2 m/s: rumble, spoke-rate clacks, rattle, creak (4 s loop)")
+@snd("wheel_loop", loop=True, fmt="ogg", desc="iron-tyred wheels on cobbles at 2 m/s: rumble, felloe-joint clacks locked to each wheel's rotation (front 3 turns, rear 2 turns per loop), sett bumps, rattle, creak (4.71 s loop)")
 def _wheel_loop(r, i):
-    L, xf = 4.0, 0.25
+    speed = 2.0
+    front_c, rear_c = TAU * 0.5, TAU * 0.75            # tyre circumferences (m)
+    L, xf = 3 * front_c / speed, 0.25                   # = 2 * rear_c / speed: both wheels come round together
     n = secs(L + xf)
-    x = lp(noise(r, n, -6), 160) * 0.5 * (0.8 + 0.2 * ctrl(r, n, 6))
+    x = lp(noise(r, n, -6), 150) * 0.45 * (0.8 + 0.2 * ctrl(r, n, 6))
     bumps = np.zeros(n)
-    for w, off in enumerate([0.0, 0.07]):
-        t = off
-        while t < L + xf:
-            g = r.uniform(0.3, 1.0)
-            mix(x, _clack(r, 0.5) * g * 0.8, t)
-            mix(bumps, np.exp(-tt(secs(0.08)) / 0.03) * g, t)
-            t += 1 / 6.3 * (1 + r.uniform(-0.12, 0.12))
-    for _ in range(r.poisson(3 * L)):
+    for circ, joints, lvl, pan_off in [(front_c, 6, 0.8, 0.0), (rear_c, 7, 1.0, 0.11)]:
+        per = circ / speed
+        # each felloe joint / tyre weld strikes at the same point of every turn, with its own weight and timbre
+        spots = [(k / joints + r.uniform(-0.03, 0.03), r.uniform(0.35, 1.0), int(r.integers(0, 1 << 30))) for k in range(joints)]
+        turn = 0
+        while turn * per < L + xf:
+            for ph, g, seed in spots:
+                t = pan_off + (turn + ph) * per
+                if 0 <= t < L + xf:
+                    rr = np.random.default_rng(seed)
+                    mix(x, _clack(rr, 0.5) * g * lvl * 0.8, t)
+                    mix(bumps, np.exp(-tt(secs(0.08)) / 0.03) * g, t)
+            turn += 1
+    for _ in range(r.poisson(2 * L)):
         t = r.uniform(0, L + xf)
-        mix(x, _clack(r, 1.5) * r.uniform(0.6, 1.2), t)
-        mix(bumps, np.exp(-tt(secs(0.2)) / 0.06) * 1.5, t)
+        mix(x, _clack(r, 1.5) * r.uniform(0.5, 1.0), t)
+        mix(bumps, np.exp(-tt(secs(0.2)) / 0.06) * 1.3, t)
     rattle = bp(noise(r, n), 1600, 1.0) * lp(bumps + 0.3 * np.abs(ctrl(r, n, 12)), 25, 1)
-    x += rattle * 0.35
+    x += rattle * 0.3
     for _ in range(2):
-        mix(x, _creak(r, 0.35) * 0.12, r.uniform(0, L))
+        mix(x, _creak(r, 0.35) * 0.1, r.uniform(0, L))
     return loopify(x, secs(L), secs(xf))
 
 
@@ -1482,49 +1589,49 @@ def bell(r, prime, dur, decay, strike=1.0, detune=0.6, inharm=0.0, bright=1.0):
         for s in (-0.5, 0.5):     # a close pair: the slow beating of a real bell
             ff = f + s * detune * r.uniform(0.5, 1.5) * (ratio ** 0.5)
             x += a * 0.5 * np.exp(-t / tau) * np.sin(TAU * ff * t + r.uniform(0, TAU))
-    na = secs(0.002)
-    x[:na] *= np.linspace(0, 1, na)
+    na = secs(0.006)                                   # a clapper on bronze: a quick but not clicky onset
+    x[:na] *= np.linspace(0, 1, na) ** 0.7
     m = min(n, secs(0.4))
-    clap = hp(burst(r, m, 0.005), 800) * 0.4
-    for _ in range(10):
-        clap += modes(r, m, [r.uniform(2000, 9000)], [r.uniform(0.05, 0.2)], [r.uniform(0.02, 0.08)])
-    x[:m] += clap * strike
+    clap = lp(hp(burst(r, m, 0.004), 500), 3500) * 0.25
+    for _ in range(6):
+        clap += modes(r, m, [r.uniform(1500, 5000)], [r.uniform(0.03, 0.1)], [r.uniform(0.015, 0.05)])
+    x[:m] += clap * strike * 0.6
     return x
 
 
 @snd("bell_great", n=1, fmt="ogg", cat="bell", desc="St Mary's great bell: one stroke (hum, prime, tierce, quint, nominal; long tail)")
 def _bell_great(r, i):
-    d = 11.0
-    x = bell(r, 98.0, d, 1.0, 1.2)
-    return fit(reverb(x, 3.2, 0.3, 0.03, 4000), secs(d))
+    d = 16.0
+    x = bell(r, 98.0, d, 1.5, 1.0, 0.6, 0.0, 0.8)
+    return fit(reverb(x, 4.0, 0.35, 0.03, 3500), secs(d))
 
 
 @snd("bell_sigismund", n=1, fmt="ogg", cat="bell", desc="the Wawel Sigismund bell far off: very deep, distant (feast days)")
 def _bell_sig(r, i):
-    d = 13.0
-    x = bell(r, 46.25, d, 1.4, 0.6, 0.35)
+    d = 18.0
+    x = bell(r, 46.25, d, 2.0, 0.5, 0.35)
     x = lp(x, 1500)
     return fit(reverb(x, 4.0, 0.55, 0.08, 2000), secs(d))
 
 
 @snd("bell_townhall", n=1, fmt="ogg", cat="bell", desc="the Town Hall clock bell: a hammer stroke, higher and shorter")
 def _bell_th(r, i):
-    d = 5.0
-    x = bell(r, 330.0, d, 0.35, 1.8, 1.0, 0.0, 1.2)
+    d = 7.0
+    x = bell(r, 330.0, d, 0.5, 1.4, 1.0, 0.0, 1.0)
     return fit(reverb(x, 2.4, 0.3, 0.02), secs(d))
 
 
 @snd("bell_small", n=3, fmt="ogg", cat="bell", desc="St Mary's smaller bells (three pitches) for the canonical hours")
 def _bell_small(r, i):
-    d = 6.0
-    x = bell(r, [196.0, 220.0, 261.6][i], d, 0.45, 1.0)
+    d = 9.0
+    x = bell(r, [196.0, 220.0, 261.6][i], d, 0.65, 0.9, 0.6, 0.0, 0.85)
     return fit(reverb(x, 2.8, 0.3, 0.03), secs(d))
 
 
 @snd("bell_uniate", n=1, fmt="ogg", cat="bell", desc="the Uniate chapel's small bell: tinny, a little out of tune")
 def _bell_uniate(r, i):
-    d = 3.5
-    x = bell(r, 494.0, d, 0.22, 1.2, 1.5, 0.03, 1.3)
+    d = 5.0
+    x = bell(r, 494.0, d, 0.3, 1.0, 1.5, 0.03, 1.1)
     return fit(reverb(x, 1.8, 0.25, 0.02), secs(d))
 
 
@@ -1595,16 +1702,17 @@ def _hejnal(r, i):
 
 # ====================================================================== UI
 
-@snd("ui_click", n=1, cat="ui", desc="UI click: a small wooden tick")
+@snd("ui_click", n=1, cat="ui", desc="UI click: a soft, muted wooden tick", peak=-8.0)
 def _ui_click(r, i):
-    n = secs(0.08)
-    return modes(r, n, [1200, 2600], [1, 0.4], [0.012, 0.006]) + hp(burst(r, n, 0.001), 2000) * 0.3
+    n = secs(0.06)
+    x = modes(r, n, [720, 1450], [1, 0.3], [0.009, 0.005]) + lp(burst(r, n, 0.0015), 2500) * 0.12
+    return lp(x, 3000) * 0.5
 
 
-@snd("ui_hover", n=1, cat="ui", desc="UI hover: a faint high tick")
+@snd("ui_hover", n=1, cat="ui", desc="UI hover: a faint soft tick", peak=-14.0)
 def _ui_hover(r, i):
-    n = secs(0.04)
-    return modes(r, n, [3200], [1], [0.005]) * 0.6
+    n = secs(0.035)
+    return lp(modes(r, n, [1900], [1], [0.004]), 3000) * 0.3
 
 
 @snd("ui_page", n=2, cat="ui", desc="journal page turn: paper swish and flutter")
@@ -1674,6 +1782,12 @@ def generate(only):
         manifest["sets"][name] = {"files": files, "desc": spec["desc"], "loop": spec["loop"], "cat": spec["cat"]}
         print("  %-22s x%d  %s" % (name, spec["n"], spec["desc"][:70]))
     man_path.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n")
+    if not only:        # drop files of sets that no longer exist (and their Godot import sidecars)
+        keep = {Path(v["file"]).name for v in manifest["sounds"].values()} | {"demo_mix.ogg"}
+        for pth in list(OUT.iterdir()):
+            base = pth.name[:-len(".import")] if pth.name.endswith(".import") else pth.name
+            if Path(base).suffix in (".wav", ".ogg") and base not in keep:
+                pth.unlink()
     size = sum(p.stat().st_size for p in OUT.iterdir() if p.suffix in (".wav", ".ogg"))
     print("wrote %d files (%d in manifest), %.2f MB in %s" % (total, len(manifest["sounds"]), size / 1048576, OUT))
 
@@ -1716,12 +1830,24 @@ def demo():
     # footsteps on cobbles, then flagstones in the arcade 9-12 s
     t = 0.3
     k = 0
+    vr = np.random.default_rng(1795)
     while t < D - 0.5:
-        surf = "step_flags" if 9.0 <= t < 12.0 else "step_cobbles"
-        place(load_set(surf, k), t, -10, 0.1 if k % 2 else -0.1)
-        t += 0.52
+        surf = "step_flags_shoe" if 9.0 <= t < 12.0 else "step_cobbles_shoe"
+        x = load_set(surf, int(vr.integers(0, STEP_VARIANTS)))
+        x = np.interp(np.arange(0, len(x), vr.uniform(0.94, 1.06)), np.arange(len(x)), x)    # pitch +-6 %
+        place(x, t, -19 + vr.uniform(-3, 3), 0.1 if k % 2 else -0.1)                          # level +-3 dB
+        t += 0.55 * vr.uniform(0.97, 1.03)       # heel strikes at the walk clip's cadence (~1.8 steps/s)
         k += 1
-    timeline.append((0.3, "player footsteps on cobbles (flagstones in the arcade 9-12 s)"))
+    timeline.append((0.3, "player footsteps (shoe) on cobbles, flagstones in the arcade 9-12 s, under the murmur"))
+    # a guard's boots crossing 25 -> 8 m away: quieter and duller with distance (the in-game distance low-pass)
+    t = 1.0
+    while t < 8.0:
+        dist = 25.0 - (t - 1.0) * 2.4
+        cut = float(np.interp(dist, [3.0, 25.0], [12000.0, 1800.0]))
+        x = lp(load_set("step_cobbles_boot", int(vr.integers(0, STEP_VARIANTS))), cut)
+        place(x, t, -16 - 20 * math.log10(dist / 3.0) + vr.uniform(-3, 3), 0.7)
+        t += 0.62
+    timeline.append((1.0, "a guard's boots approaching from 25 m (distance low-pass)"))
     # the dorozka: approaches from the left, passes at 9 s, recedes right
     t0, t1 = 3.0, 15.5
     for tt_ in np.arange(t0, t1, 0.25):
@@ -1765,12 +1891,63 @@ def demo():
         print("   %5.1f s  %s" % (at, label))
 
 
+# ====================================================================== footstep stats
+
+# Power-weighted spectral centroid ranges (the heel thud carries most of a step's energy, so a hard-soled step on
+# stone centres around 1-2.5 kHz, a hollow board or wet mud well under 1 kHz, crunchy snow / gravel / straw above
+# 1.5 kHz), and the longest acceptable onset-to-peak time (hard ground: the heel is the peak; crunchy ground: the
+# peak may land in the crunch just after). All sets: crest (peak/RMS) 10-24 dB, RMS -30..-12 dBFS at -1 dBFS peak.
+STEP_TARGETS = {
+    "cobbles": ((900, 2600), 6.0), "flags": ((500, 1800), 6.0), "snow": ((1500, 4200), 40.0),
+    "mud": ((200, 1000), 40.0), "gravel": ((1500, 4500), 25.0), "planks": ((200, 900), 8.0),
+    "straw": ((1200, 4200), 40.0),
+}
+
+
+def analyse(x):
+    """(spectral centroid Hz, attack ms = start to 90 % of the 1 ms-smoothed peak envelope, RMS dBFS, crest dB)."""
+    P = np.abs(np.fft.rfft(x)) ** 2
+    f = np.fft.rfftfreq(len(x), 1 / SR)
+    cent = float((P * f).sum() / (P.sum() + 1e-20))
+    e = np.convolve(np.abs(x), np.ones(secs(0.001)) / secs(0.001), "same")
+    on = np.argmax(e > 0.1 * e.max())
+    att = (np.argmax(e > 0.9 * e.max()) - on) / SR * 1000.0
+    pk = float(np.max(np.abs(x)))
+    return cent, att, db(rms(x)), db(pk) - db(rms(x))
+
+
+def step_stats():
+    man = json.loads((OUT / "manifest.json").read_text())
+    fails = 0
+    print("footstep sets: centroid Hz (min/mean/max) | attack ms (max) | RMS dBFS (mean) | crest dB (min/max) | target")
+    for surf in SURFACES:
+        (c_lo, c_hi), a_max = STEP_TARGETS[surf]
+        for shoe in SHOES:
+            name = "step_%s_%s" % (surf, shoe)
+            st = []
+            for fname in man["sets"][name]["files"]:
+                pth = OUT / Path(man["sounds"][fname]["file"]).name
+                with wave.open(str(pth)) as w:
+                    x = np.frombuffer(w.readframes(w.getnframes()), "<i2") / 32768.0
+                st.append(analyse(x))
+            a = np.array(st)
+            ok = (a[:, 0].min() >= c_lo and a[:, 0].max() <= c_hi and a[:, 1].max() <= a_max
+                  and a[:, 3].min() >= 10 and a[:, 3].max() <= 24 and a[:, 2].min() >= -30 and a[:, 2].max() <= -12)
+            fails += 0 if ok else 1
+            print("  %-22s %5.0f/%5.0f/%5.0f | %5.1f | %6.1f | %4.1f/%4.1f | %d-%d Hz, <=%.0f ms  %s" % (
+                name, a[:, 0].min(), a[:, 0].mean(), a[:, 0].max(), a[:, 1].max(), a[:, 2].mean(), a[:, 3].min(),
+                a[:, 3].max(), c_lo, c_hi, a_max, "ok" if ok else "OUT OF RANGE"))
+    print("footstep sets out of range: %d / %d" % (fails, len(SURFACES) * len(SHOES)))
+    return fails
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--only", default="", help="comma-separated name prefixes")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--demo", action="store_true", help="also render assets/audio/demo_mix.ogg and print its stats")
     ap.add_argument("--demo-only", action="store_true", help="render only the demo mix")
+    ap.add_argument("--stats", action="store_true", help="print footstep analysis against the target ranges")
     a = ap.parse_args()
     if a.list:
         for name, s in SOUNDS.items():
@@ -1780,6 +1957,8 @@ def main():
         sys.exit("gen_sfx: ffmpeg (with libvorbis) is needed for the Ogg files")
     if not a.demo_only:
         generate([p for p in a.only.split(",") if p])
+    if a.stats or a.demo:
+        step_stats()
     if a.demo or a.demo_only:
         demo()
 

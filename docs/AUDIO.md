@@ -14,14 +14,14 @@ godot --headless --import --path .  # import the new files (tools/build_all.sh's
 
 The generator is deterministic: each file is seeded from its name. It is not a stage of `tools/build_all.sh`; run it
 by hand after changing it. Output is 22.05 kHz mono, 16-bit WAV for short point sounds and Ogg Vorbis (q3) for beds,
-bells, the hejnał and long tails: 189 files, about 5.6 MB.
+bells, the hejnał and long tails: 386 files, about 8.7 MB. `--stats` prints the footstep analysis (below).
 
 ## Sound list
 
 | Group | Sets (variants) |
 |---|---|
-| Footsteps | `step_cobbles`, `step_flags`, `step_snow`, `step_mud`, `step_gravel`, `step_planks`, `step_straw` (4 each); `step_boot` (guards' hobnails), `step_heel` (women), `step_bare` (beggars, urchins) (4 each); `scuff` (3), `scuff_snow` (2) |
-| Horses, vehicles | `hoof_walk`, `hoof_trot` (4), `hoof_soft` (3), `horse_stamp` (2), `horse_whinny` (2), `horse_snort` (3), `coachman_hoo` (2), `harness_jingle` (4), `wheel_loop`, `wheel_mud_loop` (4 s loops), `wheel_clack` (4), `cart_creak` (2) |
+| Footsteps | `step_<surface>_<shoe>` for cobbles, flags, snow, mud, gravel, planks, straw x shoe, boot, bare (10 variants each, 210 files); `scuff` (6), `scuff_snow` (4), `drag` (4, prone), `cloth_rustle` (6), `coat_swish` (4) |
+| Horses, vehicles | `hoof_walk`, `hoof_trot` (8), `hoof_soft` (3), `horse_stamp` (2), `horse_whinny` (2), `horse_snort` (3), `coachman_hoo` (2), `harness_jingle` (4), `wheel_loop`, `wheel_mud_loop` (4 s loops), `wheel_clack` (4), `cart_creak` (2) |
 | Animals | `dog_bark` (4), `dog_bark_far` (2), `dog_growl` (2), `dog_pant`, `cat_meow` (3), `cat_purr` (loop), `pigeon_coo` (3), `pigeon_flap` (2), `crow_caw` (3), `hawk_cry` (2), `owl_hoot` (2) |
 | People | `laugh` (2), `cough` (3), `baby_cry` (2), `hiccup` (3), `snore` (2), `grunt` (4), `punch` (4), `body_fall` (2), `lash` (3), `drum_roll`, `drum_beat` (2), `drunk_song` (2), `crowd_jeer` (2) |
 | Beds (loops) | `city_murmur_loop` (16 s), `crowd_talk_loop` (10 s), `tavern_loop` (12 s), `prayer_murmur_loop` (12 s), `wind_calm_loop`, `wind_strong_loop` (16 s), `wind_gust` (2), `brazier_loop` (8 s), `grinder_loop` (4 s) |
@@ -36,9 +36,15 @@ clicks (crunch, grit, crackle), zero-phase FFT filters, a Hann-windowed STFT for
 (additive harmonic voice or noise through vowel formants), a convolution reverb from decaying noise with early
 echoes, soft limiting, equal-power loop crossfades.
 
-- Footsteps: heel + toe impacts ~50-70 ms apart. Stone = bright click + short 1-5 kHz modes + a low heel thud; snow =
-  hundreds of micro-grains over a low thud; mud = swept band-pass noise and a suction pop; gravel = many clicks;
-  planks = a hollow ~180 Hz mode set; straw = soft rustle. Boots add a heavy thud and hobnail clicks.
+- Footsteps: two layers. Heel strike = a short low thud (60-120 Hz sine drop, 14-24 ms decay; boots lowest and
+  heaviest, bare feet highest and lightest) plus the surface's contact sound; toe/roll 45-90 ms later = a band-passed
+  scuff (1-4 kHz) shaped by the surface. Cobbles: hard click, stony ring, grit tail; flags: a cleaner slap; snow: soft
+  crunch (the heel swallowed) with a dry-cold squeak on half the variants; mud: swept wet squelch and a suction pop;
+  gravel: many micro-clicks; planks: hollow knock with a 150-250 Hz board resonance (the odd creak); straw: dry
+  rustle. Boots add hobnail clicks, bare feet a skin slap.
+- Footstep targets (`--stats`, power-weighted centroid / onset-to-peak): cobbles 0.9-2.6 kHz / <=6 ms, flags
+  0.5-1.8 kHz / <=6 ms, snow 1.5-4.2 kHz / <=40 ms, mud 0.2-1.0 kHz / <=40 ms, gravel 1.5-4.5 kHz / <=25 ms, planks
+  0.2-0.9 kHz / <=8 ms, straw 1.2-4.2 kHz / <=40 ms; every set crest 10-24 dB and RMS -30..-12 dBFS. All 21 sets pass.
 - Hooves: impact click + hollow horn resonance (600-1400 Hz modes) + weight thump + faint iron-shoe ring; the walk is
   a two-part clop, the trot a single sharp clop with a flam.
 - Wheels: brown-noise rumble, iron-tyre clacks at spoke rate with jitter, random sett bumps, a rattle band driven by
@@ -76,9 +82,13 @@ echoes, soft limiting, equal-power loop crossfades.
   `lamp_changed`; `Sfx.say_hook` and `Sfx.act_hook` map street-life bubbles and clips to sounds.
 - Every second it attaches footsteps to guards and the player that lack them.
 
-`scripts/audio/footsteps.gd` (class `Footsteps`): `Footsteps.attach(body, kind)`. People step by distance travelled
-(stride per kind), the set picked from `Perception.surface_at()` (the `surface` meta / surface patches); boots, heels
-and bare feet swap sets on hard ground; scuffs on sharp turns; the player is quieter crouched or prone. Horses beat
+`scripts/audio/footsteps.gd` (class `Footsteps`): `Footsteps.attach(body, kind)`. People step on each heel strike of
+their locomotion clip (the gait in build_animations.py puts the left heel at phase 0 and the right at 0.5), falling
+back to one step per stride of distance; the set is `step_<surface>_<shoe>` from `Perception.surface_at()`, each step
++-3 dB and +-6 % pitch. Kinds: shoe, boot (guards), heel (women: the shoe set pitched up), bare (beggars, urchins),
+player (sneaking -9 dB with sole scuffs, sprinting +3 dB with a coat swish, cloth rustles, prone = a drag once a crawl
+cycle). Scuffs on sharp turns. Steps sit 6-10 dB under the murmur, and a distance low-pass (clear to 3 m, 1.8 kHz at
+28 m) makes other people's steps read as distant. Horses beat
 at fixed phases of each horse's walk (4) / trot (2) clip, so hooves follow the gait and speed. Vehicles add the wheel
 loop pitched and levelled by speed (mud loop on soft ground), sett clacks, jingle, creaks and the coachman's call when
 blocked. Dogs, cats, pigeons, crows and the hawk call on timers (growl, purr, wing claps by the player).

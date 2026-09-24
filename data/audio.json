@@ -1,187 +1,1173 @@
 {
  "_doc": "Sound tables for scripts/audio/sfx.gd, footsteps.gd and ambience.gd (docs/AUDIO.md). Sets and files come from assets/audio/manifest.json (tools/gen_sfx.py). volume_db is added to the sample (normalised to -1 dBFS); radius is the max hearing distance in metres (beyond it a sound is not started); unit is the fraction of radius at which the level is 0 dB (inverse-distance falloff after it); priority 0-3 decides voice stealing.",
- "buses": {"SFX": 0.0, "Ambience": -2.0, "UI": -8.0},
+ "buses": {
+  "SFX": 0.0,
+  "Ambience": -2.0,
+  "UI": -8.0
+ },
  "reverb_buses": {
-  "Reverb_Arcade":   {"room_size": 0.55, "damping": 0.45, "spread": 0.8, "wet": 0.55, "predelay_ms": 35, "hipass": 0.15},
-  "Reverb_Passage":  {"room_size": 0.38, "damping": 0.3,  "spread": 0.6, "wet": 0.6,  "predelay_ms": 15, "hipass": 0.2},
-  "Reverb_Interior": {"room_size": 0.3,  "damping": 0.65, "spread": 0.5, "wet": 0.4,  "predelay_ms": 10, "hipass": 0.1},
-  "Reverb_Church":   {"room_size": 0.95, "damping": 0.35, "spread": 1.0, "wet": 0.7,  "predelay_ms": 60, "hipass": 0.1}
+  "Reverb_Arcade": {
+   "room_size": 0.55,
+   "damping": 0.45,
+   "spread": 0.8,
+   "wet": 0.55,
+   "predelay_ms": 35,
+   "hipass": 0.15
+  },
+  "Reverb_Passage": {
+   "room_size": 0.38,
+   "damping": 0.3,
+   "spread": 0.6,
+   "wet": 0.6,
+   "predelay_ms": 15,
+   "hipass": 0.2
+  },
+  "Reverb_Interior": {
+   "room_size": 0.3,
+   "damping": 0.65,
+   "spread": 0.5,
+   "wet": 0.4,
+   "predelay_ms": 10,
+   "hipass": 0.1
+  },
+  "Reverb_Church": {
+   "room_size": 0.95,
+   "damping": 0.35,
+   "spread": 1.0,
+   "wet": 0.7,
+   "predelay_ms": 60,
+   "hipass": 0.1
+  }
  },
- "voices": {"max": 32, "ui": 6, "flat": 6},
- "occlusion": {"cutoff_hz": 900, "volume_db": -8.0, "clear_cutoff_hz": 14000, "update_secs": 0.25, "air_filter_db": -10.0},
- "defaults": {"volume_db": 0.0, "radius": 25.0, "unit": 0.1, "pitch_var": 0.05, "priority": 1, "bus": "SFX"},
-
+ "voices": {
+  "max": 32,
+  "ui": 6,
+  "flat": 6
+ },
+ "occlusion": {
+  "cutoff_hz": 900,
+  "volume_db": -8.0,
+  "clear_cutoff_hz": 14000,
+  "update_secs": 0.25,
+  "air_filter_db": -10.0,
+  "lp_near": 10.0,
+  "lp_far_hz": 6000.0
+ },
+ "defaults": {
+  "volume_db": 0.0,
+  "radius": 25.0,
+  "unit": 0.1,
+  "pitch_var": 0.05,
+  "priority": 1,
+  "bus": "SFX"
+ },
  "events": {
-  "stone":         {"set": "stone_land", "volume_db": -2, "radius": 30},
-  "bottle":        {"set": "bottle_smash", "volume_db": 0, "radius": 45, "priority": 2},
-  "coin":          {"set": "coin_chink", "volume_db": -4, "radius": 15},
-  "food":          {"set": "cabbage_thud", "volume_db": -4, "radius": 18},
-  "cabbage":       {"set": "cabbage_thud", "volume_db": -3, "radius": 20},
-  "smoke_charge":  {"set": "smoke_charge", "volume_db": -2, "radius": 40, "priority": 2},
-  "flash":         {"set": "flash_crack", "volume_db": 0, "radius": 60, "priority": 2},
-  "barrel_roll":   {"set": "barrel_roll_loop", "volume_db": -4, "radius": 30, "secs": 0.7},
-  "barrel_clonk":  {"set": "barrel_clonk", "volume_db": -2, "radius": 30},
-  "knock":         {"set": "door_knock", "volume_db": -2, "radius": 30},
-  "door_open":     {"set": "door_open", "volume_db": -6, "radius": 18},
-  "door_close":    {"set": "door_close", "volume_db": -4, "radius": 20},
-  "shutter_open":  {"set": "shutter_open", "volume_db": -6, "radius": 25},
-  "lamp_douse":    {"set": "lamp_douse", "volume_db": -6, "radius": 15},
-  "lamp_relight":  {"set": "lamp_relight", "volume_db": -6, "radius": 15},
-  "horse_loose":   {"set": "horse_whinny", "volume_db": -2, "radius": 60, "also": [["horse_stamp", 0.9]]},
-  "musket":        {"set": "musket_shot", "volume_db": 0, "radius": 260, "unit": 0.06, "priority": 3, "pitch_var": 0.03},
-  "pistol":        {"set": "pistol_shot", "volume_db": 0, "radius": 180, "unit": 0.06, "priority": 3, "pitch_var": 0.03},
-  "knife":         {"set": "knife_slash", "volume_db": -4, "radius": 15},
-  "fight":         {"set": "punch", "volume_db": -2, "radius": 30, "also": [["grunt", 0.12]]},
-  "blow":          {"set": "punch", "volume_db": -3, "radius": 25, "pitch_var": 0.1},
-  "grunt":         {"set": "grunt", "volume_db": -5, "radius": 25, "pitch_var": 0.08},
-  "body_fall":     {"set": "body_fall", "volume_db": -2, "radius": 25},
-  "lash":          {"set": "lash", "volume_db": -1, "radius": 40, "priority": 2},
-  "drum_roll":     {"set": "drum_roll", "volume_db": -1, "radius": 60, "priority": 2, "pitch_var": 0.0},
-  "drum_beat":     {"set": "drum_beat", "volume_db": -2, "radius": 50, "priority": 2, "pitch_var": 0.0},
-  "crowd_jeer":    {"set": "crowd_jeer", "volume_db": -6, "radius": 40},
-  "snore":         {"set": "snore", "volume_db": -10, "radius": 12},
-  "hiccup":        {"set": "hiccup", "volume_db": -8, "radius": 12, "pitch_var": 0.1},
-  "drunk_song":    {"set": "drunk_song", "volume_db": -6, "radius": 30},
-  "cough":         {"set": "cough", "volume_db": -8, "radius": 25, "pitch_var": 0.1},
-  "laugh":         {"set": "laugh", "volume_db": -8, "radius": 25},
-  "baby_cry":      {"set": "baby_cry", "volume_db": -12, "radius": 35},
-  "splash":        {"set": "splash_slops", "volume_db": -2, "radius": 30},
-  "hoof_walk":     {"set": "hoof_walk", "volume_db": -6, "radius": 40, "priority": 0, "pitch_var": 0.06},
-  "hoof_trot":     {"set": "hoof_trot", "volume_db": -4, "radius": 45, "priority": 0, "pitch_var": 0.06},
-  "hoof_soft":     {"set": "hoof_soft", "volume_db": -8, "radius": 30, "priority": 0},
-  "horse_whinny":  {"set": "horse_whinny", "volume_db": -4, "radius": 70},
-  "horse_snort":   {"set": "horse_snort", "volume_db": -8, "radius": 25},
-  "horse_stamp":   {"set": "horse_stamp", "volume_db": -5, "radius": 30},
-  "coachman_hoo":  {"set": "coachman_hoo", "volume_db": -3, "radius": 50, "priority": 2},
-  "harness_jingle":{"set": "harness_jingle", "volume_db": -10, "radius": 30, "priority": 0},
-  "wheel_clack":   {"set": "wheel_clack", "volume_db": -4, "radius": 45},
-  "cart_creak":    {"set": "cart_creak", "volume_db": -12, "radius": 25, "priority": 0},
-  "dog_bark":      {"set": "dog_bark", "volume_db": -3, "radius": 70},
-  "dog_bark_far":  {"set": "dog_bark_far", "volume_db": -4, "radius": 200, "unit": 0.2, "bus": "Ambience"},
-  "dog_growl":     {"set": "dog_growl", "volume_db": -6, "radius": 15},
-  "dog_pant":      {"set": "dog_pant", "volume_db": -12, "radius": 10, "priority": 0},
-  "cat_meow":      {"set": "cat_meow", "volume_db": -8, "radius": 25},
-  "pigeon_coo":    {"set": "pigeon_coo", "volume_db": -14, "radius": 15, "priority": 0},
-  "pigeon_flap":   {"set": "pigeon_flap", "volume_db": -6, "radius": 25},
-  "crow_caw":      {"set": "crow_caw", "volume_db": -6, "radius": 70},
-  "hawk_cry":      {"set": "hawk_cry", "volume_db": -6, "radius": 120},
-  "owl_hoot":      {"set": "owl_hoot", "volume_db": -8, "radius": 120, "unit": 0.2, "bus": "Ambience"},
-  "wind_gust":     {"set": "wind_gust", "volume_db": -8, "radius": 60, "unit": 0.3, "bus": "Ambience"},
-  "bell":          {"set": "bell_great", "volume_db": 0, "radius": 3000, "unit": 0.02, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_great":    {"set": "bell_great", "volume_db": 0, "radius": 3000, "unit": 0.02, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_small":    {"set": "bell_small", "volume_db": -3, "radius": 3000, "unit": 0.015, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_peal":     {"set": "bell_peal", "volume_db": -2, "radius": 3000, "unit": 0.015, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_townhall": {"set": "bell_townhall", "volume_db": -3, "radius": 3000, "unit": 0.015, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_uniate":   {"set": "bell_uniate", "volume_db": -6, "radius": 3000, "unit": 0.01, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "bell_sigismund":{"set": "bell_sigismund", "volume_db": 0, "radius": 5000, "unit": 0.03, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "hejnal":        {"set": "hejnal", "volume_db": -2, "radius": 3000, "unit": 0.02, "priority": 3, "pitch_var": 0.0, "bus": "Ambience"},
-  "schulklopfer":  {"set": "schulklopfer_knock", "volume_db": -6, "radius": 1000, "unit": 0.02, "priority": 2, "pitch_var": 0.03, "bus": "Ambience"},
-  "ui_click":      {"set": "ui_click", "volume_db": 0, "bus": "UI", "pitch_var": 0.04},
-  "ui_hover":      {"set": "ui_hover", "volume_db": -8, "bus": "UI", "pitch_var": 0.06},
-  "ui_page":       {"set": "ui_page", "volume_db": -2, "bus": "UI", "pitch_var": 0.06}
+  "stone": {
+   "set": "stone_land",
+   "volume_db": -2,
+   "radius": 30
+  },
+  "bottle": {
+   "set": "bottle_smash",
+   "volume_db": 0,
+   "radius": 45,
+   "priority": 2
+  },
+  "coin": {
+   "set": "coin_chink",
+   "volume_db": -4,
+   "radius": 15
+  },
+  "food": {
+   "set": "cabbage_thud",
+   "volume_db": -4,
+   "radius": 18
+  },
+  "cabbage": {
+   "set": "cabbage_thud",
+   "volume_db": -3,
+   "radius": 20
+  },
+  "smoke_charge": {
+   "set": "smoke_charge",
+   "volume_db": -2,
+   "radius": 40,
+   "priority": 2
+  },
+  "flash": {
+   "set": "flash_crack",
+   "volume_db": 0,
+   "radius": 60,
+   "priority": 2
+  },
+  "barrel_roll": {
+   "set": "barrel_roll_loop",
+   "volume_db": -4,
+   "radius": 30,
+   "secs": 0.7
+  },
+  "barrel_clonk": {
+   "set": "barrel_clonk",
+   "volume_db": -2,
+   "radius": 30
+  },
+  "knock": {
+   "set": "door_knock",
+   "volume_db": -2,
+   "radius": 30
+  },
+  "door_open": {
+   "set": "door_open",
+   "volume_db": -6,
+   "radius": 18
+  },
+  "door_close": {
+   "set": "door_close",
+   "volume_db": -4,
+   "radius": 20
+  },
+  "shutter_open": {
+   "set": "shutter_open",
+   "volume_db": -6,
+   "radius": 25
+  },
+  "lamp_douse": {
+   "set": "lamp_douse",
+   "volume_db": -6,
+   "radius": 15
+  },
+  "lamp_relight": {
+   "set": "lamp_relight",
+   "volume_db": -6,
+   "radius": 15
+  },
+  "horse_loose": {
+   "set": "horse_whinny",
+   "volume_db": -2,
+   "radius": 60,
+   "also": [
+    [
+     "horse_stamp",
+     0.9
+    ]
+   ]
+  },
+  "musket": {
+   "set": "musket_shot",
+   "volume_db": 0,
+   "radius": 260,
+   "unit": 0.06,
+   "priority": 3,
+   "pitch_var": 0.03
+  },
+  "pistol": {
+   "set": "pistol_shot",
+   "volume_db": 0,
+   "radius": 180,
+   "unit": 0.06,
+   "priority": 3,
+   "pitch_var": 0.03
+  },
+  "knife": {
+   "set": "knife_slash",
+   "volume_db": -4,
+   "radius": 15
+  },
+  "fight": {
+   "set": "punch",
+   "volume_db": -2,
+   "radius": 30,
+   "also": [
+    [
+     "grunt",
+     0.12
+    ]
+   ]
+  },
+  "blow": {
+   "set": "punch",
+   "volume_db": -3,
+   "radius": 25,
+   "pitch_var": 0.1
+  },
+  "grunt": {
+   "set": "grunt",
+   "volume_db": -5,
+   "radius": 25,
+   "pitch_var": 0.08
+  },
+  "body_fall": {
+   "set": "body_fall",
+   "volume_db": -2,
+   "radius": 25
+  },
+  "lash": {
+   "set": "lash",
+   "volume_db": -1,
+   "radius": 40,
+   "priority": 2
+  },
+  "drum_roll": {
+   "set": "drum_roll",
+   "volume_db": -1,
+   "radius": 60,
+   "priority": 2,
+   "pitch_var": 0.0
+  },
+  "drum_beat": {
+   "set": "drum_beat",
+   "volume_db": -2,
+   "radius": 50,
+   "priority": 2,
+   "pitch_var": 0.0
+  },
+  "crowd_jeer": {
+   "set": "crowd_jeer",
+   "volume_db": -6,
+   "radius": 40
+  },
+  "snore": {
+   "set": "snore",
+   "volume_db": -10,
+   "radius": 12
+  },
+  "hiccup": {
+   "set": "hiccup",
+   "volume_db": -8,
+   "radius": 12,
+   "pitch_var": 0.1
+  },
+  "drunk_song": {
+   "set": "drunk_song",
+   "volume_db": -6,
+   "radius": 30
+  },
+  "cough": {
+   "set": "cough",
+   "volume_db": -8,
+   "radius": 25,
+   "pitch_var": 0.1
+  },
+  "laugh": {
+   "set": "laugh",
+   "volume_db": -8,
+   "radius": 25
+  },
+  "baby_cry": {
+   "set": "baby_cry",
+   "volume_db": -12,
+   "radius": 35
+  },
+  "splash": {
+   "set": "splash_slops",
+   "volume_db": -2,
+   "radius": 30
+  },
+  "hoof_walk": {
+   "set": "hoof_walk",
+   "volume_db": -6,
+   "radius": 40,
+   "priority": 0,
+   "pitch_var": 0.06
+  },
+  "hoof_trot": {
+   "set": "hoof_trot",
+   "volume_db": -4,
+   "radius": 45,
+   "priority": 0,
+   "pitch_var": 0.06
+  },
+  "hoof_soft": {
+   "set": "hoof_soft",
+   "volume_db": -8,
+   "radius": 30,
+   "priority": 0
+  },
+  "horse_whinny": {
+   "set": "horse_whinny",
+   "volume_db": -4,
+   "radius": 70
+  },
+  "horse_snort": {
+   "set": "horse_snort",
+   "volume_db": -8,
+   "radius": 25
+  },
+  "horse_stamp": {
+   "set": "horse_stamp",
+   "volume_db": -5,
+   "radius": 30
+  },
+  "coachman_hoo": {
+   "set": "coachman_hoo",
+   "volume_db": -3,
+   "radius": 50,
+   "priority": 2
+  },
+  "harness_jingle": {
+   "set": "harness_jingle",
+   "volume_db": -10,
+   "radius": 30,
+   "priority": 0
+  },
+  "wheel_clack": {
+   "set": "wheel_clack",
+   "volume_db": -4,
+   "radius": 45
+  },
+  "cart_creak": {
+   "set": "cart_creak",
+   "volume_db": -12,
+   "radius": 25,
+   "priority": 0
+  },
+  "dog_bark": {
+   "set": "dog_bark",
+   "volume_db": -3,
+   "radius": 70
+  },
+  "dog_bark_far": {
+   "set": "dog_bark_far",
+   "volume_db": -4,
+   "radius": 200,
+   "unit": 0.2,
+   "bus": "Ambience"
+  },
+  "dog_growl": {
+   "set": "dog_growl",
+   "volume_db": -6,
+   "radius": 15
+  },
+  "dog_pant": {
+   "set": "dog_pant",
+   "volume_db": -12,
+   "radius": 10,
+   "priority": 0
+  },
+  "cat_meow": {
+   "set": "cat_meow",
+   "volume_db": -8,
+   "radius": 25
+  },
+  "pigeon_coo": {
+   "set": "pigeon_coo",
+   "volume_db": -14,
+   "radius": 15,
+   "priority": 0
+  },
+  "pigeon_flap": {
+   "set": "pigeon_flap",
+   "volume_db": -6,
+   "radius": 25
+  },
+  "crow_caw": {
+   "set": "crow_caw",
+   "volume_db": -6,
+   "radius": 70
+  },
+  "hawk_cry": {
+   "set": "hawk_cry",
+   "volume_db": -6,
+   "radius": 120
+  },
+  "owl_hoot": {
+   "set": "owl_hoot",
+   "volume_db": -8,
+   "radius": 120,
+   "unit": 0.2,
+   "bus": "Ambience"
+  },
+  "wind_gust": {
+   "set": "wind_gust",
+   "volume_db": -8,
+   "radius": 60,
+   "unit": 0.3,
+   "bus": "Ambience"
+  },
+  "bell": {
+   "set": "bell_great",
+   "volume_db": 0,
+   "radius": 3000,
+   "unit": 0.02,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_great": {
+   "set": "bell_great",
+   "volume_db": 0,
+   "radius": 3000,
+   "unit": 0.02,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_small": {
+   "set": "bell_small",
+   "volume_db": -3,
+   "radius": 3000,
+   "unit": 0.015,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_peal": {
+   "set": "bell_peal",
+   "volume_db": -2,
+   "radius": 3000,
+   "unit": 0.015,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_townhall": {
+   "set": "bell_townhall",
+   "volume_db": -3,
+   "radius": 3000,
+   "unit": 0.015,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_uniate": {
+   "set": "bell_uniate",
+   "volume_db": -6,
+   "radius": 3000,
+   "unit": 0.01,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "bell_sigismund": {
+   "set": "bell_sigismund",
+   "volume_db": 0,
+   "radius": 5000,
+   "unit": 0.03,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "hejnal": {
+   "set": "hejnal",
+   "volume_db": -2,
+   "radius": 3000,
+   "unit": 0.02,
+   "priority": 3,
+   "pitch_var": 0.0,
+   "bus": "Ambience"
+  },
+  "schulklopfer": {
+   "set": "schulklopfer_knock",
+   "volume_db": -6,
+   "radius": 1000,
+   "unit": 0.02,
+   "priority": 2,
+   "pitch_var": 0.03,
+   "bus": "Ambience"
+  },
+  "ui_click": {
+   "set": "ui_click",
+   "volume_db": -4,
+   "bus": "UI",
+   "pitch_var": 0.04
+  },
+  "ui_hover": {
+   "set": "ui_hover",
+   "volume_db": -10,
+   "bus": "UI",
+   "pitch_var": 0.06
+  },
+  "ui_page": {
+   "set": "ui_page",
+   "volume_db": -2,
+   "bus": "UI",
+   "pitch_var": 0.06
+  }
  },
-
  "watch_kinds": {
   "_doc": "watch.gd sound_event(pos, loudness, kind) -> event. [event, min loudness] pairs are tried in order; null = silent (the player's own steps are voiced by footsteps.gd).",
   "step": null,
-  "stone": "stone", "bottle": "bottle", "coin": "coin", "food": "food", "smoke": "smoke_charge", "flash": "flash",
-  "barrel": [["barrel_clonk", 0.6], ["barrel_roll", 0.0]],
-  "knock": "knock", "horse": "horse_loose", "bell": "bell", "fight": "fight", "splash": "splash",
-  "musket": "musket", "shot": "musket", "pistol": "pistol", "knife": "knife", "cabbage": "cabbage"
+  "stone": "stone",
+  "bottle": "bottle",
+  "coin": "coin",
+  "food": "food",
+  "smoke": "smoke_charge",
+  "flash": "flash",
+  "barrel": [
+   [
+    "barrel_clonk",
+    0.6
+   ],
+   [
+    "barrel_roll",
+    0.0
+   ]
+  ],
+  "knock": "knock",
+  "horse": "horse_loose",
+  "bell": "bell",
+  "fight": "fight",
+  "splash": "splash",
+  "musket": "musket",
+  "shot": "musket",
+  "pistol": "pistol",
+  "knife": "knife",
+  "cabbage": "cabbage"
  },
  "say": {
   "_doc": "street_life.gd say(node, key) -> event played at the speaker (non-verbal sound under the speech bubble).",
-  "snore": "snore", "song": "drunk_song", "drum": "drum_roll", "flog_cry": "grunt", "flog_crowd": "crowd_jeer",
-  "cheer": "crowd_jeer", "jeer": "crowd_jeer", "cough": "cough", "fight_down": "body_fall", "thief_cry": "grunt",
-  "shoved": "grunt", "mug_victim": "grunt", "press_mother": "grunt", "curfew_drunk": "hiccup", "drunk_reply": "hiccup",
-  "freezing": "cough", "beggar": "cough"
+  "snore": "snore",
+  "song": "drunk_song",
+  "drum": "drum_roll",
+  "flog_cry": "grunt",
+  "flog_crowd": "crowd_jeer",
+  "cheer": "crowd_jeer",
+  "jeer": "crowd_jeer",
+  "cough": "cough",
+  "fight_down": "body_fall",
+  "thief_cry": "grunt",
+  "shoved": "grunt",
+  "mug_victim": "grunt",
+  "press_mother": "grunt",
+  "curfew_drunk": "hiccup",
+  "drunk_reply": "hiccup",
+  "freezing": "cough",
+  "beggar": "cough"
  },
  "acts": {
   "_doc": "street_life.gd _act(node, clip) -> [event, delay seconds].",
-  "hit_react": ["blow", 0.0], "hit_react_back": ["blow", 0.0], "knocked_down": ["body_fall", 0.45],
-  "musket_butt": ["blow", 0.35], "knife_stab": ["knife", 0.15], "stumble": ["scuff", 0.1], "grabbed": ["grunt", 0.05],
-  "shoved": ["grunt", 0.1], "guard_seize": ["scuff", 0.05], "window_throw": ["shutter_open", 0.0]
+  "hit_react": [
+   "blow",
+   0.0
+  ],
+  "hit_react_back": [
+   "blow",
+   0.0
+  ],
+  "knocked_down": [
+   "body_fall",
+   0.45
+  ],
+  "musket_butt": [
+   "blow",
+   0.35
+  ],
+  "knife_stab": [
+   "knife",
+   0.15
+  ],
+  "stumble": [
+   "scuff",
+   0.1
+  ],
+  "grabbed": [
+   "grunt",
+   0.05
+  ],
+  "shoved": [
+   "grunt",
+   0.1
+  ],
+  "guard_seize": [
+   "scuff",
+   0.05
+  ],
+  "window_throw": [
+   "shutter_open",
+   0.0
+  ]
  },
-
  "footsteps": {
   "cull": 28.0,
-  "hard": ["cobbles", "flags", "planks", "gravel"],
+  "hard": [
+   "cobbles",
+   "flags",
+   "planks",
+   "gravel"
+  ],
   "surfaces": {
-   "cobbles": {"set": "step_cobbles", "volume_db": 0.0},
-   "flags":   {"set": "step_flags", "volume_db": -1.0},
-   "snow":    {"set": "step_snow", "volume_db": -3.0, "scuff": "scuff_snow"},
-   "mud":     {"set": "step_mud", "volume_db": -2.0, "scuff": "scuff_snow"},
-   "gravel":  {"set": "step_gravel", "volume_db": 0.0},
-   "planks":  {"set": "step_planks", "volume_db": 0.0},
-   "straw":   {"set": "step_straw", "volume_db": -6.0, "scuff": "scuff_snow"}
+   "cobbles": {
+    "volume_db": 0.0
+   },
+   "flags": {
+    "volume_db": -1.0
+   },
+   "snow": {
+    "volume_db": -3.0,
+    "scuff": "scuff_snow"
+   },
+   "mud": {
+    "volume_db": -2.0,
+    "scuff": "scuff_snow"
+   },
+   "gravel": {
+    "volume_db": 0.0
+   },
+   "planks": {
+    "volume_db": 0.0
+   },
+   "straw": {
+    "volume_db": -6.0,
+    "scuff": "scuff_snow"
+   }
   },
   "kinds": {
-   "shoe":   {"volume_db": -10.0, "pitch": 1.0, "walk": 0.72, "run": 1.15},
-   "boot":   {"volume_db": -7.0, "pitch": 0.92, "walk": 0.78, "run": 1.2, "hard_set": "step_boot"},
-   "heel":   {"volume_db": -12.0, "pitch": 1.08, "walk": 0.6, "run": 1.0, "hard_set": "step_heel"},
-   "bare":   {"volume_db": -17.0, "pitch": 1.1, "walk": 0.62, "run": 1.0, "hard_set": "step_bare"},
-   "player": {"volume_db": -9.0, "pitch": 1.0, "walk": 0.75, "run": 1.25, "crouch_db": -9.0, "prone_db": -14.0, "sprint_db": 3.0}
+   "shoe": {
+    "shoe": "shoe",
+    "volume_db": -15.0,
+    "pitch": 1.0,
+    "walk": 0.72,
+    "run": 1.15,
+    "run_db": 2.0
+   },
+   "boot": {
+    "shoe": "boot",
+    "volume_db": -12.0,
+    "pitch": 0.96,
+    "walk": 0.78,
+    "run": 1.2,
+    "run_db": 2.0
+   },
+   "heel": {
+    "shoe": "shoe",
+    "volume_db": -17.0,
+    "pitch": 1.1,
+    "walk": 0.6,
+    "run": 1.0,
+    "run_db": 2.0
+   },
+   "bare": {
+    "shoe": "bare",
+    "volume_db": -20.0,
+    "pitch": 1.05,
+    "walk": 0.62,
+    "run": 1.0,
+    "run_db": 2.0
+   },
+   "player": {
+    "shoe": "shoe",
+    "volume_db": -13.0,
+    "pitch": 1.0,
+    "walk": 0.75,
+    "run": 1.25,
+    "run_db": 2.0,
+    "sneak_db": -9.0,
+    "sneak_scuff": 0.5,
+    "sneak_scuff_db": 2.0,
+    "sprint_db": 3.0,
+    "swish_chance": 0.3,
+    "rustle_chance": 0.12
+   }
   },
   "scuff_turn": 3.0,
-  "scuff_volume_db": -14.0
+  "scuff_volume_db": -16.0,
+  "_doc": "Steps are 'step_<surface>_<shoe>' (10 variants each). A step fires on each heel strike of the locomotion clip (heel_phases of clips matching loco_clips; crawl_clips drag once a cycle), else once a stride of distance. Level +-vary_db, pitch +-pitch_var. Kinds pick the shoe set and level; steps sit ~6-10 dB under the city murmur.",
+  "heel_phases": [
+   0.0,
+   0.5
+  ],
+  "loco_clips": [
+   "walk",
+   "run",
+   "jog",
+   "sneak",
+   "march",
+   "carry",
+   "basket",
+   "sprint"
+  ],
+  "crawl_clips": [
+   "crawl"
+  ],
+  "vary_db": 3.0,
+  "pitch_var": 0.06,
+  "drag_volume_db": -14.0
  },
-
  "animals": {
-  "horse":   {"calls": [["horse_snort", 15, 40], ["horse_stamp", 12, 30], ["horse_whinny", 60, 140]]},
-  "dog":     {"calls": [["dog_bark", 30, 90]], "growl_dist": 4.0, "pant_speed": 2.0},
-  "cat":     {"calls": [["cat_meow", 40, 100]], "purr_dist": 1.8},
-  "bird":    {"calls": [["pigeon_coo", 8, 25]], "crow_calls": [["crow_caw", 15, 45]], "flap_dist": 3.0},
-  "hawk":    {"calls": [["hawk_cry", 25, 60]]},
-  "hoof_beats": {"walk": [0.0, 0.25, 0.5, 0.75], "trot": [0.0, 0.5]}
+  "horse": {
+   "calls": [
+    [
+     "horse_snort",
+     15,
+     40
+    ],
+    [
+     "horse_stamp",
+     12,
+     30
+    ],
+    [
+     "horse_whinny",
+     60,
+     140
+    ]
+   ]
+  },
+  "dog": {
+   "calls": [
+    [
+     "dog_bark",
+     30,
+     90
+    ]
+   ],
+   "growl_dist": 4.0,
+   "pant_speed": 2.0
+  },
+  "cat": {
+   "calls": [
+    [
+     "cat_meow",
+     40,
+     100
+    ]
+   ],
+   "purr_dist": 1.8
+  },
+  "bird": {
+   "calls": [
+    [
+     "pigeon_coo",
+     8,
+     25
+    ]
+   ],
+   "crow_calls": [
+    [
+     "crow_caw",
+     15,
+     45
+    ]
+   ],
+   "flap_dist": 3.0
+  },
+  "hawk": {
+   "calls": [
+    [
+     "hawk_cry",
+     25,
+     60
+    ]
+   ]
+  },
+  "hoof_beats": {
+   "walk": [
+    0.0,
+    0.25,
+    0.5,
+    0.75
+   ],
+   "trot": [
+    0.0,
+    0.5
+   ]
+  }
  },
- "vehicles": {"wheel_volume_db": -6.0, "radius": 45.0, "ref_speed": 2.0, "clack_every": [2.0, 6.0], "jingle_every": [1.5, 4.0],
-              "creak_every": [5.0, 12.0], "hoo_cooldown": 12.0, "soft": ["mud", "snow", "straw"]},
-
+ "vehicles": {
+  "wheel_volume_db": -6.0,
+  "radius": 45.0,
+  "ref_speed": 2.0,
+  "clack_every": [
+   2.0,
+   6.0
+  ],
+  "jingle_every": [
+   1.5,
+   4.0
+  ],
+  "creak_every": [
+   5.0,
+   12.0
+  ],
+  "hoo_cooldown": 12.0,
+  "soft": [
+   "mud",
+   "snow",
+   "straw"
+  ]
+ },
  "places": {
   "_doc": "Sound sources in world metres. St Mary's is NE of the square, the Town Hall tower SW. Far places (Wawel, Kazimierz, the Uniate chapel) sit at proxy positions in their direction.",
-  "st_marys_trumpet": [34.0, 42.0, -40.0],
-  "st_marys_belfry":  [27.0, 30.0, -37.0],
-  "town_hall_tower":  [-16.0, 28.0, 12.0],
-  "wawel":            [-70.0, 40.0, 190.0],
-  "kazimierz":        [150.0, 6.0, 200.0],
-  "uniate_chapel":    [-120.0, 14.0, 40.0],
-  "synagogue_door":   [140.0, 2.0, 190.0]
+  "st_marys_trumpet": [
+   34.0,
+   42.0,
+   -40.0
+  ],
+  "st_marys_belfry": [
+   27.0,
+   30.0,
+   -37.0
+  ],
+  "town_hall_tower": [
+   -16.0,
+   28.0,
+   12.0
+  ],
+  "wawel": [
+   -70.0,
+   40.0,
+   190.0
+  ],
+  "kazimierz": [
+   150.0,
+   6.0,
+   200.0
+  ],
+  "uniate_chapel": [
+   -120.0,
+   14.0,
+   40.0
+  ],
+  "synagogue_door": [
+   140.0,
+   2.0,
+   190.0
+  ]
  },
  "schedule": {
   "_doc": "Game-clock soundscape (ambience.gd). Times HH:MM. mask_secs = watch.mask_sound() per stroke / per call (a game hour is one real minute at clock_scale 1, so masks are kept short). hejnal.all_directions plays the call to all four quarters every hour (the real ceremony, ~80 s); by default one quarter per hour in turn.",
-  "hour_strikes":     {"bell": "bell_great", "place": "st_marys_belfry", "gap": 2.8, "mask_secs": 1.2},
-  "town_hall_clock":  {"bell": "bell_townhall", "place": "town_hall_tower", "gap": 1.8, "delay": 14.0, "half_hour": true, "mask_secs": 0.0},
-  "hejnal":           {"place": "st_marys_trumpet", "directions": [[0, 1], [-1, 0], [1, 0], [0, -1]], "pause": 4.0, "delay": 3.0, "all_directions": false, "mask_secs": 6.0},
-  "curfew":           {"at": "22:00", "bell": "bell_great", "place": "st_marys_belfry", "strokes": 12, "gap": 5.0, "mask_secs": 2.5},
-  "angelus":          {"at": ["06:00", "12:00", "18:00"], "bell": "bell_great", "place": "st_marys_belfry", "sets": 3, "strokes": 3, "gap": 3.5, "set_gap": 7.0, "peal": true, "mask_secs": 2.0, "peal_mask_secs": 8.0},
-  "canonical":        [{"at": "21:00", "name": "compline", "strokes": 5}, {"at": "00:00", "name": "matins", "strokes": 7}, {"at": "03:00", "name": "lauds", "strokes": 5}],
-  "canonical_bell":   {"bell": "bell_small", "place": "st_marys_belfry", "gap": 1.6, "mask_secs": 1.0},
-  "sigismund":        {"at": ["00:00", "06:00"], "flag": "feast_day", "place": "wawel", "strokes": 6, "gap": 7.0},
-  "uniate":           {"at": ["21:30", "05:30"], "place": "uniate_chapel", "strokes": 7, "gap": 1.3},
-  "schulklopfer":     {"from": "05:05", "to": "05:45", "place": "kazimierz", "every": [7.0, 14.0], "spread": 40.0, "not_day_mod": [7, 6]},
-  "sabbath_prayer":   {"until": "22:00", "day_mod": [7, 5], "flag": "sabbath_eve", "place": "synagogue_door", "volume_db": -10.0, "radius": 400.0}
+  "hour_strikes": {
+   "bell": "bell_great",
+   "place": "st_marys_belfry",
+   "gap": 2.8,
+   "mask_secs": 1.2
+  },
+  "town_hall_clock": {
+   "bell": "bell_townhall",
+   "place": "town_hall_tower",
+   "gap": 1.8,
+   "delay": 14.0,
+   "half_hour": true,
+   "mask_secs": 0.0
+  },
+  "hejnal": {
+   "place": "st_marys_trumpet",
+   "directions": [
+    [
+     0,
+     1
+    ],
+    [
+     -1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     0,
+     -1
+    ]
+   ],
+   "pause": 4.0,
+   "delay": 3.0,
+   "all_directions": false,
+   "mask_secs": 6.0
+  },
+  "curfew": {
+   "at": "22:00",
+   "bell": "bell_great",
+   "place": "st_marys_belfry",
+   "strokes": 12,
+   "gap": 5.0,
+   "mask_secs": 2.5
+  },
+  "angelus": {
+   "at": [
+    "06:00",
+    "12:00",
+    "18:00"
+   ],
+   "bell": "bell_great",
+   "place": "st_marys_belfry",
+   "sets": 3,
+   "strokes": 3,
+   "gap": 3.5,
+   "set_gap": 7.0,
+   "peal": true,
+   "mask_secs": 2.0,
+   "peal_mask_secs": 8.0
+  },
+  "canonical": [
+   {
+    "at": "21:00",
+    "name": "compline",
+    "strokes": 5
+   },
+   {
+    "at": "00:00",
+    "name": "matins",
+    "strokes": 7
+   },
+   {
+    "at": "03:00",
+    "name": "lauds",
+    "strokes": 5
+   }
+  ],
+  "canonical_bell": {
+   "bell": "bell_small",
+   "place": "st_marys_belfry",
+   "gap": 1.6,
+   "mask_secs": 1.0
+  },
+  "sigismund": {
+   "at": [
+    "00:00",
+    "06:00"
+   ],
+   "flag": "feast_day",
+   "place": "wawel",
+   "strokes": 6,
+   "gap": 7.0
+  },
+  "uniate": {
+   "at": [
+    "21:30",
+    "05:30"
+   ],
+   "place": "uniate_chapel",
+   "strokes": 7,
+   "gap": 1.3
+  },
+  "schulklopfer": {
+   "from": "05:05",
+   "to": "05:45",
+   "place": "kazimierz",
+   "every": [
+    7.0,
+    14.0
+   ],
+   "spread": 40.0,
+   "not_day_mod": [
+    7,
+    6
+   ]
+  },
+  "sabbath_prayer": {
+   "until": "22:00",
+   "day_mod": [
+    7,
+    5
+   ],
+   "flag": "sabbath_eve",
+   "place": "synagogue_door",
+   "volume_db": -10.0,
+   "radius": 400.0
+  }
  },
-
  "ambience": {
-  "wind": {"base": 0.3, "period": 110.0, "swing": 0.2, "weather": {"clear": 0.2, "snow": 0.45, "wind": 0.7, "storm": 0.95},
-           "calm_db": [-16.0, -26.0], "strong_db": [-44.0, -12.0], "inside_db": -14.0},
-  "murmur": {"radius": 40.0, "full_at": 16, "db": [-34.0, -15.0], "inside_db": -12.0},
-  "crowd": {"cluster": 5.0, "idle_cluster": 3.0, "idle_min": 3, "max_players": 4, "radius": 40.0, "volume_db": -12.0, "per_doubling_db": 3.0},
-  "tavern": {"volume_db": -4.0, "radius": 24.0, "cutoff_hz": 2200, "inside_db": -3.0, "brothel_pitch": 1.06},
+  "wind": {
+   "base": 0.3,
+   "period": 110.0,
+   "swing": 0.2,
+   "weather": {
+    "clear": 0.2,
+    "snow": 0.45,
+    "wind": 0.7,
+    "storm": 0.95
+   },
+   "calm_db": [
+    -16.0,
+    -26.0
+   ],
+   "strong_db": [
+    -44.0,
+    -12.0
+   ],
+   "inside_db": -14.0
+  },
+  "murmur": {
+   "radius": 40.0,
+   "full_at": 16,
+   "db": [
+    -30.0,
+    -13.0
+   ],
+   "inside_db": -12.0
+  },
+  "crowd": {
+   "cluster": 5.0,
+   "idle_cluster": 3.0,
+   "idle_min": 3,
+   "max_players": 4,
+   "radius": 40.0,
+   "volume_db": -12.0,
+   "per_doubling_db": 3.0
+  },
+  "tavern": {
+   "volume_db": -4.0,
+   "radius": 24.0,
+   "cutoff_hz": 2200,
+   "inside_db": -3.0,
+   "brothel_pitch": 1.06
+  },
   "random": [
-   {"event": "dog_bark_far", "every": [25, 70], "where": "far"},
-   {"event": "owl_hoot", "every": [60, 150], "where": "roof"},
-   {"event": "baby_cry", "every": [90, 220], "where": "window"},
-   {"event": "cough", "every": [40, 110], "where": "window"},
-   {"event": "crow_caw", "every": [70, 160], "where": "roof"},
-   {"event": "wind_gust", "every": [30, 80], "where": "near", "min_wind": 0.5}
+   {
+    "event": "dog_bark_far",
+    "every": [
+     25,
+     70
+    ],
+    "where": "far"
+   },
+   {
+    "event": "owl_hoot",
+    "every": [
+     60,
+     150
+    ],
+    "where": "roof"
+   },
+   {
+    "event": "baby_cry",
+    "every": [
+     90,
+     220
+    ],
+    "where": "window"
+   },
+   {
+    "event": "cough",
+    "every": [
+     40,
+     110
+    ],
+    "where": "window"
+   },
+   {
+    "event": "crow_caw",
+    "every": [
+     70,
+     160
+    ],
+    "where": "roof"
+   },
+   {
+    "event": "wind_gust",
+    "every": [
+     30,
+     80
+    ],
+    "where": "near",
+    "min_wind": 0.5
+   }
   ],
   "reverb_zones": [
-   {"name": "cloth_hall_arcade", "center": [0.0, 2.5, 0.0], "size": [36.0, 5.5, 13.0], "bus": "Reverb_Arcade", "amount": 0.6},
-   {"name": "cloth_hall_passage", "center": [0.0, 2.5, 0.0], "size": [4.6, 5.5, 10.0], "bus": "Reverb_Passage", "amount": 0.85, "priority": 2},
-   {"name": "delivery_alley", "center": [22.0, 3.0, 12.5], "size": [5.0, 7.0, 10.0], "bus": "Reverb_Passage", "amount": 0.6},
-   {"name": "town_hall_arch", "center": [-16.0, 2.5, 12.0], "size": [5.0, 5.0, 5.0], "bus": "Reverb_Passage", "amount": 0.6}
+   {
+    "name": "cloth_hall_arcade",
+    "center": [
+     0.0,
+     2.5,
+     0.0
+    ],
+    "size": [
+     36.0,
+     5.5,
+     13.0
+    ],
+    "bus": "Reverb_Arcade",
+    "amount": 0.6
+   },
+   {
+    "name": "cloth_hall_passage",
+    "center": [
+     0.0,
+     2.5,
+     0.0
+    ],
+    "size": [
+     4.6,
+     5.5,
+     10.0
+    ],
+    "bus": "Reverb_Passage",
+    "amount": 0.85,
+    "priority": 2
+   },
+   {
+    "name": "delivery_alley",
+    "center": [
+     22.0,
+     3.0,
+     12.5
+    ],
+    "size": [
+     5.0,
+     7.0,
+     10.0
+    ],
+    "bus": "Reverb_Passage",
+    "amount": 0.6
+   },
+   {
+    "name": "town_hall_arch",
+    "center": [
+     -16.0,
+     2.5,
+     12.0
+    ],
+    "size": [
+     5.0,
+     5.0,
+     5.0
+    ],
+    "bus": "Reverb_Passage",
+    "amount": 0.6
+   }
   ],
-  "interior": {"bus": "Reverb_Interior", "church_bus": "Reverb_Church", "amount": 0.7, "offset": [0.0, 3.0, -12.0], "size": [26.0, 9.0, 30.0]}
+  "interior": {
+   "bus": "Reverb_Interior",
+   "church_bus": "Reverb_Church",
+   "amount": 0.7,
+   "offset": [
+    0.0,
+    3.0,
+    -12.0
+   ],
+   "size": [
+    26.0,
+    9.0,
+    30.0
+   ]
+  }
+ },
+ "prefix_events": {
+  "_doc": "Defaults for every set name starting with the key (before the events table). lp_near / lp_far_hz: the distance low-pass.",
+  "step_": {
+   "radius": 28.0,
+   "unit": 0.08,
+   "priority": 0,
+   "pitch_var": 0.06,
+   "lp_near": 3.0,
+   "lp_far_hz": 1800.0
+  },
+  "scuff": {
+   "radius": 20.0,
+   "unit": 0.08,
+   "priority": 0,
+   "lp_near": 3.0,
+   "lp_far_hz": 1800.0
+  },
+  "drag": {
+   "radius": 15.0,
+   "unit": 0.1,
+   "priority": 0,
+   "lp_near": 3.0,
+   "lp_far_hz": 1800.0
+  },
+  "cloth_rustle": {
+   "radius": 8.0,
+   "unit": 0.15,
+   "priority": 0,
+   "volume_db": -10.0
+  },
+  "coat_swish": {
+   "radius": 10.0,
+   "unit": 0.15,
+   "priority": 0,
+   "volume_db": -8.0
+  }
  }
 }

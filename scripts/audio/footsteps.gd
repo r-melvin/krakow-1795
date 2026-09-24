@@ -34,6 +34,8 @@ var _surf_t := 0.0
 var _near := false
 var _near_t := 0.0
 var _scuff_cd := 0.0
+var _foot_ph := -1.0                  ## last phase of the locomotion clip (-1 = none)
+var _moving := false
 var _rng := RandomNumberGenerator.new()
 var _timers: Dictionary = {}          ## call event -> seconds left
 var _phases: Dictionary = {}          ## AnimationPlayer -> last phase (0..1)
@@ -169,28 +171,74 @@ func _person(delta: float) -> void:
 	var moved := step.length()
 	if moved > 2.5 or not _near or not body.is_visible_in_tree():   # teleported, far, or hidden
 		_dist = 0.0
+		_foot_ph = -1.0
 		return
 	var grounded: bool = body.is_on_floor() if body is CharacterBody3D else true
 	var speed := moved / maxf(delta, 0.0001)
-	var kc: Dictionary = (cfg("footsteps").get("kinds", {}) as Dictionary).get(kind, {})
-	if speed < 0.3 or not grounded:
+	var fc := cfg("footsteps")
+	var kc: Dictionary = (fc.get("kinds", {}) as Dictionary).get(kind, {})
+	var was_moving := _moving
+	_moving = speed >= 0.3 and grounded
+	if not _moving:
 		_dist = minf(_dist, float(kc.get("walk", 0.72)) * 0.5)
+		_foot_ph = -1.0
 		return
+	if kind == "player" and not was_moving and _rng.randf() < 0.6:
+		_extra("cloth_rustle", -4.0)
 	var dir := step / moved
 	if _last_dir != Vector2.ZERO and _scuff_cd <= 0.0:
 		var turn := absf(_last_dir.angle_to(dir)) / maxf(delta, 0.0001)
-		if turn > float(cfg("footsteps").get("scuff_turn", 3.0)) and speed < 3.0:
+		if turn > float(fc.get("scuff_turn", 3.0)) and speed < 3.0:
 			_scuff_cd = 1.0
-			_scuff()
+			_scuff(0.0)
 	_last_dir = dir
 	var run := speed > 2.3
+	var prone := kind == "player" and bool(body.get("is_prone"))
+	# cadence: a step on each heel strike of the locomotion clip (build_animations.py gait: left heel at phase 0,
+	# right at 0.5); a crawl drags once a cycle; no usable clip -> one step per stride of distance
+	var ap := _anim()
+	if ap != null and ap.current_animation_length > 0.0:
+		var clip := ap.current_animation.to_lower()
+		var crawl := _clip_is(clip, fc.get("crawl_clips", ["crawl"]))
+		if crawl or _clip_is(clip, fc.get("loco_clips", ["walk", "run", "jog", "sneak", "march", "carry"])):
+			var ph := ap.current_animation_position / ap.current_animation_length
+			var last := _foot_ph if _foot_ph >= 0.0 else ph
+			_foot_ph = ph
+			for b in ([0.1] if crawl else fc.get("heel_phases", [0.0, 0.5])):
+				if _crossed(last, ph, float(b)):
+					if crawl or prone:
+						_drag()
+					else:
+						_step(kc, run)
+			_dist = 0.0
+			return
+	_foot_ph = -1.0
 	var stride := float(kc.get("run" if run else "walk", 0.72))
-	if kind == "player" and (bool(body.get("is_crouching")) or bool(body.get("is_prone"))):
-		stride *= 0.8
+	if prone:
+		stride = 0.9
 	_dist += moved
 	if _dist >= stride:
 		_dist -= stride
-		_step(kc, run)
+		if prone:
+			_drag()
+		else:
+			_step(kc, run)
+
+
+func _anim() -> AnimationPlayer:
+	var fig: Variant = body.get("_figure")
+	if fig is Node3D and is_instance_valid(fig) and (fig as Node3D).has_meta("anim"):
+		var ap: Variant = (fig as Node3D).get_meta("anim")
+		if ap is AnimationPlayer and is_instance_valid(ap):
+			return ap
+	return null
+
+
+static func _clip_is(clip: String, keys: Array) -> bool:
+	for k in keys:
+		if clip.contains(str(k)):
+			return true
+	return false
 
 
 func _sample_surface() -> void:
@@ -203,28 +251,44 @@ func _sample_surface() -> void:
 	_surface = Perception.surface_at(body, body.global_position, ex)
 
 
+## One step: "step_<surface>_<shoe>" (10 variants), level +-vary_db, pitch +-pitch_var. The player is quieter
+## sneaking (with a scuff of the sole now and then), louder sprinting (with a coat swish), and rustles.
 func _step(kc: Dictionary, run: bool) -> void:
 	_sample_surface()
 	var fc := cfg("footsteps")
-	var sc: Dictionary = (fc.get("surfaces", {}) as Dictionary).get(_surface, (fc.get("surfaces", {}) as Dictionary).get("cobbles", {}))
-	var set_name := str(sc.get("set", "step_cobbles"))
-	if kc.has("hard_set") and _surface in (fc.get("hard", []) as Array):
-		set_name = str(kc["hard_set"])
-	var vol := float(sc.get("volume_db", 0.0)) + float(kc.get("volume_db", -10.0)) + (3.0 if run else 0.0)
+	var surfs: Dictionary = fc.get("surfaces", {})
+	var surf := _surface if surfs.has(_surface) else "cobbles"
+	var sc: Dictionary = surfs.get(surf, {})
+	var set_name := "step_%s_%s" % [surf, str(kc.get("shoe", "shoe"))]
+	var vary := float(fc.get("vary_db", 3.0))
+	var vol := float(sc.get("volume_db", 0.0)) + float(kc.get("volume_db", -14.0)) + (float(kc.get("run_db", 2.0)) if run else 0.0) \
+			+ _rng.randf_range(-vary, vary)
 	if kind == "player":
-		if bool(body.get("is_prone")):
-			vol += float(kc.get("prone_db", -14.0))
-		elif bool(body.get("is_crouching")):
-			vol += float(kc.get("crouch_db", -9.0))
+		if bool(body.get("is_crouching")):
+			vol += float(kc.get("sneak_db", -9.0))
+			if _rng.randf() < float(kc.get("sneak_scuff", 0.5)):
+				_scuff(float(kc.get("sneak_scuff_db", 2.0)))
 		elif bool(body.get("is_sprinting")):
 			vol += float(kc.get("sprint_db", 3.0))
-	Sfx.play(set_name, body.global_position, vol, 0.07, float(kc.get("pitch", 1.0)))
+			if _rng.randf() < float(kc.get("swish_chance", 0.3)):
+				_extra("coat_swish", 0.0)
+		if _rng.randf() < float(kc.get("rustle_chance", 0.12)):
+			_extra("cloth_rustle", -6.0)
+	Sfx.play(set_name, body.global_position, vol, float(fc.get("pitch_var", 0.06)), float(kc.get("pitch", 1.0)))
 
 
-func _scuff() -> void:
+func _scuff(extra_db: float) -> void:
 	_sample_surface()
 	var sc: Dictionary = (cfg("footsteps").get("surfaces", {}) as Dictionary).get(_surface, {})
-	Sfx.play(str(sc.get("scuff", "scuff")), body.global_position, float(cfg("footsteps").get("scuff_volume_db", -14.0)), 0.1)
+	Sfx.play(str(sc.get("scuff", "scuff")), body.global_position, float(cfg("footsteps").get("scuff_volume_db", -16.0)) + extra_db, 0.1)
+
+
+func _drag() -> void:
+	Sfx.play("drag", body.global_position, float(cfg("footsteps").get("drag_volume_db", -14.0)) + _rng.randf_range(-2.0, 2.0), 0.08)
+
+
+func _extra(ev: String, db: float) -> void:
+	Sfx.play(ev, body.global_position + Vector3(0, 1.0, 0), db, 0.08)
 
 
 # ------------------------------------------------------------------ horses
