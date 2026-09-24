@@ -75,6 +75,22 @@ The UI fits 1600x900 and 1920x1080.
 - **Sound** (`tools/gen_sfx.py`, `scripts/audio/`): 189 synthesised sounds; footsteps, hooves, wheels, animals,
   crowd, wind, bells and the hejnał on the clock.
 
+## Performance
+Measured with `godot --path . -- --perf` (a plain night, 40 s settle, 1600x900, MSAA 4x + TAA, SDFGI, SSR,
+volumetric mist, all systems on) on a 32-core machine with a 16 GB GPU:
+
+| Metric | Value |
+|---|---|
+| Frame time | 15 ms (~67 fps) |
+| Primitives / draw calls per frame | ~4.0M / ~6.8k |
+| Night build (menu to street) | 1.1 s; app start to the street 2.2 s; the outer town streams in over ~9 s |
+| RAM / VRAM | 2.4 GB / 3.9 GB (3.2 GB textures, VRAM-compressed) |
+| Headless CPU frame | ~7 ms (4.5 ms physics) |
+
+Levers if a machine needs them: Options (bounced light and mist, MSAA, TAA), `data/stealth.json` and
+`data/window_life.json` budgets, the shadow budget (`scripts/city/shadow_budget.gd`), and the texture caps in
+`tools/import_settings.py`.
+
 ## Layout
 - `data/` JSON: factions, origins, districts, npcs, storylines, missions, campaign, rumours, events, vendors,
   street life, window life, weather, stealth, zones, bills, audio, interiors, city layout, glossary

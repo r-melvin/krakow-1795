@@ -57,9 +57,14 @@ func _perf_run() -> void:
 	await get_tree().process_frame
 	GameState.choose_origin("veteran", "m")
 	await get_tree().process_frame
+	var t_start := Time.get_ticks_msec()
 	GameState.begin_night()
+	while get_tree().get_first_node_in_group("player") == null:
+		await get_tree().process_frame
+	var t_player := Time.get_ticks_msec()
 	for i in 2400:          # ~40 s: the outer town has loaded and the late-evening street life has spawned
 		await get_tree().process_frame
+	print("[smoke] perf load night_build_s=%.1f app_start_to_night_s=%.1f" % [(t_player - t_start) / 1000.0, t_player / 1000.0])
 	await _perf_report()
 	await _perf_report()
 	get_tree().quit()
