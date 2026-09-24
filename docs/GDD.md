@@ -47,10 +47,28 @@ Each faction: `influence` (player's sway, 0–100), `loyalty` (to player vs. to 
 Old Town (Rynek), Wawel (garrison), Kazimierz, Stradom, Kleparz, Kanonicza/Church quarter, Vistula docks, Garbary (tanners/workers). Each district: controlling faction, unrest, watch presence, safe houses.
 
 ## Core loops
-### Macro loop (day / night turn)
-1. **Day**: manage. Read letters, make deals, allocate agents, set faction moves. Time-limited (action points).
-2. **Night**: play. Third-person mission in a district. Stealth, infiltration, sabotage, meeting, rescue, theft, assassination (optional/consequential).
-3. **Dawn**: resolve. Faction reactions, Austrian crackdown level, news spreads, new opportunities and threats.
+### Macro loop (an open city, day and night)
+There is no day menu. The player lives in the city and finds the work by walking it, the way Altaïr works a
+district: the clock runs through day and night (the sky and the weather follow it; curfew falls at 22:00 and lifts at
+dawn), the city changes with the hour (markets and workshops by day, lanterns, patrols and the red lantern by night),
+and missions, favours, rumours and holds are discovered through exploration, conversation and storytelling, not chosen
+from a list.
+1. **Bureaus.** Each faction keeps a room the player can walk into: the printer's back room, the salon, the sacristy,
+   the guild hall, the red lantern, the passage where the urchins trade. The keeper talks: the news, what the faction
+   wants, who to see. Rumours are planted by going to the channel (the ballad seller under the arcades, the press, the
+   pulpit through a priest, the madam), not from a panel.
+2. **Investigation.** A target is unlocked by legwork in the streets (any two or three of): eavesdrop on a bench or at
+   a table, pickpocket a letter, corner an informer in an alley and make him talk, do a citizen a favour that earns a
+   friend in the crowd, read the bills, watch a patrol, climb a tower or roof (a viewpoint: the district's places of
+   interest come onto the map). The journal keeps what was learned; the keeper says when it is enough.
+3. **Missions.** Night missions start by being at the place at the hour (the courier passes the Cloth Hall at 23:00;
+   the ball opens at 21:00) once the legwork is done; several are open at once and the order is the player's within
+   what the arc allows. Day missions exist too (a meeting in a crowd, a theft from an open shop, a rescue from the
+   pillory).
+4. **Consequences arrive in the world.** Faction reactions, the crackdown, news and new openings show up as bills on
+   the walls, talk in the street, a changed patrol, a letter at the safe house, a keeper's greeting, a dawn page in
+   the journal. Sleeping at the bed (the safe house) saves and passes time; waiting on a bench passes an hour.
+The seven institutions of the occupier remain the spine; taking one still changes the city for good.
 
 ### Mission loop (3D stealth / puzzle)
 - Vision cones, light/shadow, noise. Suspicion meter per guard (calm → curious → searching → alarm).
@@ -255,6 +273,21 @@ left unbarred (a patrol sent the wrong way), and install (his faction's influenc
 consumes, strains (-1) or keeps the hold. Holds can be sold (debts to the Underworld, secrets to the salon), burned
 for mercy (loyalty), and pass to an heir. If the Underworld's loyalty falls below 40, Weronika may sell your proof
 to its subject. Nights when a hold was used show "blackmail" on the score card.
+
+
+### Sickness at the wells
+In 1795 nobody says cholera (it reached Poland in 1831): the street says the flux (biegunka), the fever (typhus,
+carried by the armies) or the plague air (morowe powietrze); the professor's students say "a bad well"; the street
+says poison, the strzyga, or the old lie about the Jews. A well goes bad by itself (10% a dawn from night 3, not
+at a protected well) or by the player's vial (the kit's poison verb on a well or pump). The night after:
+boards and a chalk cross on the lid, a watch guard posted on it (a new sentry the stealth systems see), two
+water-carriers selling river water (buy a bucket: Street +1), a physician and a priest with the viaticum, the small
+bell tolling; district fear +12, Church influence +3; the rumours "a bad well", "boil it", "the well spat black
+water", and the old lie (a counter action like the black dog). A poisoned well also sickens the garrison: St Mary's
+post and patrol B are abed for two nights, at the cost of notoriety +10 and Church and Street loyalty -5. The player
+can steer the blame onto the garrison (plant "the Austrians poisoned the well": ruin if traced back to a real vial)
+or onto the strzyga (fear, and nobody hanged), or protect a well (2 zł: a man on the lid, river water, the leaflet
+on boiling; Street +3). The urchins sell which wells are safe.
 
 ## The countryside (farmland as a faction avenue)
 Kraków fed on the villages around it: manor farms (folwarki) of the Church, the university, the town and the
