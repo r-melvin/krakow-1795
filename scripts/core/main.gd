@@ -41,6 +41,11 @@ func _ready() -> void:
 	fade_layer.add_child(_fade)
 	GameState.phase_changed.connect(_on_phase)
 	_on_phase(GameState.phase)
+	if "--look=" in " ".join(OS.get_cmdline_user_args()):
+		var lp := Node.new()
+		lp.name = "LookPreview"
+		lp.set_script(preload("res://scripts/core/look_preview.gd"))
+		add_child(lp)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke()
 	elif "--perf" in OS.get_cmdline_user_args():
