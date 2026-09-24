@@ -34,6 +34,7 @@ const PAIR_DIST := 3.5
 const RECORD_SECS := 10.0
 const RECORD_DIST := 26.0
 const SEE_DIST := 20.0
+const SHOP_DIST := 25.0          ## shops and vendors go on the map once the player has been this close
 const NOTORIETY := {"runner": 15.0, "fight": 25.0, "witnessed": 5.0, "tear": -5.0, "night": -10.0}
 const WANTED_AT := 30.0
 const DOUBLE_AT := 60.0
@@ -71,7 +72,7 @@ static var _smoke_seeded := false
 static func default_store() -> Dictionary:
 	return {"hints": {}, "bills": {}, "patrols": {}, "lamps": {}, "spots": {}, "enforcers": {}, "places": {},
 			"notoriety": 0.0, "last_day": 0, "alarms": 0, "overheard": 0, "recorded": 0, "zone": "street",
-			"outfit": "none", "last_seen": "", "doubled_day": 0, "torn": 0}
+			"outfit": "none", "last_seen": "", "doubled_day": 0, "torn": 0, "seen_pois": {}}
 
 
 ## The campaign's intel (Mission.journal["intel"]), created on first use. The journal map reads it.
@@ -464,13 +465,19 @@ func _discover(p: Node3D) -> void:
 		if nn and not st["enforcers"].has(id) and nn.is_visible_in_tree() and nn.global_position.distance_to(p.global_position) < 10.0 \
 				and guard_in_view(p, nn):
 			_mark_enforcer(id, Journal.person_name(id), "npc", nn)
+	# shops (taverns, the coffee house, the inn: city_map.gd POIs marked "near") once within SHOP_DIST
+	var seen: Dictionary = st["seen_pois"]
+	var pp := Vector2(p.global_position.x, p.global_position.z)
+	for pt in preload("res://scripts/ui/city_map.gd").pois(watch.get_parent() as Node3D):
+		if pt["discover"] == "near" and not seen.has(pt["id"]) and (pt["pos"] as Vector2).distance_to(pp) < SHOP_DIST:
+			seen[pt["id"]] = true
 	# vendors and the brothel, once near
 	for vm in get_tree().get_nodes_in_group("vendors"):
 		for v in vm.get("vendors"):
 			var b: Node3D = v.body
 			if b == null or not is_instance_valid(b) or st["places"].has("vendor:" + str(v.id)):
 				continue
-			if b.global_position.distance_to(p.global_position) < 12.0:
+			if b.global_position.distance_to(p.global_position) < SHOP_DIST:
 				st["places"]["vendor:" + str(v.id)] = _xz(b.global_position) + [str(v.d.get("name", str(v.id).capitalize()))]
 	if not st["places"].has("brothel"):
 		if _street_life == null and watch.get_parent() and int(_ready_t) % 5 == 1:
@@ -934,6 +941,27 @@ func _smoke_seed() -> void:
 			record_patrol(g)
 	if not bills.is_empty():
 		use_bill(bills[0])
+	# every shop counts as found, so the shots show the full set of glyphs
+	for pt in preload("res://scripts/ui/city_map.gd").pois(watch.get_parent() as Node3D):
+		store()["seen_pois"][pt["id"]] = true
+	var dir := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--intel-shot="):
+			dir = a.trim_prefix("--intel-shot=")
+	if dir != "" and DisplayServer.get_name() != "headless":
+		# stand in the square for the shot (then go back where the other smokes left the player)
+		var back: Vector3 = p.global_position if p else Vector3.ZERO
+		if p and p.has_method("face_point"):
+			p.global_position = Vector3(-6.0, 0.1, 7.0)
+			p.face_point(Vector3(-6.0, 0.0, -10.0))
+		await get_tree().create_timer(1.2).timeout
+		if is_inside_tree():
+			await RenderingServer.frame_post_draw
+			var path := dir.path_join("intel_minimap_square.png")
+			get_viewport().get_texture().get_image().save_png(path)
+			print("[smoke] intel minimap shot %s player=%s" % [path, p.global_position if p else Vector3.ZERO])
+			if p and is_instance_valid(p):
+				p.global_position = back
 	for l in watch.lamps().slice(0, 5):
 		store()["lamps"]["%d,%d" % [roundi(l.global_position.x), roundi(l.global_position.z)]] = _xz(l.global_position)
 	var z: Node = watch.get("zones")

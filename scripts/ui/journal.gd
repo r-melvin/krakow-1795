@@ -945,7 +945,7 @@ func _fill_map() -> void:
 			R.add_child(_t("%s  ·  %s" % [bd.get("title", b), bd.get("note", "") if str(bd.get("note", "")) != "" else "at " + str(bd.get("where", "?"))],
 					15, UiTheme.BAD if bd.get("wanted", false) else UiTheme.TEXT))
 	_section(R, "Key")
-	R.add_child(_t("Dotted loop: a round you watched   ·   triangle: a sentry's post   ·   flag: the Corporal   ·   gold dot: a lantern seen   ·   cross: a hiding place you used   ·   red: knows your face   ·   tinted ground: where your own clothes will not pass", 14, UiTheme.TEXT_DIM, "italic"))
+	R.add_child(_t("Dotted loop: a round you watched   ·   triangle: a sentry's post   ·   musket: the Corporal's post   ·   cross: a church   ·   arch: a door (dark: the safe house)   ·   tankard, cup, house: tavern, coffee house, inn (once found)   ·   basket: a vendor   ·   lantern: the red lantern   ·   figure: someone you are looking for   ·   gold dot: a lantern seen   ·   ✕ a hiding place you used   ·   red: knows your face   ·   tinted ground: where your own clothes will not pass", 14, UiTheme.TEXT_DIM, "italic"))
 
 
 func _district() -> Node3D:
@@ -1125,9 +1125,9 @@ class MapView extends Control:
 				"zones": "all", "zone": zid, "trespass": not permit.has(zid), "player": p, "corporal": true, "icon": 1.0, "clip": true})
 		var fb := UiTheme.font("display")
 		var fi := UiTheme.font("italic")
-		var tp := off + Vector2(mapsz.x - 200, mapsz.y - 34)    # the cartouche, bottom right below the south row
-		draw_string(fb, tp, "Rynek Główny", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CityMap.INK)
-		draw_string(fi, tp + Vector2(0, 18), "(the Main Market Square)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(CityMap.INK, 0.8))
+		var tp := off + Vector2(14, 26)                          # the cartouche, top left over the fields
+		draw_string(fb, tp, "Kraków, 1795", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, CityMap.INK)
+		draw_string(fi, tp + Vector2(0, 18), "(the walled town)", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(CityMap.INK, 0.8))
 		var c := off + Vector2(mapsz.x - 30, 36)
 		draw_colored_polygon(PackedVector2Array([c + Vector2(0, -20), c + Vector2(6, 0), c + Vector2(-6, 0)]), CityMap.INK)
 		draw_polyline(PackedVector2Array([c + Vector2(0, 20), c + Vector2(6, 0), c + Vector2(-6, 0), c + Vector2(0, 20)]), CityMap.INK, 1.0)

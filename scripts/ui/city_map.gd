@@ -16,6 +16,7 @@ extends RefCounted
 ##   icon: float            icon size multiplier (1 journal, ~0.7 minimap)
 ##   font, font_b: Font
 ##   clip: bool           cut building footprints at `rect` (the journal sheet)
+##   pois: bool             points of interest (default true): see pois() and _draw_pois()
 ##   origin: Vector3        subtracted from node positions (player, guards, ghost): a test sandbox's offset
 
 const Zones := preload("res://scripts/stealth/zones.gd")
@@ -212,7 +213,8 @@ func _draw_zones(intel: Dictionary) -> void:
 			dashed(closed, edge, 2.4 if id == cur else 1.2, 6.0, 4.0)
 			if first and opt.get("labels", false):
 				first = false
-				label(pts[0] + Vector2(4, 13), str(zd[id].get("name", id)).get_slice(":", 0), 12, col.darkened(0.6))
+				if label_ok(poly[0]):
+					label(pts[0] + Vector2(4, 13), str(zd[id].get("name", id)).get_slice(":", 0), 12, col.darkened(0.6))
 
 
 ## Dashed polyline in one draw call (the minimap redraws at 10 Hz: no per-dash primitives).
@@ -236,22 +238,231 @@ func dashed(pts: PackedVector2Array, col: Color, w: float, dash: float, gap: flo
 		ci.draw_multiline(segs, col, w)
 
 
+## Points of interest as parchment-ink glyphs. Buildings and landmarks always (pois()); shops (taverns, the
+## coffee house, the inn) once the player has been within 25 m (intel "seen_pois", intel.gd); vendors and the
+## brothel once found (intel "places"); people once their whereabouts are known (Mission.journal people, "seen at");
+## hiding spots once used (drawn by _draw_lamps_spots). Labels on the journal only.
 func _draw_places(intel: Dictionary) -> void:
+	if not opt.get("pois", true):
+		return
+	var labels: bool = opt.get("labels", false)
+	var seen: Dictionary = intel.get("seen_pois", {})
+	var gs := 12.0 * k                               # glyph size: ~7.5 px on the minimap, 12 on the journal
+	var enf: bool = intel.get("enforcers", {}).has("guard:St Mary's post")
+	for pt in pois(opt.get("world")):
+		if pt["discover"] == "near" and not seen.has(pt["id"]):
+			continue
+		var at := PV(pt["pos"])
+		if not near(at, 12.0):
+			continue
+		var col := RED if pt["kind"] == "post" and enf else INK
+		if labels and pt["kind"] in ["church", "synagogue", "gate"]:
+			at += Vector2(0, -gs * 1.1)          # clear of the building's own centred name
+		glyph(str(pt["kind"]), at, gs, col)
+		if labels and str(pt["label"]) != "" and label_ok(pt["pos"]):
+			label(at + Vector2(gs * 0.7, gs * 0.35), str(pt["label"]), 12, col)
 	var places: Dictionary = intel.get("places", {})
 	for key in places:
 		var e: Array = places[key]
 		var at := P(float(e[0]), float(e[1]))
-		if not near(at):
+		if not near(at, 12.0):
 			continue
-		if str(key) == "brothel":
-			ci.draw_circle(at, 5.0 * k, RED)
-			ci.draw_arc(at, 5.0 * k, 0, TAU, 16, INK, 1.0)
-			if opt.get("labels", false):
-				label(at + Vector2(7, -4), str(e[2]), 12, RED)
-		else:
-			var h := 3.0 * k
-			ci.draw_rect(Rect2(at - Vector2(h, h), Vector2(h, h) * 2.0), Color(0.25, 0.4, 0.2))
-			ci.draw_rect(Rect2(at - Vector2(h, h), Vector2(h, h) * 2.0), INK, false, 1.0)
+		var brothel := str(key) == "brothel"
+		glyph("lantern" if brothel else "basket", at, gs, RED if brothel else INK)
+		if labels and (brothel or scale > 5.0) and label_ok(Vector2(float(e[0]), float(e[1]))):
+			label(at + Vector2(gs * 0.7, gs * 0.35), str(e[2]), 12, RED if brothel else INK)
+	for pp in people():
+		var at := PV(pp["pos"])
+		if not near(at, 12.0):
+			continue
+		glyph("person", at, gs, BLUE)
+		if labels and label_ok(pp["pos"]):
+			label(at + Vector2(gs * 0.7, gs * 0.35), str(pp["label"]), 12, BLUE)
+
+
+## Glyph `kind` centred at `at`, `s` pixels tall, in `col` ink (paper-coloured underlay so it reads on buildings).
+## Labels are drawn only where the sheet has room: everything at street scale; zoomed out to the whole town, only
+## outside the crowded Rynek (the square's own landmarks are labelled on their footprints).
+func label_ok(pos: Variant) -> bool:
+	if scale >= 4.0:
+		return true
+	var v: Vector2 = pos if pos is Vector2 else Vector2(float(pos[0]), float(pos[1]))
+	return v.length() > 48.0
+
+
+func glyph(kind: String, at: Vector2, s: float, col: Color) -> void:
+	var h := s * 0.5
+	var w := maxf(1.2, s * 0.14)
+	ci.draw_circle(at, h * 1.1, Color(PAPER.lightened(0.15), 0.92))          # a paper disc so the glyph reads on a roof
+	ci.draw_arc(at, h * 1.1, 0.0, TAU, 14, Color(col, 0.45), 1.0)
+	match kind:
+		"church":
+			ci.draw_line(at + Vector2(0, -h), at + Vector2(0, h), col, w * 1.3)
+			ci.draw_line(at + Vector2(-h * 0.6, -h * 0.35), at + Vector2(h * 0.6, -h * 0.35), col, w * 1.3)
+		"synagogue":
+			var a := PackedVector2Array()
+			var b := PackedVector2Array()
+			for i2 in 3:
+				a.append(at + Vector2(0, -h * 0.9).rotated(TAU * i2 / 3.0))
+				b.append(at + Vector2(0, h * 0.9).rotated(TAU * i2 / 3.0))
+			a.append(a[0])
+			b.append(b[0])
+			ci.draw_polyline(a, col, w)
+			ci.draw_polyline(b, col, w)
+		"door", "cellar":
+			var pts := PackedVector2Array([at + Vector2(-h * 0.6, h), at + Vector2(-h * 0.6, -h * 0.2)])
+			for i2 in 7:
+				pts.append(at + Vector2(0, -h * 0.2) + Vector2(-h * 0.6, 0).rotated(PI * i2 / 6.0))
+			pts.append(at + Vector2(h * 0.6, h))
+			if kind == "cellar":
+				ci.draw_colored_polygon(pts, Color(col, 0.55))
+			ci.draw_polyline(pts, col, w)
+			ci.draw_line(at + Vector2(-h * 0.8, h), at + Vector2(h * 0.8, h), col, w)
+		"post":                                           # a musket, slanted, with its stock
+			ci.draw_line(at + Vector2(-h * 0.8, h * 0.8), at + Vector2(h * 0.8, -h * 0.9), col, w * 1.2)
+			ci.draw_line(at + Vector2(-h * 0.8, h * 0.8), at + Vector2(-h * 0.35, h * 0.95), col, w * 2.4)
+			ci.draw_line(at + Vector2(h * 0.55, -h * 0.62), at + Vector2(h * 0.95, -h * 1.0), col, w * 0.7)
+		"tavern":                                         # a tankard
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.55, -h * 0.6), Vector2(h * 0.9, h * 1.4)), col, false, w)
+			ci.draw_arc(at + Vector2(h * 0.4, 0.0), h * 0.35, -PI * 0.5, PI * 0.5, 6, col, w)
+			ci.draw_line(at + Vector2(-h * 0.55, -h * 0.25), at + Vector2(h * 0.35, -h * 0.25), col, w * 0.7)
+		"coffee":                                         # a cup on a saucer, with steam
+			ci.draw_arc(at + Vector2(0, h * 0.05), h * 0.5, 0.0, PI, 8, col, w)
+			ci.draw_line(at + Vector2(-h * 0.5, h * 0.05), at + Vector2(h * 0.5, h * 0.05), col, w)
+			ci.draw_line(at + Vector2(-h * 0.8, h * 0.8), at + Vector2(h * 0.8, h * 0.8), col, w)
+			ci.draw_line(at + Vector2(-h * 0.1, -h * 0.3), at + Vector2(h * 0.05, -h * 0.9), col, w * 0.7)
+		"inn":                                            # a house with its hanging sign
+			ci.draw_polyline(PackedVector2Array([at + Vector2(-h * 0.8, h), at + Vector2(-h * 0.8, -h * 0.1), at + Vector2(0, -h * 0.9),
+					at + Vector2(h * 0.8, -h * 0.1), at + Vector2(h * 0.8, h), at + Vector2(-h * 0.8, h)]), col, w)
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.25, h * 0.2), Vector2(h * 0.5, h * 0.5)), col)
+		"lantern":
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.45, -h * 0.5), Vector2(h * 0.9, h * 1.2)), col)
+			ci.draw_line(at + Vector2(0, -h * 0.5), at + Vector2(0, -h), col, w)
+			ci.draw_circle(at + Vector2(0, h * 0.1), h * 0.25, GOLD)
+		"basket":
+			ci.draw_arc(at + Vector2(0, -h * 0.05), h * 0.55, PI, TAU, 8, col, w)
+			ci.draw_colored_polygon(PackedVector2Array([at + Vector2(-h * 0.8, 0), at + Vector2(h * 0.8, 0), at + Vector2(h * 0.55, h * 0.8),
+					at + Vector2(-h * 0.55, h * 0.8)]), col)
+		"well":
+			ci.draw_arc(at + Vector2(0, h * 0.3), h * 0.6, 0.0, TAU, 12, col, w)
+			ci.draw_line(at + Vector2(-h * 0.75, -h * 0.8), at + Vector2(h * 0.75, -h * 0.8), col, w)
+			ci.draw_line(at + Vector2(-h * 0.6, -h * 0.8), at + Vector2(-h * 0.6, h * 0.1), col, w * 0.8)
+			ci.draw_line(at + Vector2(h * 0.6, -h * 0.8), at + Vector2(h * 0.6, h * 0.1), col, w * 0.8)
+		"fountain":
+			ci.draw_arc(at + Vector2(0, h * 0.4), h * 0.75, 0.0, TAU, 12, col, w)
+			for dx in [-0.45, 0.0, 0.45]:
+				ci.draw_line(at + Vector2(0, h * 0.2), at + Vector2(h * dx, -h * 0.9), col, w * 0.7)
+		"board":
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.8, -h * 0.8), Vector2(h * 1.6, h * 0.95)), col, false, w)
+			ci.draw_line(at + Vector2(-h * 0.6, h * 0.15), at + Vector2(-h * 0.6, h), col, w)
+			ci.draw_line(at + Vector2(h * 0.6, h * 0.15), at + Vector2(h * 0.6, h), col, w)
+		"gate":                                           # a tower with an arch
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.8, -h * 0.7), Vector2(h * 1.6, h * 1.7)), col)
+			for dx in [-0.8, -0.2, 0.4]:
+				ci.draw_rect(Rect2(at + Vector2(h * dx, -h), Vector2(h * 0.4, h * 0.3)), col)
+			ci.draw_circle(at + Vector2(0, h * 0.35), h * 0.35, PAPER)
+			ci.draw_rect(Rect2(at + Vector2(-h * 0.35, h * 0.35), Vector2(h * 0.7, h * 0.65)), PAPER)
+		"person":
+			ci.draw_circle(at + Vector2(0, -h * 0.5), h * 0.3, col)
+			ci.draw_colored_polygon(PackedVector2Array([at + Vector2(-h * 0.55, h), at + Vector2(0, -h * 0.15), at + Vector2(h * 0.55, h)]), col)
+		_:
+			ci.draw_circle(at, h * 0.4, col)
+
+
+## Fixed points of interest of the district (and the walled town round it), measured once per district from the placed
+## assets: [{id, kind, pos: Vector2, label, discover: "always" | "near"}].
+static var _poi_for := 0
+static var _pois: Array = []
+const GATE_NAMES := {Vector2i(10, -100): "Florian Gate", Vector2i(-68, -100): "Sławkowska", Vector2i(-12, 96): "Grodzka gate",
+		Vector2i(-100, 0): "Garbary gate", Vector2i(100, -10): "Mikołajska gate"}
+const POI_ASSETS := {"st_marys": ["church", ""], "st_adalbert": ["church", ""], "uniate_church": ["church", ""],
+		"kaz_synagogue": ["synagogue", ""], "synagogue_wooden": ["synagogue", ""], "old_synagogue": ["synagogue", ""],
+		"florian_gate": ["gate", ""], "wawel_gate": ["gate", "?"], "castle_gate": ["gate", ""], "barbican": ["gate", ""],
+		"well": ["well", "well"], "water_pump": ["well", "pump"], "fountain": ["fountain", "fountain"], "notice_board": ["board", "notice board"],
+		"sign_winiarnia": ["tavern", "Winiarnia (wine-house)"], "sign_kawiarnia": ["coffee", "Kawiarnia (coffee house)"],
+		"sign_zajazd": ["inn", "Zajazd (the inn)"]}
+
+
+static func pois(world: Node3D) -> Array:
+	if world == null or not is_instance_valid(world):
+		return _fixed_pois()
+	var pool: Array = []
+	for c in world.get_children():
+		pool.append(c)
+		var sp: Script = c.get_script()
+		if sp and (str(sp.resource_path).ends_with("outer_city.gd") or str(sp.resource_path).ends_with("dressing.gd")):
+			pool += c.get_children()
+	# the outer town places its buildings over several frames: rebuild while the node count still changes
+	var key := world.get_instance_id() + pool.size() * 7919
+	if _poi_for == key and not _pois.is_empty():
+		return _pois
+	var out: Array = _fixed_pois()
+	var n := 0
+	for c in pool:
+		var n3 := c as Node3D
+		if n3 == null:
+			continue
+		var base := n3.scene_file_path.get_file().get_basename()
+		if not POI_ASSETS.has(base):
+			continue
+		var d: Array = POI_ASSETS[base]
+		var pos := Vector2(n3.global_position.x, n3.global_position.z)
+		var lab := str(d[1])
+		if base == "wawel_gate":
+			lab = str(GATE_NAMES.get(Vector2i(roundi(pos.x), roundi(pos.y)), "town gate"))
+		var shop: bool = d[0] in ["tavern", "coffee", "inn"]
+		out.append({"id": "%s:%d" % [base, n], "kind": d[0], "pos": pos, "label": lab, "discover": "near" if shop else "always"})
+		n += 1
+	var sh := world.get_node_or_null("SafeHouse") as Node3D
+	if sh:
+		out.append({"id": "safe_house", "kind": "cellar", "pos": Vector2(sh.global_position.x, sh.global_position.z),
+				"label": "the smuggler's cellar (safe house)", "discover": "always"})
+	var ints: Node = world.get_node_or_null("Interiors")
+	if ints and "_doors" in ints:
+		for dr in ints.get("_doors"):
+			var room := str((dr as Node).get_meta("room", ""))
+			if room.begins_with("int_tavern"):
+				var dp: Vector3 = (dr as Node3D).global_position
+				if _far_from(out, Vector2(dp.x, dp.z), "tavern", 6.0):
+					out.append({"id": "tavern:" + str(dr.name), "kind": "tavern", "pos": Vector2(dp.x, dp.z), "label": "tavern", "discover": "near"})
+	_poi_for = key
+	_pois = out
+	return out
+
+
+static func _far_from(list: Array, p: Vector2, kind: String, d: float) -> bool:
+	for e in list:
+		if e["kind"] == kind and (e["pos"] as Vector2).distance_to(p) < d:
+			return false
+	return true
+
+
+## Points known without a world (the briefing names them): the salon door and the Corporal's post.
+static func _fixed_pois() -> Array:
+	return [{"id": "salon_door", "kind": "door", "pos": Vector2(-16.0, 17.4), "label": "Pani Zofia's door (the salon)", "discover": "always"},
+			{"id": "post", "kind": "post", "pos": CORPORAL_POST, "label": "the Corporal's post", "discover": "always"}]
+
+
+## People whose whereabouts are known: the mission's contacts (the printer) where they stand, and anyone in the journal's
+## People page at the place they were last seen ("seen at"). [{label, pos}]
+static func people() -> Array:
+	var out: Array = []
+	var done: Dictionary = {}
+	if Mission.is_active() and Mission.runner and is_instance_valid(Mission.runner) and Mission.runner.has_method("actor"):
+		var pr: Node3D = Mission.runner.call("actor", "printer")
+		if pr and pr.global_position.y > -50.0:
+			out.append({"label": "the Printer", "pos": Vector2(pr.global_position.x, pr.global_position.z)})
+			done["printer"] = true
+	var ppl: Dictionary = Mission.journal.get("people", {})
+	for id in ppl:
+		if done.has(id):
+			continue
+		var where := str(ppl[id].get("where", ""))
+		for pl in load("res://scripts/ui/journal.gd").PLACES:
+			if str(pl[0]) == where:
+				out.append({"label": str(ppl[id].get("name", id)), "pos": pl[1]})
+				break
+	return out
 
 
 func _draw_lamps_spots(intel: Dictionary) -> void:
@@ -284,7 +495,7 @@ func _draw_patrols(intel: Dictionary) -> void:
 			if not near(at):
 				continue
 			ci.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7) * k, at + Vector2(6, 5) * k, at + Vector2(-6, 5) * k]), col)
-			if opt.get("labels", false):
+			if opt.get("labels", false) and scale >= 4.0:
 				label(at + Vector2(8, 4), str(gname), 12, col)
 			continue
 		var pts := PackedVector2Array()
@@ -295,7 +506,7 @@ func _draw_patrols(intel: Dictionary) -> void:
 		for i in wps.size():
 			if near(PV(wps[i])):
 				ci.draw_circle(PV(wps[i]), 2.6 * k, col)
-		if opt.get("labels", false):
+		if opt.get("labels", false) and scale >= 4.0:
 			label(PV(wps[0]) + Vector2(6, -6), str(gname), 12, col)
 
 
@@ -326,15 +537,8 @@ func dotted(pts: PackedVector2Array, col: Color) -> void:
 		ci.draw_multiline(segs, col, 2.6 * k)
 
 
-func _draw_corporal(intel: Dictionary) -> void:
-	var at := P(CORPORAL_POST.x, CORPORAL_POST.y)
-	if not near(at):
-		return
-	var enf: bool = intel.get("enforcers", {}).has("guard:St Mary's post")
-	ci.draw_line(at, at + Vector2(0, -16) * k, INK, 1.6)
-	ci.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -16) * k, at + Vector2(11, -12) * k, at + Vector2(0, -8) * k]), RED if enf else INK)
-	if opt.get("labels", false):
-		label(at + Vector2(-58, 14), "the Corporal", 12, RED if enf else INK)
+func _draw_corporal(_intel: Dictionary) -> void:
+	pass                    # the post is a POI glyph now (a musket; red once the Corporal is known to know your face)
 
 
 func _draw_enforcers(intel: Dictionary) -> void:
@@ -348,7 +552,7 @@ func _draw_enforcers(intel: Dictionary) -> void:
 			continue
 		ci.draw_circle(at, 6.0 * k, Color(RED, 0.85))
 		ci.draw_arc(at, 9.0 * k, 0, TAU, 18, RED, 1.5)
-		if opt.get("labels", false):
+		if opt.get("labels", false) and scale >= 4.0:
 			label(at + Vector2(10, 4), str(e.get("name", id)), 12, RED)
 
 
@@ -359,10 +563,11 @@ func _draw_objective() -> void:
 	var at := PV(o)
 	if not near(at):
 		return
-	var r := 7.0 * k
-	ci.draw_arc(at, r, 0, TAU, 20, Color(0.1, 0.35, 0.15), 2.2)
-	ci.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -r * 0.55), at + Vector2(r * 0.55, 0), at + Vector2(0, r * 0.55), at + Vector2(-r * 0.55, 0)]),
-			Color(0.15, 0.5, 0.22))
+	var r := 8.0 * k + 1.5
+	ci.draw_circle(at, r + 2.0, Color(1.0, 0.92, 0.45, 0.55))            # the one bright mark on the sheet
+	ci.draw_arc(at, r, 0, TAU, 20, Color(0.05, 0.4, 0.12), 2.4)
+	ci.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -r * 0.62), at + Vector2(r * 0.62, 0), at + Vector2(0, r * 0.62), at + Vector2(-r * 0.62, 0)]),
+			Color(0.1, 0.62, 0.22))
 
 
 func _draw_ghost() -> void:

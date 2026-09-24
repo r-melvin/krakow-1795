@@ -4,7 +4,10 @@ extends Control
 ## building footprints, the zone tint under the player (red rim when the clothes do not pass there), lanterns seen,
 ## hiding spots used, vendors and the brothel once found, recorded patrol loops, the current objective marker
 ## (missions.json `stealth.map_marks`: "actor:<id>" or [x, z]), guards the player can see now (red dots with a facing
-## tick), the watch's last-known ghost, and the player arrow. No text but a compass N. Redrawn at 10 Hz.
+## tick), the watch's last-known ghost, and the player arrow. Points of interest as 7 px ink glyphs (city_map.gd
+## pois(): churches, synagogues, the salon door, the guard post, gates, wells, fountains, the notice board, the safe
+## house; taverns, the coffee house and the inn once within 25 m; vendors and the brothel once found; people whose
+## whereabouts are known). No text but a compass N. Redrawn at 10 Hz.
 ## `player` / `watch` / `world` may be set by a test (intel_smoke.gd); otherwise found from the "player" group.
 
 const CityMap := preload("res://scripts/ui/city_map.gd")

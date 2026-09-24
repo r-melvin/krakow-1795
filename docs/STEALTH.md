@@ -101,6 +101,11 @@ Map tab of `scripts/ui/journal.gd`, a recognise check in `scripts/npc/npc.gd`, a
   player (red rim when trespassing), lanterns seen, spots used, places found, watched rounds, the objective marker
   (missions.json `stealth.map_marks`), guards the player can see now (red dot + facing tick), the last-known ghost,
   the player arrow; no text but N.
+- **Points of interest** (city_map.gd `pois()`, both maps; labels on the journal only): churches (cross), synagogues,
+  Pani Zofia's door, the Corporal's post (a musket), the town gates, wells and pumps, fountains, the notice board and
+  the safe house (the smuggler's cellar) always; the Winiarnia, the Kawiarnia, the Zajazd and the taverns once within
+  25 m (intel "seen_pois"); vendors (a basket) and the brothel (a lantern) once found; hiding spots once used; the
+  printer and people from the journal's People page at their last-seen place. The objective is the one bright mark.
 
 ### Disguise zones, enforcers, notoriety (F)
 - **Zones** (zones.gd, `data/zones.json`): polygons in XZ: `salon` (the Town Hall door and its east side, plus the
