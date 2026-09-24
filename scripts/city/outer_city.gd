@@ -353,6 +353,11 @@ func _tag(n: Node, asset: String) -> void:
 		var b := n.find_child(nm, true, false)
 		if b:
 			b.set_meta("flammable", true)
+	for nm in ["Grate", "Lid"]:                  # underground entrances (drain_grate, well_shaft_cap)
+		var g := n.find_child(nm, true, false)
+		if g:
+			g.set_meta("hidden_entrance", true)
+			g.add_to_group("hidden_entrance")
 	var c := n.find_child("Casks", true, false)
 	if c:
 		c.set_meta("poisonable", true)

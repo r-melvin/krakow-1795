@@ -446,6 +446,31 @@ for (name, x, z, r, lx, lz) in (("cafe", -12.67, 27.78, PI, -14.3, 27.78), ("bro
     points.setdefault("perches", []).append([x, z, r])
     points.setdefault("perch_names", []).append(name)
 
+# ------------------------------------------------------------------ underground entrances (culverts and cellars)
+# Provisional drain grates at the four corners of the carriage loop round the square, on the outside of each bend,
+# 1 m off the kerb (3 m from the lane centre line); they move to the interiors set's Exit_ positions once reported.
+points["drain_grates"] = [[-45.5, -28.0, 0.0], [-45.5, 43.5, 0.0], [43.0, 43.5, 0.0], [43.0, -7.0, 0.0]]
+for (x, z, r) in points["drain_grates"]:
+    P("drain_grate", x, z, r, k="prop")
+# culvert outfalls at the foot of the walls into the moat, and one in the river bank below the quays
+points["outfalls"] = [[-40.0, -104.2, PI], [40.0, 100.2, 0.0], [-60.0, 146.2, 0.0]]
+for (x, z, r) in points["outfalls"]:
+    P("outfall_arch", x, z, r, k="big")
+P("well_shaft_cap", 12.0, -166.0, 0.0, k="prop") if False else None
+# cosmetic stone manhole covers every ~30 m along the cobbled streets, 1.5 m off the centre line
+for s_ in streets:
+    if s_["surface"] != "cobbles" or s_.get("lane"):
+        continue
+    for a, b in zip(s_["pts"], s_["pts"][1:]):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        for k in range(int(L // 30)):
+            t = (15.0 + 30.0 * k) / L
+            dx, dz = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+            x, z = a[0] + (b[0] - a[0]) * t - dz * 1.5, a[1] + (b[1] - a[1]) * t + dx * 1.5
+            if abs(x) < 46 and abs(z) < 46:
+                continue
+            P("manhole_stone", x, z, 0.0, k="prop")
+
 # ------------------------------------------------------------------ shots
 shots = [
     ["city_overhead", [0.0, 330.0, 120.0], [0.0, 0.0, 5.0]],
