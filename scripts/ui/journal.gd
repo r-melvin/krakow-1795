@@ -642,6 +642,21 @@ func _fill_missions() -> void:
 		row.add_child(UiTheme.label("delivered" if m.get("success", false) else "failed", 15,
 				UiTheme.GOOD if m.get("success", false) else UiTheme.BAD, "italic"))
 		R.add_child(row)
+		if m.has("stars"):
+			var k := int(round(float(m["stars"])))
+			var stars := "★".repeat(clampi(k, 0, 5)) + "☆".repeat(5 - clampi(k, 0, 5))
+			var sub := HBoxContainer.new()
+			sub.add_theme_constant_override("separation", 12)
+			var pad := Control.new()
+			pad.custom_minimum_size.x = 76
+			sub.add_child(pad)
+			sub.add_child(UiTheme.label(stars, 15, UiTheme.BRASS_BRIGHT))
+			if str(m.get("tier", "")) != "":
+				sub.add_child(UiTheme.label(str(m["tier"]), 15, UiTheme.TEXT_DIM, "italic"))
+			R.add_child(sub)
+			for line in m.get("score_lines", []):
+				var l := _t("      " + str(line), 14, UiTheme.TEXT_DIM)
+				R.add_child(l)
 
 
 # --- Storylines
