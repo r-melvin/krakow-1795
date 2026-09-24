@@ -251,6 +251,25 @@ def clip_audit(name, clips, phases=4, min_verts=12):
     return res
 
 
+def rear_sheet(name, out):
+    """Back and three-quarter-back views (135, 180, 225 deg) of the upper body under a low raking key light, so any
+    anatomy printing through the cloth (shoulder blades, spine groove, deltoids) shows. REAR=1."""
+    sc = scene()
+    for o in list(sc.collection.objects):
+        if o.type == "LIGHT" and o.name in ("key", "fill"):
+            o.data.energy *= 0.35
+    l = bpy.data.lights.new("rake", "SUN"); l.energy = 4.0; l.angle = 0.05; l.color = (1.0, 0.95, 0.88)
+    lo = bpy.data.objects.new("rake", l); sc.collection.objects.link(lo)
+    lo.rotation_euler = (math.radians(80), 0, math.radians(120))      # 10 deg above the horizon, from the side-back
+    sc.render.resolution_x, sc.render.resolution_y = 2100, 1000
+    for i, rz in enumerate((math.radians(135), math.radians(180), math.radians(225))):
+        load(name, i * 0.7, rz)
+    cam(sc, (0.7, -3.3, 1.35), (0.7, 0, 1.3), lens=55)
+    sc.render.filepath = os.path.join(out, name + "_rear.png")
+    bpy.ops.render.render(write_still=True)
+    print("[render]", sc.render.filepath)
+
+
 CLIPS = [c for c in os.environ.get("CLIPS", "").split(",") if c]
 
 
@@ -287,6 +306,9 @@ for name in names:
         continue
     if os.environ.get("EYES"):
         eye_sheet(name, OUT)
+        continue
+    if os.environ.get("REAR"):
+        rear_sheet(name, OUT)
         continue
     if os.environ.get("ONLY_CLIPS"):
         # CLIPS=walk_fast,run ONLY_CLIPS=1 blender -b --python render_characters.py -- <outdir> <name>

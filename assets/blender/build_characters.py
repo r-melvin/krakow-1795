@@ -427,9 +427,10 @@ def face_info(h, me, rig):
 DRAPE = {"coat", "coat_skirt", "skirt", "breeches", "cuffs", "vest", "delia"}
 OVER_EASE = {"vest": 0.022, "delia": 0.034}      # m outside the eased coat: garments worn over the coat
 DRAPE_CTX = {}
+LINED = {"coat", "coat_skirt", "skirt", "delia"}
 GARMENT_EXTRA = []      # seam strips made inside garment(), collected by build_clothes
 MAT_KEY = {}
-SOFTEN = {"vest": (8, 0.7), "delia": (10, 0.7), "coat": (8, 0.7), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (6, 0.6), "stockings": (1, 0.3), "cuffs": (2, 0.4)}
+SOFTEN = {"shoes": (10, 0.8), "shift": (3, 0.5), "stays": (4, 0.6), "vest": (8, 0.7), "delia": (10, 0.7), "coat": (8, 0.7), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (6, 0.6), "stockings": (1, 0.3), "cuffs": (2, 0.4)}
 
 
 def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, offset=0.0):
@@ -479,7 +480,7 @@ def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, 
         bpy.ops.object.modifier_apply(modifier="soften")
         offset = max(offset, 0.5)
         thickness += 0.006
-    if name == "boot_foot":
+    if name in ("boot_foot", "shoes"):
         # the foot skin is dense (toes); a boot does not need it
         dc = obj.modifiers.new("dec", "DECIMATE")
         dc.ratio = 0.35
@@ -488,12 +489,17 @@ def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, 
         vent_split(obj, DRAPE_CTX)
     hem = drape(obj, name, rig, DRAPE_CTX) if (name in DRAPE and DRAPE_CTX) else None
     seams, n_pre = seam_prepare(obj, name, DRAPE_CTX, hem) if (name in SEAMED and DRAPE_CTX) else (None, 0)
+    lining = name in LINED and _variant(mat, "lining", lambda c: _lerp3(c, (0.80, 0.76, 0.68), 0.45))
+    if lining:
+        mesh.materials.append(lining)
     sol = obj.modifiers.new("solid", "SOLIDIFY")
     sol.thickness = thickness + 0.014
     sol.offset = offset       # 0 = both sides of the helper surface (robust to inward normals); >0 pushes outward
     sol.use_even_offset = False
     sol.thickness_clamp = 1.0
     sol.use_rim = True
+    if lining:
+        sol.material_offset = 1          # the inner shell (seen under the hem and inside the skirts) is the lining
     if hem:
         # double-folded hem: the free lower edges are ~8 mm thicker than the body of the cloth
         vg = obj.vertex_groups.new(name="_hem")
@@ -1210,11 +1216,68 @@ def wearing_ease(bm, name, dom, ctx):
     inner = [v for v in bm.verts if not v.is_boundary]
     for _ in range(16):
         bmesh.ops.smooth_vert(bm, verts=inner, factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    kd = ctx.get("skin_kd")
+    if name == "coat" and kd:
+        # tailoring: above the waist the coat is a smooth shell resting on the body, not a second skin. Alternate
+        # Laplacian smoothing (boundary pinned at neck, armholes, cuffs and hem) with an outward-only clearance to the
+        # full ease: the shell settles on the high points (shoulder blades, deltoid caps, chest) as a membrane and
+        # bridges the spine groove, the scapula edges and the small of the back. Women's bodices keep their front shape.
+        female = ctx.get("female", False)
+        cy = B["spine_02"][0].y
+        shoulders = [B["upperarm_l"][0], B["upperarm_r"][0]]
+        region = []
+        for v in inner:
+            d = dom(v)
+            if v not in moves or (v.co.z < wz - 0.06 and d not in ("upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r")):
+                continue
+            cap = d in ("upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r")      # whole sleeve: a round tube, not an arm
+            if not (d in TORSO or cap):
+                continue
+            if female and v.co.y < cy - 0.02 and not cap:
+                continue
+            region.append(v)
+        # Gaussian blur of the eased positions over a 7 cm radius (the Laplacian alone moves too little on the dense
+        # helper mesh), then an outward-only clearance of 1.6 cm, then a light relax. Bridges scapulae, spine groove,
+        # deltoid and biceps; the shell keeps its overall volume because the blur works on the already-eased cloth.
+        from mathutils.kdtree import KDTree
+        R = 0.07
+        for _ in range(3):
+            tree = KDTree(len(region))
+            for i, v in enumerate(region):
+                tree.insert(v.co, i)
+            tree.balance()
+            cur = [v.co.copy() for v in region]
+            new_pos = []
+            for i, v in enumerate(region):
+                acc, wsum = Vector((0, 0, 0)), 0.0
+                for co, j, dist in tree.find_range(cur[i], R):
+                    w = math.exp(-(dist / (R * 0.5)) ** 2)
+                    acc += cur[j] * w
+                    wsum += w
+                new_pos.append(acc / wsum if wsum else cur[i])
+            for v, p_ in zip(region, new_pos):
+                v.co = p_
+            for v in region:
+                d = moves[v].normalized()
+                co, _, _ = kd.find(v.co)
+                gap = (v.co - co).dot(d)
+                if gap < 0.022:
+                    v.co += d * (0.022 - gap)
+        # finish on smoothing (a clamp last re-prints the shoulder blades), then only a thin safety clearance
+        for _ in range(10):
+            bmesh.ops.smooth_vert(bm, verts=region, factor=0.6, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+        for v in region:
+            d = moves[v].normalized()
+            co, _, _ = kd.find(v.co)
+            gap = (v.co - co).dot(d)
+            if gap < 0.007:
+                v.co += d * (0.007 - gap)
+        ctx["_shell"] = set(region)
     # smoothing shrinks convex cloth (shoulder caps, deltoids): give back ~0.6 cm, then make sure every vertex keeps
     # at least 1.4 cm over the nearest skin along its push direction
-    kd = ctx.get("skin_kd")
+    shell = ctx.pop("_shell", set())
     for v, m in moves.items():
-        if m.length < 1e-6:
+        if m.length < 1e-6 or v in shell:
             continue
         d = m.normalized()
         v.co += d * 0.006
@@ -1414,11 +1477,14 @@ def drape(obj, name, rig, ctx):
             # centre line, so a narrower arc misses them), fading out by 75 deg
             dback = abs(math.atan2(rx, ry))
             rear = 1.0 - _smooth01((dback - math.radians(50)) / math.radians(25))
-            base = 0.06                                               # +4.5 cm all round (3 cm let the front knee through)
-            fl = (base + 0.06 * rear - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
+            # +5 cm at the front, +8 cm at the rear: the 12 cm rear flare stood out like a cone (a dark bell from
+            # behind); deeper folds at the back carry the width instead, and the hem leans forward a little
+            base = 0.05
+            fl = (base + 0.03 * rear - 0.025 * sfac) * t ** 1.6 + flare * 0.3 * t ** 1.5
+            fold_k = 1.0 + 0.6 * rear
             # + 3 cm wearing ease all the way down, so the skirt clears the eased coat and breeches beneath it
-            disp = 0.03 + A_fold * f * t ** 1.1 + 0.005 * g * max(0.0, 1 - t / 0.3) + fl
-            moves[v] = Vector((rx / rl * disp, ry / rl * disp, 0.0))
+            disp = 0.03 + A_fold * fold_k * f * t ** 1.1 + 0.005 * g * max(0.0, 1 - t / 0.3) + fl
+            moves[v] = Vector((rx / rl * disp, ry / rl * disp - 0.02 * t ** 2, 0.0))
     elif name == "coat":
         cy_t = B["spine_02"][0].y
         waist_z = ctx["waist_z"]
@@ -1818,7 +1884,7 @@ def seam_build(obj, paths, n0, key, rig, ctx):
     if not bm.faces:
         bm.free()
         return None
-    o = _mk("seam_" + obj.name, bm, M(_dark(key, 0.38), 1.0, tex="plain"), rig, bone=None, angle=80, uv=0.2, recalc=False)
+    o = _mk("seam_" + obj.name, bm, M(_dark(key, 0.6), 1.0, tex="plain"), rig, bone=None, angle=80, uv=0.2, recalc=False)
     for g in obj.vertex_groups:
         o.vertex_groups.new(name=g.name)
     srcw = {}
@@ -2499,7 +2565,8 @@ def build_clothes(h, rig, spec):
 
     DRAPE_CTX.clear()
     DRAPE_CTX.update({"B": B, "waist_z": waist_z, "knee_z": knee_z, "seed": spec.get("seed", 0) or 0, "vent": spec.get("coat_len", "mid") == "mid",
-                      "bones": set(b.name for b in rig.data.bones), "arms": ARMS})
+                      "bones": set(b.name for b in rig.data.bones), "arms": ARMS,
+                      "female": spec.get("macro", {}).get("gender", 0.5) < 0.5})
     GARMENT_EXTRA.clear()
     pts = skin_points(h, me, rig)
     # body under the skirts: legs, and hips and belly (so a rotund belly pushes the skirt out instead of through)
@@ -2511,6 +2578,9 @@ def build_clothes(h, rig, spec):
         kd.insert(p, i)
     kd.balance()
     DRAPE_CTX["skin_kd"] = kd
+
+    if spec.get("outfit") is not None:
+        return build_outfit(h, rig, me, info, spec, B, waist_z, knee_z, ankle_z, top_z, pts, TORSO, ARMS, LEGS_UP, CALF, FEET)
 
     coat_len = spec.get("coat_len", "mid")
     coat = spec["coat"]
@@ -2794,6 +2864,75 @@ def build_clothes(h, rig, spec):
             set_weights(o, {"pelvis": 0.6, "thigh_l": 0.4})
         elif base in ("belt", "buckle", "belt_keeper", "sash", "sash_knot", "rope_belt", "rope_knot"):
             set_weights(o, {"pelvis": 0.5, "spine_01": 0.5})     # follows a forward bend without cutting the coat
+    return [o for o in out if o]
+
+
+def build_outfit(h, rig, me, info, spec, B, waist_z, knee_z, ankle_z, top_z, pts, TORSO, ARMS, LEGS_UP, CALF, FEET):
+    """Undress: period underclothes for the brothel set (and anyone else who needs them). spec["outfit"] is a list of
+      "shift"      off-the-shoulder linen shift, loose, short sleeves, calf length
+      "shift_top"  the same bodice pressed flat (worn under stays), with the sleeves
+      "shift_skirt" the shift from the waist down only
+      "stays"      boned stays from the waist to the bust, laced at the front
+      "stockings"  stockings to above the knee with garters
+      "shoes"      low shoes
+      "shawl"      a shawl round the shoulders (spec["shawl"] colour), open at the front
+    An empty list is nude. Skin-tight parts are cut from the tights helper; loose ones get the coat's wearing ease."""
+    parts = spec["outfit"]
+    linen = spec.get("linen", "cream")
+    out = []
+    armpit = min(B["upperarm_l"][0].z, B["upperarm_r"][0].z) - 0.035
+    neckline = armpit + 0.01
+    body_tops = TORSO - {"neck_01"}
+    def sleeve(co, dom):
+        if dom not in ("upperarm_l", "upperarm_r"):
+            return False
+        d = (co - B[dom][0]).length
+        return 0.05 < d < 0.19 and co.z < neckline
+    if "shift" in parts:
+        out.append(garment(h, rig, me, info, "coat", lambda i, co, g, dom: helper(g, "helper-tights") and
+                           ((dom in body_tops and waist_z - 0.2 < co.z < neckline) or sleeve(co, dom)), M(linen, 0.9), 0.008))
+    if "shift_top" in parts:
+        stays_top = armpit - 0.06
+        out.append(garment(h, rig, me, info, "shift", lambda i, co, g, dom: helper(g, "helper-tights") and
+                           ((dom in body_tops and stays_top - 0.02 < co.z < neckline) or sleeve(co, dom)), M(linen, 0.9), 0.006, offset=0.7))
+    if "shift" in parts or "shift_skirt" in parts:
+        out.append(garment(h, rig, me, info, "skirt", lambda i, co, g, dom: helper(g, "helper-skirt") and co.z > knee_z - 0.14,
+                           M(linen, 0.9), 0.012, offset=0.75))
+    if "stays" in parts:
+        top = armpit - 0.05
+        st = garment(h, rig, me, info, "stays", lambda i, co, g, dom: helper(g, "helper-tights") and dom in body_tops
+                     and waist_z - 0.08 < co.z < top, M(spec.get("stays", "dress_plum"), 0.7), 0.01, offset=0.9)
+        if st:
+            out.append(st)
+            # front lacing: a dark strip with cross-laces down the centre front
+            surf = [st.matrix_world @ v.co for v in st.data.vertices]
+            by_z = [(B["spine_03"][0].z, "spine_03"), (B["spine_02"][0].z, "spine_02"), (B["spine_01"][0].z, "spine_01"), (0.0, "pelvis")]
+            lp = surface_panel("stays_lacing", surf, [(-0.012, top - 0.01), (0.012, top - 0.01), (0.012, waist_z - 0.06), (-0.012, waist_z - 0.06)],
+                               M(_dark(spec.get("stays", "dress_plum"), 0.35), 0.8, tex="plain"), rig, by_z, lift=0.002, thick=0.002, rows=8, cols=2)
+            if lp:
+                out.append(lp)
+    if "stockings" in parts:
+        out.append(garment(h, rig, me, info, "stockings", lambda i, co, g, dom: helper(g, "helper-tights") and
+                           (dom in CALF or (dom in LEGS_UP and co.z <= knee_z + 0.1)) and co.z > ankle_z - 0.03, M(spec.get("stockings", "stocking")), 0.006))
+        for side, bone in ((1, "calf_l"), (-1, "calf_r")):
+            leg = {"calf_l", "foot_l", "thigh_l"} if side > 0 else {"calf_r", "foot_r", "thigh_r"}
+            out.append(band("garter", pts, knee_z + 0.07, knee_z + 0.09, 0.009, M(spec.get("garter", "kerchief_red"), 0.5, tex="silk"), rig, bone,
+                            thickness=0.003, n=20, side=side, bones=leg))
+    if "shoes" in parts:
+        out.append(garment(h, rig, me, info, "shoes", lambda i, co, g, dom: helper(g, "helper-tights") and dom in FEET | CALF and co.z < ankle_z + 0.03,
+                           M(spec.get("shoes", "black"), 0.45), 0.008))
+    if "shawl" in parts:
+        low = B["spine_03"][0].z - 0.14
+        do = garment(h, rig, me, info, "delia", lambda i, co, g, dom: helper(g, "helper-tights") and co.z > low
+                     and (dom in body_tops or (dom in ("upperarm_l", "upperarm_r") and co.z > low + 0.05))
+                     and not (abs(co.x) < 0.07 and co.y < 0.0), M(spec.get("shawl", "kerchief_red")), 0.006, offset=0.8)
+        if do:
+            out.append(do)
+    hat = spec.get("hat")
+    if hat:
+        out += build_hat(hat, spec, rig, pts, top_z, ())
+    out += GARMENT_EXTRA
+    DRAPE_CTX.update({"me": me, "pts": pts, "top_z": top_z})
     return [o for o in out if o]
 
 
@@ -3163,7 +3302,7 @@ def bake_hair_tint():
 def default_max_tex(name):
     """Exported texture size by role: 2048 for the figures the camera frames (player origins, leaders, the watchman,
     the finale bodyguards), 1024 for the crowd, townsfolk, district and cast roles. spec["max_tex"] overrides."""
-    if name.startswith(("figure_", "hist_", "cast_bodyguard")) or name == "watchman":
+    if name.startswith(("figure_", "hist_", "cast_bodyguard", "brothel_")) or name == "watchman":
         return 2048
     if name.startswith(("npc_", "dist_", "town_", "cast_")):
         return 1024
@@ -3976,7 +4115,30 @@ def hand_prop(rig, kind, spec):
     """Props held in the hand, built in the arms-down rest pose: a cane (right), a scythe pike (right), spectacles (left)."""
     bpy.context.view_layer.update()
     parts = []
-    if kind in ("cane", "pike"):
+    if kind == "coat_over_arm":
+        # a folded uniform coat hung over the left forearm: two cloth slabs either side of the arm, lapel stripe
+        fa = (rig.matrix_world @ rig.pose.bones["lowerarm_l"].matrix).to_translation()
+        hd = (rig.matrix_world @ rig.pose.bones["hand_l"].matrix).to_translation()
+        c = fa.lerp(hd, 0.45)
+        key = spec.get("coat_over_arm") if isinstance(spec.get("coat_over_arm"), str) else "white_coat"
+        for sy, L in ((-1, 0.42), (1, 0.34)):
+            bm = bmesh.new()
+            rows = []
+            for i in range(6):
+                t = i / 5
+                y = c.y + sy * (0.03 + 0.015 * t)
+                rows.append([Vector((c.x - 0.09 + 0.01 * math.sin(t * 3), y + 0.004 * math.sin(j * 2 + t * 4), c.z + 0.02 - L * t))
+                             for j, _x in enumerate(range(5))])
+                for j in range(5):
+                    rows[-1][j].x = c.x - 0.09 + 0.045 * j + 0.006 * math.sin(t * 5 + j)
+            _grid(bm, rows, closed=False)
+            parts.append(_mk("coat_over_arm", bm, M(key), rig, bone=None, angle=60, uv=0.3, solid=0.012))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=0.035, depth=0.2, location=c + Vector((0, 0, 0.015)), rotation=(0, math.pi / 2, 0))
+        fold = bpy.context.object
+        fold.data.materials.append(M(key)); fold.name = "coat_over_arm"
+        parts.append(fold)
+        bone = "lowerarm_l"
+    elif kind in ("cane", "pike"):
         hand = (rig.matrix_world @ rig.pose.bones["hand_r"].matrix).to_translation()
         x, y = hand.x - 0.01, hand.y - 0.02
         top = hand.z + (0.06 if kind == "cane" else 0.75)
@@ -4067,7 +4229,7 @@ def build(name, spec):
     rest_arms_down(rig)
     if spec.get("musket"):
         _musket(rig)
-    for kind in ("cane", "pike", "spectacles"):
+    for kind in ("cane", "pike", "spectacles", "coat_over_arm"):
         if spec.get(kind):
             hand_prop(rig, kind, spec)
     make_animations(rig)
@@ -4281,6 +4443,40 @@ CAST = {
     "cast_child_f": {"macro": {"gender": 0.1, "age": 0.14, "muscle": 0.4, "weight": 0.45, "height": 0.5},
                      "hair": "bob02", "hair_tint": "dark_brown", "brows": "eyebrow009", "coat": "dress_plum", "coat_len": "long", "collar": "cream", "sash": "cream",
                      "boots": "black", "boot_height": 0.10, "hat": "bonnet", "hat_colour": "cream", "buttons": False, "max_tex": 1024},
+    # ---- the brothel (adult cast, period dress and undress; street life spawns them, nothing sexual is animated)
+    "brothel_woman_door_a": {"macro": {"gender": 0.04, "age": 0.52, "muscle": 0.3, "weight": 0.45, "height": 0.5}, "fixed_body": True,
+                             "body": "average", "hair": "long01", "hair_tint": "auburn", "brows": "eyebrow009",
+                             "outfit": ["shift_top", "shift_skirt", "stays", "stockings", "shoes", "shawl"], "stays": "wine",
+                             "shawl": "kerchief_red", "garter": "sky_blue", "grime": 0.35},
+    "brothel_woman_door_b": {"macro": {"gender": 0.06, "age": 0.58, "muscle": 0.35, "weight": 0.62, "height": 0.46}, "fixed_body": True,
+                             "body": "average", "hair": "bob02", "hair_tint": "black", "brows": "eyebrow012",
+                             "outfit": ["shift_top", "shift_skirt", "stays", "stockings", "shoes", "shawl"], "stays": "dress_green",
+                             "shawl": "saffron", "garter": "kerchief_red", "linen": "apron", "grime": 0.4},
+    "brothel_woman_inside_a": {"macro": {"gender": 0.03, "age": 0.5, "muscle": 0.3, "weight": 0.4, "height": 0.52}, "fixed_body": True,
+                               "body": "gaunt", "hair": "braid01", "hair_tint": "blond", "brows": "eyebrow009",
+                               "outfit": ["shift"], "grime": 0.3},
+    "brothel_woman_inside_b": {"macro": {"gender": 0.05, "age": 0.55, "muscle": 0.35, "weight": 0.55, "height": 0.48}, "fixed_body": True,
+                               "body": "average", "hair": "ponytail01", "hair_tint": "dark_brown", "brows": "eyebrow012",
+                               "outfit": ["stays", "stockings", "shoes"], "stays": "crimson", "stockings": "stocking", "garter": "dress_blue", "grime": 0.3},
+    "brothel_woman_inside_c": {"macro": {"gender": 0.04, "age": 0.6, "muscle": 0.3, "weight": 0.7, "height": 0.5}, "fixed_body": True,
+                               "body": "rotund", "hair": "long01", "hair_tint": "black", "brows": "eyebrow009",
+                               "outfit": ["shift_skirt", "shawl"], "shawl": "dress_plum", "grime": 0.3},
+    "brothel_woman_inside_d": {"macro": {"gender": 0.05, "age": 0.53, "muscle": 0.35, "weight": 0.5, "height": 0.5}, "fixed_body": True,
+                               "body": "average", "hair": "bob01", "hair_tint": "brown", "brows": "eyebrow009",
+                               "outfit": [], "grime": 0.2},
+    "brothel_madam": {"macro": {"gender": 0.08, "age": 0.72, "muscle": 0.3, "weight": 0.8, "height": 0.5}, "fixed_body": True, "body": "rotund",
+                      "hair": "short01", "hair_tint": "grey", "brows": "eyebrow006", "coat": "dress_plum", "coat_len": "long", "collar": "cream",
+                      "sash": "zupan_gold", "hat": "bonnet", "hat_colour": "cream", "ribbon": "crimson", "rings": True, "earring": True,
+                      "boots": "black", "boot_height": 0.10, "buttons": "long", "button_colour": "brass", "grime": 0.12},
+    "brothel_pimp": {"macro": {"gender": 0.95, "age": 0.5, "muscle": 0.45, "weight": 0.4, "height": 0.6}, "fixed_body": True, "body": "gaunt",
+                     "hair": "ponytail01", "hair_tint": "black", "brows": "eyebrow004", "coat": "crimson", "coat_len": "mid", "cuffs": "zupan_gold",
+                     "collar": "black", "waistcoat": "dress_green", "lapels": "zupan_gold", "breeches": "black", "stockings": "stocking",
+                     "boots": "black", "boot_height": 0.12, "hat": "tricorne", "hat_colour": "black", "hat_trim": "zupan_gold", "rings": True,
+                     "earring": True, "cane": True, "cane_knob": "brass", "button_colour": "brass", "grime": 0.3},
+    "brothel_soldier": {"macro": {"gender": 1.0, "age": 0.5, "muscle": 0.6, "weight": 0.5, "height": 0.6}, "fixed_body": True, "body": "fit",
+                        "hair": "ponytail01", "hair_tint": "brown", "brows": "eyebrow003", "coat": "cream", "coat_len": "short", "collar": "cream",
+                        "breeches": "white_coat", "stockings": "stocking", "boots": "black", "boot_height": 0.32, "hat": None, "buttons": False,
+                        "coat_over_arm": "white_coat", "stubble": True, "grime": 0.4},
     # ---- faction leaders and the finale boss: hand-tuned faces (no face_variety), fixed bodies, signature props
     "hist_turski": {"macro": {"gender": 0.95, "age": 0.815, "muscle": 0.35, "weight": 0.8, "height": 0.45}, "fixed_body": True, "body": "rotund",
                     "face_variety": False, "skin": "old_caucasian_male", "hair": "short01", "hair_tint": "grey", "brows": "eyebrow006",
