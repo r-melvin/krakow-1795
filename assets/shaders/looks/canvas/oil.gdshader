@@ -6,7 +6,7 @@ shader_type canvas_item;
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;
 uniform float brush_px = 3.0;        // coarse brush radius (px)
 uniform float detail_px = 1.1;       // fine brush radius kept where the image is busy
-uniform float skin_keep = 0.85;      // faces and hands: how much of the raw frame survives the brush (skin-tone mask)
+uniform float skin_keep = 1.0;       // faces and hands: how much of the raw frame survives the brush (skin-tone mask)
 uniform float bands = 5.0;           // cel bands on luminance
 uniform float band_mix = 0.24;       // how hard the banding reads (0 = painterly only)
 uniform float ink = 0.45;            // edge darkening
@@ -69,7 +69,10 @@ void fragment() {
 	float mn = min(raw.r, min(raw.g, raw.b));
 	float sat = (mx - mn) / max(mx, 1e-3);
 	float warm_hue = step(raw.g, raw.r) * step(raw.b, raw.g) * smoothstep(0.02, 0.10, raw.r - raw.b);
-	float skin = warm_hue * smoothstep(0.08, 0.2, sat) * (1.0 - smoothstep(0.55, 0.8, sat)) * smoothstep(0.12, 0.3, mx);
+	float skin = warm_hue * smoothstep(0.05, 0.14, sat) * (1.0 - smoothstep(0.6, 0.85, sat)) * smoothstep(0.08, 0.22, mx);
+	// fine detail anywhere (eyes, mouths, hands, buttons) also escapes the brush: a tight high-frequency measure
+	float fine_detail = smoothstep(0.25, 0.7, sobel(uv, px * 0.8));
+	skin = max(skin, fine_detail * 0.7);
 	skin *= skin_keep;
 	col = mix(col, raw, skin);
 	// Muted oil palette: desaturate, warm the lights and cool the shadows a touch, lift the blacks.
@@ -98,7 +101,7 @@ void fragment() {
 	// paint; broken along the stroke by a little noise so it feels drawn not traced.
 	float e = smoothstep(ink_lo, ink_hi, sobel(uv, px * ink_width));
 	e *= 0.75 + 0.25 * hash21(floor(uv / px / 3.0));
-	col *= 1.0 - e * ink * (1.0 - 0.6 * skin);
+	col *= 1.0 - e * ink * (1.0 - 0.75 * skin);
 	// Canvas weave and grain.
 	vec2 c = uv / px;
 	float w = (sin(c.x * 1.9) * sin(c.y * 1.9)) * 0.5 + 0.5;

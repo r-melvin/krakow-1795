@@ -319,7 +319,8 @@ func _asset_mesh(asset: String) -> Mesh:
 func _place_all() -> void:
 	for e in data.get("place", []):
 		var p: Array = e["p"]
-		var n := Assets.place(self, str(e["a"]), Vector3(float(p[0]), 0.0, float(p[1])), float(e.get("r", 0.0)), float(e.get("s", 1.0)))
+		var lift := 0.014 if str(e["a"]) in FLAT_ON_COBBLES else 0.0     # flat iron and stone on the parallax cobbles: clear of the surface
+		var n := Assets.place(self, str(e["a"]), Vector3(float(p[0]), lift, float(p[1])), float(e.get("r", 0.0)), float(e.get("s", 1.0)))
 		if n == null:
 			continue
 		var vis: float = VIS.get(str(e.get("k", "house")), 300.0)
@@ -334,6 +335,7 @@ func _place_all() -> void:
 
 ## Gameplay tags on placed buildings and props: `flammable` (straw, hay, thatch, canvas, timber, laundry),
 ## `poisonable` (casks and barrels of drink), and the kingpin warehouse's cargo hook rig.
+const FLAT_ON_COBBLES := ["drain_grate", "cellar_hatch", "manhole", "gutter_grate"]
 const FLAMMABLE := ["market_stall", "farm_haystack", "farm_haystack_small", "farm_barn", "farm_cottage", "yard_shed",
 		"laundry_line", "woodpile_leanto", "straw_scatter", "carpenter_yard", "cooper_yard", "tannery_frame", "klep_stable",
 		"broken_stall", "guillotine_parts", "sacks_crates"]
@@ -424,7 +426,7 @@ func _gutters() -> void:
 			if mode == "kerb":
 				var m := int(L / 10.0)
 				for k3 in m:
-					slabs.append(Transform3D(Basis(Vector3.UP, rot + PI * 0.5), a + dir * (5.0 + 10.0 * k3) + Vector3(0, 0.004, 0)))
+					slabs.append(Transform3D(Basis(Vector3.UP, rot + PI * 0.5), a + dir * (5.0 + 10.0 * k3) + Vector3(0, 0.012, 0)))
 		for i in range(1, line.size() - 1):
 			var ain := (line[i - 1] - line[i]).normalized()
 			var aout := (line[i + 1] - line[i]).normalized()
@@ -432,11 +434,11 @@ func _gutters() -> void:
 			var ly := Basis(Vector3.UP, r) * Vector3(0, 0, -1)
 			if ly.dot(aout) < 0.5:
 				r = atan2(-aout.z, aout.x)
-			corners.append(Transform3D(Basis(Vector3.UP, r), line[i] + Vector3(0, 0.003, 0)))
+			corners.append(Transform3D(Basis(Vector3.UP, r), line[i] + Vector3(0, 0.008, 0)))
 		for e in [0, line.size() - 1]:
 			var nb := line[1] if e == 0 else line[line.size() - 2]
 			var outd := (line[e] - nb).normalized()
-			drains.append(Transform3D(Basis(Vector3.UP, atan2(-outd.z, outd.x)), line[e] + Vector3(0, 0.002, 0)))
+			drains.append(Transform3D(Basis(Vector3.UP, atan2(-outd.z, outd.x)), line[e] + Vector3(0, 0.018, 0)))   # the grate sits clear above the channel floor: no z-fight
 	for pair in [["gutter_channel", straight], ["gutter_corner", corners], ["gutter_slab", slabs], ["gutter_outfall", drains]]:
 		var mesh := _asset_mesh(pair[0])
 		if mesh:
@@ -511,6 +513,7 @@ func _fires() -> void:
 	for n in find_children("Furnace_*", "", true, false):
 		var l := FlickerLight.new()
 		l.amount = 0.25
+		l.wander = 0.06
 		l.speed = 8.0
 		l.light_color = Color(1.0, 0.5, 0.2)
 		l.light_energy = 4.0
@@ -561,6 +564,7 @@ func _street_lights() -> void:
 					var post := Assets.place(self, "lantern_post", p, atan2(-right.x * side, -right.z * side))
 					var l := FlickerLight.new()
 					l.amount = 0.10
+					l.wander = 0.01
 					l.speed = 7.0
 					l.position = p + Vector3(0.9, 2.9, 0).rotated(Vector3.UP, atan2(-right.x * side, -right.z * side))
 					l.light_color = Color(1.0, 0.62, 0.27)
