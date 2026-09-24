@@ -1322,6 +1322,11 @@
           "hostess_deliver"
         ],
         "steps": []
+      },
+      "route_hints": {
+        "street": "The urchins would have carried it for two coins, and nobody looks twice at a child.",
+        "salon": "Pani Zofia's cloak would have walked it through the front door.",
+        "underworld": "The smuggler knew where it lay, if you had come after ten past nine."
       }
     },
     "corporals_ledger": {
@@ -2147,6 +2152,11 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "laundress": "A woman with a basket of shirts walks into any watch post.",
+        "drunk": "The watch lets a drunk sleep where he falls, even beside the Corporal's book.",
+        "bribe": "Private Novak's memory costs four złoty."
       }
     },
     "salt_barge": {
@@ -2640,6 +2650,15 @@
               "next": "bartek_fence"
             },
             {
+              "id": "raft_drains",
+              "text": "Not past Pichler at all: up the outfall and through the drains to the Rynek cellars.",
+              "need": [
+                "heard:undercroft_grates|camp:fence_turned"
+              ],
+              "action": "approach:underworld;obj:deal_raft;obj:distract_excise;flag:raft_deal;flag:drains_route",
+              "next": "bartek_drains"
+            },
+            {
               "text": "And who keeps the muskets, after?",
               "tone": "blunt",
               "next": "bartek_who"
@@ -2892,6 +2911,14 @@
               "Eleven kreuzer per barrel. Salt is salt. Go away."
             ]
           ]
+        },
+        "bartek_drains": {
+          "lines": [
+            [
+              "$npc",
+              "The drains! Wet, black, and stinking, and not one exciseman has ever put his boot in them. You know the way? Then we load and you lead."
+            ]
+          ]
         }
       },
       "campaign": {
@@ -2929,6 +2956,17 @@
             },
             "text": "The guild keeps the muskets in its books and its cellars. The raftsmen spit."
           }
+        },
+        "flags": {
+          "drains_route": {
+            "loyalty": {
+              "underworld": 2
+            },
+            "camp": [
+              "drains_known"
+            ],
+            "text": "The muskets went up the outfall and through the drains under the Rynek. The raftsmen will use that road again."
+          }
         }
       },
       "smoke": {
@@ -2955,6 +2993,11 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "guilds": "On paper, a musket is salt: Master Wierzbięta's manifest.",
+        "underworld": "Herr Pichler loves a man who hates the salt tax in detail; Bartek's sledge does the rest.",
+        "drains": "The old drains run from the river outfall to the Rynek cellars, and no exciseman has ever gone in."
       }
     },
     "bishops_letter": {
@@ -3865,6 +3908,11 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "miracle": "Brother Kajetan makes Madonnas weep for three złoty, and every canon runs to look.",
+        "nun": "Nobody looks at a nun, not even a canon guarding a letter.",
+        "priest": "Canon Sierakowski has three cassocks and a grudge against Wolski."
       }
     },
     "magnates_ball": {
@@ -4731,6 +4779,11 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "servant": "The man with the tray goes everywhere and is seen by no one.",
+        "invited": "The Salon's friends are on the majordomo's list.",
+        "banker": "Herr Lindner has an invitation and nobody to share it with."
       }
     },
     "pillory": {
@@ -5482,6 +5535,11 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "quiet": "Rózia sells keys that open pillories. Or a barrel of cabbages dropped by the Cloth Hall.",
+        "omen": "Old Salomea knows what frightens a Moravian soldier.",
+        "riot": "Wojtek's crowd needed only one word."
       }
     },
     "kingpin": {
@@ -5532,7 +5590,7 @@
         },
         {
           "id": "escape",
-          "text": "Get away through the Grodzka gate"
+          "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
         }
       ],
       "approaches": {
@@ -5554,7 +5612,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5576,7 +5634,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5598,7 +5656,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5620,7 +5678,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5642,7 +5700,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5664,7 +5722,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         },
@@ -5686,7 +5744,7 @@
             },
             {
               "id": "escape",
-              "text": "Get away through the Grodzka gate"
+              "text": "Get away: the Grodzka gate, or the river outfall east along the quay"
             }
           ]
         }
@@ -5730,6 +5788,9 @@
           [
             "flag:card_invite",
             "flag:at_cards"
+          ],
+          [
+            "flag:from_below"
           ]
         ],
         "mob_spot": [
@@ -6159,6 +6220,36 @@
           "name": "The machine",
           "hidden": true,
           "rules": []
+        },
+        {
+          "id": "warehouse_drain",
+          "pos": [
+            -122.5,
+            0,
+            118.2
+          ],
+          "model": "box",
+          "scale": 0.6,
+          "name": "A drain grate behind the warehouse",
+          "rules": [
+            {
+              "if": [
+                "flag:from_below"
+              ],
+              "prompt": ""
+            },
+            {
+              "if": [
+                "flag:at_warehouse"
+              ],
+              "prompt": "go under the warehouse and come up through the floor behind Wilk",
+              "action": "flag:from_below;msg:from_below"
+            },
+            {
+              "prompt": "a drain grate (Wilk is not in the warehouse now)",
+              "action": "msg:drain_empty"
+            }
+          ]
         }
       ],
       "zones": [
@@ -6175,6 +6266,20 @@
             "done:decide_jedrek"
           ],
           "action": "obj:escape"
+        },
+        {
+          "id": "outfall",
+          "pos": [
+            -60.0,
+            0,
+            118.5
+          ],
+          "radius": 4.0,
+          "if": [
+            "done:kill_target",
+            "done:decide_jedrek"
+          ],
+          "action": "obj:escape;flag:escaped_outfall"
         }
       ],
       "variants": [
@@ -6244,7 +6349,9 @@
         "hook": "The pin comes out a finger's width. The hook will hold its load until someone pulls the rope, and then it will not.",
         "fire_empty": "The straw catches, then the sacks, then the doors. Wilk's men come running, and Wilk is somewhere else.",
         "coat": "You drag the bodyguard behind a crate and take his coat and hat. The others see a colleague, until someone looks closely.",
-        "privy": "One of Wilk's bodyguards walks off behind the warehouse to the privy. Alone."
+        "privy": "One of Wilk's bodyguards walks off behind the warehouse to the privy. Alone.",
+        "from_below": "Through the drain, along a culvert that stinks of salt and rats, and up through a loose board in the warehouse floor. Wilk's bodyguards are watching the door.",
+        "drain_empty": "The drain runs under the warehouse office. It would be useful if Wilk were in it."
       },
       "kill_texts": {
         "poison": "Wilk drinks, frowns at his cards, and folds, for the last time.",
@@ -6878,6 +6985,13 @@
             ]
           }
         ]
+      },
+      "route_hints": {
+        "accident": "The cargo hook over his barges holds by one pin.",
+        "poison": "Salomea sells a drop that stops a heart; he drinks from his own jug.",
+        "knife": "His big bodyguard goes to the privy at a quarter past ten, alone, in a good coat.",
+        "riot": "The raftsmen by their fire hate him more than they fear him.",
+        "below": "A drain behind the warehouse comes up through the office floor, behind the bodyguards."
       }
     }
   }

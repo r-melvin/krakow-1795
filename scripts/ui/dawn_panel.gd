@@ -14,6 +14,7 @@ var _report: VBoxContainer
 var _deltas: VBoxContainer
 var _continue: Button
 var _city: VBoxContainer
+var _score: VBoxContainer
 
 
 func _ready() -> void:
@@ -71,6 +72,9 @@ func _ready() -> void:
 	rsv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rsv.add_theme_constant_override("separation", 10)
 	rs.add_child(rsv)
+	_score = VBoxContainer.new()
+	_score.add_theme_constant_override("separation", 4)
+	rsv.add_child(_score)
 	rsv.add_child(UiTheme.kicker("Report"))
 	_report = VBoxContainer.new()
 	_report.add_theme_constant_override("separation", 8)
@@ -134,8 +138,43 @@ func show_result(success: bool, summary: String) -> void:
 		lines.append("The night passed without report.")
 	for l in lines:
 		_report.add_child(UiTheme.body("—  " + l, 17))
+	_build_score()
 	_build_city()
 	_build_deltas()
+
+
+## The night's score card (Campaign.score_night): stars, the tier, what moved it, a road not taken.
+func _build_score() -> void:
+	if _score == null:
+		return
+	for c in _score.get_children():
+		c.queue_free()
+	var mission: Node = get_node_or_null("/root/Mission")
+	var camp: Node = mission.get("campaign") if mission else null
+	if camp == null:
+		return
+	var sc: Dictionary = camp.call("last_score")
+	if sc.is_empty() or int(sc.get("night", -1)) != GameState.day - 1:
+		return
+	var k := int(sc.get("stars", 1))
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 14)
+	top.add_child(UiTheme.label("★".repeat(k) + "☆".repeat(5 - k), 30, UiTheme.BRASS_BRIGHT, "bold"))
+	top.add_child(UiTheme.label(str(sc.get("tier", "")), 28, UiTheme.TEXT, "display_light"))
+	_score.add_child(top)
+	var facts := "Seen %d  ·  alarms %d  ·  dead %d  ·  knocked out %d  ·  %d min  ·  %d zł spent" % [int(sc.get("seen", 0)), int(sc.get("alarms", 0)),
+			int(sc.get("blood", 0)), int(sc.get("knockouts", 0)), int(sc.get("minutes", 0)), int(sc.get("spent", 0))]
+	_score.add_child(UiTheme.label(facts, 14, UiTheme.BRASS, "bold"))
+	for l in sc.get("lines", []):
+		_score.add_child(UiTheme.body("·  " + str(l), 15, UiTheme.TEXT))
+	if str(sc.get("hint", "")) != "":
+		_score.add_child(UiTheme.body("Another road: " + str(sc["hint"]), 15, UiTheme.TEXT_DIM))
+	var eff: Dictionary = sc.get("effects", {})
+	if eff.has("notoriety"):
+		_score.add_child(UiTheme.body("A clean night: the city forgets your face a little; the Salon and the Church take note.", 14, UiTheme.GOOD))
+	elif eff.has("crackdown"):
+		_score.add_child(UiTheme.body("A loud night: the Austrians tighten their grip, and the street is excited.", 14, UiTheme.BAD))
+	_score.add_child(HSeparator.new())
 
 
 func _build_city() -> void:

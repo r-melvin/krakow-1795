@@ -85,6 +85,9 @@ func preview_shots(host: Node, smoke: Node) -> void:
 	r.night_step(lines)
 	lines.append("In the night: You caught a bolting cart-horse by the bridle; the carter Wojtek owes you.")
 	camp.st()["dawn"] = lines
+	camp.st()["last_score"] = {"night": 2, "stars": 4, "tier": "Quiet hand", "seen": 1, "alarms": 0, "blood": 0, "knockouts": 0, "minutes": 47, "spent": 4,
+			"lines": ["Glimpsed once or twice, and forgotten.", "Not a hand raised. Not a drop spilled.", "By bribe, with the help of the urchins."],
+			"hint": "A woman with a basket of shirts walks into any watch post.", "effects": {"notoriety": -5}}
 	GameState.last_night_success = true
 	GameState.last_night_summary = "Private Novak's memory proved short and cheap. Four złoty: the price of a winter's watch.\nBy dawn the boatmen knew every hour the watch would walk until the thaw."
 	GameState.night_start_influence = {}
@@ -147,6 +150,11 @@ func run(host: Node, smoke: Node) -> void:
 		await frames(3)
 		var st := await _night(n, mid)
 		print("[smoke] night %d %s state=%s dawn_lines=%d crackdown=%d coins=%d frames=%d" % [n, mid, st, camp.dawn_lines().size(), GameState.crackdown, GameState.coins, Engine.get_process_frames() - f0])
+		var sc: Dictionary = camp.last_score()
+		print("[smoke] score night=%d stars=%d tier=%s seen=%d blood=%d method=%s alarms=%d minutes=%d" % [n, int(sc.get("stars", 0)), sc.get("tier", "?"),
+				int(sc.get("seen", 0)), int(sc.get("blood", 0)), sc.get("method", "?"), int(sc.get("alarms", 0)), int(sc.get("minutes", 0))])
+		if n == 2 and shot_dir != "":
+			await shot("score_card", 1.4)
 		for l in camp.dawn_lines().slice(0, 4):
 			print("[smoke]   dawn: %s" % str(l).left(150))
 		if n == 3:
@@ -178,6 +186,9 @@ func _day(n: int) -> void:
 			notes.append(camp.do_action("nominate:apprentice").left(60))
 			camp.choose_lead("deserter")
 		4:
+			camp.rumours.seed_rumour("fence_undercroft")
+			camp.rumours.hear("fence_undercroft", "smoke")
+			camp.choose_lead("sq:fences_ledger")
 			notes.append(camp.do_action("stage_miracle").left(60))
 			notes.append(camp.do_action("rest").left(60))
 		5:
@@ -248,6 +259,8 @@ func _night(n: int, mid: String) -> String:
 			print("[smoke]   lead found %s=%s" % [who, camp.found(who)])
 	if n == 3:
 		await _capture_test()
+	if n == 4:
+		await _undercroft()
 	if mid == "printers_bundle":
 		print(await ms.run_approach("underworld"))
 	else:
@@ -500,3 +513,30 @@ func _succession() -> void:
 	var cr: String = camp.resolve_coup("yield")
 	print("[smoke] succession nominated=%s heir=%s forced=%s coup=%s leader=%s | %s" % [nominated if nominated != "" else "none", heir, forced if forced != heir else "none",
 			cr != "", camp.st().get("leader", "?"), cr.left(90)])
+
+
+func _undercroft() -> void:
+	var r := runner()
+	var entered := false
+	if r.items.has("well_grate"):
+		await _use("well_grate", [])
+		entered = Mission.has_flag("below")
+	var kuna := "absent"
+	var below_ev := "none"
+	if r.actor("kuna"):
+		await ms.talk("kuna")
+		await ms.run_dialogue(["turn", "trade", "blackmail"])
+		kuna = "turned" if camp.flag("fence_turned") else ("traded" if camp.flag("kuna_traded") else "talked")
+	if entered and r.events:
+		r.events.fired.clear()
+		if r.events.stage("corpse_carried"):
+			var key := str(r.events.active.get("key", ""))
+			await frames(4)
+			await ms.talk(key)
+			await ms.run_dialogue([])
+			below_ev = "corpse_carried:" + r.events.last_outcome
+			r.events.clear()
+	print("[smoke] undercroft side_quest=%s entered=%s kuna=%s event=%s" % [r.items.has("well_grate"), entered, kuna, below_ev])
+	if entered and r.interiors and r.interiors.has_method("_go_out_now"):
+		r.interiors.call("_go_out_now", ms.player())
+		await frames(4)

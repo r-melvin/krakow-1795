@@ -387,6 +387,12 @@ func night_people() -> Array:
 func leads() -> Array:
 	var out: Array = []
 	for rid in rumours.known():
+		var sq := str(rumours.def(rid).get("side_quest", ""))
+		var sqd: Dictionary = db.get("side_quests", {}).get(sq, {})
+		if sq != "" and not sqd.is_empty() and not flag("sq_done_" + sq):
+			out.append({"id": "sq:" + sq, "rumour": rid, "label": str(sqd.get("label", sq)), "desc": str(rumours.def(rid).get("text", "")),
+					"chosen": str(st().get("lead", "")) == "sq:" + sq, "mission_only": false})
+			continue
 		var pid := str(rumours.def(rid).get("person", ""))
 		if pid == "" or found(pid) or person(pid).is_empty():
 			continue
@@ -1095,6 +1101,15 @@ func resolve_coup(choice: String) -> String:
 
 # ------------------------------------------------------------------ night side
 
+## The side quest package for tonight's lead ({} if none).
+func side_quest_tonight() -> Dictionary:
+	var lead := str(st().get("lead", ""))
+	if not lead.begins_with("sq:"):
+		return {}
+	var d: Dictionary = db.get("side_quests", {}).get(lead.trim_prefix("sq:"), {})
+	return d.duplicate(true)
+
+
 ## Tonight's modifiers for mission_runner.gd: {remove_guards, add_guards: [{name, wps}], view_mult, health,
 ## hide_npcs, slips, messages, sabotage}. One-shot campaign flags are consumed here.
 func night_setup() -> Dictionary:
@@ -1166,6 +1181,7 @@ func _on_mission_ended(success: bool, _summary: String) -> void:
 	var is_arc := not ended() and mid != "" and mid == mission_for_night(n)
 	rumours.from_flags(Mission.flags)
 	var md: Dictionary = Mission.data
+	var card: Dictionary = score_night(success, md)
 	# capture and death bookkeeping (the mission runner sets these flags)
 	if Mission.has_flag("captured"):
 		s["captures"] = int(s.get("captures", 0)) + 1
@@ -1204,12 +1220,112 @@ func _on_mission_ended(success: bool, _summary: String) -> void:
 	rumours.night_step(lines)
 	if not succession_pending():
 		_faith_check(lines)
+	var lead := str(s.get("lead", ""))
+	if lead.begins_with("sq:"):
+		var sqd: Dictionary = db.get("side_quests", {}).get(lead.trim_prefix("sq:"), {})
+		var eff: Dictionary = sqd.get("effects", {})
+		var any := false
+		for k in eff:
+			if flag(k) and not flag("sq_applied_" + k):
+				set_flag("sq_applied_" + k)
+				apply_effects(eff[k], lines)
+				any = true
+		if any:
+			set_flag("sq_done_" + lead.trim_prefix("sq:"))
 	s["tonight"] = {}
 	s["lead"] = ""
 	if is_arc:
 		_check_end(success, mid, lines)
+	if not card.is_empty():
+		apply_effects(card.get("effects", {}), lines, "silent")
 	s["dawn"] = lines
 	changed.emit()
+
+
+const TIERS := ["The watch has your description", "The talk of the town", "Rough trade", "Quiet hand", "Ghost of the Rynek"]
+
+
+## The dawn score card: 1-5 stars from tonight's conduct (mission_runner.gd score_card), a tier in period voice,
+## 3-5 lines on what moved it, one hint about a road not taken; small world effects. Kept in
+## GameState.campaign.scores, st.last_score and the journal's Missions entry.
+func score_night(success: bool, md: Dictionary) -> Dictionary:
+	var r: Node = Mission.runner
+	if r == null or not is_instance_valid(r) or not r.has_method("score_card"):
+		return {}
+	var sc: Dictionary = r.score_card()
+	var stars := 5.0
+	var lines: Array = []
+	var seen := int(sc["spotted"])
+	var alarms := int(sc["alarms"]) + int(sc["runners"])
+	var kills := int(sc["kills"])
+	var kos := int(sc["knockouts"])
+	var noise := int(sc["noise"])
+	if alarms > 0:
+		stars -= minf(2.0, float(alarms))
+		lines.append("The watch was roused %d time%s; the Corporal will have heard." % [alarms, "" if alarms == 1 else "s"])
+	elif seen > 2:
+		stars -= 1.0
+		lines.append("Seen %d times. Nobody shouted, but they will remember a face." % seen)
+	elif seen == 0:
+		lines.append("Nobody saw you who mattered.")
+	else:
+		lines.append("Glimpsed once or twice, and forgotten.")
+	if kills > 0:
+		stars -= 1.0
+		lines.append("Blood on the snow: %d dead. Kraków keeps count." % kills)
+	elif kos > 0:
+		if kos > 2 or int(sc["fights"]) > 0:
+			stars -= 0.5
+		lines.append("%d laid out cold, nobody killed%s." % [kos, " (and a brawl in the open)" if int(sc["fights"]) > 0 else ""])
+	else:
+		lines.append("Not a hand raised. Not a drop spilled.")
+	if noise > 0:
+		stars -= 1.0
+		lines.append("Loud: %s. The whole quarter will talk of it." % ("fire" if sc["methods"].has("fire") else ("a mob" if int(sc["collateral"]) > 0 else "a shot")))
+	if int(sc["bodies"]) > 0:
+		stars -= 0.5
+		lines.append("Bodies left where the watch could find them.")
+	if int(sc["slips"]) > 0 or bool(sc["captured"]):
+		stars -= 0.5
+	if not success:
+		stars = minf(stars, 2.0)
+	var methods: Array = (sc["methods"] as Dictionary).keys()
+	var allies: Array = (sc["allies"] as Dictionary).keys()
+	var how := str(sc.get("approach", ""))
+	if not methods.is_empty() or not allies.is_empty():
+		lines.append("By %s%s." % [", ".join(methods.map(func(m) -> String: return str(m))) if not methods.is_empty() else "your own wits",
+				(" with the help of " + ", ".join(allies.map(func(a) -> String: return str(a)))) if not allies.is_empty() else ""])
+	var k := clampi(int(round(stars)), 1, 5)
+	var hint := ""
+	var hints: Dictionary = md.get("route_hints", {})
+	for a in hints:
+		if a != how:
+			hint = str(hints[a])
+			break
+	var eff := {}
+	if k >= 4:
+		eff = {"notoriety": -5, "loyalty": {"salon": 1, "church": 1}}
+	elif k <= 2:
+		eff = {"crackdown": 3, "loyalty": {"street": 2}}
+	var card := {"night": GameState.day - 1, "mission": Mission.mission_id, "title": Mission.title, "stars": k, "tier": TIERS[k - 1],
+			"lines": lines.slice(0, 4), "hint": hint, "seen": seen, "alarms": alarms, "blood": kills, "knockouts": kos, "noise": noise,
+			"method": how if how != "" else (str(methods[0]) if not methods.is_empty() else "none"), "minutes": int(sc["minutes"]),
+			"spent": int(sc["spent"]), "allies": allies, "collateral": int(sc["collateral"]), "success": success, "effects": eff}
+	var s := st()
+	if not s.has("scores") or not (s["scores"] is Array):
+		s["scores"] = []
+	(s["scores"] as Array).append(card)
+	s["last_score"] = card
+	var jm: Array = Mission.journal.get("missions", [])
+	if not jm.is_empty() and str(jm[-1].get("id", "")) == Mission.mission_id:
+		jm[-1]["stars"] = k
+		jm[-1]["tier"] = card["tier"]
+		jm[-1]["score_lines"] = card["lines"]
+	return card
+
+
+func last_score() -> Dictionary:
+	return st().get("last_score", {})
 
 
 func _check_end(success: bool, mid: String, lines: Array) -> void:

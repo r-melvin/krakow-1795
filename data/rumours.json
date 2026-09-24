@@ -1053,6 +1053,35 @@
       "disproved": {
         "text": "No raid came. Wilk's men laugh, and look harder at strangers."
       }
+    },
+    "undercroft_grates": {
+      "subject": "The drains",
+      "truth": true,
+      "spread": 0.35,
+      "start": true,
+      "seed": [
+        "passage"
+      ],
+      "text": "The boys go in by the well grate: under the Rynek the old cellars are joined by brick drains all the way to the river outfall.",
+      "line": [
+        "Chłopaki wchodzą przez kratę przy studni. Pod Rynkiem piwnice łączą się kanałami aż do Wisły.",
+        "The lads go in through the grate by the well. Under the square the cellars are joined by drains all the way to the Vistula."
+      ]
+    },
+    "fence_undercroft": {
+      "subject": "The fence below",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "passage"
+      ],
+      "side_quest": "fences_ledger",
+      "text": "Pan Kuna, the fence under the Rynek, buys anything in a cellar you reach by the well grate, and keeps a ledger of every thief in town.",
+      "line": [
+        "Pan Kuna pod Rynkiem kupi wszystko. Wejście przez kratę przy studni. Ma księgę każdego złodzieja.",
+        "Pan Kuna under the square buys anything. In through the well grate. He keeps a book on every thief."
+      ]
     }
   },
   "kind_spread": {

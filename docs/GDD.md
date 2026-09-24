@@ -290,14 +290,18 @@ Godot +Z, points out into the street), `Furnace_<n>` at forge, foundry, brewery 
 
 The winter is not one fixed night. Each night the campaign picks a preset from data/weather.json
 (`Weather.set_conditions("sleet")`, or `--weather=<preset>` for testing): clear frost, light snow, blizzard,
-sleet, a rain thaw, fog, overcast, and the day looks (clear day with no snow, snow day). scripts/city/weather.gd
-drives the sky, the moon or the low winter sun (after 06:00 the sun rises and the lanterns fade), fog and exposure,
-and precipitation particles that follow the player (off indoors and under an arcade). Baked roof, sill and coping
-snow melts through a shader on the global `snow_cover`: a rain thaw takes the roofs from white to patchy wet tile
-over about six game hours, a snowfall brings the cover back, and the square collects snow in the joints of the setts
-or puddles under rain (`wetness`, which also darkens and glosses plaster, wood and tile). Weather is a stealth lever:
-rain masks footsteps (guard hearing x0.6), wind and blizzards muffle further (x0.8) and blizzard and fog shorten the
-guards' far sight, while a clear frosty night leaves every sound carrying across the square.
+sleet, a rain thaw, fog, overcast, and the day looks (clear day with no snow, snow day). A preset says what is
+falling; the town's state accumulates from it and carries over from night to night in the campaign save
+(`weather_state`): snowfall lays fresh powder on the roofs and the square and fills old tracks in; rain and thaw
+melt the roof snow (it slides off the eaves in sheets when it goes fast, melt water drips from the eaves), wet the
+plaster, wood and tile and pool in the low joints of the setts, rippled by the drops; sleet leaves a grey crust that
+crunches underfoot (louder steps); melt water refreezes into icicles in frost, which fall in the sun. Mist lies in the
+moat, over the Vistula, in the yards and the churchyard and thickens toward dawn; smoke pools by the watch braziers,
+lantern haloes grow in mist, and breath shows in the frost. scripts/city/weather.gd and weather_fx.gd drive it,
+with the sky, the moon or the low winter sun (after 06:00 the sun rises and the lanterns fade), fog and exposure.
+Weather is a stealth lever: rain masks footsteps (guard hearing x0.6), wind and blizzards muffle further (x0.8),
+fresh powder muffles steps and a sleet crust betrays them, and blizzard and fog shorten the guards' far sight,
+while a clear frosty night leaves every sound carrying across the square.
 
 ## Campaign (seven nights, one winter)
 
@@ -486,3 +490,28 @@ the grid and nothing stands within 4 m of them.
   overlook the cafe, the guard post by the Cloth Hall and the brothel door.
 - **Tags**: `flammable` and `poisonable` metas on the placed props that burn or hold drink; the warehouse's
   `CargoHook` node carries `rig`/`rig_kind`.
+
+### The dawn score card
+Every night is scored (`Campaign.score_night` from `mission_runner.gd score_card()`): times seen (the watch's
+`player_spotted`, debounced), alarms and runners reaching the Corporal, blood (kills, knockouts, fights in the
+open), noise (shots, fires, mobs), collateral, bodies found, methods (disguise, poison, bribe, rumour, distraction,
+superstition, the drains, slipping away) and allies (urchins, Mother Weronika, crowds), game-minutes and coin spent.
+Five stars minus alarms (up to 2), being seen often, killing, noise, bodies and slips; a failed night caps at two.
+Tiers: 5 Ghost of the Rynek, 4 Quiet hand, 3 Rough trade, 2 The talk of the town, 1 The watch has your description.
+The dawn panel shows it above the report with the facts, 3-4 lines on what moved it and one road not taken
+(missions.json `route_hints`). A 4-5 star night: notoriety -5, Salon and Church loyalty +1; a 1-2 star night:
+crackdown +3, Street loyalty +2. Ratings are kept in `GameState.campaign.scores` and on the journal's Missions
+entries (`stars`, `tier`, `score_lines`).
+
+### Below the Rynek: the undercroft
+Medieval brick culverts and linked cellars (the interiors agent's `int_undercroft`), reached by street grates
+(symbolic door ids in `campaign.json undercroft.entrances`: the well grate, the Cloth Hall grate, the laundry
+grate, the river outfall; a missing door falls back to a message). The rumour "the boys go in by the well grate"
+starts in the passage. Uses: the drains route on night 3 (up the outfall with the muskets, past no exciseman), a
+drain behind Wilk's warehouse on night 7 (come up through the office floor behind the bodyguards, which counts as a
+permit) and the river-outfall escape, the cell break-out (down the old well shaft, up the laundry grate), and the
+side quest **The Fence's Ledger**: follow the lead to Pan Kuna, the fence below the Rynek, and trade with him (the
+Corporal's torn pages), rob him (his ledger: coins and a lever, Underworld loyalty -5), or turn him from Wilk to the
+movement, by standing or with the body in his dump alcove as blackmail (both reveal Wilk's habits). Two events fire
+only below: a corpse carried to the river and a dog-fight ring. Side quests are lead packages merged into any
+night (`campaign.json side_quests`: people, items, talk, texts, optional objectives, effects at dawn).

@@ -207,6 +207,8 @@ func _lead_line() -> String:
 	var lid := str(_camp.call("st").get("lead", ""))
 	if lid == "":
 		return ""
+	if lid.begins_with("sq:"):
+		return str((_camp.get("db").get("side_quests", {}) as Dictionary).get(lid.trim_prefix("sq:"), {}).get("title", lid)) + " (marked on your map)"
 	var p: Dictionary = _camp.call("person", lid)
 	return "%s, %s (marked on your map)" % [p.get("name", lid), p.get("where", "")]
 
@@ -329,6 +331,8 @@ func _fill_leads(sv: VBoxContainer) -> void:
 		var b := UiTheme.button(("●  " if l["chosen"] else "○  ") + str(l["label"]), func() -> void: _camp.call("choose_lead", str(l["id"])), 0)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.custom_minimum_size.y = 38
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		b.tooltip_text = str(l["desc"])
 		b.disabled = bool(l.get("mission_only", false))
 		sv.add_child(b)
@@ -362,6 +366,8 @@ func _day_col() -> Control:
 	var p := UiTheme.panel()
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.size_flags_stretch_ratio = 1.1
+	p.custom_minimum_size.x = 0
+	p.clip_contents = true
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	p.add_child(scroll)
@@ -373,7 +379,7 @@ func _day_col() -> Control:
 		_city(v)
 		return p
 	var ds: Dictionary = _camp.call("day_state")
-	v.add_child(UiTheme.kicker("The day  ·  %d of %d hours left  ·  %d zł" % [int(ds.get("left", 0)), int(ds.get("max", 0)), GameState.coins]))
+	v.add_child(UiTheme.kicker("The day  ·  %d of %d hours  ·  %d zł" % [int(ds.get("left", 0)), int(ds.get("max", 0)), GameState.coins]))
 	for a in _camp.call("day_actions"):
 		var b := UiTheme.button(str(a["label"]), func() -> void: _camp.call("do_action", str(a["id"])), 0)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -381,6 +387,9 @@ func _day_col() -> Control:
 		b.disabled = not bool(a["enabled"])
 		b.tooltip_text = str(a["desc"]) + ("\n" + str(a["why"]) if str(a["why"]) != "" else "")
 		b.add_theme_font_size_override("font_size", 15)
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		b.custom_minimum_size.x = 0
 		v.add_child(b)
 	v.add_child(_plant_box())
 	v.add_child(_urchin_box())
@@ -417,8 +426,11 @@ func _plant_box() -> Control:
 		_plant_channel.set_item_tooltip(i, str(c["desc"]) + ("\n" + str(c["why"]) if str(c["why"]) != "" else ""))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
-	_plant_rumour.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_plant_channel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for ob in [_plant_rumour, _plant_channel]:
+		ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ob.clip_text = true
+		ob.fit_to_longest_item = false
+		ob.custom_minimum_size.x = 60
 	row.add_child(_plant_rumour)
 	row.add_child(_plant_channel)
 	box.add_child(row)
@@ -452,11 +464,15 @@ func _plant_box() -> Control:
 func _urchin_box() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
-	box.add_child(UiTheme.kicker("The passage urchins  ·  1 zł, no hour spent  ·  honest %d%% of the time" % int(round(float(_camp.call("urchin_truth_chance")) * 100.0))))
+	box.add_child(UiTheme.kicker("The passage urchins"))
+	box.add_child(UiTheme.body("1 zł, no hour spent. Honest about %d%% of the time." % int(round(float(_camp.call("urchin_truth_chance")) * 100.0)), 13, UiTheme.TEXT_DIM))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	_urchin_opt = OptionButton.new()
 	_urchin_opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_urchin_opt.clip_text = true
+	_urchin_opt.fit_to_longest_item = false
+	_urchin_opt.custom_minimum_size.x = 60
 	var enabled := false
 	for o in _camp.call("urchin_offers"):
 		_urchin_opt.add_item(str(o["label"]))

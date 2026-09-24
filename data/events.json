@@ -1,288 +1,1719 @@
 {
-  "_doc": "Random events with player participation (scripts/mission/events.gd). At most `max_per_night` a night, each event at most once a night, staged at an `anchors` point 12-40 m from the player (outdoors, no dialogue open), first after `first_at`, then every `every` game minutes (random in range). An event: `hours` [from, until] on the night clock, `min_night`, `if` (campaign/mission conditions), `notice` (on-screen line when it starts), `actors` [{model: [candidates], at: [dx, dz] from the anchor, facing, clip, key?: true (the one you talk to), barks: [[text, gloss]], walk?: [dx, dz] (walks there), run?: bool}], `talk` prompt, `dialogue` nodes (runner format; the first is `<id>_start`), choice actions use the mission runner's verbs; `ev:<id>:<outcome>` resolves the event with `outcomes[outcome]` (campaign effects + text for the dawn report). `special`: fire (a burning stall: light, guards drawn to it), procession (join it: disguised while you walk with it), lamps (the lamplighter darkens lanterns nearby), flogging (uses street_life.gd's flogging scene when it exposes start_event). `timeout` real seconds before the actors leave.",
+  "_doc": "Random events with player participation (scripts/mission/events.gd). At most `max_per_night` a night, each event at most once a night, staged at an `anchors` point 12-40 m from the player (outdoors, no dialogue open), first after `first_at`, then every `every` game minutes (random in range). An event: `hours` [from, until] on the night clock, `min_night`, `if` (campaign/mission conditions), `notice` (on-screen line when it starts), `actors` [{model: [candidates], at: [dx, dz] from the anchor, facing, clip, key?: true (the one you talk to), barks: [[text, gloss]], walk?: [dx, dz] (walks there), run?: bool}], `talk` prompt, `dialogue` nodes (runner format; the first is `<id>_start`), choice actions use the mission runner's verbs; `ev:<id>:<outcome>` resolves the event with `outcomes[outcome]` (campaign effects + text for the dawn report). `special`: fire (a burning stall: light, guards drawn to it), procession (join it: disguised while you walk with it), lamps (the lamplighter darkens lanterns nearby), flogging (uses street_life.gd's flogging scene when it exposes start_event). `timeout` real seconds before the actors leave. An event with `interior` (e.g. int_undercroft) fires only while the player is in that room, at `local` anchors (room space).",
   "max_per_night": 3,
   "first_at": "21:06",
-  "every": [5, 9],
+  "every": [
+    5,
+    9
+  ],
   "timeout": 110,
   "anchors": [
-    [-12, 1], [12, -1], [-2, 14], [2, -15], [-20, 10], [20, -4], [-8, -20], [8, 20], [16, 14], [-16, -14],
-    [-24, -18], [24, 18], [0, 24], [0, -24], [-24, 20], [22, -20],
-    [10, -55], [10, -80], [-42.5, 10], [-42.5, -50], [-12, 60], [-60, 0], [-80, 118], [-100, 128], [58, -30], [24, 160], [10, -150], [-140, 4]
+    [
+      -12,
+      1
+    ],
+    [
+      12,
+      -1
+    ],
+    [
+      -2,
+      14
+    ],
+    [
+      2,
+      -15
+    ],
+    [
+      -20,
+      10
+    ],
+    [
+      20,
+      -4
+    ],
+    [
+      -8,
+      -20
+    ],
+    [
+      8,
+      20
+    ],
+    [
+      16,
+      14
+    ],
+    [
+      -16,
+      -14
+    ],
+    [
+      -24,
+      -18
+    ],
+    [
+      24,
+      18
+    ],
+    [
+      0,
+      24
+    ],
+    [
+      0,
+      -24
+    ],
+    [
+      -24,
+      20
+    ],
+    [
+      22,
+      -20
+    ],
+    [
+      10,
+      -55
+    ],
+    [
+      10,
+      -80
+    ],
+    [
+      -42.5,
+      10
+    ],
+    [
+      -42.5,
+      -50
+    ],
+    [
+      -12,
+      60
+    ],
+    [
+      -60,
+      0
+    ],
+    [
+      -80,
+      118
+    ],
+    [
+      -100,
+      128
+    ],
+    [
+      58,
+      -30
+    ],
+    [
+      24,
+      160
+    ],
+    [
+      10,
+      -150
+    ],
+    [
+      -140,
+      4
+    ]
   ],
   "events": {
     "runaway_cart": {
-      "hours": ["21:00", "23:30"], "notice": "Shouts and hooves: a carter's horse has bolted, dragging the cart across the square.",
+      "hours": [
+        "21:00",
+        "23:30"
+      ],
+      "notice": "Shouts and hooves: a carter's horse has bolted, dragging the cart across the square.",
       "actors": [
-        {"model": ["dist_carter", "town_coachman", "npc_m_01"], "at": [-3, 0], "facing": 1.57, "key": true, "barks": [["Stój! Stój, bestio!", "Whoa! Whoa, you beast!"], ["Mój wóz! Ratujcie!", "My cart! Help!"]], "walk": [4, 1], "run": true},
-        {"model": ["horse_cart", "horse"], "at": [2, 1], "facing": 1.57}
+        {
+          "model": [
+            "dist_carter",
+            "town_coachman",
+            "npc_m_01"
+          ],
+          "at": [
+            -3,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "barks": [
+            [
+              "Stój! Stój, bestio!",
+              "Whoa! Whoa, you beast!"
+            ],
+            [
+              "Mój wóz! Ratujcie!",
+              "My cart! Help!"
+            ]
+          ],
+          "walk": [
+            4,
+            1
+          ],
+          "run": true
+        },
+        {
+          "model": [
+            "horse_cart",
+            "horse"
+          ],
+          "at": [
+            2,
+            1
+          ],
+          "facing": 1.57
+        }
       ],
       "talk": "help the carter",
       "dialogue": {
-        "runaway_cart_start": {"lines": [["$npc", "The horse! Grab the bridle before it goes into the Cloth Hall stalls!"]],
+        "runaway_cart_start": {
+          "lines": [
+            [
+              "$npc",
+              "The horse! Grab the bridle before it goes into the Cloth Hall stalls!"
+            ]
+          ],
           "choices": [
-            {"text": "Grab the bridle", "action": "ev:runaway_cart:bridle", "next": "runaway_cart_thanks"},
-            {"text": "Help yourself to a sack while he's busy", "action": "ev:runaway_cart:sack", "next": "runaway_cart_sack"},
-            {"text": "Keep walking.", "action": "ev:runaway_cart:ignore"}
-          ]},
-        "runaway_cart_thanks": {"lines": [["$npc", "God reward you. I carry for the salt merchants: if you ever need a cart that asks no questions, ask for Wojtek."]]},
-        "runaway_cart_sack": {"lines": [["$npc", "Hey! Thief! ...Oh, never mind, I've no time. Whoa!"]]}
+            {
+              "text": "Grab the bridle",
+              "action": "ev:runaway_cart:bridle",
+              "next": "runaway_cart_thanks"
+            },
+            {
+              "text": "Help yourself to a sack while he's busy",
+              "action": "ev:runaway_cart:sack",
+              "next": "runaway_cart_sack"
+            },
+            {
+              "text": "Keep walking.",
+              "action": "ev:runaway_cart:ignore"
+            }
+          ]
+        },
+        "runaway_cart_thanks": {
+          "lines": [
+            [
+              "$npc",
+              "God reward you. I carry for the salt merchants: if you ever need a cart that asks no questions, ask for Wojtek."
+            ]
+          ]
+        },
+        "runaway_cart_sack": {
+          "lines": [
+            [
+              "$npc",
+              "Hey! Thief! ...Oh, never mind, I've no time. Whoa!"
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "bridle": {"loyalty": {"guilds": 3, "street": 2}, "hear": ["salt_tax"], "text": "You caught a bolting cart-horse by the bridle; the carter Wojtek owes you."},
-        "sack": {"coins": 2, "notoriety": 3, "loyalty": {"guilds": -2}, "text": "You lifted a sack of salt from a runaway cart. Two złoty at the fish market."},
-        "ignore": {"text": ""}
+        "bridle": {
+          "loyalty": {
+            "guilds": 3,
+            "street": 2
+          },
+          "hear": [
+            "salt_tax"
+          ],
+          "text": "You caught a bolting cart-horse by the bridle; the carter Wojtek owes you."
+        },
+        "sack": {
+          "coins": 2,
+          "notoriety": 3,
+          "loyalty": {
+            "guilds": -2
+          },
+          "text": "You lifted a sack of salt from a runaway cart. Two złoty at the fish market."
+        },
+        "ignore": {
+          "text": ""
+        }
       }
     },
     "arrest": {
-      "hours": ["21:20", "01:30"], "notice": "Two soldiers have a journeyman against the wall by his collar.",
+      "hours": [
+        "21:20",
+        "01:30"
+      ],
+      "notice": "Two soldiers have a journeyman against the wall by his collar.",
       "actors": [
-        {"model": ["dist_journeyman", "npc_m_05", "figure_townsman"], "at": [0, 0], "facing": 0.0, "key": true, "barks": [["Ja nic nie zrobiłem!", "I've done nothing!"]]},
-        {"model": ["watchman", "cast_polizei", "npc_m_06"], "at": [0.9, 0.6], "facing": -2.2, "barks": [["Papiere! Sofort!", "Papers! Now!"], ["Du kommst mit.", "You're coming with us."]]},
-        {"model": ["watchman", "npc_m_06"], "at": [-0.9, 0.7], "facing": 2.2}
+        {
+          "model": [
+            "dist_journeyman",
+            "npc_m_05",
+            "figure_townsman"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 0.0,
+          "key": true,
+          "barks": [
+            [
+              "Ja nic nie zrobiłem!",
+              "I've done nothing!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "watchman",
+            "cast_polizei",
+            "npc_m_06"
+          ],
+          "at": [
+            0.9,
+            0.6
+          ],
+          "facing": -2.2,
+          "barks": [
+            [
+              "Papiere! Sofort!",
+              "Papers! Now!"
+            ],
+            [
+              "Du kommst mit.",
+              "You're coming with us."
+            ]
+          ]
+        },
+        {
+          "model": [
+            "watchman",
+            "npc_m_06"
+          ],
+          "at": [
+            -0.9,
+            0.7
+          ],
+          "facing": 2.2
+        }
       ],
       "talk": "step in",
       "dialogue": {
-        "arrest_start": {"lines": [["$npc", "Help me, for God's sake! They say I sang the Mazurek!"], ["Soldier", "Weitergehen! Move along!"]],
+        "arrest_start": {
+          "lines": [
+            [
+              "$npc",
+              "Help me, for God's sake! They say I sang the Mazurek!"
+            ],
+            [
+              "Soldier",
+              "Weitergehen! Move along!"
+            ]
+          ],
           "choices": [
-            {"text": "\"He's my cousin, Herr Soldat, simple in the head.\" (Eloquence)", "action": "test:skill:eloquence>=2|arrest_talked|arrest_failed"},
-            {"text": "Slip the soldier 2 złoty", "action": "coins:-2;ev:arrest:bribe", "next": "arrest_bribed", "need": ["coins>=2"]},
-            {"text": "Pull your hat down and walk on", "action": "ev:arrest:walk"}
-          ]},
-        "arrest_talked": {"enter": "ev:arrest:talked", "lines": [["Soldier", "Cousin, is it? Take the idiot home, and keep him off the songs."]]},
-        "arrest_failed": {"enter": "ev:arrest:failed", "lines": [["Soldier", "And who are you? Your face... move along before we take you both."]]},
-        "arrest_bribed": {"lines": [["Soldier", "...We saw nobody. Off with you both."]]}
+            {
+              "text": "\"He's my cousin, Herr Soldat, simple in the head.\" (Eloquence)",
+              "action": "test:skill:eloquence>=2|arrest_talked|arrest_failed"
+            },
+            {
+              "text": "Slip the soldier 2 złoty",
+              "action": "coins:-2;ev:arrest:bribe",
+              "next": "arrest_bribed",
+              "need": [
+                "coins>=2"
+              ]
+            },
+            {
+              "text": "Pull your hat down and walk on",
+              "action": "ev:arrest:walk"
+            }
+          ]
+        },
+        "arrest_talked": {
+          "enter": "ev:arrest:talked",
+          "lines": [
+            [
+              "Soldier",
+              "Cousin, is it? Take the idiot home, and keep him off the songs."
+            ]
+          ]
+        },
+        "arrest_failed": {
+          "enter": "ev:arrest:failed",
+          "lines": [
+            [
+              "Soldier",
+              "And who are you? Your face... move along before we take you both."
+            ]
+          ]
+        },
+        "arrest_bribed": {
+          "lines": [
+            [
+              "Soldier",
+              "...We saw nobody. Off with you both."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "talked": {"loyalty": {"street": 4}, "text": "You talked a journeyman out of the soldiers' hands. The street heard of it."},
-        "bribe": {"loyalty": {"street": 3}, "text": "Two złoty bought a journeyman his freedom."},
-        "failed": {"notoriety": 5, "crackdown": 1, "text": "Your lie to the soldiers failed; they took the journeyman and looked hard at you."},
-        "walk": {"loyalty": {"street": -1}, "text": ""}
+        "talked": {
+          "loyalty": {
+            "street": 4
+          },
+          "text": "You talked a journeyman out of the soldiers' hands. The street heard of it."
+        },
+        "bribe": {
+          "loyalty": {
+            "street": 3
+          },
+          "text": "Two złoty bought a journeyman his freedom."
+        },
+        "failed": {
+          "notoriety": 5,
+          "crackdown": 1,
+          "text": "Your lie to the soldiers failed; they took the journeyman and looked hard at you."
+        },
+        "walk": {
+          "loyalty": {
+            "street": -1
+          },
+          "text": ""
+        }
       }
     },
     "stall_fire": {
-      "hours": ["21:30", "00:30"], "special": "fire", "notice": "Smoke and a red glow: a stall's brazier has set its awning alight!",
+      "hours": [
+        "21:30",
+        "00:30"
+      ],
+      "special": "fire",
+      "notice": "Smoke and a red glow: a stall's brazier has set its awning alight!",
       "actors": [
-        {"model": ["stallholder_east", "cast_stallholder_f", "npc_f_00", "figure_townswoman"], "at": [1.5, 1.0], "facing": -2.5, "key": true, "barks": [["Pali się! Wody!", "Fire! Water!"], ["Moje płótno!", "My linen!"]]},
-        {"model": ["npc_m_00", "figure_townsman"], "at": [-1.8, 1.2], "facing": 2.5, "barks": [["Wiadra! Do studni!", "Buckets! To the well!"]]}
+        {
+          "model": [
+            "stallholder_east",
+            "cast_stallholder_f",
+            "npc_f_00",
+            "figure_townswoman"
+          ],
+          "at": [
+            1.5,
+            1.0
+          ],
+          "facing": -2.5,
+          "key": true,
+          "barks": [
+            [
+              "Pali się! Wody!",
+              "Fire! Water!"
+            ],
+            [
+              "Moje płótno!",
+              "My linen!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_m_00",
+            "figure_townsman"
+          ],
+          "at": [
+            -1.8,
+            1.2
+          ],
+          "facing": 2.5,
+          "barks": [
+            [
+              "Wiadra! Do studni!",
+              "Buckets! To the well!"
+            ]
+          ]
+        }
       ],
       "talk": "help with the fire",
       "dialogue": {
-        "stall_fire_start": {"lines": [["$npc", "Buckets! The well! Before it takes the whole row!"]],
+        "stall_fire_start": {
+          "lines": [
+            [
+              "$npc",
+              "Buckets! The well! Before it takes the whole row!"
+            ]
+          ],
           "choices": [
-            {"text": "Carry buckets from the well", "action": "ev:stall_fire:buckets", "next": "stall_fire_buckets"},
-            {"text": "Let them fight it: the watch is running here, and the way behind them is open", "action": "ev:stall_fire:slip"}
-          ]},
-        "stall_fire_buckets": {"lines": [["$npc", "Bless you, bless you! The watch just stood and watched it burn."]]}
+            {
+              "text": "Carry buckets from the well",
+              "action": "ev:stall_fire:buckets",
+              "next": "stall_fire_buckets"
+            },
+            {
+              "text": "Let them fight it: the watch is running here, and the way behind them is open",
+              "action": "ev:stall_fire:slip"
+            }
+          ]
+        },
+        "stall_fire_buckets": {
+          "lines": [
+            [
+              "$npc",
+              "Bless you, bless you! The watch just stood and watched it burn."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "buckets": {"loyalty": {"guilds": 3, "street": 2}, "influence": {"guilds": 2}, "text": "You carried buckets to a burning stall while the watch stood and gawped."},
-        "slip": {"text": "A stall fire drew the watch; you used the minutes it gave you."}
+        "buckets": {
+          "loyalty": {
+            "guilds": 3,
+            "street": 2
+          },
+          "influence": {
+            "guilds": 2
+          },
+          "text": "You carried buckets to a burning stall while the watch stood and gawped."
+        },
+        "slip": {
+          "text": "A stall fire drew the watch; you used the minutes it gave you."
+        }
       }
     },
     "procession": {
-      "hours": ["21:10", "23:00"], "special": "procession", "notice": "A small procession with candles is crossing the square, singing a hymn to the Virgin.",
+      "hours": [
+        "21:10",
+        "23:00"
+      ],
+      "special": "procession",
+      "notice": "A small procession with candles is crossing the square, singing a hymn to the Virgin.",
       "actors": [
-        {"model": ["figure_priest", "cast_priest", "npc_m_05"], "at": [0, 0], "facing": 1.57, "key": true, "walk": [10, 0], "barks": [["Bogurodzico, Dziewico...", "Mother of God, Virgin..."]]},
-        {"model": ["npc_f_01", "figure_townswoman"], "at": [-1.2, 0.6], "facing": 1.57, "walk": [8.8, 0.6]},
-        {"model": ["npc_f_04", "figure_townswoman"], "at": [-1.2, -0.6], "facing": 1.57, "walk": [8.8, -0.6]},
-        {"model": ["npc_m_04", "figure_townsman"], "at": [-2.4, 0], "facing": 1.57, "walk": [7.6, 0]}
+        {
+          "model": [
+            "figure_priest",
+            "cast_priest",
+            "npc_m_05"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "walk": [
+            10,
+            0
+          ],
+          "barks": [
+            [
+              "Bogurodzico, Dziewico...",
+              "Mother of God, Virgin..."
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_f_01",
+            "figure_townswoman"
+          ],
+          "at": [
+            -1.2,
+            0.6
+          ],
+          "facing": 1.57,
+          "walk": [
+            8.8,
+            0.6
+          ]
+        },
+        {
+          "model": [
+            "npc_f_04",
+            "figure_townswoman"
+          ],
+          "at": [
+            -1.2,
+            -0.6
+          ],
+          "facing": 1.57,
+          "walk": [
+            8.8,
+            -0.6
+          ]
+        },
+        {
+          "model": [
+            "npc_m_04",
+            "figure_townsman"
+          ],
+          "at": [
+            -2.4,
+            0
+          ],
+          "facing": 1.57,
+          "walk": [
+            7.6,
+            0
+          ]
+        }
       ],
       "talk": "join the procession",
       "dialogue": {
-        "procession_start": {"lines": [["$npc", "Take a candle, child, and walk with us to St Mary's. The soldiers do not stop a hymn."]],
+        "procession_start": {
+          "lines": [
+            [
+              "$npc",
+              "Take a candle, child, and walk with us to St Mary's. The soldiers do not stop a hymn."
+            ]
+          ],
           "choices": [
-            {"text": "Take a candle and walk with them", "action": "ev:procession:join", "next": "procession_joined"},
-            {"text": "Put a coin in the plate (1 zł)", "action": "coins:-1;ev:procession:alms", "need": ["coins>=1"]},
-            {"text": "Step aside.", "action": "ev:procession:aside"}
-          ]},
-        "procession_joined": {"lines": [["$npc", "Sing, then. Louder. They are watching."]]}
+            {
+              "text": "Take a candle and walk with them",
+              "action": "ev:procession:join",
+              "next": "procession_joined"
+            },
+            {
+              "text": "Put a coin in the plate (1 zł)",
+              "action": "coins:-1;ev:procession:alms",
+              "need": [
+                "coins>=1"
+              ]
+            },
+            {
+              "text": "Step aside.",
+              "action": "ev:procession:aside"
+            }
+          ]
+        },
+        "procession_joined": {
+          "lines": [
+            [
+              "$npc",
+              "Sing, then. Louder. They are watching."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "join": {"loyalty": {"church": 3}, "text": "You walked with a candle procession under the soldiers' noses."},
-        "alms": {"influence": {"church": 2}, "text": "A coin in a procession's plate."},
-        "aside": {"text": ""}
+        "join": {
+          "loyalty": {
+            "church": 3
+          },
+          "text": "You walked with a candle procession under the soldiers' noses."
+        },
+        "alms": {
+          "influence": {
+            "church": 2
+          },
+          "text": "A coin in a procession's plate."
+        },
+        "aside": {
+          "text": ""
+        }
       }
     },
     "brawl": {
-      "hours": ["22:00", "02:00"], "notice": "A raftsman and a guild journeyman are at each other's throats outside a tavern.",
+      "hours": [
+        "22:00",
+        "02:00"
+      ],
+      "notice": "A raftsman and a guild journeyman are at each other's throats outside a tavern.",
       "actors": [
-        {"model": ["dist_raftsman", "cast_boatman", "npc_m_04"], "at": [-0.7, 0], "facing": 1.57, "key": true, "barks": [["Cechowy szczur!", "Guild rat!"], ["Chodź tu!", "Come here!"]]},
-        {"model": ["dist_flemish_journeyman", "dist_journeyman", "npc_m_05"], "at": [0.7, 0], "facing": -1.57, "barks": [["Przemytnik! Złodziej!", "Smuggler! Thief!"]]},
-        {"model": ["npc_m_00", "figure_townsman"], "at": [0, 2.2], "facing": 3.1},
-        {"model": ["npc_f_03", "figure_townswoman"], "at": [1.4, 2.0], "facing": 3.0}
+        {
+          "model": [
+            "dist_raftsman",
+            "cast_boatman",
+            "npc_m_04"
+          ],
+          "at": [
+            -0.7,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "barks": [
+            [
+              "Cechowy szczur!",
+              "Guild rat!"
+            ],
+            [
+              "Chodź tu!",
+              "Come here!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "dist_flemish_journeyman",
+            "dist_journeyman",
+            "npc_m_05"
+          ],
+          "at": [
+            0.7,
+            0
+          ],
+          "facing": -1.57,
+          "barks": [
+            [
+              "Przemytnik! Złodziej!",
+              "Smuggler! Thief!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_m_00",
+            "figure_townsman"
+          ],
+          "at": [
+            0,
+            2.2
+          ],
+          "facing": 3.1
+        },
+        {
+          "model": [
+            "npc_f_03",
+            "figure_townswoman"
+          ],
+          "at": [
+            1.4,
+            2.0
+          ],
+          "facing": 3.0
+        }
       ],
       "talk": "get between them",
       "dialogue": {
-        "brawl_start": {"lines": [["$npc", "Stay out of it, or pick a side! He says the guild weighs our salt short!"]],
+        "brawl_start": {
+          "lines": [
+            [
+              "$npc",
+              "Stay out of it, or pick a side! He says the guild weighs our salt short!"
+            ]
+          ],
           "choices": [
-            {"text": "Side with the raftsman", "action": "ev:brawl:raftsman", "next": "brawl_side"},
-            {"text": "Side with the journeyman", "action": "ev:brawl:guild", "next": "brawl_side"},
-            {"text": "Break it up before the watch comes", "action": "ev:brawl:break", "next": "brawl_broken"}
-          ]},
-        "brawl_side": {"lines": [["$npc", "Ha! Now it's a fair fight!"]]},
-        "brawl_broken": {"lines": [["$npc", "...Fine. Fine! Another night, cech-rat."]]}
+            {
+              "text": "Side with the raftsman",
+              "action": "ev:brawl:raftsman",
+              "next": "brawl_side"
+            },
+            {
+              "text": "Side with the journeyman",
+              "action": "ev:brawl:guild",
+              "next": "brawl_side"
+            },
+            {
+              "text": "Break it up before the watch comes",
+              "action": "ev:brawl:break",
+              "next": "brawl_broken"
+            }
+          ]
+        },
+        "brawl_side": {
+          "lines": [
+            [
+              "$npc",
+              "Ha! Now it's a fair fight!"
+            ]
+          ]
+        },
+        "brawl_broken": {
+          "lines": [
+            [
+              "$npc",
+              "...Fine. Fine! Another night, cech-rat."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "raftsman": {"influence": {"underworld": 3}, "notoriety": 3, "text": "You threw in with a raftsman in a tavern brawl. The guild noticed."},
-        "guild": {"influence": {"guilds": 3}, "notoriety": 3, "text": "You stood with a guild journeyman in a tavern brawl. The raftsmen noticed."},
-        "break": {"loyalty": {"guilds": 1, "underworld": 1}, "crackdown": -1, "text": "You broke up a brawl before the watch arrived."}
+        "raftsman": {
+          "influence": {
+            "underworld": 3
+          },
+          "notoriety": 3,
+          "text": "You threw in with a raftsman in a tavern brawl. The guild noticed."
+        },
+        "guild": {
+          "influence": {
+            "guilds": 3
+          },
+          "notoriety": 3,
+          "text": "You stood with a guild journeyman in a tavern brawl. The raftsmen noticed."
+        },
+        "break": {
+          "loyalty": {
+            "guilds": 1,
+            "underworld": 1
+          },
+          "crackdown": -1,
+          "text": "You broke up a brawl before the watch arrived."
+        }
       }
     },
     "lost_child": {
-      "hours": ["21:00", "23:30"], "notice": "A small girl is crying by herself in the snow.",
+      "hours": [
+        "21:00",
+        "23:30"
+      ],
+      "notice": "A small girl is crying by herself in the snow.",
       "actors": [
-        {"model": ["cast_child_f", "cast_urchin_f", "npc_f_07"], "at": [0, 0], "facing": 3.1, "key": true, "barks": [["Mamo! Mamusiu!", "Mama! Mummy!"]]}
+        {
+          "model": [
+            "cast_child_f",
+            "cast_urchin_f",
+            "npc_f_07"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 3.1,
+          "key": true,
+          "barks": [
+            [
+              "Mamo! Mamusiu!",
+              "Mama! Mummy!"
+            ]
+          ]
+        }
       ],
       "talk": "kneel by the child",
       "dialogue": {
-        "lost_child_start": {"lines": [["$npc", "I lost Mama at the well. She was talking to the other ladies about the soldier who... who..."]],
+        "lost_child_start": {
+          "lines": [
+            [
+              "$npc",
+              "I lost Mama at the well. She was talking to the other ladies about the soldier who... who..."
+            ]
+          ],
           "choices": [
-            {"text": "Take her to the west well", "action": "ev:lost_child:help", "next": "lost_child_mother"},
-            {"text": "Give her a ring-bread and point the way", "action": "ev:lost_child:point"}
-          ]},
-        "lost_child_mother": {"lines": [["Her mother", "Hania! Oh, God keep you, sir. Listen: you look like a man who wants to know things. The women at the well say..."]]}
+            {
+              "text": "Take her to the west well",
+              "action": "ev:lost_child:help",
+              "next": "lost_child_mother"
+            },
+            {
+              "text": "Give her a ring-bread and point the way",
+              "action": "ev:lost_child:point"
+            }
+          ]
+        },
+        "lost_child_mother": {
+          "lines": [
+            [
+              "Her mother",
+              "Hania! Oh, God keep you, sir. Listen: you look like a man who wants to know things. The women at the well say..."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "help": {"loyalty": {"street": 3}, "hear_loudest": 1, "text": "You brought a lost child back to her mother, who paid you in gossip."},
-        "point": {"text": ""}
+        "help": {
+          "loyalty": {
+            "street": 3
+          },
+          "hear_loudest": 1,
+          "text": "You brought a lost child back to her mother, who paid you in gossip."
+        },
+        "point": {
+          "text": ""
+        }
       }
     },
     "snowball_urchins": {
-      "hours": ["21:00", "22:40"], "notice": "Urchins are pelting a sentry with snowballs from behind a stall.",
+      "hours": [
+        "21:00",
+        "22:40"
+      ],
+      "notice": "Urchins are pelting a sentry with snowballs from behind a stall.",
       "actors": [
-        {"model": ["cast_urchin", "npc_m_07"], "at": [0, 0], "facing": 0.5, "key": true, "barks": [["Masz, szwabie!", "Take that, Kraut!"]]},
-        {"model": ["cast_urchin_f", "npc_f_07"], "at": [1.0, 0.4], "facing": 0.3, "barks": [["Hi hi hi!", "Hee hee!"]]},
-        {"model": ["cast_child", "npc_m_07"], "at": [-1.0, 0.5], "facing": 0.6}
+        {
+          "model": [
+            "cast_urchin",
+            "npc_m_07"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 0.5,
+          "key": true,
+          "barks": [
+            [
+              "Masz, szwabie!",
+              "Take that, Kraut!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "cast_urchin_f",
+            "npc_f_07"
+          ],
+          "at": [
+            1.0,
+            0.4
+          ],
+          "facing": 0.3,
+          "barks": [
+            [
+              "Hi hi hi!",
+              "Hee hee!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "cast_child",
+            "npc_m_07"
+          ],
+          "at": [
+            -1.0,
+            0.5
+          ],
+          "facing": 0.6
+        }
       ],
       "talk": "crouch by the urchins",
       "dialogue": {
-        "snowball_urchins_start": {"lines": [["$npc", "Shh! We're at war. Want to join the army of the Cloth Hall, mister?"]],
+        "snowball_urchins_start": {
+          "lines": [
+            [
+              "$npc",
+              "Shh! We're at war. Want to join the army of the Cloth Hall, mister?"
+            ]
+          ],
           "choices": [
-            {"text": "Throw one yourself", "action": "ev:snowball_urchins:join", "next": "snowball_urchins_join"},
-            {"text": "Pay them a coin to pelt the nearest guard when you whistle", "action": "coins:-1;ev:snowball_urchins:hire", "next": "snowball_urchins_hired", "need": ["coins>=1"]},
-            {"text": "Shoo them off before they're flogged", "action": "ev:snowball_urchins:shoo"}
-          ]},
-        "snowball_urchins_join": {"lines": [["$npc", "Right in the tricorne! You're one of us now."]]},
-        "snowball_urchins_hired": {"lines": [["$npc", "Consider him pelted."]]}
+            {
+              "text": "Throw one yourself",
+              "action": "ev:snowball_urchins:join",
+              "next": "snowball_urchins_join"
+            },
+            {
+              "text": "Pay them a coin to pelt the nearest guard when you whistle",
+              "action": "coins:-1;ev:snowball_urchins:hire",
+              "next": "snowball_urchins_hired",
+              "need": [
+                "coins>=1"
+              ]
+            },
+            {
+              "text": "Shoo them off before they're flogged",
+              "action": "ev:snowball_urchins:shoo"
+            }
+          ]
+        },
+        "snowball_urchins_join": {
+          "lines": [
+            [
+              "$npc",
+              "Right in the tricorne! You're one of us now."
+            ]
+          ]
+        },
+        "snowball_urchins_hired": {
+          "lines": [
+            [
+              "$npc",
+              "Consider him pelted."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "join": {"loyalty": {"street": 2}, "notoriety": 3, "text": "You pelted a sentry with snowballs alongside the urchins."},
-        "hire": {"loyalty": {"street": 1}, "text": "The urchins pelted a guard on your signal and drew him off his post."},
-        "shoo": {"text": ""}
+        "join": {
+          "loyalty": {
+            "street": 2
+          },
+          "notoriety": 3,
+          "text": "You pelted a sentry with snowballs alongside the urchins."
+        },
+        "hire": {
+          "loyalty": {
+            "street": 1
+          },
+          "text": "The urchins pelted a guard on your signal and drew him off his post."
+        },
+        "shoo": {
+          "text": ""
+        }
       }
     },
     "lamplighter": {
-      "hours": ["21:00", "23:59"], "special": "lamps", "notice": "The lamplighter is going round with his ladder and his can of oil.",
+      "hours": [
+        "21:00",
+        "23:59"
+      ],
+      "special": "lamps",
+      "notice": "The lamplighter is going round with his ladder and his can of oil.",
       "actors": [
-        {"model": ["town_lamplighter", "npc_m_01", "figure_townsman"], "at": [0, 0], "facing": 1.57, "key": true, "barks": [["Latarnie! Uwaga na drabinę!", "Lamps! Mind the ladder!"]]}
+        {
+          "model": [
+            "town_lamplighter",
+            "npc_m_01",
+            "figure_townsman"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "barks": [
+            [
+              "Latarnie! Uwaga na drabinę!",
+              "Lamps! Mind the ladder!"
+            ]
+          ]
+        }
       ],
       "talk": "talk to the lamplighter",
       "dialogue": {
-        "lamplighter_start": {"lines": [["$npc", "Evening. The magistrate pays me for oil and the Austrians fine me for dark corners. I'm poor either way."]],
+        "lamplighter_start": {
+          "lines": [
+            [
+              "$npc",
+              "Evening. The magistrate pays me for oil and the Austrians fine me for dark corners. I'm poor either way."
+            ]
+          ],
           "choices": [
-            {"text": "Pay him to 'run out of oil' on this corner (1 zł)", "action": "coins:-1;ev:lamplighter:dark", "next": "lamplighter_dark", "need": ["coins>=1"]},
-            {"text": "Ask what he sees on his rounds", "action": "ev:lamplighter:talk", "next": "lamplighter_talk"},
-            {"text": "Good night.", "action": "ev:lamplighter:none"}
-          ]},
-        "lamplighter_dark": {"lines": [["$npc", "Dear me, my can's empty. What a pity. These lanterns will have to wait till tomorrow."]]},
-        "lamplighter_talk": {"lines": [["$npc", "I see everything from a ladder, sir. Everything."]]}
+            {
+              "text": "Pay him to 'run out of oil' on this corner (1 zł)",
+              "action": "coins:-1;ev:lamplighter:dark",
+              "next": "lamplighter_dark",
+              "need": [
+                "coins>=1"
+              ]
+            },
+            {
+              "text": "Ask what he sees on his rounds",
+              "action": "ev:lamplighter:talk",
+              "next": "lamplighter_talk"
+            },
+            {
+              "text": "Good night.",
+              "action": "ev:lamplighter:none"
+            }
+          ]
+        },
+        "lamplighter_dark": {
+          "lines": [
+            [
+              "$npc",
+              "Dear me, my can's empty. What a pity. These lanterns will have to wait till tomorrow."
+            ]
+          ]
+        },
+        "lamplighter_talk": {
+          "lines": [
+            [
+              "$npc",
+              "I see everything from a ladder, sir. Everything."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "dark": {"text": "The lamplighter left a corner of the square dark for a złoty."},
-        "talk": {"hear_loudest": 1, "text": "A lamplighter told you what he sees from his ladder."},
-        "none": {"text": ""}
+        "dark": {
+          "text": "The lamplighter left a corner of the square dark for a złoty."
+        },
+        "talk": {
+          "hear_loudest": 1,
+          "text": "A lamplighter told you what he sees from his ladder."
+        },
+        "none": {
+          "text": ""
+        }
       }
     },
     "pamphlet_drop": {
-      "hours": ["21:30", "01:00"], "notice": "Pamphlets are fluttering down from an upper window. Someone has emptied a basket of them.",
+      "hours": [
+        "21:30",
+        "01:00"
+      ],
+      "notice": "Pamphlets are fluttering down from an upper window. Someone has emptied a basket of them.",
       "actors": [
-        {"model": ["npc_f_02", "figure_townswoman"], "at": [0.8, 0], "facing": 3.1, "key": true, "barks": [["Co to? 'Obywatele Krakowa...'", "What's this? 'Citizens of Kraków...'"]]},
-        {"model": ["npc_m_02", "figure_townsman"], "at": [-0.8, 0.4], "facing": 3.0}
+        {
+          "model": [
+            "npc_f_02",
+            "figure_townswoman"
+          ],
+          "at": [
+            0.8,
+            0
+          ],
+          "facing": 3.1,
+          "key": true,
+          "barks": [
+            [
+              "Co to? 'Obywatele Krakowa...'",
+              "What's this? 'Citizens of Kraków...'"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_m_02",
+            "figure_townsman"
+          ],
+          "at": [
+            -0.8,
+            0.4
+          ],
+          "facing": 3.0
+        }
       ],
       "talk": "pick up a pamphlet",
       "dialogue": {
-        "pamphlet_drop_start": {"lines": [["$npc", "'Citizens of Kraków, the Constitution is not dead.' Whoever dropped these is braver than wise."]],
+        "pamphlet_drop_start": {
+          "lines": [
+            [
+              "$npc",
+              "'Citizens of Kraków, the Constitution is not dead.' Whoever dropped these is braver than wise."
+            ]
+          ],
           "choices": [
-            {"text": "Gather an armful and carry them to people who'll read them", "action": "ev:pamphlet_drop:carry"},
-            {"text": "Read one and pocket it", "action": "ev:pamphlet_drop:read"},
-            {"text": "Help burn them before the watch comes", "action": "ev:pamphlet_drop:burn"}
-          ]}
+            {
+              "text": "Gather an armful and carry them to people who'll read them",
+              "action": "ev:pamphlet_drop:carry"
+            },
+            {
+              "text": "Read one and pocket it",
+              "action": "ev:pamphlet_drop:read"
+            },
+            {
+              "text": "Help burn them before the watch comes",
+              "action": "ev:pamphlet_drop:burn"
+            }
+          ]
+        }
       },
       "outcomes": {
-        "carry": {"loyalty": {"salon": 3, "street": 2}, "notoriety": 4, "text": "You carried an armful of someone else's pamphlets into the city."},
-        "read": {"hear": ["kollataj_letter"], "text": "A dropped pamphlet quoted a letter from Kołłątaj's prison."},
-        "burn": {"crackdown": -1, "loyalty": {"salon": -2}, "text": "You burned a stranger's pamphlets before the watch found them."}
+        "carry": {
+          "loyalty": {
+            "salon": 3,
+            "street": 2
+          },
+          "notoriety": 4,
+          "text": "You carried an armful of someone else's pamphlets into the city."
+        },
+        "read": {
+          "hear": [
+            "kollataj_letter"
+          ],
+          "text": "A dropped pamphlet quoted a letter from Kołłątaj's prison."
+        },
+        "burn": {
+          "crackdown": -1,
+          "loyalty": {
+            "salon": -2
+          },
+          "text": "You burned a stranger's pamphlets before the watch found them."
+        }
       }
     },
     "duel": {
-      "hours": ["23:00", "03:00"], "min_night": 3, "notice": "Two gentlemen in shirtsleeves are measuring paces in the snow. A duel.",
+      "hours": [
+        "23:00",
+        "03:00"
+      ],
+      "min_night": 3,
+      "notice": "Two gentlemen in shirtsleeves are measuring paces in the snow. A duel.",
       "actors": [
-        {"model": ["cast_magnate", "figure_noble", "npc_m_02"], "at": [-3, 0], "facing": 1.57, "key": true, "barks": [["Za honor Rzeczypospolitej!", "For the honour of the Commonwealth!"]]},
-        {"model": ["cast_officer", "watchman", "npc_m_06"], "at": [3, 0], "facing": -1.57, "barks": [["Für Seine Majestät!", "For His Majesty!"]]},
-        {"model": ["npc_m_00", "figure_townsman"], "at": [0, 2.5], "facing": 3.1}
+        {
+          "model": [
+            "cast_magnate",
+            "figure_noble",
+            "npc_m_02"
+          ],
+          "at": [
+            -3,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "barks": [
+            [
+              "Za honor Rzeczypospolitej!",
+              "For the honour of the Commonwealth!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "cast_officer",
+            "watchman",
+            "npc_m_06"
+          ],
+          "at": [
+            3,
+            0
+          ],
+          "facing": -1.57,
+          "barks": [
+            [
+              "Für Seine Majestät!",
+              "For His Majesty!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_m_00",
+            "figure_townsman"
+          ],
+          "at": [
+            0,
+            2.5
+          ],
+          "facing": 3.1
+        }
       ],
       "talk": "approach the Polish duellist",
       "dialogue": {
-        "duel_start": {"lines": [["$npc", "An Austrian lieutenant called my mother a Prussian. I need a second, and he needs a lesson."]],
+        "duel_start": {
+          "lines": [
+            [
+              "$npc",
+              "An Austrian lieutenant called my mother a Prussian. I need a second, and he needs a lesson."
+            ]
+          ],
           "choices": [
-            {"text": "Stand as his second", "action": "ev:duel:second", "next": "duel_second"},
-            {"text": "Stop it: a dead Austrian means a hundred arrests", "action": "ev:duel:stop", "next": "duel_stopped"},
-            {"text": "Wager on the Pole (2 zł)", "action": "test:loyalty:magnates>=45|duel_win|duel_lose", "need": ["coins>=2"]}
-          ]},
-        "duel_second": {"lines": [["$npc", "A true szlachcic! He fired wide; so did I. Honour is satisfied and the lieutenant will remember my face. And yours."]]},
-        "duel_stopped": {"lines": [["$npc", "...You may be right. The Commonwealth needs me alive and him embarrassed. Another night."]]},
-        "duel_win": {"enter": "coins:+2;ev:duel:won", "lines": [["$npc", "Ha! He dropped his pistol in the snow! Your purse is heavier, friend."]]},
-        "duel_lose": {"enter": "coins:-2;ev:duel:lost", "lines": [["$npc", "A graze. A graze! I am quite well. Your money is not."]]}
+            {
+              "text": "Stand as his second",
+              "action": "ev:duel:second",
+              "next": "duel_second"
+            },
+            {
+              "text": "Stop it: a dead Austrian means a hundred arrests",
+              "action": "ev:duel:stop",
+              "next": "duel_stopped"
+            },
+            {
+              "text": "Wager on the Pole (2 zł)",
+              "action": "test:loyalty:magnates>=45|duel_win|duel_lose",
+              "need": [
+                "coins>=2"
+              ]
+            }
+          ]
+        },
+        "duel_second": {
+          "lines": [
+            [
+              "$npc",
+              "A true szlachcic! He fired wide; so did I. Honour is satisfied and the lieutenant will remember my face. And yours."
+            ]
+          ]
+        },
+        "duel_stopped": {
+          "lines": [
+            [
+              "$npc",
+              "...You may be right. The Commonwealth needs me alive and him embarrassed. Another night."
+            ]
+          ]
+        },
+        "duel_win": {
+          "enter": "coins:+2;ev:duel:won",
+          "lines": [
+            [
+              "$npc",
+              "Ha! He dropped his pistol in the snow! Your purse is heavier, friend."
+            ]
+          ]
+        },
+        "duel_lose": {
+          "enter": "coins:-2;ev:duel:lost",
+          "lines": [
+            [
+              "$npc",
+              "A graze. A graze! I am quite well. Your money is not."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "second": {"loyalty": {"magnates": 4}, "crackdown": 2, "notoriety": 4, "text": "You stood second to a Polish noble in a dawn duel with an Austrian lieutenant."},
-        "stop": {"loyalty": {"church": 2, "magnates": -1}, "crackdown": -1, "text": "You stopped a duel between a Polish noble and an Austrian officer."},
-        "won": {"loyalty": {"magnates": 1}, "text": "You won a wager on a duel in the snow."},
-        "lost": {"text": "You lost a wager on a duel in the snow."}
+        "second": {
+          "loyalty": {
+            "magnates": 4
+          },
+          "crackdown": 2,
+          "notoriety": 4,
+          "text": "You stood second to a Polish noble in a dawn duel with an Austrian lieutenant."
+        },
+        "stop": {
+          "loyalty": {
+            "church": 2,
+            "magnates": -1
+          },
+          "crackdown": -1,
+          "text": "You stopped a duel between a Polish noble and an Austrian officer."
+        },
+        "won": {
+          "loyalty": {
+            "magnates": 1
+          },
+          "text": "You won a wager on a duel in the snow."
+        },
+        "lost": {
+          "text": "You lost a wager on a duel in the snow."
+        }
       }
     },
     "drunk_soldier": {
-      "hours": ["22:30", "03:00"], "notice": "An Austrian soldier is asleep in a doorway, dead drunk, his coat beside him in the snow.",
+      "hours": [
+        "22:30",
+        "03:00"
+      ],
+      "notice": "An Austrian soldier is asleep in a doorway, dead drunk, his coat beside him in the snow.",
       "actors": [
-        {"model": ["watchman", "npc_m_06"], "at": [0, 0], "facing": 3.1, "key": true, "clip": "sit", "barks": [["...Mutti...", "...Mummy..."]]}
+        {
+          "model": [
+            "watchman",
+            "npc_m_06"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 3.1,
+          "key": true,
+          "clip": "sit",
+          "barks": [
+            [
+              "...Mutti...",
+              "...Mummy..."
+            ]
+          ]
+        }
       ],
       "talk": "look at the sleeping soldier",
       "dialogue": {
-        "drunk_soldier_start": {"lines": [["$npc", "Zzz... Schnaps... zzz..."]],
+        "drunk_soldier_start": {
+          "lines": [
+            [
+              "$npc",
+              "Zzz... Schnaps... zzz..."
+            ]
+          ],
           "choices": [
-            {"text": "Take his coat (an Austrian uniform, for tonight)", "action": "flag:disguise_austrian;notor:+3;ev:drunk_soldier:coat", "next": "drunk_soldier_coat"},
-            {"text": "Cover him with it, before he freezes", "action": "ev:drunk_soldier:mercy"},
-            {"text": "Leave him.", "action": "ev:drunk_soldier:leave"}
-          ]},
-        "drunk_soldier_coat": {"lines": [["$you", "White coat, black facings. It smells of schnapps. Tonight it is a key to the watch post."]]}
+            {
+              "text": "Take his coat (an Austrian uniform, for tonight)",
+              "action": "flag:disguise_austrian;notor:+3;ev:drunk_soldier:coat",
+              "next": "drunk_soldier_coat"
+            },
+            {
+              "text": "Cover him with it, before he freezes",
+              "action": "ev:drunk_soldier:mercy"
+            },
+            {
+              "text": "Leave him.",
+              "action": "ev:drunk_soldier:leave"
+            }
+          ]
+        },
+        "drunk_soldier_coat": {
+          "lines": [
+            [
+              "$you",
+              "White coat, black facings. It smells of schnapps. Tonight it is a key to the watch post."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "coat": {"text": "You stole a sleeping soldier's coat and wore it into the watch's zones."},
-        "mercy": {"loyalty": {"church": 1}, "text": "You covered a drunken Austrian so he would not freeze. Someone saw, and thought well of it."},
-        "leave": {"text": ""}
+        "coat": {
+          "text": "You stole a sleeping soldier's coat and wore it into the watch's zones."
+        },
+        "mercy": {
+          "loyalty": {
+            "church": 1
+          },
+          "text": "You covered a drunken Austrian so he would not freeze. Someone saw, and thought well of it."
+        },
+        "leave": {
+          "text": ""
+        }
       }
     },
     "flogging_crowd": {
-      "hours": ["23:15", "23:50"], "special": "flogging", "at": [-11.5, 26.0], "notice": "The drum by the Town Hall: a flogging, and a crowd gathering to watch.",
+      "hours": [
+        "23:15",
+        "23:50"
+      ],
+      "special": "flogging",
+      "at": [
+        -11.5,
+        26.0
+      ],
+      "notice": "The drum by the Town Hall: a flogging, and a crowd gathering to watch.",
       "actors": [
-        {"model": ["npc_f_06", "figure_townswoman"], "at": [0.8, 0], "facing": 3.1, "key": true, "barks": [["Za piosenkę! Za jedną piosenkę!", "For a song! For one song!"]]},
-        {"model": ["npc_m_03", "figure_townsman"], "at": [-0.8, 0.3], "facing": 3.1},
-        {"model": ["dist_peasant_f", "npc_f_02"], "at": [0, 1.0], "facing": 3.1}
+        {
+          "model": [
+            "npc_f_06",
+            "figure_townswoman"
+          ],
+          "at": [
+            0.8,
+            0
+          ],
+          "facing": 3.1,
+          "key": true,
+          "barks": [
+            [
+              "Za piosenkę! Za jedną piosenkę!",
+              "For a song! For one song!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "npc_m_03",
+            "figure_townsman"
+          ],
+          "at": [
+            -0.8,
+            0.3
+          ],
+          "facing": 3.1
+        },
+        {
+          "model": [
+            "dist_peasant_f",
+            "npc_f_02"
+          ],
+          "at": [
+            0,
+            1.0
+          ],
+          "facing": 3.1
+        }
       ],
       "talk": "stand with the crowd",
       "dialogue": {
-        "flogging_crowd_start": {"lines": [["$npc", "Twenty-five strokes for singing the Mazurek. He's seventeen."]],
+        "flogging_crowd_start": {
+          "lines": [
+            [
+              "$npc",
+              "Twenty-five strokes for singing the Mazurek. He's seventeen."
+            ]
+          ],
           "choices": [
-            {"text": "Stand silent in the crowd (you are hidden among them)", "action": "ev:flogging_crowd:blend"},
-            {"text": "Shout \"Shame!\"", "action": "ev:flogging_crowd:shame", "next": "flogging_crowd_shame"},
-            {"text": "Push through and give the boy water afterwards", "action": "ev:flogging_crowd:water"}
-          ]},
-        "flogging_crowd_shame": {"lines": [["$npc", "Shame! Shame! ...They're looking this way. God help us."]]}
+            {
+              "text": "Stand silent in the crowd (you are hidden among them)",
+              "action": "ev:flogging_crowd:blend"
+            },
+            {
+              "text": "Shout \"Shame!\"",
+              "action": "ev:flogging_crowd:shame",
+              "next": "flogging_crowd_shame"
+            },
+            {
+              "text": "Push through and give the boy water afterwards",
+              "action": "ev:flogging_crowd:water"
+            }
+          ]
+        },
+        "flogging_crowd_shame": {
+          "lines": [
+            [
+              "$npc",
+              "Shame! Shame! ...They're looking this way. God help us."
+            ]
+          ]
+        }
       },
       "outcomes": {
-        "blend": {"notoriety": -3, "text": "You stood hidden in the flogging crowd while the drum counted."},
-        "shame": {"loyalty": {"street": 4}, "crackdown": 2, "notoriety": 5, "seed": ["flogging_shame"], "text": "You shouted 'Shame!' at a flogging and the crowd took it up."},
-        "water": {"loyalty": {"street": 2, "church": 2}, "text": "You gave a flogged boy water under the soldiers' eyes."}
+        "blend": {
+          "notoriety": -3,
+          "text": "You stood hidden in the flogging crowd while the drum counted."
+        },
+        "shame": {
+          "loyalty": {
+            "street": 4
+          },
+          "crackdown": 2,
+          "notoriety": 5,
+          "seed": [
+            "flogging_shame"
+          ],
+          "text": "You shouted 'Shame!' at a flogging and the crowd took it up."
+        },
+        "water": {
+          "loyalty": {
+            "street": 2,
+            "church": 2
+          },
+          "text": "You gave a flogged boy water under the soldiers' eyes."
+        }
+      }
+    },
+    "corpse_carried": {
+      "interior": "int_undercroft",
+      "local": [
+        [
+          0.5,
+          -4.0
+        ],
+        [
+          -1.0,
+          -8.0
+        ]
+      ],
+      "hours": [
+        "21:00",
+        "04:00"
+      ],
+      "notice": "Two men are dragging something long in a sack along the culvert. It is not salt.",
+      "actors": [
+        {
+          "model": [
+            "dist_porter",
+            "npc_m_04"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 1.57,
+          "key": true,
+          "barks": [
+            [
+              "Ciężki, cholera. Tłuszcz z Austriackiego chleba.",
+              "Heavy, damn him. Fat on Austrian bread."
+            ]
+          ]
+        },
+        {
+          "model": [
+            "dist_tanner",
+            "npc_m_03"
+          ],
+          "at": [
+            1.2,
+            0.2
+          ],
+          "facing": 1.57
+        }
+      ],
+      "talk": "stop the carriers",
+      "dialogue": {
+        "corpse_carried_start": {
+          "lines": [
+            [
+              "$npc",
+              "Evening. Don't mind us. He's going for a swim. He doesn't mind either, any more."
+            ]
+          ],
+          "choices": [
+            {
+              "text": "Who was he?",
+              "tone": "blunt",
+              "action": "ev:corpse_carried:ask",
+              "next": "corpse_who"
+            },
+            {
+              "text": "Mind you don't drop him in the drinking well.",
+              "tone": "joke",
+              "action": "ev:corpse_carried:joke",
+              "next": "corpse_joke",
+              "on_bad": "corpse_cold"
+            },
+            {
+              "text": "I saw nothing.",
+              "action": "ev:corpse_carried:nothing"
+            }
+          ]
+        },
+        "corpse_who": {
+          "lines": [
+            [
+              "$npc",
+              "Informer. Sold three raftsmen to the Polizei. The river keeps its own accounts."
+            ]
+          ]
+        },
+        "corpse_joke": {
+          "lines": [
+            [
+              "$npc",
+              "Ha! He'd poison it out of spite. You're all right. Here's a free one: Wilk pays for every informer we sink."
+            ]
+          ],
+          "enter": "hear:wilk_tithe"
+        },
+        "corpse_cold": {
+          "lines": [
+            [
+              "$npc",
+              "Funny. Walk on."
+            ]
+          ]
+        }
+      },
+      "outcomes": {
+        "ask": {
+          "hear_loudest": 1,
+          "text": "You watched an informer's body go down the drains to the river."
+        },
+        "joke": {
+          "loyalty": {
+            "underworld": 2
+          },
+          "text": "You traded black jokes with two men sinking an informer in the drains."
+        },
+        "nothing": {
+          "text": ""
+        }
+      }
+    },
+    "dog_fight": {
+      "interior": "int_undercroft",
+      "local": [
+        [
+          -0.5,
+          -6.0
+        ],
+        [
+          1.0,
+          -9.0
+        ]
+      ],
+      "hours": [
+        "21:30",
+        "03:00"
+      ],
+      "notice": "Shouts and snarling from a lit cellar: a dog fight, with money on it.",
+      "actors": [
+        {
+          "model": [
+            "dist_horse_dealer",
+            "npc_m_02"
+          ],
+          "at": [
+            0,
+            0
+          ],
+          "facing": 0.0,
+          "key": true,
+          "barks": [
+            [
+              "Stawiajcie! Dwa złote na Burka!",
+              "Place your bets! Two złoty on Burek!"
+            ]
+          ]
+        },
+        {
+          "model": [
+            "dog_mongrel",
+            "dog_hound"
+          ],
+          "at": [
+            0.8,
+            -1.2
+          ],
+          "facing": 1.0
+        },
+        {
+          "model": [
+            "dog_ogar",
+            "dog_mongrel"
+          ],
+          "at": [
+            -0.8,
+            -1.2
+          ],
+          "facing": -2.0
+        },
+        {
+          "model": [
+            "npc_m_00",
+            "figure_townsman"
+          ],
+          "at": [
+            1.6,
+            0.6
+          ],
+          "facing": 3.1
+        }
+      ],
+      "talk": "talk to the bookmaker",
+      "dialogue": {
+        "dog_fight_start": {
+          "lines": [
+            [
+              "$npc",
+              "Two złoty on Burek, two on the Austrian's hound. The Austrian's hound has better rations; Burek has better reasons."
+            ]
+          ],
+          "choices": [
+            {
+              "text": "Two on Burek (2 zł)",
+              "need": [
+                "coins>=2"
+              ],
+              "tone": "bribe",
+              "action": "test:loyalty:street>=45|dog_win|dog_lose"
+            },
+            {
+              "text": "Let the dogs go and stop this.",
+              "tone": "appeal-to-faith",
+              "action": "ev:dog_fight:stop",
+              "next": "dog_stop"
+            },
+            {
+              "text": "Walk on.",
+              "action": "ev:dog_fight:walk"
+            }
+          ]
+        },
+        "dog_win": {
+          "enter": "coins:+2;ev:dog_fight:won",
+          "lines": [
+            [
+              "$npc",
+              "Burek! Burek! Your purse is fatter, friend, and the Austrian's is thinner. Best kind of night."
+            ]
+          ]
+        },
+        "dog_lose": {
+          "enter": "coins:-2;ev:dog_fight:lost",
+          "lines": [
+            [
+              "$npc",
+              "Rations win again. Such is empire."
+            ]
+          ]
+        },
+        "dog_stop": {
+          "lines": [
+            [
+              "$npc",
+              "And go where? Up there? Up there they flog men for songs. Down here it's only dogs. ...Fine. Show's over."
+            ]
+          ]
+        }
+      },
+      "outcomes": {
+        "won": {
+          "loyalty": {
+            "underworld": 1
+          },
+          "text": "You won two złoty on a dog fight in the drains."
+        },
+        "lost": {
+          "text": "You lost two złoty on a dog fight in the drains."
+        },
+        "stop": {
+          "loyalty": {
+            "church": 1,
+            "underworld": -1
+          },
+          "text": "You broke up a dog fight under the Rynek."
+        },
+        "walk": {
+          "text": ""
+        }
       }
     }
   }

@@ -66,7 +66,7 @@ func _physics_process(delta: float) -> void:
 	var ev: Array = db.get("every", [5, 9])
 	_next_at = GameState.clock_minutes + _rng.randf_range(float(ev[0]), float(ev[1]))
 	var p := _player()
-	if p == null or p.global_position.y < -50.0 or runner.dialogue_open():
+	if p == null or runner.dialogue_open():
 		return
 	var ids: Array = eligible()
 	if ids.is_empty():
@@ -103,6 +103,20 @@ func eligible() -> Array:
 
 
 func _anchor(e: Dictionary, p: Vector3) -> Variant:
+	if e.has("interior"):
+		var it: Node = runner.interiors
+		if it == null or not it.has_method("inside"):
+			return null
+		var room := str(it.inside())
+		var want := str(e["interior"])
+		if room == "" or not room.begins_with(want):
+			return null
+		var o: Vector3 = it.interior_origin(room)
+		var loc: Array = e.get("local", [[0, -4]])
+		var l: Array = loc[_rng.randi() % loc.size()]
+		return o + Vector3(float(l[0]), 0.05, float(l[1]))
+	if p.y < -50.0:
+		return null
 	if e.has("at"):
 		var a := Vector3(float(e["at"][0]), 0, float(e["at"][1]))
 		return a if Vector2(a.x - p.x, a.z - p.z).length() < 45.0 else null
@@ -199,7 +213,7 @@ func _manage(delta: float) -> void:
 	var light: Variant = active.get("light")
 	if light != null and is_instance_valid(light):
 		(light as OmniLight3D).light_energy = 3.2 + 1.4 * sin(now * 13.0) * sin(now * 5.3)
-	var gone := p != null and p.global_position.y > -50.0 and p.global_position.distance_to(active["anchor"]) > 75.0
+	var gone := p != null and p.global_position.distance_to(active["anchor"]) > 75.0
 	var late := now - float(active["t0"]) > float(db.get("timeout", 110))
 	var over := float(active["done_at"]) > 0.0 and now - float(active["done_at"]) > 10.0
 	if (gone or late or over) and not runner.dialogue_open():

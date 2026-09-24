@@ -1,5 +1,5 @@
 {
-  "_doc": "The campaign (scripts/mission/campaign.gd, docs/GDD.md 'Campaign'). Seven nights, one per `arc` entry: the first `options` entry whose `if` conditions hold is tonight's mission (conditions: camp:<flag>, lever:<id>, found:<person>, heard:<rumour>, rumour:<rumour> (taken hold or planted), night:<mission> (won), lost:<mission>, crackdown>=N, notoriety>=N, loyalty:<faction>>=N, influence:<faction>>=N, origin:<a|b>, gender:<m|f>, coins>=N; '!' negates). Each night takes one `institution` from the occupier when won. Day: `actions_per_day` actions (one more after a won night), chosen from `day_actions` (effects: influence, loyalty, fear, strength, crackdown, coins, notoriety, camp flags, tonight flags, hear: [rumours], levers), plus planting a rumour through a `channel` and choosing one lead to follow. `people`: persons to find; each is brought into the night by following the lead of its rumour (or by a rumour's `camp` flag like deserter_in_open) and yields a `lever` when spoken to; `meet` is the day meeting once found. `endings`: first match after the seventh night. `estimate`: pacing constants for `[smoke] campaign est_minutes`. `relations`: rival pairs (weight w): an influence gain of D with one side costs the other round(D*w) loyalty; if one side's influence exceeds the other's by more than `arms_length_gap` the lesser keeps you at arm's length (its influence gates fail until you make amends in the day phase). `grievance`: neglect (no influence gained for `neglect_nights` nights) or a broken promise raises it; at `sabotage_at` or more the faction sabotages the next night (`sabotage` kinds) unless appeased. `urchins`: the passage children's day and night trade in news (they lie with chance 1 - (truth_base + street influence x truth_per_street)). `heirs`: people who can take up the movement if the figurehead dies (origin-like modifiers). `historical`: real people (docs/HISTORY.md).",
+  "_doc": "The campaign (scripts/mission/campaign.gd, docs/GDD.md 'Campaign'). Seven nights, one per `arc` entry: the first `options` entry whose `if` conditions hold is tonight's mission (conditions: camp:<flag>, lever:<id>, found:<person>, heard:<rumour>, rumour:<rumour> (taken hold or planted), night:<mission> (won), lost:<mission>, crackdown>=N, notoriety>=N, loyalty:<faction>>=N, influence:<faction>>=N, origin:<a|b>, gender:<m|f>, coins>=N; '!' negates). Each night takes one `institution` from the occupier when won. Day: `actions_per_day` actions (one more after a won night), chosen from `day_actions` (effects: influence, loyalty, fear, strength, crackdown, coins, notoriety, camp flags, tonight flags, hear: [rumours], levers), plus planting a rumour through a `channel` and choosing one lead to follow. `people`: persons to find; each is brought into the night by following the lead of its rumour (or by a rumour's `camp` flag like deserter_in_open) and yields a `lever` when spoken to; `meet` is the day meeting once found. `endings`: first match after the seventh night. `estimate`: pacing constants for `[smoke] campaign est_minutes`. `relations`: rival pairs (weight w): an influence gain of D with one side costs the other round(D*w) loyalty; if one side's influence exceeds the other's by more than `arms_length_gap` the lesser keeps you at arm's length (its influence gates fail until you make amends in the day phase). `grievance`: neglect (no influence gained for `neglect_nights` nights) or a broken promise raises it; at `sabotage_at` or more the faction sabotages the next night (`sabotage` kinds) unless appeased. `urchins`: the passage children's day and night trade in news (they lie with chance 1 - (truth_base + street influence x truth_per_street)). `heirs`: people who can take up the movement if the figurehead dies (origin-like modifiers). `historical`: real people (docs/HISTORY.md). `side_quests`: a lead package merged into tonight's mission when its rumour's lead is followed (npcs, items, talk, dialogue, optional objectives, map marks); `entrances` are symbolic door ids of data/interiors.json (the undercroft's grates and outfall).",
   "actions_per_day": 2,
   "bonus_action_after_win": 1,
   "arc": [
@@ -1345,6 +1345,295 @@
       "cynical-merchant": "Now you speak my language. A crumb, free:",
       "ambitious": "You see me clearly. Few do. Listen:",
       "default": "You've a way with you. Listen:"
+    }
+  },
+  "undercroft": {
+    "room": "int_undercroft",
+    "entrances": {
+      "well_grate": "door_grate_well",
+      "cloth_hall_grate": "door_grate_cloth_hall",
+      "laundry_grate": "door_grate_laundry",
+      "outfall": "door_undercroft_outfall"
+    },
+    "note": "Symbolic ids until the interiors agent reports the real door names; the runner falls back to a message when a door is missing."
+  },
+  "side_quests": {
+    "fences_ledger": {
+      "title": "The Fence's Ledger",
+      "label": "Follow the lead: Pan Kuna, the fence under the Rynek",
+      "objectives": [
+        {
+          "id": "sq_kuna",
+          "text": "Go down the well grate and deal with Pan Kuna the fence (trade, rob, or turn him)",
+          "optional": true
+        },
+        {
+          "id": "sq_evidence",
+          "text": "Find what lies in the dump alcove",
+          "optional": true
+        }
+      ],
+      "map_marks": {
+        "sq_kuna": [
+          -11.6,
+          5.0
+        ],
+        "sq_evidence": [
+          -11.6,
+          5.0
+        ]
+      },
+      "npcs": [
+        {
+          "id": "kuna",
+          "model": [
+            "dist_moneylender",
+            "dist_tavern_keeper",
+            "npc_m_01"
+          ],
+          "interior": "int_undercroft",
+          "pos": [
+            1.5,
+            0,
+            -7.0
+          ],
+          "facing": 0.0,
+          "behaviour": "stand",
+          "clip": "idle",
+          "role": "Pan Kuna, the fence under the Rynek"
+        },
+        {
+          "id": "kuna_heavy",
+          "model": [
+            "dist_porter",
+            "cast_hajduk",
+            "npc_m_04"
+          ],
+          "interior": "int_undercroft",
+          "pos": [
+            -1.2,
+            0,
+            -5.5
+          ],
+          "facing": 1.2,
+          "behaviour": "stand",
+          "clip": "idle",
+          "role": "Kuna's doorman, a slab of a man"
+        }
+      ],
+      "items": [
+        {
+          "id": "well_grate",
+          "pos": [
+            -11.6,
+            0,
+            5.0
+          ],
+          "model": "box",
+          "name": "The well grate",
+          "scale": 0.6,
+          "rules": [
+            {
+              "prompt": "climb down the well grate",
+              "action": "below:well_grate"
+            }
+          ]
+        },
+        {
+          "id": "dump",
+          "interior": "int_undercroft",
+          "pos": [
+            3.2,
+            0,
+            -10.0
+          ],
+          "model": "box",
+          "name": "The dump alcove",
+          "rules": [
+            {
+              "if": [
+                "flag:sq_evidence"
+              ],
+              "prompt": ""
+            },
+            {
+              "prompt": "look in the dump alcove",
+              "action": "flag:sq_evidence;lever:body_evidence;obj:sq_evidence;msg:dump"
+            }
+          ]
+        },
+        {
+          "id": "kuna_ledger",
+          "interior": "int_undercroft",
+          "pos": [
+            2.2,
+            0,
+            -7.6
+          ],
+          "model": "book",
+          "name": "Kuna's ledger",
+          "hidden": true,
+          "rules": [
+            {
+              "if": [
+                "flag:sq_ledger"
+              ],
+              "prompt": ""
+            },
+            {
+              "prompt": "take the fence's ledger",
+              "action": "flag:sq_ledger;lever:fence_ledger;coins:+6;obj:sq_kuna;camp:kuna_robbed"
+            }
+          ]
+        }
+      ],
+      "takedown": [
+        "kuna",
+        "kuna_heavy"
+      ],
+      "on_takedown": {
+        "kuna": "showitem:kuna_ledger;msg:kuna_down"
+      },
+      "texts": {
+        "dump": "Under sacking in the alcove: one of Wilk's collectors, three days dead, with Kuna's knife still in him. Evidence, if you can stomach carrying the tale.",
+        "kuna_down": "Kuna folds over his scales. His ledger lies open on the table.",
+        "below_missing": "The grate is rusted shut tonight. (The drains are not open yet.)"
+      },
+      "talk": {
+        "kuna": {
+          "name": "Pan Kuna",
+          "personality": "cynical-merchant",
+          "temper": 0.5,
+          "rules": [
+            {
+              "if": [
+                "done:sq_kuna"
+              ],
+              "node": "kuna_after",
+              "prompt": "talk to Kuna"
+            },
+            {
+              "node": "kuna_hello",
+              "prompt": "talk to the fence"
+            }
+          ]
+        }
+      },
+      "dialogue": {
+        "kuna_hello": {
+          "lines": [
+            [
+              "$npc",
+              "Down here we don't ask names, we ask prices. Candlesticks, watches, Austrian buttons: I weigh everything, even consciences."
+            ],
+            [
+              "$npc",
+              "Wilk takes a third of my trade. You look like someone who'd take less."
+            ]
+          ],
+          "choices": [
+            {
+              "id": "trade",
+              "text": "Sell him the pages you tore from the Corporal's ledger (+5 zł)",
+              "need": [
+                "camp:rota_stolen"
+              ],
+              "tone": "bribe",
+              "action": "coins:+5;obj:sq_kuna;camp:kuna_traded",
+              "next": "kuna_trade"
+            },
+            {
+              "id": "turn",
+              "text": "Work for the movement, not for Wilk.",
+              "need": [
+                "influence:underworld>=20|lever:body_evidence"
+              ],
+              "tone": "blunt",
+              "action": "obj:sq_kuna;camp:fence_turned;hear:wilk_cards;hear:wilk_barge",
+              "next": "kuna_turned"
+            },
+            {
+              "id": "blackmail",
+              "text": "Wilk's collector is in your dump alcove with your knife in him.",
+              "need": [
+                "lever:body_evidence"
+              ],
+              "tone": "threat",
+              "action": "obj:sq_kuna;camp:fence_turned;camp:kuna_blackmailed;hear:wilk_bathhouse",
+              "next": "kuna_blackmailed"
+            },
+            {
+              "text": "Your scales are crooked, Kuna.",
+              "tone": "joke",
+              "next": "kuna_joke"
+            },
+            {
+              "text": "Just looking.",
+              "action": "leave"
+            }
+          ]
+        },
+        "kuna_trade": {
+          "lines": [
+            [
+              "$npc",
+              "The Corporal's own hand. The Austrians would pay double to get these back, and I'll sell them to them, twice. Pleasure."
+            ]
+          ]
+        },
+        "kuna_turned": {
+          "lines": [
+            [
+              "$npc",
+              "A third to Wilk, or nothing to a cause. ...Nothing to a cause. At least a cause doesn't break fingers. Wilk plays cards behind the fishermen's tavern and checks his barges himself."
+            ]
+          ]
+        },
+        "kuna_blackmailed": {
+          "lines": [
+            [
+              "$npc",
+              "...You've a nose for the dead. Fine. Fine! I'm yours. He takes the steam at the riverside bathhouse at twenty to eleven. Now get out of my cellar."
+            ]
+          ]
+        },
+        "kuna_joke": {
+          "lines": [
+            [
+              "$npc",
+              "Everybody's scales are crooked. Mine are crooked in your favour, today."
+            ]
+          ]
+        },
+        "kuna_after": {
+          "lines": [
+            [
+              "$npc",
+              "Mind the flooded stretch. Things float in it."
+            ]
+          ]
+        }
+      },
+      "effects": {
+        "kuna_robbed": {
+          "loyalty": {
+            "underworld": -5
+          },
+          "text": "You robbed the fence under the Rynek; the Underworld marks it."
+        },
+        "fence_turned": {
+          "loyalty": {
+            "underworld": 3
+          },
+          "text": "Pan Kuna sells to the movement now, not to Wilk."
+        },
+        "kuna_traded": {
+          "influence": {
+            "underworld": 2
+          },
+          "text": "You traded with the fence below the Rynek."
+        }
+      }
     }
   }
 }

@@ -83,6 +83,11 @@ var _riot_at := -1.0
 var _decoded_lead := ""
 static var capture_in_smoke := false   ## the campaign smoke tests the capture loop
 var stats := {"tones": 0, "personalities": {}, "branches": 0}
+## Tonight's conduct for the dawn score card (Campaign.score_night): times seen, runners that reached the
+## Corporal, guards downed (in the open), kills, noise, collateral, bodies found, methods and allies used.
+var score := {"spotted": 0, "runners": 0, "knockouts": 0, "fights": 0, "kills": 0, "noise": 0, "collateral": 0, "bodies": 0,
+		"methods": {}, "allies": {}, "coins0": 0, "clock0": 0.0, "slips": 0, "captured": false}
+var _last_spot := -10.0
 static var tone_stats := {"tones": 0, "personalities": {}, "branches": 0}   ## all nights (smoke)
 
 
@@ -160,6 +165,9 @@ func _spawn_npcs() -> void:
 	for e in data.get("npcs", []):
 		if e.has("interior") and interiors:
 			var o: Vector3 = interiors.interior_origin(str(e["interior"]))
+			if o == Vector3.INF:
+				push_warning("Mission: no room '%s' for %s" % [e["interior"], e.get("id", "?")])
+				continue
 			if o != Vector3.INF:
 				var e2: Dictionary = e.duplicate()
 				var pp: Array = e["pos"]
@@ -768,11 +776,31 @@ func _campaign_ready() -> void:
 				GameState.coins = maxi(GameState.coins - 3, 0)
 			"tongue":
 				GameState.add_notoriety(15.0)
+	_merge_side_quest()
 	_spawn_items()
 	_zones = data.get("zones", []).duplicate(true)
 	_timers = data.get("timers", []).duplicate(true)
 	_spawn_people()
 	_urchin_contacts()
+	score["coins0"] = GameState.coins
+	score["clock0"] = GameState.clock_minutes
+	var wt: Variant = world.get("watch")
+	if wt:
+		if wt.has_signal("player_spotted"):
+			wt.player_spotted.connect(func(_g: Node, _p: Vector3) -> void:
+				var now := Time.get_ticks_msec() / 1000.0
+				if now - _last_spot > 4.0:
+					score["spotted"] = int(score["spotted"]) + 1
+				_last_spot = now)
+		if wt.has_signal("runner_arrived"):
+			wt.runner_arrived.connect(func(_g: Node) -> void: score["runners"] = int(score["runners"]) + 1)
+		if wt.has_signal("guard_downed"):
+			wt.guard_downed.connect(func(_g: Node, in_fight: bool, _w: Node) -> void:
+				score["knockouts"] = int(score["knockouts"]) + 1
+				if in_fight:
+					score["fights"] = int(score["fights"]) + 1)
+		if wt.has_signal("body_found"):
+			wt.body_found.connect(func(_b: Node, _f: Node) -> void: score["bodies"] = int(score["bodies"]) + 1)
 	_kingpin_setup()
 	events = EventsScript.new()
 	events.name = "Events"
@@ -884,6 +912,7 @@ func _num(s: String) -> int:
 func _verb(v: String, id: String) -> String:
 	var key := v.get_slice(":", 0)
 	var arg := v.substr(key.length() + 1) if ":" in v else ""
+	_score_verb(key, arg)
 	var p := player()
 	var lines: Array = []
 	match key:
@@ -1040,6 +1069,14 @@ func _verb(v: String, id: String) -> String:
 			_mob_start()
 		"frisk_ok":
 			Mission.set_flag("frisk_ok")
+		"below":
+			var ents: Dictionary = camp.db.get("undercroft", {}).get("entrances", {}) if camp else {}
+			var door := str(ents.get(arg, arg))
+			if interiors == null or p == null or not interiors.enter_now(p, door):
+				Mission.message.emit(str(data.get("texts", {}).get("below_missing", "The grate will not budge.")), 3.5)
+			else:
+				Mission.set_flag("below")
+				score["methods"]["the drains"] = true
 		"slip":
 			_slip_away()
 		"cells":
@@ -1413,6 +1450,7 @@ func _slip_away() -> void:
 	var p := player()
 	if p == null or _checkpoint.is_empty():
 		return
+	score["slips"] = int(score["slips"]) + 1
 	slips_left -= 1
 	Mission.objectives = (_checkpoint["objectives"] as Array).duplicate(true)
 	Mission.flags = (_checkpoint["flags"] as Dictionary).duplicate(true)
@@ -1436,6 +1474,7 @@ func _slip_away() -> void:
 func _to_cells() -> void:
 	var p := player()
 	captured = true
+	score["captured"] = true
 	Mission.set_flag("captured")
 	if p == null:
 		return
@@ -1576,7 +1615,7 @@ func _break_out() -> void:
 	for g in get_tree().get_nodes_in_group("guards"):
 		if world.is_ancestor_of(g):
 			g.sight_modifiers.append(func(_g: Node, _p: Node) -> float: return 1.2)
-	Mission.announcement.emit("Out through the window into the laundry yard. 3 a.m., and every soldier is looking for you.", 5.0)
+	Mission.announcement.emit("Out through the window, down the old well shaft into the drains, and up through the laundry grate. 3 a.m., and every soldier is looking for you.", 5.0)
 	print("[mission] broke out of the cells at %s" % GameState.time_string())
 
 
@@ -1728,6 +1767,10 @@ func _kill(method: String) -> String:
 	var k := kingpin()
 	if kill_method != "" or k == null:
 		return ""
+	score["kills"] = int(score["kills"]) + 1
+	score["methods"][method] = true
+	if method in ["pistol", "riot", "guillotine", "fire"]:
+		score["noise"] = int(score["noise"]) + 1
 	kill_method = method
 	Mission.set_flag("killed")
 	Mission.set_flag("killed_" + method)
@@ -1747,3 +1790,117 @@ func _kill(method: String) -> String:
 			g.suspicion = 100.0
 	print("[mission] kingpin killed: %s at %s" % [method, GameState.time_string()])
 	return ""
+
+
+# ------------------------------------------------------------------ score card data
+
+func _score_verb(key: String, arg: String) -> void:
+	match key:
+		"disguise":
+			if arg == "on":
+				score["methods"]["disguise"] = true
+		"flag":
+			if arg.begins_with("disguise_") or arg in ["masked", "laundress", "drunk_act", "invited"]:
+				score["methods"]["disguise"] = true
+			elif arg.begins_with("poisoned") or arg == "hauer_poisoned":
+				score["methods"]["poison"] = true
+			elif arg in ["riot_on"]:
+				score["noise"] = int(score["noise"]) + 1
+				score["collateral"] = int(score["collateral"]) + 1
+				score["allies"]["the crowd"] = true
+			elif arg in ["batman_bribed", "informer_bribed"]:
+				score["methods"]["bribe"] = true
+			elif arg == "omen_told" or arg == "canon_away":
+				score["methods"]["superstition"] = true
+		"fire":
+			score["noise"] = int(score["noise"]) + 1
+			score["collateral"] = int(score["collateral"]) + 2
+			score["methods"]["fire"] = true
+		"mob":
+			score["noise"] = int(score["noise"]) + 1
+			score["collateral"] = int(score["collateral"]) + 1
+			score["allies"]["the raftsmen"] = true
+		"plant":
+			score["methods"]["rumour"] = true
+		"lure", "send":
+			score["methods"]["distraction"] = true
+		"urchin":
+			score["allies"]["the urchins"] = true
+		"camp":
+			if arg == "miracle_staged":
+				score["methods"]["miracle"] = true
+
+
+## Tonight's score inputs, read by Campaign.score_night at dawn.
+func score_card() -> Dictionary:
+	var sc := score.duplicate(true)
+	if Mission.has_flag("urchins_hired"):
+		sc["allies"]["the urchins"] = true
+	if Mission.has_flag("brothel_room") or Mission.has_flag("brothel_room_used") or Mission.has_flag("gossip_rota"):
+		sc["allies"]["Mother Weronika"] = true
+	if Mission.has_flag("decoy_planted"):
+		sc["methods"]["false leaf"] = true
+	if Mission.has_flag("slipped"):
+		sc["methods"]["slipping away"] = true
+	if events and events.fired.size() > 0:
+		sc["events"] = events.fired.size()
+	sc["alarms"] = GameState.night_alarm_count
+	sc["minutes"] = int(GameState.clock_minutes - float(sc["clock0"]))
+	sc["spent"] = maxi(int(sc["coins0"]) - GameState.coins, 0)
+	sc["approach"] = Mission.approach
+	return sc
+
+
+# ------------------------------------------------------------------ side quests (campaign.json side_quests)
+
+## Tonight's lead may be a side quest: merge its people, items, talk, texts and optional objectives.
+func _merge_side_quest() -> void:
+	if camp == null or GameState.campaign.is_empty():
+		return
+	var sq: Dictionary = camp.side_quest_tonight()
+	if sq.is_empty():
+		return
+	var n := 0
+	for e in sq.get("npcs", []):
+		var o: Vector3 = interiors.interior_origin(str(e.get("interior", ""))) if interiors and e.has("interior") else Vector3.ZERO
+		if o == Vector3.INF or population == null:
+			continue
+		var pp: Array = e["pos"]
+		var at := o + Vector3(float(pp[0]), float(pp[1]) + 0.05, float(pp[2]))
+		var e2: Dictionary = e.duplicate()
+		e2["pos"] = [at.x, at.y, at.z]
+		var b: Node3D = population.spawn_entry(e2)
+		if b:
+			b.add_to_group("mission")
+			if b.has_method("relocate"):
+				b.relocate(at, float(e.get("facing", 0.0)))
+			n += 1
+	if not data.has("items"):
+		data["items"] = []
+	for it in sq.get("items", []):
+		(data["items"] as Array).append(it)
+	var tx: Dictionary = data.get("texts", {})
+	for k in sq.get("texts", {}):
+		tx[k] = sq["texts"][k]
+	data["texts"] = tx
+	var ot: Dictionary = data.get("on_takedown", {})
+	for k in sq.get("on_takedown", {}):
+		ot[k] = sq["on_takedown"][k]
+	data["on_takedown"] = ot
+	for id in sq.get("takedown", []):
+		var a := actor(str(id))
+		if a:
+			a.add_to_group("takedown")
+	for id in sq.get("talk", {}):
+		add_talk(str(id), sq["talk"][id], sq.get("dialogue", {}))
+	var marks: Dictionary = data.get("stealth", {}).get("map_marks", {})
+	for k in sq.get("map_marks", {}):
+		marks[k] = sq["map_marks"][k]
+	if data.has("stealth"):
+		data["stealth"]["map_marks"] = marks
+	for o2 in sq.get("objectives", []):
+		var lo := {"id": str(o2["id"]), "text": str(o2["text"]), "done": false, "optional": true}
+		set_meta("lead_" + str(o2["id"]), lo)
+		Mission.objectives.append(lo.duplicate())
+	Mission.objectives_changed.emit()
+	print("[mission] side quest: %s (%d people placed below)" % [sq.get("title", "?"), n])
