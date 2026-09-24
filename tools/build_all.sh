@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Rebuilds every generated model from the Blender scripts, then runs the Godot import.
-# Usage: JOBS=8 tools/build_all.sh [--no-characters] [--only assets,animals,interiors,third_party,animations,characters,import]
+# Usage: JOBS=8 tools/build_all.sh [--no-characters] [--only layout,assets,animals,interiors,props,third_party,animations,audio,characters,import]
 # Asset and character builds run JOBS Blender processes in parallel (default 8).
 # Needs: blender (5.2) and godot (4.7) on PATH; MPFB2 + MakeHuman system assets installed for characters.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-STAGES="assets,animals,interiors,third_party,animations,characters,import"
+STAGES="layout,assets,animals,interiors,props,third_party,animations,audio,characters,import"
 for a in "$@"; do
   case "$a" in
     --no-characters) STAGES="${STAGES/characters,/}" ;;
@@ -18,6 +18,7 @@ has() { [[ ",$STAGES," == *",$1,"* ]]; }
 t0=$(date +%s)
 mkdir -p assets/models assets/textures assets/ground
 JOBS="${JOBS:-8}"
+if has layout;      then echo "== city layout";                        python3 tools/gen_city_layout.py; fi
 if has assets; then
   echo "== textures (bake once, shared cache)"; blender -b --python assets/blender/build_assets.py -- --textures >/dev/null
   echo "== buildings, props, districts, farm ($JOBS parallel)"
@@ -27,8 +28,10 @@ if has assets; then
 fi
 if has animals;     then echo "== procedural animals and the dragon";   blender -b --python assets/blender/build_assets.py -- --animals; fi
 if has interiors;   then echo "== interiors";                          blender -b --python assets/blender/build_interiors.py; fi
+if has props;       then echo "== vendor, window and kit props";        for b in build_vendor_props build_window_props build_kit_props; do blender -b --python assets/blender/$b.py >/dev/null 2>&1 || echo "FAILED $b"; done; fi
 if has third_party; then echo "== third-party animals";                 tools/fetch_animals.sh && blender -b --python assets/blender/build_animals.py; fi
 if has animations;  then echo "== animation library";                   blender -b --python assets/blender/build_animations.py; fi
+if has audio;       then echo "== audio (procedural synthesis)";        python3 tools/gen_sfx.py; fi
 if has characters; then
   echo "== characters ($JOBS parallel)"
   CH=$(blender -b --python-expr "import sys; sys.path.insert(0,'assets/blender'); import build_characters as b; print('NAMES', ' '.join(b.ALL))" 2>/dev/null | sed -n 's/^NAMES //p')
