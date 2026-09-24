@@ -15,7 +15,7 @@ extends "res://scripts/npc/walker.gd"
 ## (HORSE_WALK / HORSE_TROT / DOG_WALKS / PIGEON_WALK). Playback speed = actual speed / this, so hooves and
 ## paws stay planted instead of sliding.
 const GAIT_REF := {
-	"horse": {"walk": 1.5, "trot": 3.0}, "horse_harnessed": {"walk": 1.5, "trot": 3.0},
+	"horse": {"walk": 1.5, "trot": 2.14}, "horse_harnessed": {"walk": 1.5, "trot": 2.14},
 	"dog_hound": {"walk": 1.125}, "dog_spitz": {"walk": 0.98}, "cat": {"walk": 0.55},
 	"pigeon": {"walk": 0.225}, "crow": {"walk": 0.25},
 }
@@ -80,6 +80,9 @@ func _ready() -> void:
 		return
 	setup_navigation(0.3 if _box_size().x < 0.5 else 0.6, 0.6, 4.0)
 	nav_agent.avoidance_priority = 0.3   # animals give way to people
+	if model_name == "dragon" and _lod_timer:   # one creature, seen from afar under Wawel: never pause its idle
+		_lod_timer.stop()
+		_lod_set(false)
 	if follow != "":
 		behaviour = "follow"
 	if behaviour == "stand":
@@ -88,6 +91,7 @@ func _ready() -> void:
 				_rest_clip = "sit"
 	_play(_rest_clip)
 	_desync()
+	_maybe_burst()
 
 
 # ------------------------------------------------------------------ building
@@ -112,6 +116,8 @@ func _build() -> void:
 		var b := _merged_aabb(mesh, mesh.transform)
 		if b.size != Vector3.ZERO:
 			box = b
+		for e in _find(mesh, "ember", []):
+			_add_ember(e as Node3D)
 	else:
 		push_warning("Animal %s: no model among %s" % [npc_id, candidates])
 	if tether:
@@ -122,6 +128,41 @@ func _build() -> void:
 			add_child(rail)
 			box = box.merge(AABB(rail.position - Vector3(1.3, 0, 0.1), Vector3(2.6, 1.2, 0.2)))
 	_add_box(self, box)
+
+
+## The dragon's nostrils: a faint ember glow and a few sparks drifting up (the "ember" empty rides the head bone).
+func _add_ember(at: Node3D) -> void:
+	var light := OmniLight3D.new()
+	light.light_color = Color(1.0, 0.42, 0.12)
+	light.light_energy = 1.6
+	light.omni_range = 3.5
+	light.position = Vector3(0, 0, 0.1)
+	at.add_child(light)
+	var p := CPUParticles3D.new()
+	p.amount = 14
+	p.lifetime = 1.6
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 25.0
+	p.initial_velocity_min = 0.15
+	p.initial_velocity_max = 0.4
+	p.gravity = Vector3(0, 0.25, 0)
+	p.scale_amount_min = 0.5
+	p.scale_amount_max = 1.0
+	var q := QuadMesh.new()
+	q.size = Vector2(0.025, 0.025)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_color = Color(1.0, 0.5, 0.15)
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	q.material = m
+	p.mesh = q
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1.0, 0.6, 0.2, 1.0))
+	ramp.set_color(1, Color(0.6, 0.15, 0.05, 0.0))
+	p.color_ramp = ramp
+	at.add_child(p)
 
 
 func _add_box(body: Node, box: AABB) -> void:
@@ -181,12 +222,16 @@ func _collect_anims(n: Node) -> void:
 
 
 func _play(clip: String, spd: float = 1.0) -> void:
-	for ap in _anims:
+	for i in _anims.size():
+		var ap := _anims[i]
 		var name := clip if ap.has_animation(clip) else ("idle" if ap.has_animation("idle") else "")
 		if name == "":
 			continue
 		if ap.current_animation != name:
 			ap.play(name, 0.25)
+			# a pair in harness must not step in lockstep: each horse keeps its own phase offset in every gait
+			if _anims.size() > 1:
+				ap.seek(fmod(0.37 * i + _rng.randf() * 0.1, 1.0) * ap.current_animation_length, true)
 		ap.speed_scale = spd if name == clip else 1.0
 
 
@@ -202,6 +247,73 @@ func _find(n: Node, prefix: String, out: Array) -> Array:
 	for c in n.get_children():
 		_find(c, prefix, out)
 	return out
+
+
+# ------------------------------------------------------------------ shot mode: burst captures
+static var _burst_busy := false
+static var _burst_done := {}
+
+
+## `-- --smoke --shot=/dir`: the dorozka ("dorozka"), the tethered horse ("inn_horse") and the dragon ("smok") save 8 frames
+## (shot_burst_<id>_<n>.png) from a camera beside them, so gait and idle can be judged in engine. The dorozka's
+## frames are 3 physics ticks apart; the idles' 30 ticks apart.
+func _maybe_burst() -> void:
+	if not (npc_id in ["dorozka", "inn_horse", "smok"]) or _burst_done.has(npc_id):
+		return
+	var dir := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--shot="):
+			dir = a.trim_prefix("--shot=")
+	if dir == "":
+		return
+	_burst_done[npc_id] = true
+	_burst.call_deferred(dir)
+
+
+func _burst(dir: String) -> void:
+	var wait: int = {"dorozka": 200, "inn_horse": 330, "smok": 460}[npc_id]    # dorozka up to speed first
+	for i in wait:
+		await get_tree().physics_frame
+	while _burst_busy:
+		await get_tree().physics_frame
+	_burst_busy = true
+	if has_method("_lod_set"):
+		call("_lod_set", false)                          # a close-up must not show a LOD-paused animation
+		if _lod_timer:
+			_lod_timer.stop()
+	var cam := Camera3D.new()
+	cam.fov = 50.0
+	get_tree().current_scene.add_child(cam)
+	var prev := get_viewport().get_camera_3d()
+	var gap := 3 if npc_id == "dorozka" else 30
+	for k in 8:
+		var fwd := -global_transform.basis.z
+		var side := global_transform.basis.x
+		var p := global_position
+		if npc_id == "dorozka":        # from the side facing the open square, a little ahead of the pair
+			var s2 := side if side.dot(Vector3(-p.x, 0, -p.z)) > 0.0 else -side
+			cam.look_at_from_position(p + s2 * 6.0 + fwd * 1.5 + Vector3(0, 1.6, 0), p - fwd * 1.0 + Vector3(0, 0.9, 0))
+		elif npc_id == "smok":
+			cam.look_at_from_position(p + fwd * 7.0 - side * 5.0 + Vector3(0, 2.6, 0), p + Vector3(0, 1.4, 0))
+		else:
+			cam.look_at_from_position(p - side * 4.5 + fwd * 0.8 + Vector3(0, 1.4, 0), p + Vector3(0, 0.9, 0))
+		cam.current = true
+		await get_tree().process_frame
+		cam.current = true              # other shot routines may have grabbed the view meanwhile
+		await get_tree().process_frame
+		get_viewport().get_texture().get_image().save_png("%s/shot_burst_%s_%d.png" % [dir, npc_id, k])
+		var clip: String = String(_anims[0].current_animation) if not _anims.is_empty() else ""
+		var pos: float = _anims[0].current_animation_position if not _anims.is_empty() else 0.0
+		print("[smoke] burst %s %d clip=%s t=%.2f speed_scale=%.2f ground=%.2f" % [npc_id, k, clip, pos,
+				_anims[0].speed_scale if not _anims.is_empty() else 0.0, _drive_speed if behaviour == "drive" else Vector2(velocity.x, velocity.z).length()])
+		for i in gap:
+			await get_tree().physics_frame
+	if prev and is_instance_valid(prev):
+		prev.current = true
+	cam.queue_free()
+	if _lod_timer:
+		_lod_timer.start()
+	_burst_busy = false
 
 
 # ------------------------------------------------------------------ vehicles
@@ -282,6 +394,7 @@ func _build_vehicle() -> void:
 		rotation.y = atan2(-d.x, -d.z)
 	_place_trailer(true)
 	_play("idle")
+	_maybe_burst()
 	_desync()
 
 
@@ -373,9 +486,9 @@ func _drive(delta: float) -> void:
 	if _drive_speed > 0.15:
 		var g: Dictionary = GAIT_REF["horse_harnessed"]
 		if _drive_speed > TROT_ABOVE:
-			_play("trot", clampf(_drive_speed / g["trot"], 0.4, 1.6))
+			_play("trot", clampf(_drive_speed / g["trot"], 0.75, 1.5))
 		else:
-			_play("walk", clampf(_drive_speed / g["walk"], 0.3, 1.6))
+			_play("walk", clampf(_drive_speed / g["walk"], 0.3, 1.25))
 	else:
 		_play("idle")
 

@@ -163,12 +163,13 @@ func _environment() -> void:
 		Assets.place(self, "lantern_post", p, 0.0)
 		_lanterns.append([l, p])
 
-	# The dragon's cave, south-west beyond the Town Hall: a sulphurous glow (easter egg).
+	# The dragon's cave, south-west beyond the Town Hall: a dim ember glow from its nostrils (easter egg). Kept low and
+	# warm so it reads as breath on the snow, not a green floodlight over the whole lot.
 	var cave := OmniLight3D.new()
-	cave.position = Vector3(-72, 2.5, 138)      # beyond the walls, below the Wawel skyline; a glow to stumble on
-	cave.light_color = Color(0.55, 0.95, 0.45)
-	cave.light_energy = 3
-	cave.omni_range = 11
+	cave.position = Vector3(-72, 1.6, 138)      # beyond the walls, below the Wawel skyline; a glow to stumble on
+	cave.light_color = Color(1.0, 0.55, 0.22)
+	cave.light_energy = 1.1
+	cave.omni_range = 7
 	cave.shadow_enabled = false
 	cave.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
 	cave.add_to_group("shadow_capable")

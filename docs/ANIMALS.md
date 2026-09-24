@@ -62,6 +62,7 @@ people.
 | `pigeon` | mujtaba-io pigeon | 0.30 m long | idle, walk (keyed here), fly | 1,010 |
 | `crow` | Teh_Bucket raven | 0.45 m long | idle, walk (layered here), fly | 2,380 |
 | `hawk` | Sherkiz hawk | 0.55 m long | fly, idle (= fly) | 9,956 |
+| `dragon` | procedural Smok Wawelski (rigged, baked scales); `build_assets.py -- --animals` delegates here | ~6 m nose to tail | idle (10 s) | 7,644 |
 | `carriage` | procedural dorożka, textured | 1.5 m track, 0.66 m rear wheels | - | 6,136 |
 | `horse_cart` | procedural ladder cart, textured | 0.62 m wheels | - | 3,252 |
 | `coach` | procedural travelling coach (inn yard), textured; replaces build_assets.py's `coach` | 0.72 m rear wheels | - | 5,692 |
@@ -77,11 +78,11 @@ Build notes:
 - **Gaits are hoof-planted by IK** (`LegIK` in build_animals.py): per frame each leg's hoof / paw target follows a
   stance phase that slides back at exactly the ground speed and an eased, lifted swing; the upper bones are solved
   in the sagittal plane on the branch nearest the rest pose, so front knees fold back and hocks fold the right way.
-  Measured planted-foot speeds match the design (horse walk 1.50, trot 3.00; hound 1.12, spitz 0.98, cat 0.55,
+  Measured planted-foot speeds match the design (horse walk 1.50, trot 2.14; hound 1.12, spitz 0.98, cat 0.55,
   pigeon 0.22 m/s). `scripts/npc/animal.gd` `GAIT_REF` holds the same numbers and sets playback speed =
   ground speed / reference, so nothing slides in game.
 - Horse: four-beat lateral walk (LH, LF, RH, RF, 25 % apart; 32 frames, stride 1.6 m), two-beat diagonal trot
-  (21 frames, stride 2.1 m; the dorozka trots above 1.8 m/s), idle of 8 s with the resting hind leg changing
+  (21 frames, stride 1.5 m; the dorozka trots above 1.8 m/s), idle of 8 s with the resting hind leg changing
   sides (hoof drawn forward onto the toe), head lowering and raising, ear flicks, tail swishes.
 - Dogs and cat: the Quaternius walk/idle slid (planted paws moving 0.1-0.9 m/s within one stance) and their paws
   hang off separately animated IK bones, so those weights are folded into the lower-leg bones and the walk and
@@ -95,6 +96,23 @@ Build notes:
   blinkers and bit, reins over the neck to the driver. Pieces are skinned to the neck, head or spine bone.
 - The pigeon was modelled flying; its ground pose folds the wings along the flanks, and its walk bobs the head.
 - The .blend sources predate node materials; the script rebuilds Principled materials from their packed images.
+
+## Smok Wawelski
+Lofted from a Catmull-Rom spine (thick neck, deep chest with a hanging belly, a 3.5 m tapering tail), a horned
+head with brow ridges, a hinged jaw with upper and lower teeth, emissive eyes and nostrils, bat wings folded
+along the back (arm and four finger bones, a double-sided membrane between them and down to the flank), 20 dorsal
+spines, four clawed legs. The skin is a baked procedural scale texture (Voronoi cells in object space, dark
+green-black with ochre ventral scales, glossy centres and dark gaps; albedo, normal and roughness at 1024).
+Rig: hips, chest, three neck bones, head, jaw, five tail bones, two wing bones; 10 s idle with four breaths, a
+tail sway, a head turn and a slow yawn. An `ember` empty on the head bone gets a faint orange light and drifting
+sparks from animal.gd; the dragon is exempt from the walker LOD so it keeps breathing when seen from afar.
+
+## Horses in the game (second pass)
+Checked in engine with burst captures (`shot_burst_dorozka_*`, `shot_burst_inn_horse_*`, written by animal.gd in
+`--shot` mode). The pair in harness stepped in lockstep (both AnimationPlayers restarted at 0 on each clip change)
+and trotted in slow motion (2 m/s on a 3 m/s trot clip = 0.67x playback). Now each horse keeps its own phase offset,
+and the trot is a cab's jog trot (stride 1.5 m, 0.7 s: 2.14 m/s at 1x, so the dorozka plays it at 0.93x). Vehicles
+are not in the walker LOD; the tethered horse is, like other animals, paused beyond 55 m from the player.
 
 ## In the city
 

@@ -3,7 +3,7 @@
 Run:  bash tools/fetch_animals.sh                      (downloads the sources into assets/third_party/)
       blender -b --python assets/blender/build_animals.py [-- --only horse,cat]
 Writes assets/models/<name>.glb for: horse, horse_harnessed, dog_hound, dog_spitz, cat, pigeon, crow, hawk,
-carriage, horse_cart, coach (replaces build_assets.py's inn-yard coach), hitch_rail. Sources and licences:
+carriage, horse_cart, coach (replaces build_assets.py's inn-yard coach), hitch_rail, dragon. Sources and licences:
 docs/ANIMALS.md.
 
 Conventions (same as build_assets.py)
@@ -530,12 +530,69 @@ def load_horse():
     rig.name = "horse_rig"
     normalise(rig, [body], 1.60, "withers", shoulder_bone="Bone_L", yaw=0.0, measure_verts=set(range(n_coat)))
     body.parent = rig
+    add_hoof_bones(rig, body)
+    square_up_horse(rig, body)
     return rig, body
+
+
+def add_hoof_bones(rig, body, fetlock=0.24):
+    """The source rig's lowest leg bone runs from knee / hock to the ground, so rotating the cannon tips the hoof.
+    Split off a hoof bone at the fetlock (child of the cannon) and move the pastern and hoof weights onto it."""
+    select([rig], rig)
+    bpy.ops.object.mode_set(mode="EDIT")
+    eb = rig.data.edit_bones
+    made = []
+    for chain in FRONT + HIND:
+        c = eb[chain[2]]
+        h, t = c.head.copy(), c.tail.copy()
+        k = max(0.0, min(1.0, (fetlock - t.z) / max(h.z - t.z, 1e-6)))
+        b = eb.new(chain[2] + "_hoof")
+        b.head = t.lerp(h, k)
+        b.tail = t
+        b.parent = c
+        made.append((chain[2], b.name, b.head.z))
+    bpy.ops.object.mode_set(mode="OBJECT")
+    for cannon, hoof, fz in made:
+        gc = body.vertex_groups.get(cannon)
+        gh = body.vertex_groups.new(name=hoof)
+        for v in body.data.vertices:
+            wc = next((g.weight for g in v.groups if g.group == gc.index), 0.0)
+            if wc <= 0:
+                continue
+            z = (body.matrix_world @ v.co).z
+            f = max(0.0, min(1.0, (fz + 0.03 - z) / 0.06))
+            f = f * f * (3 - 2 * f)
+            if f > 0:
+                gh.add([v.index], wc * f, "REPLACE")
+                gc.add([v.index], wc * (1 - f), "REPLACE")
+
+
+def square_up_horse(rig, body):
+    """The source model stands badly: forelegs slanting back ~10 degrees from elbow to hoof, hind cannons slanting
+    forward ~24 degrees (hooves tucked under the belly), neck low. Bake a corrected stance into the rest pose, solved
+    with LegIK so the hooves stay on the ground: fore cannon and forearm plumb with the hoof under the elbow, hind
+    cannon plumb under the hock (hoof under the hip), neck raised. All clips are keyed relative to this rest."""
+    pose = {}
+    for chain in FRONT:
+        ik = LegIK(rig, chain)
+        elbow = _yz(rig.data.bones[chain[1]].head_local)
+        hoof = Vector((elbow.x, ik.hoof.y))
+        r = ik.solve(hoof, -math.pi / 2 - ik.rest[2])
+        pose.update(r)
+    for chain in HIND:
+        ik = LegIK(rig, chain)
+        hock = _yz(rig.data.bones[chain[2]].head_local)
+        hoof = Vector((hock.x + 0.03, ik.hoof.y))
+        pose.update(ik.solve(hoof, -math.pi / 2 - ik.rest[2]))
+    pose["Bone.001"] = rx(-0.22)          # neck out and up
+    pose["Bone.002"] = rx(0.12)           # head keeps its angle
+    bake_pose_into_rest(rig, body, {k: (v, (1, 1, 1)) for k, v in pose.items()})
+    reground(rig, [body])
 
 
 # Gait timing shared with scripts/npc/animal.gd (GAIT_REF): ground speed at playback speed 1 = stride / cycle.
 HORSE_WALK = {"frames": 32, "stride": 1.60, "duty": 0.62}     # 1.067 s cycle -> 1.50 m/s
-HORSE_TROT = {"frames": 21, "stride": 2.10, "duty": 0.42}     # 0.70 s cycle  -> 3.00 m/s
+HORSE_TROT = {"frames": 21, "stride": 1.50, "duty": 0.45}     # 0.70 s cycle  -> 2.14 m/s: a cab's jog trot
 HORSE_IDLE_FRAMES = 240                                       # 8 s: weight shifts between the hind legs
 
 
@@ -554,6 +611,8 @@ class LegIK:
     Returns armature-space X rotations per bone, relative to their parents (key_pose composes them)."""
 
     def __init__(self, rig, names, end=None):
+        self.has_hoof = (names[-1] + "_hoof") in rig.data.bones
+        self.hoof_fold = 0.0
         """names: 3 bones (pivot bone, knee/hock bone, cannon) or 2 bones (upper, lower: plain two-bone IK).
         end: rest contact point (armature space) if the hoof / paw lies beyond the last bone's tail."""
         self.names = names
@@ -591,8 +650,14 @@ class LegIK:
         _, phi0, phi1 = best
         w = [_wrap(phi0 - self.rest[0]), _wrap(phi1 - self.rest[1])]
         out = {self.names[0]: rx(w[0]), self.names[1]: rx(w[1] - w[0])}
+        self.cannon_delta = 0.0
         if phi2 is not None:
-            out[self.names[2]] = rx(_wrap(phi2 - self.rest[2]) - w[1])
+            self.cannon_delta = _wrap(phi2 - self.rest[2])
+            out[self.names[2]] = rx(self.cannon_delta - w[1])
+            hb = self.names[2] + "_hoof"
+            if getattr(self, "has_hoof", False):
+                # the hoof keeps its rest attitude (sole flat) whatever the cannon does, plus any extra fold
+                out[hb] = rx(-self.cannon_delta + getattr(self, "hoof_fold", 0.0))
         return out
 
 
@@ -633,6 +698,7 @@ def horse_anims(rig):
                 front = k.endswith("F")
                 p = (t - phase[k]) % 1.0
                 hoof, flex = _hoof_path(ik, p, spec["stride"], spec["duty"], 0.13 if front else 0.10, 1.05 if front else 0.45)
+                ik.hoof_fold = 0.9 * flex if p >= spec["duty"] else 0.0       # fetlock folds in flight, flat on the ground
                 r.update(ik.solve(hoof, flex))
             r["Bone.001"] = rx(nod * math.sin(t * math.tau * 2 + 0.6))       # head nods with each forelimb
             r["Bone.002"] = rx(-nod * 0.6 * math.sin(t * math.tau * 2 + 0.6))
@@ -661,6 +727,7 @@ def horse_anims(rig):
             w = wr if k == "RH" else (wl if k == "LH" else 0.0)
             # resting hind: hoof drawn a little forward and up onto its toe, fetlock and hock eased
             hoof = ik.hoof + Vector((-0.06 * w, 0.035 * w))
+            ik.hoof_fold = 0.35 * w                                           # resting hoof tipped onto its toe
             r.update(ik.solve(hoof, 0.32 * w))
         # the planted legs take the weight: hips tip towards the resting side (a small roll of the tail root)
         graze = smooth((math.sin(t * math.tau * 2 - 1.2) - 0.55) / 0.3)       # head lowers twice per cycle
@@ -1660,6 +1727,393 @@ def hawk():
     rig_export("hawk", rig, [body])
 
 
+# ------------------------------------------------------------------ Smok Wawelski (procedural, rigged, baked scales)
+def _catmull(pts, n):
+    """n points along a Catmull-Rom spline through pts (end points duplicated)."""
+    P = [pts[0]] + list(pts) + [pts[-1]]
+    out = []
+    segs = len(pts) - 1
+    for k in range(n):
+        u = k / (n - 1) * segs
+        i = min(int(u), segs - 1)
+        t = u - i
+        p0, p1, p2, p3 = P[i], P[i + 1], P[i + 2], P[i + 3]
+        t2, t3 = t * t, t * t * t
+        out.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    return out
+
+
+def _lerp_prof(prof, u):
+    """prof: tuples at evenly spaced control points; u in 0..1."""
+    x = u * (len(prof) - 1)
+    i = min(int(x), len(prof) - 2)
+    t = x - i
+    a, b = prof[i], prof[i + 1]
+    return tuple(a[j] + (b[j] - a[j]) * t for j in range(len(a)))
+
+
+def loft_path(bm, pts, rads, seg=16, cap=True, sag=None):
+    """Tube along pts with elliptic sections rads[i] = (half width, half height); sag[i] drops the section centre
+    (a belly hanging below the spine). Returns the rings."""
+    rings = []
+    up0 = Vector((0, 0, 1))
+    for i, p in enumerate(pts):
+        t = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+        side = t.cross(up0)
+        if side.length < 1e-4:
+            side = Vector((1, 0, 0))
+        side.normalize()
+        up = side.cross(t).normalized()
+        rx_, rz_ = rads[i]
+        c = p - up * (sag[i] if sag else 0.0)
+        ring = []
+        for j in range(seg):
+            a = math.tau * j / seg
+            ring.append(bm.verts.new(c + side * (math.cos(a) * rx_) + up * (math.sin(a) * rz_)))
+        rings.append(ring)
+    for r0, r1 in zip(rings[:-1], rings[1:]):
+        for j in range(seg):
+            bm.faces.new((r0[j], r0[(j + 1) % seg], r1[(j + 1) % seg], r1[j]))
+    if cap:
+        for ring, flip in ((rings[0], True), (rings[-1], False)):
+            c = bm.verts.new(sum((v.co for v in ring), Vector()) / len(ring))
+            for j in range(seg):
+                a, b = ring[j], ring[(j + 1) % seg]
+                bm.faces.new((c, b, a) if flip else (c, a, b))
+    return rings
+
+
+def cone(bm, base, tip, r, seg=6):
+    return bm_cyl(bm, base, tip, r, 0.002, seg=seg)
+
+
+def _seg_dist(p, a, b):
+    ab = b - a
+    t = max(0.0, min(1.0, (p - a).dot(ab) / max(ab.length_squared, 1e-9)))
+    return (p - (a + ab * t)).length
+
+
+def weight_by_bones(obj, rig, names, power=4.0):
+    """Skin each vertex to its two nearest bones in `names` (inverse distance^power)."""
+    segs = {n: (rig.data.bones[n].head_local, rig.data.bones[n].tail_local) for n in names}
+    groups = {n: (obj.vertex_groups.get(n) or obj.vertex_groups.new(name=n)) for n in names}
+    for v in obj.data.vertices:
+        d = sorted((_seg_dist(v.co, a, b), n) for n, (a, b) in segs.items())[:2]
+        ws = [1.0 / (x ** power + 1e-6) for x, _ in d]
+        s = sum(ws)
+        for (x, n), w in zip(d, ws):
+            groups[n].add([v.index], w / s, "REPLACE")
+
+
+def bake_scales(obj, size=1024):
+    """Bake a procedural scale skin to albedo / normal / roughness maps: Voronoi scales in object space, dark
+    green-black on the back, paler ochre below, glossy (wet) scale centres and dark gaps."""
+    np = _np()
+    select([obj], obj)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.006)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    m = bpy.data.materials.new("dragon_skin_src")
+    if m.node_tree is None:
+        m.use_nodes = True
+    nt = m.node_tree
+    bs = nt.nodes["Principled BSDF"]
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    vor = nt.nodes.new("ShaderNodeTexVoronoi")
+    vor.feature = "DISTANCE_TO_EDGE"
+    vor.inputs["Scale"].default_value = 34.0
+    nt.links.new(tc.outputs["Object"], vor.inputs["Vector"])
+    vor2 = nt.nodes.new("ShaderNodeTexVoronoi")
+    vor2.inputs["Scale"].default_value = 34.0
+    nt.links.new(tc.outputs["Object"], vor2.inputs["Vector"])
+    edge = nt.nodes.new("ShaderNodeMapRange")
+    edge.inputs["From Min"].default_value = 0.0
+    edge.inputs["From Max"].default_value = 0.12
+    nt.links.new(vor.outputs["Distance"], edge.inputs["Value"])
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    nt.links.new(geo.outputs["Normal"], sep.inputs["Vector"])
+    belly = nt.nodes.new("ShaderNodeMapRange")
+    belly.inputs["From Min"].default_value = -0.15
+    belly.inputs["From Max"].default_value = -0.55
+    nt.links.new(sep.outputs["Z"], belly.inputs["Value"])
+    back = nt.nodes.new("ShaderNodeMix")
+    back.data_type = "RGBA"
+    back.inputs["A"].default_value = (0.005, 0.011, 0.008, 1)
+    back.inputs["B"].default_value = (0.018, 0.042, 0.024, 1)
+    nt.links.new(vor2.outputs["Color"], back.inputs["Factor"])
+    bel = nt.nodes.new("ShaderNodeMix")
+    bel.data_type = "RGBA"
+    bel.inputs["B"].default_value = (0.19, 0.16, 0.08, 1)
+    nt.links.new(back.outputs["Result"], bel.inputs["A"])
+    nt.links.new(belly.outputs["Result"], bel.inputs["Factor"])
+    rim = nt.nodes.new("ShaderNodeMix")
+    rim.data_type = "RGBA"
+    rim.inputs["A"].default_value = (0.004, 0.006, 0.005, 1)
+    nt.links.new(edge.outputs["Result"], rim.inputs["Factor"])
+    nt.links.new(bel.outputs["Result"], rim.inputs["B"])
+    nt.links.new(rim.outputs["Result"], bs.inputs["Base Color"])
+    rr = nt.nodes.new("ShaderNodeMapRange")
+    rr.inputs["To Min"].default_value = 0.7
+    rr.inputs["To Max"].default_value = 0.34
+    nt.links.new(edge.outputs["Result"], rr.inputs["Value"])
+    nt.links.new(rr.outputs["Result"], bs.inputs["Roughness"])
+    bump = nt.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.8
+    bump.inputs["Distance"].default_value = 0.01
+    nt.links.new(edge.outputs["Result"], bump.inputs["Height"])
+    nt.links.new(bump.outputs["Normal"], bs.inputs["Normal"])
+    obj.data.materials.clear()
+    obj.data.materials.append(m)
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = 4
+    sc.render.bake.margin = 8
+    out = {}
+    for kind, btype, noncol in (("albedo", "DIFFUSE", False), ("normal", "NORMAL", True), ("rough", "ROUGHNESS", True)):
+        img = bpy.data.images.new("dragon_" + kind, size, size, alpha=False)
+        if noncol:
+            img.colorspace_settings.name = "Non-Color"
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = img
+        nt.nodes.active = t
+        if btype == "DIFFUSE":
+            bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"}, use_clear=True, margin=8)
+        else:
+            bpy.ops.object.bake(type=btype, use_clear=True, margin=8)
+        a = np.array(img.pixels[:], np.float32).reshape(size, size, 4)[..., :3]
+        out[kind] = np_image("dragon_" + kind + "_map", a, non_color=noncol)
+        nt.nodes.remove(t)
+        bpy.data.images.remove(img)
+    skin = principled("dragon_skin", (1, 1, 1), 0.4, out["albedo"], out["normal"], spec=0.4)
+    rt = skin.node_tree.nodes.new("ShaderNodeTexImage")
+    rt.image = out["rough"]
+    skin.node_tree.links.new(rt.outputs["Color"], next(n for n in skin.node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Roughness"])
+    obj.data.materials.clear()
+    obj.data.materials.append(skin)
+    bpy.data.materials.remove(m)
+
+
+def dragon():
+    """Smok Wawelski, ~6 m nose to tail: lofted body with a thick neck and a long tapering tail, horned head with a
+    hinged jaw, teeth and glowing eyes, bat wings folded along the back (arm, fingers, membrane), dorsal spines,
+    clawed feet, baked scale texture. Rigged (spine, neck, head, jaw, tail, wings) with a 10 s idle: breathing,
+    tail sway, head turn, a slow yawn. An "ember" empty on the head marks the nostrils (animal.gd adds a light and
+    embers there). Front at -Y like the other animals. build_assets.py -- --animals delegates here."""
+    reset()
+    V = Vector
+    arm = bpy.data.armatures.new("dragon_rig")
+    rig = bpy.data.objects.new("dragon_rig", arm)
+    bpy.context.scene.collection.objects.link(rig)
+    select([rig], rig)
+    bpy.ops.object.mode_set(mode="EDIT")
+    spine = [V((0, 0.8, 1.25)), V((0, 0.1, 1.28)), V((0, -0.7, 1.32)), V((0, -1.25, 1.5)), V((0, -1.75, 1.9)), V((0, -2.05, 2.3))]
+    tail = [V((0, 0.8, 1.25)), V((0.1, 1.6, 1.0)), V((0.45, 2.4, 0.62)), V((1.0, 3.0, 0.32)), V((1.7, 3.3, 0.16)), V((2.4, 3.3, 0.1))]
+    bones = {}
+
+    def bone(name, h, t, parent=None):
+        b = arm.edit_bones.new(name)
+        b.head, b.tail = h, t
+        if parent:
+            b.parent = bones[parent]
+            b.use_connect = (b.parent.tail - h).length < 1e-4
+        bones[name] = b
+    bone("hips", spine[0], spine[1])
+    bone("chest", spine[1], spine[2], "hips")
+    bone("neck1", spine[2], spine[3], "chest")
+    bone("neck2", spine[3], spine[4], "neck1")
+    bone("neck3", spine[4], spine[5], "neck2")
+    bone("head", spine[5], V((0, -2.95, 2.25)), "neck3")
+    bone("jaw", V((0, -2.2, 2.12)), V((0, -3.05, 2.02)), "head")
+    prev = "hips"
+    for i in range(5):
+        bone("tail%d" % (i + 1), tail[i], tail[i + 1], prev)
+        prev = "tail%d" % (i + 1)
+    for sd, sx in (("L", 1), ("R", -1)):
+        bone("wing." + sd, V((sx * 0.35, -0.55, 1.75)), V((sx * 0.58, -0.75, 2.25)), "chest")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    body_bones = ["hips", "chest", "neck1", "neck2", "neck3"] + ["tail%d" % i for i in range(1, 6)]
+
+    # body, neck and tail: one loft along a spline through the spine and tail
+    ctrl = [V((0, -2.05, 2.28)), V((0, -1.75, 1.88)), V((0, -1.25, 1.48)), V((0, -0.7, 1.32)), V((0, 0.1, 1.28)),
+            V((0, 0.8, 1.25))] + tail[1:]
+    prof = [(0.22, 0.25, 0.0), (0.27, 0.29, 0.0), (0.38, 0.42, 0.04), (0.56, 0.62, 0.12), (0.62, 0.64, 0.14),
+            (0.5, 0.52, 0.06), (0.34, 0.33, 0.0), (0.22, 0.2, 0.0), (0.13, 0.12, 0.0), (0.07, 0.06, 0.0), (0.015, 0.015, 0.0)]
+    N = 72
+    pts = _catmull(ctrl, N)
+    pr = [_lerp_prof(prof, k / (N - 1)) for k in range(N)]
+    bm = bmesh.new()
+    loft_path(bm, pts, [(a, b) for a, b, _ in pr], seg=22, sag=[c for _, _, c in pr])
+    body = new_obj("body", bm, None)
+    weight_by_bones(body, rig, body_bones)
+    skin_parts = [body]
+
+    # head: skull with brow ridges, hinged jaw
+    bm = bmesh.new()
+    loft_path(bm, [V((0, -2.0, 2.3)), V((0, -2.3, 2.36)), V((0, -2.6, 2.32)), V((0, -2.88, 2.24)), V((0, -3.08, 2.2)), V((0, -3.2, 2.18))],
+              [(0.25, 0.27), (0.28, 0.26), (0.21, 0.19), (0.15, 0.13), (0.11, 0.09), (0.05, 0.045)], seg=18)
+    for sx in (-1, 1):
+        loft_path(bm, [V((sx * 0.16, -2.35, 2.5)), V((sx * 0.2, -2.55, 2.47)), V((sx * 0.17, -2.72, 2.4))],
+                  [(0.05, 0.035), (0.055, 0.04), (0.03, 0.02)], seg=8)
+    skull = new_obj("skull", bm, None)
+    weight_all(skull, "head")
+    bm = bmesh.new()
+    loft_path(bm, [V((0, -2.15, 2.12)), V((0, -2.5, 2.1)), V((0, -2.85, 2.05)), V((0, -3.08, 2.03))],
+              [(0.2, 0.08), (0.17, 0.07), (0.12, 0.05), (0.06, 0.03)], seg=14)
+    jawo = new_obj("jaw", bm, None)
+    weight_all(jawo, "jaw")
+    skin_parts += [skull, jawo]
+
+    # legs and feet (static, skinned to chest / hips), claws separate
+    bm_front, bm_hind = bmesh.new(), bmesh.new()
+    claws_f, claws_h = bmesh.new(), bmesh.new()
+    for sx in (-1, 1):
+        for b_, cl, (a, k_, w, f) in ((bm_front, claws_f, (V((sx * 0.42, -0.72, 1.12)), V((sx * 0.6, -0.5, 0.62)), V((sx * 0.62, -0.82, 0.16)), V((sx * 0.63, -0.98, 0.06)))),
+                                     (bm_hind, claws_h, (V((sx * 0.44, 0.78, 1.12)), V((sx * 0.62, 0.35, 0.66)), V((sx * 0.64, 1.02, 0.34)), V((sx * 0.64, 0.92, 0.07))))):
+            lp = _catmull([a, k_, w, f], 14)
+            rr = [_lerp_prof([(0.26, 0.28), (0.17, 0.18), (0.11, 0.11), (0.1, 0.07)], i / 13) for i in range(14)]
+            loft_path(b_, lp, rr, seg=12)
+            r = bmesh.ops.create_uvsphere(b_, u_segments=10, v_segments=6, radius=0.5)
+            bmesh.ops.transform(b_, matrix=Matrix.Translation(f + V((0, -0.08, -0.02))) @ Matrix.Diagonal((0.2, 0.3, 0.09, 1)), verts=r["verts"])
+            for c in (-1, 0, 1):
+                base = f + V((c * 0.075, -0.2, 0.0))
+                cone(cl, base, base + V((c * 0.03, -0.14, -0.05)), 0.028)
+            cone(cl, f + V((0, 0.08, 0.02)), f + V((0, 0.18, -0.03)), 0.022)
+    fl = new_obj("forelegs", bm_front, None)
+    weight_all(fl, "chest")
+    hl = new_obj("hindlegs", bm_hind, None)
+    weight_all(hl, "hips")
+    skin_parts += [fl, hl]
+
+    # folded bat wings: arm and finger bones in skin, membrane between the fingers and back to the flank
+    bm_w, bm_m = bmesh.new(), bmesh.new()
+    for sx in (-1, 1):
+        S_, E_, W_ = V((sx * 0.35, -0.55, 1.75)), V((sx * 0.64, 0.3, 1.72)), V((sx * 0.6, -0.78, 2.28))
+        loft_path(bm_w, _catmull([S_, E_], 6), [(0.08, 0.08)] * 3 + [(0.065, 0.065)] * 3, seg=8)
+        loft_path(bm_w, _catmull([E_, W_], 6), [(0.065, 0.065)] * 3 + [(0.05, 0.05)] * 3, seg=8)
+        cone(bm_w, W_, W_ + V((sx * 0.02, -0.22, 0.12)), 0.035)
+        fingers = []
+        for i in range(4):
+            knuckle = W_ + V((sx * (0.12 + 0.03 * i), 0.55 + 0.35 * i, -0.08 - 0.12 * i))
+            tip = W_ + V((sx * (0.16 + 0.05 * i), 1.35 + 0.55 * i, -0.28 - 0.3 * i))
+            fingers.append((W_, knuckle, tip))
+            loft_path(bm_w, [W_, knuckle, tip], [(0.035, 0.035), (0.026, 0.026), (0.01, 0.01)], seg=6)
+        edges = [list(f) for f in fingers] + [[E_, V((sx * 0.5, 0.9, 1.45)), V((sx * 0.35, 1.3, 1.2))]]
+        for fa, fb in zip(edges[:-1], edges[1:]):
+            va = [bm_m.verts.new(p) for p in fa]
+            vb = [bm_m.verts.new(p) for p in fb]
+            for k in range(2):
+                bm_m.faces.new((va[k], va[k + 1], vb[k + 1], vb[k]))
+        va = [bm_m.verts.new(p) for p in (S_, E_)]
+        vb = [bm_m.verts.new(p) for p in (V((sx * 0.4, -0.4, 1.5)), V((sx * 0.5, 0.9, 1.45)))]
+        bm_m.faces.new((va[0], va[1], vb[1], vb[0]))
+    wings_bone = new_obj("wing_bones", bm_w, None)
+    mem_mat = principled("dragon_membrane", (0.10, 0.045, 0.035), 0.75, spec=0.3)
+    mem_mat.use_backface_culling = False
+    membrane = new_obj("membrane", bm_m, mem_mat)
+    for o in (wings_bone, membrane):
+        vgl, vgr = o.vertex_groups.new(name="wing.L"), o.vertex_groups.new(name="wing.R")
+        for v in o.data.vertices:
+            (vgl if v.co.x > 0 else vgr).add([v.index], 1.0, "REPLACE")
+    skin_parts.append(wings_bone)
+
+    # horns, teeth, dorsal spines, claws (horn), eyes and nostrils (emissive)
+    bm_b = bmesh.new()
+    for sx in (-1, 1):
+        hp = [V((sx * 0.16, -2.2, 2.52)), V((sx * 0.24, -2.0, 2.68)), V((sx * 0.3, -1.72, 2.74)), V((sx * 0.3, -1.45, 2.68))]
+        loft_path(bm_b, _catmull(hp, 8), [_lerp_prof([(0.07, 0.07), (0.05, 0.05), (0.03, 0.03), (0.005, 0.005)], i / 7) for i in range(8)], seg=8)
+        cone(bm_b, V((sx * 0.24, -2.1, 2.3)), V((sx * 0.4, -1.95, 2.35)), 0.04)
+        for k in range(6):
+            y = -2.55 - k * 0.1
+            cone(bm_b, V((sx * (0.13 - k * 0.012), y, 2.12)), V((sx * (0.13 - k * 0.012), y, 2.04)), 0.014, seg=4)
+    horns = new_obj("horns_teeth", bm_b, None)
+    weight_all(horns, "head")
+    bm_lt = bmesh.new()
+    for sx in (-1, 1):
+        for k in range(6):
+            y = -2.5 - k * 0.1
+            cone(bm_lt, V((sx * (0.11 - k * 0.012), y, 2.1)), V((sx * (0.11 - k * 0.012), y, 2.16)), 0.012, seg=4)
+    lteeth = new_obj("lower_teeth", bm_lt, None)
+    weight_all(lteeth, "jaw")
+    bm_s = bmesh.new()
+    for k in range(4, N - 12, 3):
+        c, (rx_, rz_, sag_) = pts[k], pr[k]
+        t = (pts[k + 1] - pts[k - 1]).normalized()
+        side = t.cross(V((0, 0, 1))).normalized()
+        up = side.cross(t).normalized()
+        base = c + up * (rz_ - sag_ - 0.02)
+        h = 0.12 + 0.28 * min(1.0, rz_ / 0.6)
+        cone(bm_s, base, base + up * h + t * h * 0.5, 0.03 + 0.05 * min(1.0, rz_ / 0.6), seg=5)
+    spines = new_obj("spines", bm_s, None)
+    weight_by_bones(spines, rig, body_bones)
+    claws = []
+    for b_, g in ((claws_f, "chest"), (claws_h, "hips")):
+        o = new_obj("claws", b_, None)
+        weight_all(o, g)
+        claws.append(o)
+    horn_mat = principled("dragon_horn", (0.36, 0.32, 0.24), 0.45, spec=0.5)
+    horny = [horns, lteeth, spines] + claws
+    for o in horny:
+        o.data.materials.append(horn_mat)
+    bm_e = bmesh.new()
+    for sx in (-1, 1):
+        r = bmesh.ops.create_uvsphere(bm_e, u_segments=10, v_segments=8, radius=0.045)
+        bmesh.ops.translate(bm_e, verts=r["verts"], vec=V((sx * 0.2, -2.56, 2.4)))
+    eyes = new_obj("eyes", bm_e, principled("dragon_eye", (1.0, 0.45, 0.05), 0.1, emit=(1.0, 0.5, 0.08, 7.0), spec=0.9))
+    weight_all(eyes, "head")
+    bm_n = bmesh.new()
+    for sx in (-1, 1):
+        r = bmesh.ops.create_uvsphere(bm_n, u_segments=6, v_segments=4, radius=0.022)
+        bmesh.ops.translate(bm_n, verts=r["verts"], vec=V((sx * 0.05, -3.19, 2.21)))
+    nostr = new_obj("nostrils", bm_n, principled("dragon_ember", (1.0, 0.3, 0.05), 0.4, emit=(1.0, 0.32, 0.04, 4.0)))
+    weight_all(nostr, "head")
+
+    # one skin mesh, smooth, baked scales
+    select(skin_parts, body)
+    bpy.ops.object.join()
+    skin = body
+    skin.name = "dragon_skin"
+    for p in skin.data.polygons:
+        p.use_smooth = True
+    bake_scales(skin, 1024)
+    meshes = [skin, membrane, eyes, nostr] + horny
+    for o in meshes:
+        attach_armature(o, rig)
+    for p in eyes.data.polygons:
+        p.use_smooth = True
+
+    # idle: 10 s, four breaths, tail sway, head turn, a slow yawn
+    n = 300
+
+    def idle(f):
+        t = (f - 1) / n
+        br = math.sin(t * math.tau * 4)
+        look = math.sin(t * math.tau) * 0.8 + 0.2 * math.sin(t * math.tau * 3)
+        yawn = max(0.0, math.sin((t - 0.55) / 0.25 * math.pi)) ** 2 if 0.55 < t < 0.8 else 0.0
+        r = {"chest": rx(0.015 * br), "neck1": rx(-0.02 * br), "neck2": rz(0.18 * look), "neck3": rz(0.12 * look) @ rx(0.05 * yawn),
+             "head": rz(0.08 * look) @ rx(-0.12 * yawn), "jaw": rx(0.04 + 0.45 * yawn),
+             "wing.L": rz(0.03 * br), "wing.R": rz(-0.03 * br)}
+        for i in range(5):
+            r["tail%d" % (i + 1)] = rz(0.10 * math.sin(t * math.tau * 2 - 0.7 * i) + 0.04 * math.sin(t * math.tau * 5 - i))
+        return r, None
+    act = keyed_action(rig, "idle", list(range(1, n + 2, 5)), idle)
+    for fc in action_fcurves(act):
+        for k in fc.keyframe_points:
+            k.interpolation = "BEZIER"
+    push_nla(rig, act, "idle")
+    ember = bpy.data.objects.new("ember", None)
+    bpy.context.scene.collection.objects.link(ember)
+    ember.parent = rig
+    ember.parent_type = "BONE"
+    ember.parent_bone = "head"
+    bpy.context.view_layer.update()
+    ember.matrix_world = Matrix.Translation(V((0, -3.22, 2.2)))
+    log("  dragon tris", tris(meshes))
+    rig_export("dragon", rig, meshes, extra=[ember])
+
+
 # ------------------------------------------------------------------ vehicles (procedural, textured like the buildings)
 # Materials come from build_assets.py (imported, not edited): its baked oak / iron / glass / cloth / snow textures,
 # tinted per key, with auto_uv() projecting UVs at the same texel density as the buildings.
@@ -2128,6 +2582,7 @@ BUILDS = [
     ("horse_cart", horse_cart),
     ("coach", coach),
     ("hitch_rail", hitch_rail),
+    ("dragon", dragon),
 ]
 
 
