@@ -6,9 +6,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=${OUT:-/tmp/krakow-1795-shots}
 rm -rf "$OUT"; mkdir -p "$OUT"
+for d in game ui campaign stealth kit street window vendors dressing interiors weather outer; do mkdir -p "$OUT/$d"; done   # Godot's save_png does not create directories
 S=docs/screenshots
 j() { magick "$1" -quality 86 "$2"; }
-run() { tools/with_gpu.sh timeout 900 godot --path . --quit-after 3000 -- --smoke "$@" 2>&1 | grep -E "SCRIPT ERROR|\[smoke\] perf" | head -5 || true; }
+run() { tools/with_gpu.sh timeout 900 godot --path . --quit-after 6000 -- --smoke "$@" 2>&1 | grep -E "SCRIPT ERROR|\[smoke\] perf" | head -5 || true; }
 
 echo "== windowed perf (plain night)"
 tools/with_gpu.sh timeout 900 godot --path . --quit-after 6000 -- --perf 2>&1 | grep -E "\[smoke\] perf" | tail -3
