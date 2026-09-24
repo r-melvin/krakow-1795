@@ -1,3 +1,4 @@
+import os
 """Contact sheets of the exported glTF assets, rendered with EEVEE under a low winter sun and a sky-blue world.
 
 Run:  blender -b --python assets/blender/render_sheets.py -- <outdir> [group,group,...]
@@ -43,7 +44,15 @@ for gname, (names, spacing, h) in groups.items():
         continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
-    sc.render.engine = "BLENDER_EEVEE"
+    # RENDER_ENGINE=CYCLES renders on the CPU (for when Eevee's EGL context fails on the GPU driver)
+    if os.environ.get("RENDER_ENGINE", "").upper() == "CYCLES":
+        sc.render.engine = "CYCLES"
+        sc.cycles.device = "CPU"
+        sc.cycles.samples = int(os.environ.get("CYCLES_SAMPLES", "24"))
+        sc.cycles.use_denoising = True
+        sc.cycles.max_bounces = 4
+    else:
+        sc.render.engine = "BLENDER_EEVEE"
     sc.render.resolution_x, sc.render.resolution_y = 2400, 1200
     sc.view_settings.view_transform = "AgX"
     sc.view_settings.look = "AgX - Medium High Contrast"

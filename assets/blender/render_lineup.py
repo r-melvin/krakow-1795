@@ -1,3 +1,4 @@
+import os
 """Lineup of every character (front, standing) plus a grid of face close-ups.
 Run: blender -b --python assets/blender/render_lineup.py -- <outdir>"""
 import bpy, math, os, sys
@@ -25,7 +26,15 @@ else:
 def scene():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
-    sc.render.engine = "BLENDER_EEVEE"
+    # RENDER_ENGINE=CYCLES renders on the CPU (for when Eevee's EGL context fails on the GPU driver)
+    if os.environ.get("RENDER_ENGINE", "").upper() == "CYCLES":
+        sc.render.engine = "CYCLES"
+        sc.cycles.device = "CPU"
+        sc.cycles.samples = int(os.environ.get("CYCLES_SAMPLES", "24"))
+        sc.cycles.use_denoising = True
+        sc.cycles.max_bounces = 4
+    else:
+        sc.render.engine = "BLENDER_EEVEE"
     sc.world = bpy.data.worlds.new("w"); sc.world.use_nodes = True
     sc.world.node_tree.nodes["Background"].inputs[0].default_value = (0.40, 0.44, 0.52, 1)
     sc.world.node_tree.nodes["Background"].inputs[1].default_value = 0.6
