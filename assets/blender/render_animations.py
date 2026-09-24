@@ -39,6 +39,9 @@ def opt(name, default):
 REVIEW = "--review" in argv
 if REVIEW:
     argv.remove("--review")
+HANDS = "--hands" in argv          # close-ups of both hands (finger poses), 4 frames x (right, left) x (outside, front)
+if HANDS:
+    argv.remove("--hands")
 CHAR = opt("--char", "watchman")
 OUTDIR = opt("--out", "/tmp/anim_sheets")
 NFRAMES = int(opt("--frames", "8" if REVIEW else "6"))
@@ -48,10 +51,12 @@ os.makedirs(os.path.join(OUTDIR, "tiles"), exist_ok=True)
 PLAYER_CLIPS = {"attack_swing": "cudgel", "attack_thrust": "cudgel", "block": "cudgel", "sabre_draw": "sabre", "sabre_slash": "sabre",
                 "sabre_parry": "sabre", "knife_stab": "knife", "pistol_draw": "pistol", "pistol_aim": "pistol", "pistol_fire": "pistol",
                 "takedown": None, "fall_land_roll": None, "stumble": None,
-                "walk": None, "walk_player": None, "walk_fast": None, "run": None, "sneak": None, "carry_basket": None}
+                "walk": None, "walk_player": None, "walk_fast": None, "run": None, "sneak": None, "carry_basket": None,
+                "push_cart": "cart", "cart_hold": "cart", "carry_two_hand": "box", "carry_two_hand_idle": "box",
+                "talk_gesture_a": None, "talk_gesture_b": None, "haggle": None, "wave": None, "idle": None}
 GUARD_CLIPS = ["musket_ready", "musket_present", "musket_aim", "musket_fire", "musket_reload", "bayonet_thrust", "musket_butt", "guard_seize",
                "hit_react", "hit_react_back", "stagger", "shoved", "grabbed", "knocked_down", "knocked_down_forward", "death_fall",
-               "death_fall_forward", "death_kneel", "death_musket", "get_up", "get_up_prone"]
+               "death_fall_forward", "death_kneel", "death_musket", "get_up", "get_up_prone", "wince", "pain_idle", "guard_sentry"]
 REVIEW_CLIPS = list(PLAYER_CLIPS) + GUARD_CLIPS
 
 
@@ -225,6 +230,75 @@ def sheet(name, rows, title):
     print("[render] sheet", out)
 
 
+CART_GRIP = (0.27, 0.45, 0.90)     # = build_animations.CART_GRIP (body frame: half-width, forward, height)
+BOX_GRIP = (0.21, 0.30, 1.02)
+
+
+def make_cart():
+    """Stand-in handcart: two shafts whose grip points sit at CART_GRIP, a bed and a wheel ahead (world, facing -Y)."""
+    m = material("cartwood", (0.40, 0.28, 0.15))
+    parts = []
+    for sx in (1, -1):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.022, depth=1.5)
+        o = bpy.context.object
+        o.rotation_euler = (math.radians(98), 0, 0)          # runs forward and slightly down from the grip
+        o.location = (sx * CART_GRIP[0], -(CART_GRIP[1] + 0.75), CART_GRIP[2] - 0.10)
+        parts.append(o)
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -(CART_GRIP[1] + 1.15), 0.66))
+    b = bpy.context.object
+    b.scale = (0.62, 0.8, 0.22)
+    parts.append(b)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=16, radius=0.34, depth=0.06, location=(0, -(CART_GRIP[1] + 1.2), 0.34), rotation=(0, math.radians(90), 0))
+    parts.append(bpy.context.object)
+    for o in parts:
+        o.data.materials.append(m)
+        o.color = (0.45, 0.32, 0.18, 1)
+    return parts
+
+
+def make_box():
+    bpy.ops.mesh.primitive_cube_add(size=1)
+    b = bpy.context.object
+    b.scale = (BOX_GRIP[0] * 2 - 0.08, 0.34, 0.30)
+    b.data.materials.append(material("box", (0.55, 0.42, 0.25)))
+    b.color = (0.6, 0.46, 0.28, 1)
+    return b
+
+
+if HANDS:
+    sc.render.resolution_x = 220
+    sc.render.resolution_y = 220
+    vet = Target("figure_veteran")
+    wat = Target("watchman")
+    names = [n for n in (ONLY or REVIEW_CLIPS) if n in clips]
+    for name in names:
+        act = clips[name]
+        f0, f1 = act.frame_range
+        tg = vet if name in PLAYER_CLIPS else wat
+        vet.hide(tg is not vet)
+        wat.hide(tg is not wat)
+        cam_data.ortho_scale = 0.42
+        rows = {k: [] for k in ("r_out", "r_front", "l_out", "l_front")}
+        for i in range(4):
+            tg.apply(eval_lib(act, f0 + (f1 - f0) * i / 3))
+            bpy.context.view_layer.update()
+            for side, sx in (("r", -1), ("l", 1)):
+                pb = tg.rig.pose.bones["hand_" + side]
+                mw = tg.rig.matrix_world @ pb.matrix
+                c = mw.to_translation() + (mw.to_3x3() @ Vector((0, 0.07, 0)))
+                for v, off in (("out", Vector((sx * 1.2, 0, 0.15))), ("front", Vector((0, -1.2, 0.15)))):
+                    aim(c + off, c)
+                    p = os.path.join(OUTDIR, "tiles", "hand_%s_%s_%s_%d.png" % (name, side, v, i))
+                    render(p)
+                    rows[side + "_" + v].append(p)
+        out = os.path.join(OUTDIR, "hands_%s.png" % name)
+        files = [f for k in ("r_out", "r_front", "l_out", "l_front") for f in rows[k]]
+        subprocess.run(["montage"] + files + ["-tile", "4x4", "-geometry", "+2+2", "-title",
+                        "hands: %s  rows: right outside / right front / left outside / left front" % name, "-pointsize", "16", out], check=False)
+        print("[render] sheet", out)
+    sys.exit(0)
+
+
 # ------------------------------------------------------------------ review mode
 if REVIEW:
     sc.render.resolution_x = 190
@@ -248,6 +322,9 @@ if REVIEW:
             o.color = (0.26, 0.27, 0.24, 1)
     wat_victim_pos = Vector((0, -TAKEDOWN_OFFSET, 0))       # the characters face -Y
     props = {k: make_prop(k, vet) for k in ("cudgel", "sabre", "knife", "pistol")}
+    props["cart"] = make_cart()
+    box = make_box()
+    props["box"] = [box]
     VIEWS = [("front", (0, -6, 1.1)), ("left", (6, 0, 1.0)), ("right", (-6, 0, 1.0)), ("front34", (4.2, -4.2, 1.9)), ("back", (0, 6, 1.2))]
     names = [n for n in REVIEW_CLIPS if n in clips and (not ONLY or n in ONLY)]
     for name in names:
@@ -269,6 +346,11 @@ if REVIEW:
             fr = f0 + (f1 - f0) * i / (NFRAMES - 1)
             pose = eval_lib(act, fr)
             (vet if player else wat).apply(pose)
+            if PLAYER_CLIPS.get(name) == "box":
+                bpy.context.view_layer.update()
+                hl = (vet.rig.matrix_world @ vet.rig.pose.bones["hand_l"].matrix).to_translation()
+                hr = (vet.rig.matrix_world @ vet.rig.pose.bones["hand_r"].matrix).to_translation()
+                box.location = (hl + hr) / 2 + Vector((0, -0.04, -0.06))
             if pair and victim:
                 wat.apply(eval_lib(victim, victim.frame_range[0] + (victim.frame_range[1] - victim.frame_range[0]) * i / (NFRAMES - 1)))
             bpy.context.view_layer.update()

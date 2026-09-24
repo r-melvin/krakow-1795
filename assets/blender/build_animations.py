@@ -31,6 +31,8 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(ROOT, "assets", "models", "anim_library.glb")
 CACHE = os.path.join(os.environ.get("ANIM_CACHE", "/tmp"), "krakow_anim_reference.blend")
 FPS = 30
+CART_GRIP = (0.27, 0.45, 0.90)   # handcart shafts: grip centre half-width, forward, height (m, body frame) = Assets.CART_GRIP
+BOX_GRIP = (0.21, 0.30, 1.02)    # two-handed box carry: palm centres half-width, forward, height = Assets.BOX_GRIP
 TAKEDOWN_OFFSET = 0.22     # takedown pair: victim origin this far in front of the attacker, same facing
 REF_NAME = "watchman"
 try:
@@ -196,14 +198,18 @@ def local_rotations(P):
         R["upperarm_" + s] = rz(sg * g("ah" + S, 0)) @ ry(-sg * g("aa" + S, 0)) @ rx(-g("af" + S, 0)) @ rz(sg * g("at" + S, 0))
         R["lowerarm_" + s] = rx(-g("e" + S, 0)) @ rz(-sg * g("pr" + S, 0))
         R["hand_" + s] = ry(sg * g("wf" + S, 0)) @ rx(-g("wd" + S, 0))
-        curl = g("f" + S, 12)
+        curl, idx, hook, spread = g("f" + S, 30), g("fi" + S, 0), g("fh" + S, 0), g("fs" + S, -2)
+        grip = max(0.0, min(1.0, (curl - 55.0) / 30.0))          # a real fist closes at the knuckles too
+        w1 = lerp(lerp(0.9, 1.2, grip), 0.3, hook)
+        w2, w3 = lerp(1.1, 1.55, hook), lerp(0.8, 1.2, hook)
         for fi, fb in enumerate(("index", "middle", "ring", "pinky")):
-            spread = (fi - 1.5) * g("fs" + S, 0)
-            R["%s_01_%s" % (fb, s)] = ry(sg * curl * 0.9) @ rx(spread)
-            R["%s_02_%s" % (fb, s)] = ry(sg * curl * 1.1)
-            R["%s_03_%s" % (fb, s)] = ry(sg * curl * 0.8)
-        th = g("th" + S, 8)
-        R["thumb_01_" + s] = rx(-th * 0.4)
+            c = curl * (0.84, 1.0, 1.07, 1.14)[fi] + (idx if fb == "index" else 0.0)
+            c = max(-8.0, min(100.0, c))
+            R["%s_01_%s" % (fb, s)] = ry(sg * c * w1) @ rx((fi - 1.5) * spread)
+            R["%s_02_%s" % (fb, s)] = ry(sg * c * w2)
+            R["%s_03_%s" % (fb, s)] = ry(sg * c * w3)
+        th, tp = g("th" + S, 20), g("tp" + S, 22)
+        R["thumb_01_" + s] = rz(-sg * tp) @ rx(-th * 0.3)
         R["thumb_02_" + s] = ry(sg * th * 0.6)
         R["thumb_03_" + s] = ry(sg * th * 0.8)
     return R
@@ -489,7 +495,7 @@ def ankle_z():
 
 GLOBAL_PARAMS = "hx hy hz pp pl pt sp sl st np nl nt hp hl ht gz gp gt gl fyaw mk mbx mby mbz mpitch myaw mside mroll mlh mlw".split()
 SIDE_PARAMS = ("ik fx fy fz a to fo fr fa kp tf ta tt tz k cs cp af aa ah at e pr wf wd f fs th "
-               "ikh hx hy hz hra hyw hrl hpt pw px py pz ep wp wx wy wz kx ky kz").split()
+               "ikh hx hy hz hra hyw hrl hpt pw px py pz ep wp wx wy wz kx ky kz fi fh tp").split()
 
 
 def defaults():
@@ -498,7 +504,7 @@ def defaults():
     for S, _, sg in SIDES:
         for k in SIDE_PARAMS:
             d[k + S] = 0.0
-        d.update({"fa" + S: 1.0, "f" + S: 12.0, "th" + S: 8.0, "fz" + S: ankle_z(), "kp" + S: 8.0, "fx" + S: sg * 0.11, "pz" + S: -1.0,
+        d.update({"fa" + S: 1.0, "f" + S: 30.0, "th" + S: 20.0, "tp" + S: 22.0, "fs" + S: -2.0, "fz" + S: ankle_z(), "kp" + S: 8.0, "fx" + S: sg * 0.11, "pz" + S: -1.0,
                   "wy" + S: 1.0, "kz" + S: -1.0})
     d.update({"mpitch": 90.0, "mlh": -1.0, "mlw": 1.0})
     return d
@@ -513,7 +519,7 @@ def complete(p):
 def stand(**kw):
     """Relaxed standing: planted IK feet, soft knees, arms hanging with a slight bend, loose fingers."""
     p = {"ikL": 1, "ikR": 1, "fxL": 0.11, "fxR": -0.11, "fyL": 0.0, "fyR": -0.02, "fzL": ankle_z(), "fzR": ankle_z(),
-         "hz": -0.012, "foL": 6, "foR": 6, "eL": 12, "eR": 12, "afL": 2, "afR": 2, "fL": 18, "fR": 18, "thL": 10, "thR": 10,
+         "hz": -0.012, "foL": 6, "foR": 6, "eL": 12, "eR": 12, "afL": 2, "afR": 2, "fL": 32, "fR": 30, "thL": 22, "thR": 22,
          "gz": 0.0, "prL": 8, "prR": 8}
     p.update(kw)
     return complete(p)
@@ -621,8 +627,8 @@ def define_clips():
                 P["at" + S] = -6
                 P["pr" + S] = 18 + 8 * fore
                 P["wf" + S] = 6 - 10 * sg2 * math.cos(2 * math.pi * (ph - lag - 0.16))   # wrist drags behind
-                P["f" + S] = 24 if not run else 62
-                P["th" + S] = 14 if not run else 40
+                P["f" + S] = 34 if not run else 66
+                P["th" + S] = 22 if not run else 42
         return P
 
     # townsfolk: relaxed, unhurried (1.08 m/s, 112 steps/min)
@@ -667,7 +673,7 @@ def define_clips():
     def _carry_basket(t):
         P = gait(t, 1.05, 0.25, 0.37, 0.63, 0.07, -0.04, 0.016, lean=2, gaze=3)
         # basket on the left forearm, body counter-leans to the right, left arm still
-        P.update({"afL": 18, "aaL": 12, "ahL": -8, "eL": 95, "prL": -60, "fL": 35, "wfL": -5, "csL": 5,
+        P.update({"afL": 18, "aaL": 12, "ahL": -8, "eL": 95, "prL": -60, "fL": 80, "fhL": 1, "thL": 30, "wfL": -5, "csL": 5,
                   "sl": P["sl"] - 4, "pl": P["pl"] - 1})
         return P
 
@@ -708,7 +714,7 @@ def define_clips():
         return add(P, breath(t, 1.0, 0.25 + 0 * t))
 
     def musket_shoulder():
-        return {"mk": 1, "mbx": -0.30, "mby": 0.06, "mbz": 0.54, "mpitch": 97, "mside": 6, "mroll": -10, "mlh": -1,
+        return {"mk": 1, "mbx": -0.30, "mby": 0.06, "mbz": 0.54, "mpitch": 97, "mside": 6, "mroll": -10, "mlh": -1, "fsR": -4,
                 "fR": 75, "thR": 45}
 
     @clip("idle_alert", 2.4, loop=True)
@@ -1054,51 +1060,87 @@ def define_clips():
     ])
 
     # ---------------------------------------------------------------- being hit
-    # upper body first (head snaps, shoulders turn with the blow), hips follow, then a clear step to catch the weight
-    seq("hit_react", 0.6, [
-        K(0, **STAND),
-        K(0.06, hy=-0.02, pt=8, st=12, sp=-14, hp=-24, np=-8, afL=40, eL=80, aaL=16, afR=6, aaR=18, eR=22, hz=-0.02, gz=0),
-        K(0.16, hy=-0.07, pt=10, st=8, sp=-8, hp=-10, fyR=-0.16, fzR=AZ + 0.06, aR=10, hz=-0.05),
-        K(0.28, hy=-0.10, pt=6, st=4, sp=-2, hp=-4, fyR=-0.24, fzR=AZ, aR=0, hz=-0.06, afL=20, eL=50),
-        K(0.6, **dict(STAND, hy=-0.09, fyL=-0.02, fyR=-0.24, fxR=-0.13)),
+    # Weight first: the blow whips the head and folds the body around the impact, the knees give, one or two stumble
+    # steps with the arms thrown out for balance, the head lolls and overshoots as the body stops, then a recovery.
+    # The rig has no jaw or face bones (MPFB game_engine: 53 body bones), so a wince is faked with a head pitch/tilt,
+    # a shrug and a hand to the face; the musket hand stays low so a guard does not fling his musket around.
+    seq("hit_react", 0.95, [
+        K(0.0, **STAND),
+        K(0.05, hy=-0.02, pt=10, st=16, sp=-16, hp=-30, np=-10, ht=18, hl=12, csL=14, csR=14,
+          afL=48, aaL=40, eL=60, afR=8, aaR=30, eR=24, fL=10, hz=-0.03, gz=0),
+        K(0.15, hy=-0.07, pt=8, st=8, sp=20, np=8, hp=20, ht=-6, hl=-4, hz=-0.12, fyR=-0.22, fzR=AZ + 0.09, aR=12, kR=40,
+          afL=40, aaL=55, eL=40, aaR=40),
+        K(0.28, hy=-0.14, pl=5, sl=-8, sp=16, hp=10, ht=-14, hl=-12, hz=-0.10, fyR=-0.30, fzR=AZ, aR=0,
+          fyL=-0.10, fzL=AZ + 0.07, aL=10, **H("L", (0.03, 0.16, 1.54), fL=45, thL=30)),
+        K(0.42, hy=-0.17, pl=-3, sl=4, sp=12, hp=16, ht=6, hl=6, hz=-0.06, fyL=-0.14, fzL=AZ, aL=0),
+        K(0.62, hy=-0.16, sp=8, hp=6, ht=-3, hl=0, hz=-0.04, **H("L", (0.08, 0.10, 1.34), fL=30)),
+        K(0.95, **dict(STAND, hy=-0.14, fyL=-0.14, fyR=-0.30, sp=4)),
     ])
-    seq("hit_react_back", 0.6, [
-        K(0, **STAND),
-        K(0.06, hy=0.03, pt=-6, sp=18, hp=20, np=6, afL=-16, aaL=18, eL=30, afR=-10, aaR=16, hz=-0.03, gz=0),
-        K(0.18, hy=0.08, sp=12, hp=10, fyL=0.18, fzL=AZ + 0.07, aL=-10, hz=-0.06),
-        K(0.30, hy=0.11, sp=6, hp=4, fyL=0.24, fzL=AZ, aL=0, hz=-0.06),
-        K(0.6, **dict(STAND, hy=0.10, fyL=0.24, fyR=0.02)),
+    seq("hit_react_back", 0.95, [
+        K(0.0, **STAND),
+        K(0.05, hy=0.03, pt=-8, sp=-12, hp=26, np=12, ht=-10, csL=16, csR=16, afL=-24, aaL=34, eL=30, afR=-10, aaR=26,
+          hz=-0.03, gz=0),
+        K(0.16, hy=0.08, sp=22, hp=16, hz=-0.12, fyL=0.20, fzL=AZ + 0.09, aL=-10, kL=40, afL=30, aaL=50, eL=40, aaR=40, afR=16),
+        K(0.30, hy=0.15, pl=-4, sl=6, sp=18, hp=6, ht=10, hl=10, hz=-0.10, fyL=0.28, fzL=AZ, aL=0, fyR=0.10, fzR=AZ + 0.07, aR=-10),
+        K(0.44, hy=0.18, sp=12, hp=14, ht=-6, hl=-6, hz=-0.06, fyR=0.14, fzR=AZ, aR=0),
+        K(0.66, hy=0.17, sp=8, hp=4, ht=2, hl=0, hz=-0.04),
+        K(0.95, **dict(STAND, hy=0.16, fyL=0.28, fyR=0.14, sp=4)),
     ])
-    seq("stagger", 1.4, [
-        K(0, **STAND),
-        K(0.08, hy=-0.03, sp=-18, hp=-22, pt=6, afL=40, afR=8, aaL=40, aaR=45, eL=40, eR=20, gz=0),
-        K(0.24, hy=-0.14, hz=-0.07, pl=5, sl=-8, fyR=-0.30, fzR=AZ + 0.08, aR=10, sp=-10),
-        K(0.36, hy=-0.22, fyR=-0.36, fzR=AZ, aR=0, aaL=55, aaR=50),
-        K(0.52, hy=-0.34, hz=-0.10, pl=-5, sl=8, fyL=-0.26, fzL=AZ + 0.08, aL=10),
-        K(0.64, hy=-0.44, fyL=-0.56, fzL=AZ, aL=0),
-        K(0.80, hy=-0.54, hz=-0.12, pl=4, sl=-4, fyR=-0.40, fzR=AZ + 0.06, sp=6, hp=4),
-        K(0.92, hy=-0.60, fyR=-0.70, fzR=AZ, afL=30, afR=6, aaL=20, aaR=20),
-        K(1.4, **dict(STAND, hy=-0.62, fyL=-0.56, fyR=-0.70, hz=-0.04, sp=6)),
+    seq("stagger", 1.6, [
+        K(0.0, **STAND),
+        K(0.06, hy=-0.03, sp=-22, hp=-32, np=-10, ht=20, hl=14, pt=10, st=14, csL=16, csR=16,
+          afL=50, afR=8, aaL=50, aaR=45, eL=40, eR=20, hz=-0.04, gz=0),
+        K(0.20, hy=-0.14, hz=-0.12, pl=6, sl=-10, sp=12, hp=18, ht=-10, fyR=-0.30, fzR=AZ + 0.10, aR=12, kR=40, aaL=70, afL=60),
+        K(0.32, hy=-0.22, fyR=-0.36, fzR=AZ, aR=0, hp=6, hl=-14, afL=80, aaL=40, eL=70),
+        K(0.48, hy=-0.34, hz=-0.16, pl=-6, sl=10, sp=20, hp=22, ht=12, hl=10, fyL=-0.26, fzL=AZ + 0.09, aL=12, kL=40,
+          afL=20, aaL=70, aaR=55),
+        K(0.60, hy=-0.44, fyL=-0.58, fzL=AZ, aL=0, hp=10),
+        K(0.76, hy=-0.54, hz=-0.20, pl=5, sl=-6, sp=24, hp=26, hl=-12, fyR=-0.44, fzR=AZ + 0.07, kL=60, kR=40),   # nearly goes down
+        K(0.90, hy=-0.60, fyR=-0.74, fzR=AZ, hz=-0.16, hp=14),
+        K(1.10, hy=-0.62, hz=-0.10, sp=14, hp=10, hl=4, afL=30, afR=6, aaL=30, aaR=24, **H("L", (0.14, 0.20, 0.72), fL=40)),  # hand on knee
+        K(1.6, **dict(STAND, hy=-0.64, fyL=-0.58, fyR=-0.74, hz=-0.04, sp=6)),
     ])
-    seq("shoved", 1.0, [
-        K(0, **STAND),
-        K(0.06, sp=-14, cpL=-14, cpR=-14, hp=-10, afL=34, afR=8, aaL=24, aaR=34, eL=40, eR=20, gz=0),
-        K(0.16, hy=-0.10, hz=-0.05, sp=-8, fyR=-0.22, fzR=AZ + 0.08, aR=12),
-        K(0.30, hy=-0.20, hz=-0.08, fyR=-0.36, fzR=AZ, aR=0),
-        K(0.44, hy=-0.26, fyL=-0.14, fzL=AZ + 0.05, sp=4),
-        K(0.56, fyL=-0.20, fzL=AZ),
-        K(1.0, **dict(STAND, hy=-0.28, fyL=-0.20, fyR=-0.36, sp=4)),
+    seq("shoved", 1.1, [
+        K(0.0, **STAND),
+        K(0.05, sp=-16, cpL=-14, cpR=-14, hp=16, np=10, afL=40, afR=8, aaL=30, aaR=34, eL=40, eR=20, hz=-0.03, gz=0),
+        K(0.14, hy=-0.10, hz=-0.08, sp=-10, hp=-12, ht=8, fyR=-0.24, fzR=AZ + 0.09, aR=12, aaL=55, afL=55),
+        K(0.28, hy=-0.20, hz=-0.10, fyR=-0.38, fzR=AZ, aR=0, hp=8, ht=-8, pl=4, sl=-6),
+        K(0.42, hy=-0.27, fyL=-0.16, fzL=AZ + 0.07, sp=6, hp=12, pl=-3, sl=4),
+        K(0.54, fyL=-0.22, fzL=AZ, hp=4, ht=0),
+        K(1.1, **dict(STAND, hy=-0.28, fyL=-0.22, fyR=-0.38, sp=4)),
     ])
-    # seized by the collar from the front: yanked forward, hands clamp the grabber's wrists, twisting to break free
-    seq("grabbed", 1.6, [
-        K(0, **STAND),
-        K(0.10, hy=0.06, sp=14, hp=8, csL=14, csR=14, gz=0.4, fyL=0.08, fzL=AZ + 0.04),
-        K(0.22, fyL=0.10, fzL=AZ, **H("L", (0.07, 0.24, 1.30), fL=85), **G("R", (-0.07, 0.25, 1.26), (1, 0, 0.1), (0.6, 0.3, -1))),
-        K(0.55, pt=18, st=16, sp=8, ht=-18, hxL=0.10, hxR=-0.02, fyR=-0.14, fzR=AZ),
-        K(0.90, pt=-20, st=-18, sp=6, ht=16, hxL=0.02, hxR=-0.10, fyR=-0.08),
-        K(1.25, pt=14, st=12, sp=14, hp=12, ht=-8, hyL=0.28, hyR=0.29),
-        K(1.6, pt=-4, st=-4, sp=10, ht=0, hyL=0.25, hyR=0.26),
+    # seized by the collar from the front: yanked forward (head whips), hands clamp the grabber's wrists, twisting and
+    # pulling back, knees bent, the head turning away from the grabber's face
+    seq("grabbed", 1.7, [
+        K(0.0, **STAND),
+        K(0.08, hy=0.08, sp=16, hp=18, np=8, csL=16, csR=16, gz=0, fyL=0.10, fzL=AZ + 0.05),
+        K(0.20, fyL=0.12, fzL=AZ, hp=-8, **H("L", (0.07, 0.24, 1.30), fL=85, thL=50), **G("R", (-0.07, 0.25, 1.26), (1, 0, 0.1), (0.6, 0.3, -1))),
+        K(0.50, pt=20, st=18, sp=-6, hy=0.02, hz=-0.08, ht=-26, hl=-10, hxL=0.10, hxR=-0.02, fyR=-0.18, fzR=AZ),
+        K(0.85, pt=-22, st=-20, sp=-4, ht=24, hl=10, hxL=0.02, hxR=-0.10, fyR=-0.10, hz=-0.10),
+        K(1.20, pt=16, st=14, sp=-8, hp=-14, ht=-14, hy=-0.02, hyL=0.30, hyR=0.31),
+        K(1.7, pt=-4, st=-4, sp=6, hp=4, ht=0, hyL=0.26, hyR=0.27, hz=-0.06),
     ])
+    # a flinch: shoulders up, head ducks and turns away, eyes-shut tilt, one hand comes up; feet stay planted
+    seq("wince", 0.6, [
+        K(0.0, **STAND),
+        K(0.06, csL=20, csR=20, cpL=8, cpR=8, sp=10, hp=24, np=6, ht=-22, hl=-14, hz=-0.04, gz=0,
+          **H("L", (0.06, 0.20, 1.50), fL=40, thL=30)),
+        K(0.24, csL=14, csR=14, hp=18, ht=-16, hl=-10),
+        K(0.6, **STAND),
+    ])
+    # wounded: hunched over a hand pressed to the right side, weight on the left leg, the right knee bent and heel up,
+    # laboured breathing, the head sagging and rolling; a stab of pain (wince) once per loop
+    pain = dict(STAND, hx=0.05, hz=-0.06, pl=4, sp=18, st=8, sl=-4, np=10, hp=10, fxL=0.12, fxR=-0.12, fyR=0.10,
+                fzR=AZ + 0.05, aR=-14, toR=14, gz=0.0,
+                afR=6, aaR=10, eR=24, fR=45, **H("L", (-0.07, 0.16, 1.06), fL=55, thL=30, hraL=0))
+
+    def _pain(t):
+        b = math.sin(t * math.tau * 0.5)
+        stab = math.exp(-((t - 1.9) / 0.18) ** 2)
+        return add(pain, {"sp": 2.5 * b + 8 * stab, "csL": 3 * b + 10 * stab, "csR": 3 * b + 10 * stab,
+                          "hp": 4 * math.sin(t * math.tau / 3.0) + 10 * stab, "ht": 8 * math.sin(t * math.tau / 3.0 + 1.0) - 12 * stab,
+                          "hz": -0.01 * b - 0.03 * stab, "hx": 0.01 * math.sin(t * math.tau / 3.0)})
+    CLIPS["pain_idle"] = (3.0, _pain, True)
 
     # ---------------------------------------------------------------- player weapons (stand-ins in the review sheets)
     # guard stance: left foot forward, pelvis bladed, left hand up as a guard, head on the target
@@ -1161,11 +1203,11 @@ def define_clips():
     ])
     # pistol: duelling line, right shoulder to the target, arm straight at shoulder height, off hand on the back
     aim_pistol = dict(STAND, fxL=0.14, fyL=-0.20, foL=55, fxR=-0.05, fyR=0.14, foR=4, pt=52, st=24, gz=1.0, gt=0, gp=0, csR=4,
-                      **G("R", (-0.03, 0.70, 1.45), (0, 0, 1), (0, 1, 0), fR=80, thR=30), **H("L", (0.12, -0.18, 1.00), epL=30))
+                      **G("R", (-0.03, 0.70, 1.45), (0, 0, 1), (0, 1, 0), fR=86, fiR=-46, thR=34), **H("L", (0.12, -0.18, 1.00), epL=30))
     seq("pistol_draw", 0.85, [
         K(0.0, **STAND),
         K(0.24, st=8, gz=0.8, gp=20, **G("R", (0.06, 0.16, 1.02), (-0.3, 0.2, 0.93), (0.6, 0.6, -0.4), fR=30)),
-        K(0.36, fR=85),
+        K(0.36, fR=86, fiR=-46),
         K(0.56, pt=30, st=14, fyL=-0.12, fzL=AZ + 0.04, gp=0, **G("R", (-0.10, 0.36, 1.50), (0, -0.3, 0.95), (0, 0.95, 0.3))),
         K(0.85, **aim_pistol),
     ])
@@ -1404,8 +1446,46 @@ def define_clips():
         K(2.0, **lie_back(hy=0.12, pt=70, ht=30)),
     ])
 
+    # ---------------------------------------------------------------- handcart and two-handed carrying (vendors)
+    # Hands on the cart shafts at CART_GRIP (body frame: x = left, y = forward, z = up, from the character's origin);
+    # the vendors agent places its shafts' grip points there (Assets.CART_GRIP). Hammer grip, thumbs forward.
+    def cart_hands(P, bob=0.0):
+        for S, sg in (("L", 1.0), ("R", -1.0)):
+            P.update(G(S, (sg * CART_GRIP[0], CART_GRIP[1], CART_GRIP[2] + bob), (0, 1, 0.08), (sg * 0.15, 0.35, -1)))
+            P["ep" + S] = 15
+        return P
+
+    @clip("push_cart", 1.0, loop=True)
+    def _push_cart(t):
+        P = gait(t, 1.0, 0.20, 0.32, 0.66, 0.06, -0.08, 0.012, sway=0.02, twist=3, roll=3, lean=16, arms=False, gaze=-2,
+                 load=0.018, head_hold=0.7, toe_off=30, strike=10)
+        P["hy"] = -0.04
+        return cart_hands(P, 0.006 * math.cos(4 * math.pi * t))
+
+    def _cart_hold(t):
+        P = stand(sp=8, hz=-0.03, fyL=0.08, fyR=-0.10, gz=0.5, gp=4)
+        return add(cart_hands(P), breath(t))
+    CLIPS["cart_hold"] = (4.0, _cart_hold, True)
+
+    # a box / crate held in front against the chest, palms on its sides, elbows in, leaning back a touch
+    def box_hands(P):
+        for S, sg in (("L", 1.0), ("R", -1.0)):
+            P.update({"ikh" + S: 1, "hx" + S: sg * BOX_GRIP[0], "hy" + S: BOX_GRIP[1], "hz" + S: BOX_GRIP[2], "hra" + S: 1,
+                      "hrl" + S: 80, "hpt" + S: -10, "f" + S: 30, "th" + S: 20, "ep" + S: -10, "wp" + S: 0})
+        return P
+
+    @clip("carry_two_hand", 1.05, loop=True)
+    def _carry_two_hand(t):
+        P = gait(t, 1.05, 0.23, 0.34, 0.64, 0.065, -0.05, 0.016, sway=0.03, twist=2.5, roll=4, lean=-4, arms=False, gaze=6,
+                 load=0.016, head_hold=0.6)
+        return box_hands(P)
+
+    def _box_hold(t):
+        return add(box_hands(stand(sp=-3, gz=0.5, gp=6)), breath(t, 1.3))
+    CLIPS["carry_two_hand_idle"] = (4.0, _box_hold, True)
+
     # ---------------------------------------------------------------- townsfolk life
-    talk = stand(fxL=0.12, fxR=-0.10, fyL=0.04, fyR=-0.04, foL=12, hz=-0.015, gz=0.4)
+    talk = stand(fsL=3, fsR=3, fxL=0.12, fxR=-0.10, fyL=0.04, fyR=-0.04, foL=12, hz=-0.015, gz=0.4)
     seq("talk_gesture_a", 3.2, [
         K(0.0, **talk),
         K(0.5, afR=30, eR=80, ahR=-10, prR=-60, wfR=-10, fR=10, thR=0, st=6, hp=4, ht=-4, sl=2),
@@ -1566,6 +1646,13 @@ def bake(rig, solver, name, length, fn, loop):
     for f in range(0, frames + 1):          # a loop's last frame equals its first
         t = f / FPS
         P = fn(t % length if loop else min(t, length))
+        # finger micro-motion so hands never freeze: whole cycles per clip, so loops stay seamless
+        cyc = max(1, round(length / 2.3))
+        for S, ph0 in (("L", 0.0), ("R", 1.7)):
+            w = math.tau * cyc * t / length
+            P["f" + S] = P.get("f" + S, 30) + 2.5 * math.sin(w + ph0)
+            P["fi" + S] = P.get("fi" + S, 0) - 2.0 * math.sin(w * 2 + ph0 + 0.8)
+            P["th" + S] = P.get("th" + S, 20) + 1.5 * math.sin(w + ph0 + 2.1)
         basis, loc = solver.solve(P)
         for n, q in basis.items():
             pb = pbs[n]
@@ -1617,7 +1704,7 @@ def main():
         length, fn, loop = CLIPS[n]
         bake(rig, solver, n, length, fn, loop)
     log("baked %d clips: %s" % (len(names), " ".join(names)))
-    for n in ("walk", "walk_player", "walk_fast", "jog", "run", "sneak", "walk_carry", "carry_basket", "guard_march"):
+    for n in ("walk", "walk_player", "walk_fast", "jog", "run", "sneak", "walk_carry", "carry_basket", "guard_march", "push_cart", "carry_two_hand"):
         if n in GAIT_SPEED:
             log("speed %s %.2f m/s" % (n, GAIT_SPEED[n]))
     for pb in rig.pose.bones:

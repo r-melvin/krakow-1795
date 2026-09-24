@@ -367,6 +367,9 @@ func _animate(planar: float) -> void:
 		else:
 			Assets.play(_figure, "idle_alert")
 		return
+	if planar <= 0.3 and health > 0 and health * 2 <= MAX_HEALTH and state != State.ALARM:
+		Assets.play(_figure, "pain_idle")      # wounded and not fighting: hunched over the hurt, favouring a leg
+		return
 	match state:
 		State.CALM:
 			if planar > 2.6:

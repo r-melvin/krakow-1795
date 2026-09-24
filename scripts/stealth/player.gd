@@ -34,6 +34,7 @@ const Traversal := preload("res://scripts/stealth/traversal.gd")
 const Pickup := preload("res://scripts/stealth/pickup.gd")
 const FpView := preload("res://scripts/stealth/fp_view.gd")
 const Verbs := preload("res://scripts/stealth/verbs.gd")
+const Blood := preload("res://scripts/stealth/blood.gd")
 
 enum CamMode { THIRD, SHOULDER, FIRST }
 const CAM_BLEND := 0.25            ## seconds for a camera mode change
@@ -151,6 +152,7 @@ func _ready() -> void:
 	kit.changed.connect(_update_hand_prop)
 	trav = Traversal.new(self)
 	_update_hand_prop.call_deferred()
+	_attach_satchel.call_deferred()
 	var args := OS.get_cmdline_user_args()
 	for a in args:
 		if a.begins_with("--shot=") and "--smoke" in args and not sandbox:
@@ -158,6 +160,9 @@ func _ready() -> void:
 		if a.begins_with("--fight-shot=") and not sandbox and not _fight_started:
 			_fight_started = true
 			Player._fight_shots(a.trim_prefix("--fight-shot="))
+		if a.begins_with("--anim-shot=") and not sandbox and not _fight_started:
+			_fight_started = true
+			Player._anim_shots(a.trim_prefix("--anim-shot="))
 		if a.begins_with("--walk-shot=") and not sandbox and not _fight_started:
 			_fight_started = true
 			Player._walk_shots(a.trim_prefix("--walk-shot="))
@@ -621,7 +626,7 @@ func _animate(planar: float, moving: bool, delta: float) -> void:
 	elif _shot_walk and not Mission.dialogue_blocking():
 		Assets.play_move(_figure, "walk_fast", 2.2)
 	else:
-		Assets.play(_figure, "idle")
+		Assets.play(_figure, "pain_idle" if health * 2 <= MAX_HEALTH else "idle")   # wounded: hunched over the hurt
 
 
 ## Normal of the nearest wall within HIDE_WALL_DIST of the capsule (8 rays at knee height), or ZERO.
@@ -789,6 +794,9 @@ func attack() -> String:
 		velocity = Vector3.ZERO
 		Assets.play_action(_figure, "knife_stab" if (lethal or staggered) else "takedown")
 		kit.last_takedown = "thrust" if staggered else ("lethal" if lethal else "choke")
+		if lethal or staggered:
+			Blood.wound(target, global_position, 1.0 if lethal else 0.8)
+			Blood.stain_weapon(held_prop())
 		if target is Guard:
 			if lethal:
 				target.dead = true
@@ -805,6 +813,8 @@ func attack() -> String:
 		match wpn:
 			"knife":
 				Assets.play_action(_figure, "knife_slash")
+				Blood.wound(target, global_position, 0.6)
+				Blood.stain_weapon(held_prop())
 				target.take_hit(self)
 			"musket":
 				# a two-handed club: slow, heavy (two blows' worth), loud
@@ -877,6 +887,7 @@ func fire_pistol() -> String:
 	var result := "miss"
 	if target:
 		result = "hit"
+		Blood.wound(target, global_position, 1.4)
 		if target is Guard:
 			target.dead = true
 			target.knock_down(1.0e9, true)
@@ -1004,8 +1015,41 @@ func drop_item(item: String) -> void:
 
 
 ## The current weapon in the right hand (kit_<item>.glb on a BoneAttachment3D), or nothing.
+## The model shown in the right hand for each kit item (kit_<name>.glb); the coin purse for coins.
+const HELD_MODEL := {"knife": "knife", "cosh": "cosh", "cudgel": "cudgel", "pistol": "pistol", "musket": "musket",
+		"torch": "torch", "stone": "stone", "bottle": "bottle", "coin": "pouch", "food": "food", "smoke": "smoke",
+		"flash": "flash", "poison": "poison", "tinderbox": "tinderbox", "lockpick": "lockpick"}
+
+
+## The item whose prop is in the hand now ("" if none).
+func held_item() -> String:
+	return _hand_item.trim_suffix("_lit") if _hand_prop and is_instance_valid(_hand_prop) else ""
+
+
+## The prop node in the hand (for blood on the blade), or null.
+func held_prop() -> Node3D:
+	if _hand_prop == null or not is_instance_valid(_hand_prop) or _hand_prop.get_child_count() == 0:
+		return null
+	return _hand_prop.get_child(0) as Node3D
+
+
+## Grip transform for `item` on the hand_r bone: data/stealth.json kit.grips[item] = {pos: [x, y, z] (m, bone
+## space), rot: [x, y, z] (degrees)}, else kit.grips.default. Props are modelled grip at the origin, business end +Y.
+func grip_for(item: String) -> Transform3D:
+	var grips: Variant = _tv("kit.grips", {})
+	var g: Dictionary = {}
+	if grips is Dictionary:
+		g = (grips as Dictionary).get(item, (grips as Dictionary).get("default", {}))
+	var pos := Perception.vec(g.get("pos", [0.0, 0.08, 0.03]))
+	var rot := Perception.vec(g.get("rot", [0.0, 0.0, -90.0]))
+	var sc := float(g.get("scale", 1.0))
+	var basis := Basis.from_euler(Vector3(deg_to_rad(rot.x), deg_to_rad(rot.y), deg_to_rad(rot.z))).scaled(Vector3.ONE * sc)
+	return Transform3D(basis, pos)
+
+
+## The current kit item in the right hand (kit_<model>.glb on a BoneAttachment3D with its grip).
 func _update_hand_prop() -> void:
-	var item: String = kit.current if kit and kit.current in ["knife", "cosh", "cudgel", "pistol", "musket", "torch"] else ""
+	var item: String = kit.current if kit and HELD_MODEL.has(kit.current) and kit.has(kit.current) else ""
 	var key := item + ("_lit" if item == "torch" and kit.torch_lit else "")
 	if key == _hand_item and (_hand_prop == null or is_instance_valid(_hand_prop)):
 		return
@@ -1013,22 +1057,20 @@ func _update_hand_prop() -> void:
 	if _hand_prop and is_instance_valid(_hand_prop):
 		_hand_prop.queue_free()
 	_hand_prop = null
-	if item == "" or not ResourceLoader.exists("res://assets/models/kit_%s.glb" % item) or _figure == null or not is_inside_tree():
+	var model: String = "kit_" + str(HELD_MODEL.get(item, item))
+	if item == "" or not ResourceLoader.exists("res://assets/models/%s.glb" % model) or _figure == null or not is_inside_tree():
 		return
 	var sks := _figure.find_children("*", "Skeleton3D", true, false)
 	if sks.is_empty():
 		return
 	var sk: Skeleton3D = sks[0]
-	var bi := sk.find_bone("hand_r")
-	if bi < 0:
+	if sk.find_bone("hand_r") < 0:
 		return
 	var ba := BoneAttachment3D.new()
 	ba.bone_name = "hand_r"
 	sk.add_child(ba)
-	var m := Assets.instance("kit_" + item)
-	# kit props are modelled along +Y (Godot) from the grip; the hand bone runs wrist -> fingers along its +Y
-	m.position = Vector3(0.0, 0.08, 0.03)
-	m.rotation = Vector3(0, 0, -PI * 0.5)
+	var m := Assets.instance(model)
+	m.transform = grip_for(item)
 	ba.add_child(m)
 	_hand_prop = ba
 	if key == "torch_lit":
@@ -1038,18 +1080,19 @@ func _update_hand_prop() -> void:
 		fl.light_energy = 2.2
 		fl.omni_range = 7.0
 		fl.shadow_enabled = not sandbox
-		fl.position = m.position + m.basis * Vector3(0, 0.45, 0)
+		fl.position = m.transform * Vector3(0, 0.49, 0)
 		ba.add_child(fl)
 		var flame := MeshInstance3D.new()
 		var sm := SphereMesh.new()
-		sm.radius = 0.06
-		sm.height = 0.18
+		sm.radius = 0.035
+		sm.height = 0.13
 		var mat := StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.albedo_color = Color(1.0, 0.7, 0.3)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(1.0, 0.62, 0.22, 0.85)
 		mat.emission_enabled = true
-		mat.emission = Color(1.0, 0.55, 0.2)
-		mat.emission_energy_multiplier = 4.0
+		mat.emission = Color(1.0, 0.5, 0.15)
+		mat.emission_energy_multiplier = 1.6
 		sm.material = mat
 		flame.mesh = sm
 		flame.position = fl.position
@@ -1100,6 +1143,8 @@ func take_hit(from: Node3D) -> void:
 		end_fp()
 	health -= 1
 	_lock = 0.35
+	if from and from.get("_figure") and Assets.action_clip(from.get("_figure")) in ["bayonet_thrust", "musket_fire", "sabre_slash"]:
+		Blood.wound(self, from.global_position, 0.9)
 	if from:
 		var push := global_position - from.global_position
 		push.y = 0.0
@@ -1124,6 +1169,32 @@ func take_hit(from: Node3D) -> void:
 
 
 # ------------------------------------------------------------------ carried bundle and cloak
+
+## The satchel the kit lives in (assets/models/satchel.glb), on the left hip: a pelvis-bone attachment placed from the
+## figure's rest so it rides crouches and runs.
+var _satchel: Node3D
+
+
+func _attach_satchel() -> void:
+	if _satchel or _figure == null or not ResourceLoader.exists("res://assets/models/satchel.glb") or not is_inside_tree():
+		return
+	var sks := _figure.find_children("*", "Skeleton3D", true, false)
+	var m := Assets.instance("satchel")
+	if m == null:
+		return
+	var want := _figure.global_transform * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(-0.21, 1.0, 0.03))
+	if not sks.is_empty() and (sks[0] as Skeleton3D).find_bone("pelvis") >= 0:
+		var ba := BoneAttachment3D.new()
+		ba.bone_name = "pelvis"
+		(sks[0] as Skeleton3D).add_child(ba)
+		ba.add_child(m)
+		m.global_transform = want
+		_satchel = ba
+	else:
+		_figure.add_child(m)
+		m.global_transform = want
+		_satchel = m
+
 
 func _update_props() -> void:
 	if _figure == null:
@@ -1686,3 +1757,190 @@ static func _walk_shots(dir: String) -> void:
 				shots += 1
 	vp.queue_free()
 	print("[smoke] walk shots=%d models=%s in %s" % [shots, models, dir])
+
+
+## A private lit stage (SubViewport with its own World3D) for capture modes; returns [viewport, camera].
+static func _capture_stage(tree: SceneTree) -> Array:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(1280, 720)
+	vp.own_world_3d = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	tree.root.add_child(vp)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.62, 0.66, 0.72)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(0.55, 0.55, 0.58)
+	vp.add_child(env)
+	var sun := DirectionalLight3D.new()
+	sun.rotation = Vector3(-0.9, 0.5, 0)
+	sun.shadow_enabled = true
+	vp.add_child(sun)
+	var ground := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(30, 30)
+	ground.mesh = pm
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(0.38, 0.38, 0.36)
+	ground.material_override = gm
+	vp.add_child(ground)
+	var cam := Camera3D.new()
+	cam.fov = 34
+	vp.add_child(cam)
+	cam.current = true
+	return [vp, cam]
+
+
+static func _pose(f: Node3D, clip: String, t: float) -> void:
+	var name := Assets.resolve(f, clip)
+	if name == "":
+		return
+	var ap: AnimationPlayer = f.get_meta("anim")
+	Assets.play_action(f, clip, 1.0, true, 0.0)
+	ap.seek(minf(t, ap.get_animation(name).length), true)
+	ap.pause()
+
+
+static func _snap(tree: SceneTree, vp: SubViewport, cam: Camera3D, from: Vector3, at: Vector3, path: String) -> void:
+	cam.position = from
+	cam.look_at(at)
+	for k in 4:
+		await tree.process_frame
+	vp.get_texture().get_image().save_png(path)
+
+
+## Capture mode (`-- --smoke --anim-shot=/dir`): hit sequence (player hit by a guard's butt stroke, stagger,
+## knockdown, wounded idle), a townsman pushing a stand-in handcart and carrying a box, and a hand close-up of three
+## figures in the same idle frame (per-model finger variation). Private stage, so the smoke run cannot disturb it.
+static func _anim_shots(dir: String) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	for i in 150:
+		await tree.process_frame
+	DirAccess.make_dir_recursive_absolute(dir)
+	var st := _capture_stage(tree)
+	var vp: SubViewport = st[0]
+	var cam: Camera3D = st[1]
+	var pl := Assets.character(GameState.figure_name())
+	var gd := Assets.character("watchman")
+	var tm := Assets.character("npc_m_01")
+	var tw := Assets.character("npc_f_02")
+	for f in [pl, gd, tm, tw]:
+		if f:
+			vp.add_child(f)
+			f.visible = false
+	var n := 0
+	# hit sequence: player at the origin facing -X, the guard 1.35 m in front of him facing back
+	pl.visible = true
+	gd.visible = true
+	pl.position = Vector3.ZERO
+	pl.rotation.y = PI * 0.5
+	gd.position = Vector3(-1.35, 0, 0)
+	gd.rotation.y = -PI * 0.5
+	var mid := Vector3(-0.6, 0.9, 0)
+	for t in [0.05, 0.15, 0.28, 0.45, 0.95]:
+		_pose(gd, "musket_butt", 0.42 + t * 0.4)
+		_pose(pl, "hit_react", t)
+		await _snap(tree, vp, cam, mid + Vector3(0, 0.1, 6.5), mid, "%s/hit_react_%03d_side.png" % [dir, int(t * 100)])
+		await _snap(tree, vp, cam, mid + Vector3(-3.4, 0.7, 4.4), mid, "%s/hit_react_%03d_front.png" % [dir, int(t * 100)])
+		n += 2
+	gd.visible = false
+	for c in [["hit_react_back", [0.05, 0.3]], ["stagger", [0.2, 0.48, 0.76]], ["shoved", [0.14, 0.42]], ["knocked_down", [0.28, 0.66, 1.4]]]:
+		for t in c[1]:
+			_pose(pl, c[0], t)
+			var m := Vector3(0.3, 0.8, 0)
+			await _snap(tree, vp, cam, m + Vector3(0, 0.1, 6.5), m, "%s/%s_%03d_side.png" % [dir, c[0], int(t * 100)])
+			await _snap(tree, vp, cam, m + Vector3(-4.2, 0.6, 3.6), m, "%s/%s_%03d_front.png" % [dir, c[0], int(t * 100)])
+			n += 2
+	# wounded idle on the player and on the guard, side by side
+	gd.visible = true
+	gd.position = Vector3(1.6, 0, 0)
+	gd.rotation.y = PI * 0.5
+	_pose(pl, "pain_idle", 0.6)
+	_pose(gd, "pain_idle", 1.9)
+	await _snap(tree, vp, cam, Vector3(0.8, 1.0, 6.5), Vector3(0.8, 0.9, 0), "%s/pain_idle_side.png" % dir)
+	await _snap(tree, vp, cam, Vector3(-3.4, 1.5, 3.8), Vector3(0.8, 0.9, 0), "%s/pain_idle_front.png" % dir)
+	n += 2
+	pl.visible = false
+	gd.visible = false
+	# handcart and box on a townsman
+	if tm:
+		tm.visible = true
+		tm.position = Vector3.ZERO
+		tm.rotation.y = PI * 0.5
+		var cart := _stand_in_cart()
+		tm.add_child(cart)
+		for t in [0.1, 0.35]:
+			_pose(tm, "push_cart", t)
+			await _snap(tree, vp, cam, Vector3(-0.6, 1.0, 6.0), Vector3(-0.6, 0.8, 0), "%s/push_cart_%03d_side.png" % [dir, int(t * 100)])
+			await _snap(tree, vp, cam, Vector3(-4.6, 1.6, 3.4), Vector3(-0.6, 0.8, 0), "%s/push_cart_%03d_front.png" % [dir, int(t * 100)])
+			n += 2
+		cart.queue_free()
+		var box := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(Assets.BOX_GRIP.x * 2 - 0.08, 0.30, 0.34)
+		box.mesh = bm
+		box.position = Vector3(0, Assets.BOX_GRIP.z - 0.06, -Assets.BOX_GRIP.y)
+		tm.add_child(box)
+		_pose(tm, "carry_two_hand", 0.2)
+		await _snap(tree, vp, cam, Vector3(0, 1.0, 5.0), Vector3(0, 0.9, 0), "%s/carry_two_hand_side.png" % dir)
+		await _snap(tree, vp, cam, Vector3(-3.4, 1.5, 2.6), Vector3(0, 0.9, 0), "%s/carry_two_hand_front.png" % dir)
+		n += 2
+		box.queue_free()
+	# hands: three figures in the same idle frame, from the front (their finger curl and wrists differ per model)
+	var row := [pl, tm, tw]
+	for i in row.size():
+		if row[i] == null:
+			continue
+		row[i].visible = true
+		row[i].position = Vector3(0.8 * i, 0, 0)
+		row[i].rotation.y = 0.0
+		_pose(row[i], "idle", 1.0)
+	cam.fov = 22
+	await _snap(tree, vp, cam, Vector3(0.8, 0.95, -4.2), Vector3(0.8, 0.9, 0), "%s/hands_idle_variation.png" % dir)
+	for i in row.size():
+		if row[i]:
+			_pose(row[i], "talk_gesture_a", 0.9)
+	await _snap(tree, vp, cam, Vector3(0.8, 1.1, -4.2), Vector3(0.8, 1.0, 0), "%s/hands_talk_variation.png" % dir)
+	n += 2
+	vp.queue_free()
+	print("[smoke] anim shots=%d in %s" % [n, dir])
+
+
+## Two shafts ending at Assets.CART_GRIP in the figure's frame, a bed and a wheel ahead of it (child of the pivot).
+static func _stand_in_cart() -> Node3D:
+	var c := Node3D.new()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.45, 0.31, 0.17)
+	var g := Assets.CART_GRIP
+	for sx in [-1.0, 1.0]:
+		var shaft := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.022
+		cm.bottom_radius = 0.022
+		cm.height = 1.5
+		shaft.mesh = cm
+		shaft.material_override = mat
+		# pivot frame: x = figure's right, -z = forward; the shaft runs forward and a little down from the grip
+		shaft.rotation.x = -PI * 0.5 - 0.14
+		shaft.position = Vector3(sx * g.x, g.z - 0.10, -(g.y + 0.75))
+		c.add_child(shaft)
+	var bed := MeshInstance3D.new()
+	var bb := BoxMesh.new()
+	bb.size = Vector3(0.62, 0.22, 0.8)
+	bed.mesh = bb
+	bed.material_override = mat
+	bed.position = Vector3(0, 0.66, -(g.y + 1.15))
+	c.add_child(bed)
+	var wheel := MeshInstance3D.new()
+	var wm := CylinderMesh.new()
+	wm.top_radius = 0.34
+	wm.bottom_radius = 0.34
+	wm.height = 0.06
+	wheel.mesh = wm
+	wheel.material_override = mat
+	wheel.rotation.z = PI * 0.5
+	wheel.position = Vector3(0, 0.34, -(g.y + 1.2))
+	c.add_child(wheel)
+	return c
+

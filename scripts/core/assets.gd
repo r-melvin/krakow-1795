@@ -149,13 +149,24 @@ const LOOPING := {
 	"carry_basket": true, "sneak": true, "crouch_idle": true, "crouch_hide": true, "prone_idle": true, "prone_crawl": true,
 	"prone_crawl_side": true, "crouch_crawl": true, "guard_sentry": true, "guard_march": true, "guard_alert_look": true,
 	"musket_aim": true, "musket_ready": true, "pistol_aim": true, "block": false, "talk_gesture_a": true, "talk_gesture_b": true,
-	"haggle": true, "sit_idle": true, "sweep": true,
+	"haggle": true, "sit_idle": true, "sweep": true, "pain_idle": true, "push_cart": true, "cart_hold": true,
+	"carry_two_hand": true, "carry_two_hand_idle": true,
 }
+
+## Where hands grip, in the character's frame (x = its left, y = forward, z = up, metres from its origin), so props can
+## be placed to meet them: handcart shafts (push_cart, cart_hold) are gripped at (+-x, y, z); a box (carry_two_hand)
+## is held between palms at (+-x, y, z). Same numbers as CART_GRIP / BOX_GRIP in build_animations.py.
+const CART_GRIP := Vector3(0.27, 0.45, 0.90)
+const BOX_GRIP := Vector3(0.21, 0.30, 1.02)
+
+## Per-model hand variation applied at retarget time: finger curl scaled by up to +-15 %, wrist turned up to +-6 deg.
+const HAND_VARIATION := 0.15
+const WRIST_VARIATION := 0.10
 
 ## Ground speed (m/s) each in-place locomotion clip was authored at (stride / stance time in build_animations.py).
 const CLIP_SPEED := {
 	"walk": 0.93, "walk_player": 1.27, "walk_fast": 2.18, "jog": 2.57, "run": 4.84, "walk_carry": 0.85, "carry_basket": 0.94,
-	"sneak": 1.28, "guard_march": 1.78, "prone_crawl": 0.70, "prone_crawl_side": 0.35, "crouch_crawl": 0.31,
+	"sneak": 1.28, "guard_march": 1.78, "push_cart": 0.79, "carry_two_hand": 0.85, "prone_crawl": 0.70, "prone_crawl_side": 0.35, "crouch_crawl": 0.31,
 }
 
 ## Gameplay state -> clip. Scripts ask Assets.clip_for("prone") instead of hard-coding clip names.
@@ -165,7 +176,7 @@ const STATE_CLIP := {
 	"crawl": "prone_crawl", "attack": "attack_swing", "thrust": "attack_thrust", "takedown": "takedown", "hit": "hit_react",
 	"hit_back": "hit_react_back", "down": "knocked_down", "dead": "death_fall", "get_up": "get_up", "sentry": "guard_sentry",
 	"march": "guard_march", "search": "guard_alert_look", "fight": "musket_ready", "strike": "musket_butt",
-	"seize": "guard_seize", "sit": "sit_idle", "talk": "talk_gesture_a", "haggle": "haggle", "sweep": "sweep",
+	"seize": "guard_seize", "wounded": "pain_idle", "wince": "wince", "push_cart": "push_cart", "carry_box": "carry_two_hand", "sit": "sit_idle", "talk": "talk_gesture_a", "haggle": "haggle", "sweep": "sweep",
 }
 
 ## When a model lacks a library clip (no anim_library.glb), fall back to its own baked clips.
@@ -227,13 +238,23 @@ static func _attach_library(pivot: Node3D, ap: AnimationPlayer, model: String) -
 		ap.add_animation_library(LIB, _libs[model])
 	pivot.set_meta("anim_skel", sk)
 	pivot.set_meta("anim_skel_path", str(root.get_path_to(sk)))
+	pivot.set_meta("anim_model", model)
 
 
 ## Library clip -> this skeleton. Each bone keeps the library's rotation as a world-space delta from rest:
 ## q_target = A * q_lib * B with A = Gt(parent)^-1 * Glib(parent) and B = Glib(bone)^-1 * Gt(bone) (global rests),
 ## so arms, feet and spines with different rest orientations (female pelvis/thigh angles, MPFB bone rolls) still
 ## land in the same world pose. Only the pelvis keeps a translation track, scaled by pelvis height.
-static func _retarget(clip: String, src: Animation, sk: Skeleton3D, sk_path: String) -> Animation:
+static func _retarget(clip: String, src: Animation, sk: Skeleton3D, sk_path: String, model: String = "") -> Animation:
+	# seeded per model, so every instance of a figure has the same hands but two figures rarely match
+	var rng := RandomNumberGenerator.new()
+	var vary := {}
+	for side in ["l", "r"]:
+		rng.seed = hash(model + side)
+		vary["curl_" + side] = 1.0 + rng.randf_range(-HAND_VARIATION, HAND_VARIATION)
+		vary["thumb_" + side] = 1.0 + rng.randf_range(-HAND_VARIATION, HAND_VARIATION)
+		vary["wrist_" + side] = Quaternion(Vector3(rng.randf_range(-1, 1), 0.3, rng.randf_range(-1, 1)).normalized(),
+				rng.randf_range(-WRIST_VARIATION, WRIST_VARIATION))
 	var dst := Animation.new()
 	dst.length = src.length
 	dst.loop_mode = Animation.LOOP_LINEAR if LOOPING.get(clip, false) else Animation.LOOP_NONE
@@ -258,9 +279,22 @@ static func _retarget(clip: String, src: Animation, sk: Skeleton3D, sk_path: Str
 		dst.track_set_interpolation_type(nt, src.track_get_interpolation_type(t))
 		if type == Animation.TYPE_ROTATION_3D:
 			var b: Quaternion = (_lib_rest[bone] as Quaternion).inverse() * sk.get_bone_global_rest(bi).basis.get_rotation_quaternion()
+			var side := bone.substr(bone.length() - 1)
+			var finger := model != "" and (bone.begins_with("index") or bone.begins_with("middle") or bone.begins_with("ring") or bone.begins_with("pinky") or bone.begins_with("thumb"))
+			var wrist := model != "" and (bone == "hand_l" or bone == "hand_r")
+			var k_curl: float = vary.get(("thumb_" if bone.begins_with("thumb") else "curl_") + side, 1.0)
+			var rest_q := sk.get_bone_rest(bi).basis.get_rotation_quaternion()
 			for k in src.track_get_key_count(t):
 				var q: Quaternion = src.track_get_key_value(t, k)
-				dst.rotation_track_insert_key(nt, src.track_get_key_time(t, k), (a * q * b).normalized())
+				var r := (a * q * b).normalized()
+				if finger:
+					var d := (rest_q.inverse() * r).normalized()
+					var axis := Vector3(d.x, d.y, d.z)
+					if axis.length() > 0.000001:
+						r = rest_q * Quaternion(axis.normalized(), d.get_angle() * k_curl)
+				elif wrist:
+					r = r * (vary["wrist_" + side] as Quaternion)
+				dst.rotation_track_insert_key(nt, src.track_get_key_time(t, k), r.normalized())
 		else:
 			var rest_t := sk.get_bone_rest(bi).origin
 			var rest_l: Vector3 = _lib_rest_pos[bone]
@@ -281,7 +315,8 @@ static func resolve(pivot: Node3D, clip: String) -> String:
 	if _lib_anims.has(clip) and ap.has_animation_library(LIB) and pivot.has_meta("anim_skel"):
 		var lib := ap.get_animation_library(LIB)
 		if not lib.has_animation(clip):
-			lib.add_animation(clip, _retarget(clip, _lib_anims[clip], pivot.get_meta("anim_skel"), pivot.get_meta("anim_skel_path")))
+			lib.add_animation(clip, _retarget(clip, _lib_anims[clip], pivot.get_meta("anim_skel"), pivot.get_meta("anim_skel_path"),
+					str(pivot.get_meta("anim_model", ""))))
 		return full
 	if ap.has_animation(clip):
 		return clip
@@ -428,15 +463,104 @@ static func _weather_material(m: Material) -> Material:
 	if "snow" in nm or nm == "ice":
 		if not _snow_mats.has(bm):
 			_snow_mats[bm] = snow_material(bm, 0.12 if nm == "ice" else (0.08 if "~snow" in nm else 0.0))
+			if nm == "ice":
+				(_snow_mats[bm] as ShaderMaterial).set_shader_parameter("is_ice", true)
 			weather_swapped += 1
 		return _snow_mats[bm]
+	if nm.begins_with("cobble") or bm.heightmap_enabled:
+		register_wet(bm)
+		register_ground(bm)
+		return m
+	var wm := weathered_material(bm)
+	if wm:
+		return wm
 	for p in WET_PREFIXES:
 		if nm.begins_with(p):
 			register_wet(bm)
-			if p == "cobble":
-				register_ground(bm)
 			break
 	return m
+
+
+# ------------------------------------------------------------------ weathered surfaces (snow / wet on every face)
+const WEATHERED_SHADER := "res://assets/shaders/weathered_surface.gdshader"
+## Never converted: skin, eyes, hair, glass, fire and glow, water, mirrors (their look is not a plain PBR surface).
+const WEATHER_SKIP := ["glass", "skin", "body", "eye", "hair", "brow", "lash", "teeth", "tongue", "human", "ponytail",
+		"high-poly", "low-poly", "flame", "fire", "ember", "glow", "water", "lamp", "mirror", "moon", "star", "void",
+		"wax", "tallow", "gold", "ink", "paper"]
+static var _weathered: Dictionary = {}         ## source material -> ShaderMaterial
+static var _weathered_shaders: Dictionary = {} ## cull mode -> Shader
+static var weathered_count := 0
+
+
+static func _weathered_shader(cull: int) -> Shader:
+	if not _weathered_shaders.has(cull):
+		var base: Shader = load(WEATHERED_SHADER)
+		if cull == BaseMaterial3D.CULL_BACK:
+			_weathered_shaders[cull] = base
+		else:
+			var sh := Shader.new()
+			var mode := "cull_disabled" if cull == BaseMaterial3D.CULL_DISABLED else "cull_front"
+			sh.code = base.code.replace("render_mode blend_mix,", "render_mode %s, blend_mix," % mode)
+			_weathered_shaders[cull] = sh
+	return _weathered_shaders[cull]
+
+
+## A weathered_surface.gdshader copy of a plain opaque StandardMaterial3D, or null when `src` uses features the
+## copy does not carry (transparency, emission, parallax, subsurface, triplanar, detail, billboards).
+static func weathered_material(src: BaseMaterial3D) -> ShaderMaterial:
+	if _weathered.has(src):
+		return _weathered[src]
+	if "--no-weather-layer" in OS.get_cmdline_user_args():
+		return null
+	var nm := src.resource_name.to_lower()
+	for k in WEATHER_SKIP:
+		if k in nm:
+			return null
+	if not (src is StandardMaterial3D) or src.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED \
+			or src.emission_enabled or src.heightmap_enabled or src.subsurf_scatter_enabled or src.uv1_triplanar \
+			or src.detail_enabled or src.refraction_enabled or src.billboard_mode != BaseMaterial3D.BILLBOARD_DISABLED \
+			or src.shading_mode != BaseMaterial3D.SHADING_MODE_PER_PIXEL or src.grow or src.use_point_size:
+		return null
+	var sm := ShaderMaterial.new()
+	sm.resource_name = src.resource_name + "_weathered"
+	sm.shader = _weathered_shader(src.cull_mode)
+	sm.render_priority = src.render_priority
+	sm.set_shader_parameter("albedo", src.albedo_color)
+	if src.albedo_texture:
+		sm.set_shader_parameter("albedo_tex", src.albedo_texture)
+	sm.set_shader_parameter("use_vertex_color", src.vertex_color_use_as_albedo)
+	if src.normal_enabled and src.normal_texture:
+		sm.set_shader_parameter("use_normal", true)
+		sm.set_shader_parameter("normal_tex", src.normal_texture)
+		sm.set_shader_parameter("normal_scale", src.normal_scale)
+	var ch := [Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0), Vector4(0, 0, 1, 0), Vector4(0, 0, 0, 1), Vector4(0.33, 0.33, 0.33, 0)]
+	if src.roughness_texture:
+		sm.set_shader_parameter("rough_tex", src.roughness_texture)
+		sm.set_shader_parameter("rough_channel", ch[clampi(src.roughness_texture_channel, 0, 4)])
+	if src.metallic_texture:
+		sm.set_shader_parameter("metal_tex", src.metallic_texture)
+		sm.set_shader_parameter("metal_channel", ch[clampi(src.metallic_texture_channel, 0, 4)])
+	sm.set_shader_parameter("roughness", src.roughness)
+	sm.set_shader_parameter("metallic", src.metallic)
+	sm.set_shader_parameter("specular", src.metallic_specular)
+	sm.set_shader_parameter("uv1_scale", src.uv1_scale)
+	sm.set_shader_parameter("uv1_offset", src.uv1_offset)
+	var catch := 1.0
+	var wet := 1.0
+	if nm.begins_with("cloth_") or "leather" in nm or "fur" in nm or "coat" in nm or "feather" in nm:
+		catch = 0.35              # a dusting on hats and shoulders
+		if nm.begins_with("cloth_"):
+			sm.set_shader_parameter("roughness", 0.95)     # the character cloth tuning (_tune_materials)
+			sm.set_shader_parameter("specular", 0.2)
+	elif nm.begins_with("tile") or nm.begins_with("shingle") or nm.begins_with("thatch") or "roof" in nm:
+		catch = 0.6               # pitched roofs shed most of it (the baked blankets carry the rest)
+	elif "iron" in nm or "metal" in nm or "copper" in nm or "patina" in nm or "lead" in nm or "brass" in nm:
+		wet = 0.6
+	sm.set_shader_parameter("catch_amount", catch)
+	sm.set_shader_parameter("wet_amount", wet)
+	_weathered[src] = sm
+	weathered_count += 1
+	return sm
 
 
 ## A snow_cover.gdshader material that renders like `src` at full cover.
@@ -534,4 +658,4 @@ static func apply_wetness(w: float, overlay: bool) -> void:
 
 
 static func weather_counts() -> Dictionary:
-	return {"snow": _snow_mats.size(), "wet": _wet_mats.size(), "ground": _ground_mats.size()}
+	return {"snow": _snow_mats.size(), "wet": _wet_mats.size(), "ground": _ground_mats.size(), "weathered": _weathered.size()}
