@@ -238,8 +238,8 @@ func _homes() -> void:
 	_wall(8, "shovel_broom", 3.6, 0.0, 0.08)
 	_wall(8, "trampled_snow", -2.0, 0.0, 0.08)
 	# frozen washing strung across the two corner alleys, from the gable end of the row to a pole
-	Assets.place(self, "laundry_line", Vector3(-24.0, 0, -31.5), -PI * 0.5)
-	Assets.place(self, "laundry_line", Vector3(-24.0, 0, 31.0), -PI * 0.5)
+	_laundry(Assets.place(self, "laundry_line", Vector3(-24.0, 0, -31.5), -PI * 0.5))
+	_laundry(Assets.place(self, "laundry_line_b", Vector3(-24.0, 0, 31.0), -PI * 0.5))
 	Assets.place(self, "sledge", Vector3(-25.2, 0, -34.0), 0.4)
 
 
@@ -303,6 +303,50 @@ func _clutter() -> void:
 	Assets.place(self, "sledge", Vector3(-7.5, 0, 13.6), -0.5)
 
 
+# ------------------------------------------------------------------ washing that sways (assets/shaders/cloth_sway.gdshader)
+const CLOTH_SWAY := "res://assets/shaders/cloth_sway.gdshader"
+static var _sway_mats := {}          ## imported cloth_laundry* material -> ShaderMaterial (shared by both lines)
+
+## Swap every cloth_laundry* surface under `root` for the sway shader, carrying the imported textures over.
+## The wind amplitude comes from the global `wind` parameter that Weather drives; frozen pieces are stiff.
+func _laundry(root: Node) -> void:
+	if root == null:
+		return
+	for c in root.find_children("*", "MeshInstance3D", true, false):
+		var mesh := (c as MeshInstance3D).mesh
+		if mesh == null:
+			continue
+		for i in mesh.get_surface_count():
+			var m := mesh.surface_get_material(i) as BaseMaterial3D
+			if m == null or not m.resource_name.begins_with("cloth_laundry"):
+				continue
+			if not _sway_mats.has(m):
+				_sway_mats[m] = _sway_material(m)
+			mesh.surface_set_material(i, _sway_mats[m])
+
+
+func _sway_material(src: BaseMaterial3D) -> ShaderMaterial:
+	var sm := ShaderMaterial.new()
+	sm.resource_name = src.resource_name + "_sway"
+	sm.shader = load(CLOTH_SWAY)
+	sm.set_shader_parameter("albedo", src.albedo_color)
+	if src.albedo_texture:
+		sm.set_shader_parameter("albedo_tex", src.albedo_texture)
+	if src.normal_enabled and src.normal_texture:
+		sm.set_shader_parameter("use_normal", true)
+		sm.set_shader_parameter("normal_tex", src.normal_texture)
+		sm.set_shader_parameter("normal_scale", src.normal_scale)
+	if src.roughness_texture:
+		sm.set_shader_parameter("rough_tex", src.roughness_texture)
+	sm.set_shader_parameter("roughness", src.roughness)
+	sm.set_shader_parameter("uv1_scale", src.uv1_scale)
+	sm.set_shader_parameter("uv1_offset", src.uv1_offset)
+	var frozen := src.resource_name.ends_with("frozen")
+	sm.set_shader_parameter("stiffness", 0.9 if frozen else 0.0)
+	sm.set_shader_parameter("translucency", 0.15 if frozen else 0.4)
+	return sm
+
+
 # ------------------------------------------------------------------ feathered slush edges
 static var _feathered := {}          ## source mesh -> rebuilt mesh with rim alpha (shared by every instance)
 
@@ -327,7 +371,7 @@ func _feathered_copy(src: ArrayMesh) -> ArrayMesh:
 	for i in src.get_surface_count():
 		var mat := src.surface_get_material(i)
 		var arrays := src.surface_get_arrays(i)
-		if mat != null and mat.resource_name == "snow_dirty" and mat is BaseMaterial3D \
+		if mat != null and mat.resource_name == "slush_trod" and mat is BaseMaterial3D \
 				and (mat as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 			hit = true
 			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -460,6 +504,9 @@ func _shots(dir: String) -> void:
 		["inn_yard", Vector3(26.5, 3.2, -14.5), Vector3(33.0, 1.2, -6.0)],
 		["churchyard", Vector3(34.0, 4.5, -6.5), Vector3(41.0, 0.5, -13.0)],
 		["laundry", Vector3(-21.0, 2.2, -23.5), Vector3(-28.0, 2.8, -31.0)],
+		["laundry_close", Vector3(-26.0, 2.0, -27.5), Vector3(-28.2, 2.3, -31.0)],
+		["laundry_south", Vector3(-26.0, 2.0, 27.0), Vector3(-28.2, 2.3, 30.6)],
+		["cafe_awning", Vector3(-20.2, 2.4, 22.6), Vector3(-22.0, 3.4, 28.0)],
 		["adalbert", Vector3(12.5, 2.0, 21.0), Vector3(17.5, 1.5, 19.0)],
 		["hedge_close", Vector3(39.4, 1.5, -12.2), Vector3(41.2, 0.45, -15.6)],
 		["slush_cafe_door", Vector3(-16.6, 1.6, 25.2), Vector3(-18.0, 0.0, 27.8)],

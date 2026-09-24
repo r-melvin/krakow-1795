@@ -4055,58 +4055,13 @@ def cat():
 
 
 def dragon():
-    """Smok Wawelski: the Wawel dragon, coiled at the mouth of its cave. About 6 m nose to tail. Easter egg."""
-    reset()
-    PAL["dragon"] = (0.16, 0.30, 0.22)
-    PAL["dragon_belly"] = (0.55, 0.50, 0.30)
-    PAL["dragon_spine"] = (0.10, 0.18, 0.14)
-    scale_ = M("dragon", 0.7)
-    belly = M("dragon_belly", 0.8)
-    dark = M("dragon_spine", 0.6)
-    parts = []
-    H = 1.2
-    # body curving: build rings with x offsets to coil
-    body = []
-    for i in range(9):
-        t = i / 8
-        yy = -1.2 + 2.8 * t
-        cx = 0.5 * math.sin(t * math.pi)
-        r = 0.55 * math.sin(0.3 + t * 2.5) + 0.25
-        body.append((yy, cx, H - 0.1 + 0.1 * math.sin(t * math.pi), max(0.18, r), max(0.16, r * 0.9)))
-    parts.append(loft_y("body", body, scale_, verts=20))
-    parts.append(loft_y("belly", [(y, cx, cz - rz * 0.35, rx * 0.7, rz * 0.5) for (y, cx, cz, rx, rz) in body], belly, verts=16))
-    # neck arching up and head
-    neck = [(-1.15, 0, H + 0.1, 0.32, 0.30), (-1.6, -0.1, H + 0.6, 0.26, 0.26), (-1.95, -0.15, H + 1.2, 0.22, 0.22), (-2.15, -0.15, H + 1.7, 0.2, 0.2)]
-    parts.append(loft_y("neck", neck, scale_, verts=16))
-    head = [(-2.1, -0.15, H + 1.75, 0.22, 0.2), (-2.45, -0.15, H + 1.8, 0.28, 0.24), (-2.85, -0.15, H + 1.72, 0.22, 0.17), (-3.2, -0.15, H + 1.62, 0.14, 0.10), (-3.35, -0.15, H + 1.6, 0.06, 0.05)]
-    parts.append(loft_y("head", head, scale_, verts=16))
-    for sx in (-1, 1):
-        parts.append(sphere("eye", 0.06, (-0.15 + sx * 0.17, -2.6, H + 1.88), M("gold", 0.2), seg=12, rings=8))
-        parts.append(cyl("horn", 0.06, 0.45, (-0.15 + sx * 0.16, -2.35, H + 1.95), dark, verts=8, r2=0.01, rot=(0.5, sx * 0.3, 0), bevel=0))
-        parts.append(cyl("nostril", 0.03, 0.02, (-0.15 + sx * 0.06, -3.3, H + 1.68), dark, verts=8, bevel=0))
-    # spines along the back
-    for i in range(14):
-        t = i / 13
-        yy = -2.0 + 4.4 * t
-        seg_ = neck if yy < -1.15 else body
-        parts.append(cyl("spine", 0.08 - 0.03 * t, 0.28 - 0.1 * t, (0.5 * math.sin(max(0, (yy + 1.2) / 2.8) * math.pi) if yy > -1.2 else -0.1, yy, H + 0.45 + (0.9 * max(0, -yy - 1.15) if yy < -1.15 else 0)), dark, verts=4, r2=0.01, bevel=0))
-    # tail
-    parts.append(loft_y("tail", [(1.55, 0.0, H - 0.05, 0.25, 0.22), (2.2, 0.35, H - 0.2, 0.17, 0.15), (2.8, 0.9, H - 0.4, 0.10, 0.09), (3.3, 1.5, H - 0.6, 0.05, 0.05)], scale_, verts=14))
-    # wings: folded, membrane as flat fans
-    for sx in (-1, 1):
-        w = box("wing", (0.06, 1.6, 1.3), (sx * 0.62, 0.1, H + 0.2), dark, bevel=0.02)
-        edit_verts(w, lambda co, sx=sx: setattr(co, "x", co.x + sx * 0.5 * ((co.z - H - 0.2) / 1.3) ** 2))
-        parts.append(w)
-        parts.append(cyl("wing_bone", 0.05, 1.5, (sx * 0.7, 0.1, H + 0.2), scale_, verts=8, r2=0.02, rot=(0, sx * 0.35, 0), bevel=0))
-    # legs, crouched
-    for sx in (-1, 1):
-        parts.append(leg("foreleg", (sx * 0.45, -0.8, H - 0.2), (sx * 0.65, -1.0, 0.0), 0.16, 0.1, scale_, knee=(sx * 0.6, -0.7, 0.5)))
-        parts.append(leg("hindleg", (sx * 0.5, 1.0, H - 0.2), (sx * 0.8, 1.3, 0.0), 0.2, 0.12, scale_, knee=(sx * 0.7, 0.8, 0.55)))
-        for yy in (-1.0, 1.3):
-            for k in range(3):
-                parts.append(cyl("claw", 0.04, 0.22, (sx * (0.65 if yy < 0 else 0.8) + (k - 1) * 0.09, yy - 0.15, 0.03), dark, verts=6, r2=0.005, rot=(math.pi / 2 + 0.2, 0, 0), bevel=0))
-    visual = join(parts, "dragon")
-    export("dragon", visual, box("c", (2.4, 6.8, H + 2.1), (0, 0.4, 0)))
+    """Smok Wawelski now lives in build_animals.py (rigged, scale texture baked, idle clip, glowing eyes and
+    nostrils): delegate, so `build_assets.py -- --animals` still writes the same dragon.glb."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("krakow_build_animals", os.path.join(ROOT, "assets", "blender", "build_animals.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.dragon()
 
 
 if __name__ == "__main__" and "--animals" in sys.argv:
@@ -4500,7 +4455,7 @@ def _slush_patch(name, outline, centre, lift=0.018, seed=0):
 def _slush_mat():
     """The slush material, exported with glTF alphaMode BLEND. The exporter does not write the "Col" rim alpha to
     COLOR_0, so scripts/city/dressing.gd rebuilds the fade from vertex height (rim verts sit at 6 mm)."""
-    m = M("snow_dirty")
+    m = M("slush_trod")          # not "*snow*": Assets' weather pass would swap it for the melt shader
     if not m.get("feather"):
         nt = m.node_tree
         bsdf = nt.nodes["Principled BSDF"]
@@ -5129,31 +5084,6 @@ def shopfront_bottles():
     export("shopfront_bottles", join(parts, "shopfront_bottles"))
 
 
-def awning_striped():
-    """Striped canvas awning on iron arms with a scalloped valance and snow along the top.
-    Origin = top edge on the wall; 2.0 m wide, projects 1.15 m and drops 0.5 m."""
-    reset()
-    W, D, drop = 2.0, 1.15, 0.5
-    ang = math.atan2(drop, D)
-    L = math.hypot(D, drop)
-    parts = []
-    n = 8
-    for k in range(n):
-        x = -W / 2 + W / n * (k + 0.5)
-        mat = M("canvas_stripe") if k % 2 else M("canvas")
-        parts.append(cbox("stripe", (W / n + 0.002, L, 0.02), (x, -D / 2, -drop / 2), mat, rot=(ang, 0, 0)))
-        parts.append(box("valance", (W / n, 0.02, 0.2), (x, -D, -drop - 0.2), mat))
-        parts.append(cyl("scallop", W / n / 2, 0.02, (x, -D, -drop - 0.2), mat, verts=10, rot=(math.pi / 2, 0, 0), center=True))
-    parts.append(box("roller", (W + 0.1, 0.1, 0.1), (0, -0.05, -0.05), M("wood_dark"), bevel=0.01, seg=1))
-    for sx in (-1, 1):
-        bm = bmesh.new()
-        _tube(bm, (sx * W / 2, 0, -0.9), (sx * W / 2, -D, -drop), 0.015, 0.015, 5)
-        _tube(bm, (sx * W / 2, 0, 0), (sx * W / 2, -D, -drop), 0.012, 0.012, 5)
-        parts.append(_bm_obj("arm", bm, M("iron")))
-    parts.append(cbox("snow", (W - 0.05, L * 0.7, 0.05), (0, -D * 0.4, -drop * 0.4 + 0.035), M("snow"), rot=(ang, 0, 0), bevel=0.02, seg=1))
-    export("awning_striped", join(parts, "awning_striped"))
-
-
 def oriel_cafe():
     """Timber oriel (bay) window for the cafe's first floor: glazed on three sides, lit, lead roof with snow.
     Origin = base centre on the wall; 1.7 m wide, 0.65 m deep, 2.3 m tall plus the corbel below."""
@@ -5598,48 +5528,6 @@ def trampled_snow():
     export("trampled_snow", join(parts, "trampled_snow"))
 
 
-def laundry_line():
-    """Washing frozen stiff on a line from a wall hook out to a forked pole: two sheets, a shirt and a petticoat.
-    Origin = under the wall hook at the pavement; the line runs 6 m out from the wall (-Y) at 3.2 m and sags."""
-    reset()
-    Ly, H = 6.0, 3.2
-
-    def zline(d):
-        return H - 0.45 * math.sin(math.pi * d / Ly)
-    parts = [box("wall_hook", (0.06, 0.1, 0.06), (0, -0.05, H - 0.03), M("iron"))]
-    bm = bmesh.new()
-    pts = [Vector((0, -Ly * k / 12, zline(Ly * k / 12))) for k in range(13)]
-    for a, b in zip(pts, pts[1:]):
-        _tube(bm, a, b, 0.008, 0.008, 4)
-    parts.append(_bm_obj("line", bm, M("sacking")))
-    bm = bmesh.new()
-    _tube(bm, (0, -Ly, 0), (0, -Ly, H + 0.2), 0.05, 0.04, 6)
-    _tube(bm, (0, -Ly, H), (0, -Ly + 0.12, H + 0.3), 0.03, 0.02, 5)
-    parts.append(_bm_obj("pole", bm, M("wood_dark")))
-    rng = random.Random(201)
-    items = [(0.6, 1.1, 1.3, "linen"), (1.9, 1.1, 1.2, "linen"), (3.2, 0.7, 0.8, "plaster_white"), (4.2, 0.8, 1.0, "sacking")]
-    for (d0, w, h, mat) in items:
-        sheet = bmesh.new()
-        nx, nz = 5, 4
-        grid = []
-        for i in range(nx + 1):
-            col = []
-            for j in range(nz + 1):
-                d = d0 + w * i / nx
-                z = zline(d) - h * j / nz
-                x = 0.05 * math.sin(i * 1.7 + j * 0.9) + rng.uniform(-0.015, 0.015) + 0.04 * j / nz
-                col.append(sheet.verts.new((x, -d, z)))
-            grid.append(col)
-        for i in range(nx):
-            for j in range(nz):
-                sheet.faces.new((grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]))
-        parts.append(_bm_obj("sheet", sheet, M(mat)))
-        for pd in (d0 + 0.05, d0 + w - 0.05):
-            parts.append(box("peg", (0.03, 0.02, 0.08), (0, -pd, zline(pd) - 0.05), M("wood")))
-    parts.append(cyl("pole_foot", 0.2, 0.05, (0, -Ly, -0.01), M("snow_dirty"), verts=8))
-    export("laundry_line", join(parts, "laundry_line"), box("c", (0.2, 0.2, H), (0, -Ly, 0)))
-
-
 # ------------------------------------------------------------------ the churchyard green
 def park_railing():
     """3 m of low wrought-iron railing on a sandstone kerb: spear-headed bars between square posts."""
@@ -5771,6 +5659,236 @@ def gravel_path():
     export("gravel_path", join(parts, "gravel_path"))
 
 
+# ------------------------------------------------------------------ cloth: laundry and awnings as draped panels
+PAL.update({"cloth_laundry_linen": (0.92, 0.90, 0.84), "cloth_laundry_undyed": (0.74, 0.68, 0.56),
+            "cloth_laundry_indigo": (0.16, 0.22, 0.42), "cloth_laundry_red": (0.66, 0.12, 0.10),
+            "cloth_laundry_frozen": (0.84, 0.86, 0.88), "slush_trod": (1.0, 1.0, 1.0)})
+TEX_OF.update({"cloth_laundry_linen": "cloth", "cloth_laundry_undyed": "cloth", "cloth_laundry_indigo": "cloth",
+               "cloth_laundry_red": "cloth", "cloth_laundry_frozen": "cloth", "slush_trod": "slush"})
+TINT.update({"slush_trod": (1.0, 1.0, 1.0)})
+
+
+def _grid_faces(bm, grid, smooth=True, up=False):
+    """Quads over a vertex grid; up=True flips any face whose normal points down (roof-like cloth seen from above)."""
+    nu, nv = len(grid) - 1, len(grid[0]) - 1
+    faces = []
+    for i in range(nu):
+        row = []
+        for j in range(nv):
+            f = bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+            f.smooth = smooth
+            if up:
+                f.normal_update()
+                if f.normal.z < 0:
+                    f.normal_flip()
+            row.append(f)
+        faces.append(row)
+    return faces
+
+
+def _garment(bm, zline, d0, w, h, nu, nv, seed, frozen=False, belly=0.1, lift=0.12, taper=(1.0, 1.0), foot=0.0,
+             x_off=0.0, pegs=True):
+    """One hanging piece on a line running along -Y (distance d from the wall hook; z of the line = zline(d)).
+    A nu x nv panel pinned at two pegs: catenary sag between them, gathered folds fanning down from the pegs, a
+    wind belly out along +X and a hem corner lifted by the wind. Frozen pieces hang stiff: shallow folds, a held
+    shape and a couple of sharp cracked creases. Returns the peg distances."""
+    rng = random.Random(seed)
+    dc = d0 + w / 2
+    pa, pb = d0 + 0.05, d0 + w - 0.05
+    fold_a = 0.012 if frozen else 0.045
+    nf = rng.uniform(4.0, 6.0) * w
+    ph = rng.uniform(0, math.tau)
+    grid = []
+    for i in range(nu + 1):
+        t = i / nu
+        col = []
+        for j in range(nv + 1):
+            v = j / nv
+            wv = w * (taper[0] + (taper[1] - taper[0]) * v)
+            d = dc + (t - 0.5) * wv
+            dt = dc + (t - 0.5) * w
+            tp = min(max((dt - pa) / max(pb - pa, 1e-3), 0.0), 1.0)
+            ztop = zline(min(max(dt, pa), pb)) - 0.035 * w * math.sin(math.pi * tp) - 0.02
+            if dt < pa or dt > pb:                               # beyond a peg the corner flops down
+                ztop -= 0.25 * abs(dt - (pa if dt < pa else pb))
+            z = ztop - h * v * (1.0 + 0.03 * math.sin(math.pi * t))
+            x = x_off
+            x += fold_a * math.sin(t * nf * math.pi + ph) * v ** 0.6
+            x += fold_a * 0.45 * math.sin(t * nf * 2.3 * math.pi + ph * 1.7 + v * 2.0) * v
+            for pd in (pa, pb):                                  # pinch folds radiating from each peg
+                g = math.exp(-((dt - pd) / 0.09) ** 2)
+                x += (0.006 if frozen else 0.02) * g * math.sin(v * 14.0 + pd * 5.0) * (1.0 - v) * 3.0
+                z -= 0.012 * g * (1 - v)
+            x += belly * math.sin(math.pi * t) * math.sin(math.pi * min(v * 1.15, 1.0)) * (0.5 if frozen else 1.0)
+            cw = (max(0.0, (t - 0.55) / 0.45) ** 2) * (max(0.0, (v - 0.55) / 0.45) ** 2)
+            z += lift * cw
+            x += lift * 0.9 * cw
+            d -= 0.04 * cw
+            if frozen:                                           # two cracked creases across the stiff cloth
+                for cv in (0.38, 0.71):
+                    x += 0.014 * max(0.0, 1.0 - abs(v - cv) * 18.0)
+            if foot and v > 0.78:                                 # a stocking's foot turns out along the line
+                k = (v - 0.78) / 0.22
+                d += foot * k
+                z += h * 0.12 * k * k
+            x += rng.uniform(-0.003, 0.003)
+            col.append(bm.verts.new((x, -d, z)))
+        grid.append(col)
+    _grid_faces(bm, grid, smooth=not frozen)
+    return (pa, pb) if pegs else ()
+
+
+def _laundry(name, items):
+    """A 6 m washing line from a wall hook out to a forked pole, hung with draped garments (see _garment).
+    Each item: (kind, material key, d0, seed, frozen)."""
+    reset()
+    Ly, H = 6.0, 3.2
+
+    def zline(d):
+        return H - 0.45 * math.sin(math.pi * min(max(d, 0.0), Ly) / Ly)
+    parts = [box("wall_hook", (0.06, 0.1, 0.06), (0, -0.05, H - 0.03), M("iron"))]
+    bm = bmesh.new()
+    pts = [Vector((0, -Ly * k / 16, zline(Ly * k / 16))) for k in range(17)]
+    for a, b in zip(pts, pts[1:]):
+        _tube(bm, a, b, 0.007, 0.007, 4)
+    parts.append(_bm_obj("line", bm, M("sacking")))
+    bm = bmesh.new()
+    _tube(bm, (0, -Ly, 0), (0, -Ly, H + 0.2), 0.05, 0.04, 6)
+    _tube(bm, (0, -Ly, H), (0, -Ly + 0.12, H + 0.3), 0.03, 0.02, 5)
+    parts.append(_bm_obj("pole", bm, M("wood_dark")))
+    parts.append(cyl("pole_foot", 0.2, 0.05, (0, -Ly, -0.01), M("snow_dirty"), verts=8))
+    pegs = []
+    for (kind, mat, d0, seed, frozen) in items:
+        bm = bmesh.new()
+        if kind == "sheet":
+            pegs += _garment(bm, zline, d0, 1.15, 1.35, 20, 30, seed, frozen, belly=0.14, lift=0.18)
+        elif kind == "sheet_small":
+            pegs += _garment(bm, zline, d0, 1.0, 1.1, 16, 24, seed, frozen, belly=0.1, lift=0.12)
+        elif kind in ("shirt", "smock"):
+            s = 1.0 if kind == "shirt" else 0.7
+            pegs += _garment(bm, zline, d0, 0.62 * s, 0.78 * s, 12, 16, seed, frozen, belly=0.06, lift=0.08)
+            for side, dd in ((-1, d0 - 0.035), (1, d0 + 0.62 * s - 0.155 * s)):      # sleeves hanging at the shoulders
+                _garment(bm, zline, dd + (0.0 if side < 0 else 0.035), 0.155 * s, 0.6 * s, 3, 10, seed + side * 7,
+                         frozen, belly=0.015, lift=0.0, taper=(1.0, 0.8), x_off=0.018, pegs=False)
+        elif kind == "petticoat":
+            pegs += _garment(bm, zline, d0, 0.7, 0.85, 14, 18, seed, frozen, belly=0.09, lift=0.1, taper=(0.9, 1.35))
+        elif kind == "apron":
+            pegs += _garment(bm, zline, d0, 0.55, 0.7, 10, 14, seed, frozen, belly=0.05, lift=0.08)
+            for dd in (d0 + 0.02, d0 + 0.53):
+                p0 = Vector((0.0, -dd, zline(dd) - 0.03))
+                _tube(bm, p0, p0 + Vector((0.03, -0.02, -0.42)), 0.006, 0.005, 3)
+        elif kind == "stockings":
+            for k in range(2):
+                pegs += _garment(bm, zline, d0 + k * 0.16, 0.11, 0.58, 3, 12, seed + k, frozen, belly=0.01, lift=0.0,
+                                 taper=(1.0, 0.8), foot=0.12)
+        elif kind == "kerchief":
+            pegs += _garment(bm, zline, d0, 0.45, 0.38, 8, 8, seed, frozen, belly=0.03, lift=0.05, taper=(1.0, 0.04))
+        parts.append(_bm_obj(kind, bm, M(mat)))
+    for pd in pegs:
+        parts.append(box("peg", (0.025, 0.018, 0.075), (0.0, -pd, zline(pd) - 0.05), M("wood")))
+    return parts, Ly, H
+
+
+def laundry_line():
+    """Washing from a wall hook to a pole: a linen sheet, a shirt with its sleeves hanging, a petticoat, a pair of
+    indigo stockings and a red kerchief. Origin = under the wall hook; the line runs 6 m out along -Y at 3.2 m."""
+    parts, Ly, H = _laundry("laundry_line", [
+        ("sheet", "cloth_laundry_linen", 0.35, 301, False), ("shirt", "cloth_laundry_undyed", 1.7, 302, False),
+        ("petticoat", "cloth_laundry_linen", 2.55, 303, False), ("stockings", "cloth_laundry_indigo", 3.5, 304, False),
+        ("kerchief", "cloth_laundry_red", 4.05, 305, False)])
+    export("laundry_line", join(parts, "laundry_line"), box("c", (0.2, 0.2, H), (0, -Ly, 0)))
+
+
+def laundry_line_b():
+    """The second alley's line: a sheet frozen board-stiff, an indigo apron, a child's smock and undyed stockings."""
+    parts, Ly, H = _laundry("laundry_line_b", [
+        ("sheet_small", "cloth_laundry_frozen", 0.4, 311, True), ("apron", "cloth_laundry_indigo", 1.65, 312, False),
+        ("smock", "cloth_laundry_linen", 2.45, 313, False), ("stockings", "cloth_laundry_undyed", 3.2, 314, True),
+        ("kerchief", "cloth_laundry_red", 3.75, 315, False)])
+    export("laundry_line_b", join(parts, "laundry_line_b"), box("c", (0.2, 0.2, H), (0, -Ly, 0)))
+
+
+def _two_mat(o, mat_b, pick):
+    """Give `o` a second material and move the faces for which pick(face_centre) is true onto it."""
+    o.data.materials.append(mat_b)
+    for p in o.data.polygons:
+        if pick(p.center):
+            p.material_index = 1
+    return o
+
+
+def awning_striped():
+    """Striped canvas awning as cloth: the panel sags between the iron arms and bellies under a snow load, a small
+    ripple runs across it, and a scalloped valance hangs from the front bar. Origin = top edge on the wall;
+    2.0 m wide, projects 1.15 m and drops 0.5 m."""
+    reset()
+    W, D, drop = 2.0, 1.15, 0.5
+    n = 8
+    nu, nv = 24, 12
+    S = 0.09
+    rng = random.Random(401)
+
+    def surf(x, s):
+        sag = S * math.sin(math.pi * s) * (1.0 - (2.0 * x / W) ** 2)
+        rip = 0.008 * math.sin(x * 17.0 + s * 5.0) * math.sin(math.pi * s)
+        return Vector((x, -D * s, -drop * s - sag + rip))
+    bm = bmesh.new()
+    grid = [[bm.verts.new(surf(-W / 2 + W * i / nu, j / nv)) for j in range(nv + 1)] for i in range(nu + 1)]
+    _grid_faces(bm, grid, up=True)
+    # the underside too (single-sided glTF materials cull it, and the awning is mostly seen from below)
+    dup = bmesh.ops.duplicate(bm, geom=list(bm.faces))
+    under = [g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)]
+    bmesh.ops.reverse_faces(bm, faces=under)
+    for v in {v for f in under for v in f.verts}:
+        v.co.z -= 0.002
+    canvas = _bm_obj("canvas", bm, M("canvas"))
+    stripe = lambda c: int((c.x + W / 2) / (W / n)) % 2 == 1
+    _two_mat(canvas, M("canvas_stripe"), stripe)
+    parts = [canvas]
+    # valance: a strip hanging from the front bar, its hem cut in one scallop per stripe, a slight flutter
+    bm = bmesh.new()
+    vu, vv = 64, 4
+    grid = []
+    for i in range(vu + 1):
+        x = -W / 2 + W * i / vu
+        fr = ((x + W / 2) / (W / n)) % 1.0
+        hem = 0.12 + 0.1 * math.sin(math.pi * fr)
+        col = []
+        for j in range(vv + 1):
+            v = j / vv
+            col.append(bm.verts.new((x, -D - 0.012 * math.sin(x * 9.0) * v - 0.004 * v, -drop - 0.01 - hem * v)))
+        grid.append(col)
+    _grid_faces(bm, grid)
+    dup = bmesh.ops.duplicate(bm, geom=list(bm.faces))
+    bmesh.ops.reverse_faces(bm, faces=[g for g in dup["geom"] if isinstance(g, bmesh.types.BMFace)])
+    val = _bm_obj("valance", bm, M("canvas"))
+    _two_mat(val, M("canvas_stripe"), stripe)
+    parts.append(val)
+    # snow lying in the belly: a cushion that follows the sagging canvas and thins to nothing at its edges
+    bm = bmesh.new()
+    su, sv = 14, 8
+    grid = []
+    for i in range(su + 1):
+        col = []
+        for j in range(sv + 1):
+            x = -W * 0.4 + W * 0.8 * i / su
+            s = 0.2 + 0.62 * j / sv
+            th = 0.06 * math.sin(math.pi * i / su) * math.sin(math.pi * j / sv) * (0.8 + 0.4 * rng.random())
+            p = surf(x, s)
+            col.append(bm.verts.new((p.x, p.y, p.z + 0.004 + th)))
+        grid.append(col)
+    _grid_faces(bm, grid, up=True)
+    parts.append(_bm_obj("snow", bm, M("snow")))
+    parts.append(box("roller", (W + 0.1, 0.1, 0.1), (0, -0.05, -0.05), M("wood_dark"), bevel=0.01, seg=1))
+    bm = bmesh.new()
+    _tube(bm, (-W / 2 - 0.02, -D, -drop - 0.005), (W / 2 + 0.02, -D, -drop - 0.005), 0.014, 0.014, 6)
+    for sx in (-1, 1):
+        _tube(bm, (sx * W / 2, 0, -0.9), (sx * W / 2, -D, -drop), 0.015, 0.015, 5)
+        _tube(bm, (sx * W / 2, 0, 0), (sx * W / 2, -D, -drop), 0.012, 0.012, 5)
+    parts.append(_bm_obj("iron", bm, M("iron")))
+    export("awning_striped", join(parts, "awning_striped"))
+
+
 DRESSING_BUILDS = [
     ("tree_linden", tree_linden), ("tree_chestnut", tree_chestnut), ("shrub_tub", shrub_tub), ("shrub_juniper", shrub_juniper),
     ("pot_herbs", pot_herbs), ("pot_hellebore", pot_hellebore), ("window_box", window_box), ("ivy_patch", ivy_patch),
@@ -5786,7 +5904,7 @@ DRESSING_BUILDS = [
     ("cellar_hatch", cellar_hatch), ("notice_board", notice_board), ("water_trough", water_trough), ("hitching_post", hitching_post),
     ("woodpile_leanto", woodpile_leanto), ("coach", coach), ("shovel_broom", shovel_broom), ("sacks_crates", sacks_crates),
     ("handcart", handcart), ("sledge", sledge), ("muck_heap", muck_heap), ("doormat_scraper", doormat_scraper),
-    ("trampled_snow", trampled_snow), ("laundry_line", laundry_line), ("park_railing", park_railing), ("hedge", hedge),
+    ("trampled_snow", trampled_snow), ("laundry_line", laundry_line), ("laundry_line_b", laundry_line_b), ("park_railing", park_railing), ("hedge", hedge),
     ("lawn_snow", lawn_snow), ("gravel_path", gravel_path),
 ]
 
@@ -8069,6 +8187,100 @@ PASS5_BUILDS = [("bathhouse", bathhouse), ("kingpin_warehouse", kingpin_warehous
                 ("kingpin_house", kingpin_house)]
 
 
+# ------------------------------------------------------------------ UNDERGROUND ENTRANCES (pass 6)
+def drain_grate():
+    """Street drain grate, 0.9 x 0.6 m: a dressed stone kerb frame flush with the paving, the iron grate (separate
+    node `Grate`, the interactable: meta hidden_entrance, set by outer_city.gd) sunk 3 cm, dark shaft below.
+    The frame has -colonly collision; the grate has none."""
+    reset()
+    parts, col = [], []
+    for sx in (-1, 1):
+        parts.append(box("frame_l", (0.14, 0.88, 0.1), (sx * 0.52, 0, -0.08), M("stone"), bevel=0.015, seg=1))
+        col.append(box("c", (0.14, 0.88, 0.1), (sx * 0.52, 0, -0.08)))
+        parts.append(box("frame_s", (1.18, 0.14, 0.1), (0, sx * 0.37, -0.08), M("stone"), bevel=0.015, seg=1))
+        col.append(box("c", (1.18, 0.14, 0.1), (0, sx * 0.37, -0.08)))
+    parts.append(box("shaft", (0.9, 0.6, 0.02), (0, 0, -0.6), M("void")))
+    parts.append(box("snow", (0.3, 0.12, 0.015), (0.4, 0.37, 0.02), M("snow_dirty")))
+    g = [box("grate_rim", (0.9, 0.6, 0.03), (0, 0, -0.06), M("iron"))]
+    bpy.data.objects.remove(g.pop(), do_unlink=True)
+    for k in range(7):
+        g.append(box("bar", (0.03, 0.6, 0.03), (-0.39 + k * 0.13, 0, -0.05), M("iron")))
+    for sy in (-1, 1):
+        g.append(box("rail", (0.9, 0.04, 0.035), (0, sy * 0.28, -0.05), M("iron")))
+    g.append(torus("ring", 0.04, 0.008, (0.3, 0, -0.01), M("iron"), seg=8, mseg=4))
+    extra("Grate", g)
+    export("drain_grate", join(parts, "drain_grate"), join(col, "col"))
+
+
+def outfall_arch():
+    """Culvert outfall in a moat or river bank: a brick arch (1.6 m wide) in a stone-faced bank 5 m wide, 2.4 m
+    high, a rusted iron grille across it (separate node `Grille`), a frozen trickle fanning out below.
+    Front at -Y; the bank face at y=0; collision on the bank, none on the grille."""
+    reset()
+    parts, col = [], []
+    aw, ah = 1.6, 1.6 + 0.8
+    parts.append(facade("bank", M("stone_dark"), "-Y", 0.0, -2.5, 2.5, -0.6, 2.4, [(0.0, -0.4, aw, ah, "round")], depth=1.2, back=True))
+    parts.append(box("bank_mass", (5.0, 2.0, 3.0), (0, 2.2, -0.6), M("stone_dark")))
+    voussoirs(parts, "-Y", 0.0, 0.0, -0.4 + ah - aw / 2, aw, 0.26, M("brick"), n=11, proud=0.05, key=0.06)
+    parts.append(slab("dark", outline(0.0, -0.4, aw, ah, "round"), "-Y", 0.0, -1.19, -1.17, M("void")))
+    parts.append(box("bank_snow", (5.0, 1.4, 0.06), (0, 0.5, 2.4), M("snow"), bevel=0.03, seg=1))
+    g = []
+    for k in range(7):
+        x = -aw / 2 + 0.15 + k * (aw - 0.3) / 6
+        top = -0.4 + ah - aw / 2 + math.sqrt(max(0.0, (aw / 2) ** 2 - x * x)) - 0.05
+        g.append(box("bar", (0.04, 0.04, top + 0.4), (x, -0.2, -0.4), M("iron")))
+    for z in (0.2, 1.0):
+        g.append(box("rail", (aw, 0.05, 0.05), (0, -0.2, z), M("iron")))
+    extra("Grille", g)
+    bm = bmesh.new()
+    _tube(bm, (0, -0.1, -0.35), (0.1, -1.2, -0.58), 0.12, 0.3, n=6)
+    parts.append(_mesh_obj("trickle", bm, M("ice", 0.05)))
+    parts.append(box("trickle_sheet", (1.2, 1.4, 0.01), (0.1, -1.4, -0.6), M("ice", 0.05), wonk=0.1))
+    icicles(parts, (-0.7, -0.3), (0.7, -0.3), -0.4 + ah - 0.2, maxlen=0.4, seed=81, density=6)
+    col.append(box("c", (5.0, 1.8, 3.0), (0, 2.3, -0.6)))
+    for sx in (-1, 1):
+        col.append(box("c", (1.7, 1.2, 3.0), (sx * 1.65, 0.6, -0.6)))
+    export("outfall_arch", join(parts, "outfall_arch"), join(col, "col"))
+
+
+def well_shaft_cap():
+    """The square's well capped for winter: the octagonal stone curb with an iron lid (separate node `Lid`,
+    hinged at +Y, meta hidden_entrance set at runtime) and a staple and padlock, snow on the curb, no windlass."""
+    reset()
+    parts = []
+    stone = M("stone_dark")
+    for k in range(8):
+        a = math.tau * k / 8
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a), 1.15 * math.sin(a), 0.25), stone, rot=(0, 0, a + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+        parts.append(cbox("stone", (0.95, 0.55, 0.5), (1.15 * math.cos(a + math.pi / 8), 1.15 * math.sin(a + math.pi / 8), 0.75), stone, rot=(0, 0, a + math.pi / 8 + math.pi / 2), bevel=0.04, seg=1, wonk=0.03))
+        parts.append(cbox("lip_snow", (0.8, 0.5, 0.03), (1.15 * math.cos(a), 1.15 * math.sin(a), 1.015), M("snow"), rot=(0, 0, a + math.pi / 2)))
+    lid = [cyl("lid", 1.0, 0.05, (0, 0, 1.0), M("iron"), verts=16)]
+    for k in range(3):
+        lid.append(box("strap", (2.0, 0.08, 0.02), (0, -0.6 + k * 0.6, 1.05), M("iron")))
+    lid.append(torus("handle", 0.1, 0.015, (0, -0.8, 1.07), M("iron"), seg=10, mseg=4))
+    lid.append(cyl("lid_snow", 0.8, 0.02, (0.1, 0.1, 1.07), M("snow"), verts=12))
+    extra("Lid", lid)
+    parts.append(box("hinge", (0.5, 0.1, 0.06), (0, 0.98, 1.0), M("iron")))
+    parts.append(box("staple", (0.06, 0.06, 0.12), (0, -1.05, 0.95), M("iron")))
+    parts.append(box("padlock", (0.1, 0.05, 0.12), (0, -1.1, 0.86), M("iron")))
+    parts.append(box("drift", (3.2, 3.2, 0.1), (0.2, 0.2, 0), M("snow"), bevel=0.25, seg=2, wonk=0.12))
+    export("well_shaft_cap", join(parts, "well_shaft_cap"), cyl("c", 1.45, 1.05, (0, 0, 0), None, verts=8))
+
+
+def manhole_stone():
+    """A round stone cover slab set into a street (cosmetic): 0.8 m, a lifting ring socket, worn edge, flush."""
+    reset()
+    parts = [cyl("slab", 0.42, 0.06, (0, 0, -0.05), M("stone"), verts=16),
+             cyl("rim", 0.46, 0.05, (0, 0, -0.055), M("stone_dark"), verts=16),
+             cyl("socket", 0.05, 0.02, (0.2, 0, 0.0), M("void"), verts=8),
+             torus("ring", 0.05, 0.008, (0.2, 0, 0.012), M("iron"), seg=8, mseg=4)]
+    export("manhole_stone", join(parts, "manhole_stone"), None)
+
+
+PASS6_BUILDS = [("drain_grate", drain_grate), ("outfall_arch", outfall_arch), ("well_shaft_cap", well_shaft_cap),
+                ("manhole_stone", manhole_stone)]
+
+
 PASS2_BUILDS = [
     ("ten_renaissance", ten_renaissance), ("ten_renaissance_b", lambda: ten_renaissance("ten_renaissance_b", "plaster_mint", "shutter_brown", seed=31)),
     ("ten_gothic", ten_gothic), ("ten_gothic_b", lambda: ten_gothic("ten_gothic_b", "plaster_oxblood", seed=32)),
@@ -8094,7 +8306,7 @@ BUILDS = [
     ("sukiennice", sukiennice), ("st_marys", st_marys), ("town_hall", town_hall), ("st_adalbert", st_adalbert),
     ("market_stall", market_stall), ("barrel", barrel), ("crate_stack", crate_stack), ("cart", cart), ("well", well),
     ("lantern_post", lantern_post), ("brazier", brazier), ("ground_cobbles", ground_cobbles),
-] + globals().get("DISTRICT_BUILDS", []) + globals().get("FARM_BUILDS", []) + globals().get("DRESSING_BUILDS", []) + globals().get("PASS2_BUILDS", []) + globals().get("PASS3_BUILDS", []) + globals().get("PASS4_BUILDS", []) + globals().get("PASS5_BUILDS", [])
+] + globals().get("DISTRICT_BUILDS", []) + globals().get("FARM_BUILDS", []) + globals().get("DRESSING_BUILDS", []) + globals().get("PASS2_BUILDS", []) + globals().get("PASS3_BUILDS", []) + globals().get("PASS4_BUILDS", []) + globals().get("PASS5_BUILDS", []) + globals().get("PASS6_BUILDS", [])
 
 
 def _cli_list(flag):
