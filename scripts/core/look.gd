@@ -29,6 +29,7 @@ func _ready() -> void:
 	_rect = ColorRect.new()
 	_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rect.color = Color(0, 0, 0, 0)     # if the shader ever fails to compile the frame shows through instead of a white rect
 	layer.add_child(_rect)
 	apply()
 	if arg != "":

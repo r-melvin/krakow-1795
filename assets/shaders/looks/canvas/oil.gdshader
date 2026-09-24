@@ -4,10 +4,11 @@ shader_type canvas_item;
 // weave. Preview only: --look=oil (scripts/core/look_preview.gd).
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;
-uniform float brush_px = 4.0;        // coarse brush radius (px)
-uniform float detail_px = 1.6;       // fine brush radius kept where the image is busy (faces, hands)
+uniform float brush_px = 3.0;        // coarse brush radius (px)
+uniform float detail_px = 1.1;       // fine brush radius kept where the image is busy
+uniform float skin_keep = 0.85;      // faces and hands: how much of the raw frame survives the brush (skin-tone mask)
 uniform float bands = 5.0;           // cel bands on luminance
-uniform float band_mix = 0.32;       // how hard the banding reads (0 = painterly only)
+uniform float band_mix = 0.24;       // how hard the banding reads (0 = painterly only)
 uniform float ink = 0.45;            // edge darkening
 uniform float ink_width = 1.7;       // sobel step in px
 uniform float ink_lo = 0.34;         // edge strength below this gets no ink (mortar lines, brick courses, fine cloth weave)
@@ -56,10 +57,21 @@ void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec2 px = 1.0 / vec2(textureSize(screen_tex, 0));
 	// Brush: coarse strokes on flat areas, finer strokes where there is local detail (keeps faces readable).
+	vec3 raw = texture(screen_tex, uv).rgb;
 	vec3 coarse = kuwahara(uv, px, brush_px);
 	vec3 fine = kuwahara(uv, px, detail_px);
 	float busy = clamp(sobel(uv, px * 2.0) * 1.6, 0.0, 1.0);
 	vec3 col = mix(coarse, fine, busy);
+	// Skin mask: warm, moderately saturated, mid-bright pixels (faces, hands; also some plaster and leather, which is
+	// harmless). There the raw frame shows through the brush, the banding is lifted and the ink is lighter, so eyes,
+	// brows and mouths keep their drawing at conversation distance.
+	float mx = max(raw.r, max(raw.g, raw.b));
+	float mn = min(raw.r, min(raw.g, raw.b));
+	float sat = (mx - mn) / max(mx, 1e-3);
+	float warm_hue = step(raw.g, raw.r) * step(raw.b, raw.g) * smoothstep(0.02, 0.10, raw.r - raw.b);
+	float skin = warm_hue * smoothstep(0.08, 0.2, sat) * (1.0 - smoothstep(0.55, 0.8, sat)) * smoothstep(0.12, 0.3, mx);
+	skin *= skin_keep;
+	col = mix(col, raw, skin);
 	// Muted oil palette: desaturate, warm the lights and cool the shadows a touch, lift the blacks.
 	float l = luma(col);
 	col = mix(vec3(l), col, saturation);
@@ -69,7 +81,7 @@ void fragment() {
 	col = col * (1.0 - lift) + vec3(lift * 1.1, lift * 1.0, lift * 0.9);
 	// Soft cel: quantise luminance in a few bands, but only partially, so it reads as painted planes not flat cel.
 	float lq = (floor(l * bands) + 0.5) / bands;
-	float k = mix(1.0, lq / max(l, 0.02), band_mix);
+	float k = mix(1.0, lq / max(l, 0.02), band_mix * (1.0 - skin));
 	col *= clamp(k, 0.6, 1.4);
 	// Lamp glow: the hot pixels warm toward oil-lamp orange, and a wide four-tap bleed carries a little of that warmth
 	// into the dark around each lantern and lit window.
@@ -86,7 +98,7 @@ void fragment() {
 	// paint; broken along the stroke by a little noise so it feels drawn not traced.
 	float e = smoothstep(ink_lo, ink_hi, sobel(uv, px * ink_width));
 	e *= 0.75 + 0.25 * hash21(floor(uv / px / 3.0));
-	col *= 1.0 - e * ink;
+	col *= 1.0 - e * ink * (1.0 - 0.6 * skin);
 	// Canvas weave and grain.
 	vec2 c = uv / px;
 	float w = (sin(c.x * 1.9) * sin(c.y * 1.9)) * 0.5 + 0.5;
