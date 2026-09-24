@@ -782,6 +782,11 @@ func _fill_people() -> void:
 		box.add_child(top)
 		if str(p.get("role", "")) != "":
 			box.add_child(_t(str(p["role"]), 16, UiTheme.TEXT))
+		# holds on people (scripts/mission/campaign.gd): weaknesses learned, holds held
+		if str(p.get("weaknesses", "")) != "":
+			box.add_child(_t("Weak spots: " + str(p["weaknesses"]), 14, UiTheme.TEXT_DIM, "italic"))
+		if str(p.get("holds", "")) != "":
+			box.add_child(_t("◆  Your hold: " + str(p["holds"]), 14, UiTheme.BRASS_BRIGHT, "bold"))
 		var marks: Array = []
 		if bool(p.get("historical", false)):
 			marks.append("historical person")

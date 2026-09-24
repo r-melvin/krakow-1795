@@ -308,6 +308,54 @@
           "street": 3
         }
       }
+    },
+    {
+      "id": "wf_debtor",
+      "label": "Frighten a debtor for Mother Weronika",
+      "desc": "A wine merchant owes the house forty złoty. Notoriety +4, Underworld +3; a favour done.",
+      "need": [
+        "found:weronika"
+      ],
+      "why": "You do not know the madam.",
+      "effects": {
+        "notoriety": 4,
+        "influence": {
+          "underworld": 3
+        },
+        "favour": "weronika"
+      }
+    },
+    {
+      "id": "wf_brother",
+      "label": "Get a girl's brother out of the guardhouse (3 zł)",
+      "desc": "A sergeant's price and a sergeant's memory. Street loyalty +2; a favour done.",
+      "cost": 3,
+      "need": [
+        "found:weronika"
+      ],
+      "why": "You do not know the madam.",
+      "effects": {
+        "loyalty": {
+          "street": 2
+        },
+        "favour": "weronika"
+      }
+    },
+    {
+      "id": "wf_lantern",
+      "label": "Smash a rival house's red lantern on Floriańska",
+      "desc": "Crackdown +2, Underworld loyalty +3; a favour done.",
+      "need": [
+        "found:weronika"
+      ],
+      "why": "You do not know the madam.",
+      "effects": {
+        "crackdown": 2,
+        "loyalty": {
+          "underworld": 3
+        },
+        "favour": "weronika"
+      }
     }
   ],
   "people": {
@@ -834,6 +882,45 @@
       ],
       "personality": "ambitious",
       "temper": 0.5
+    },
+    "weronika": {
+      "name": "Mother Weronika",
+      "role": "Madam of the house with the red lantern; the Underworld's leader in the Old Town",
+      "faction": "underworld",
+      "model": [
+        "brothel_madam",
+        "town_market_woman_f"
+      ],
+      "street_life": true,
+      "where": "the house with the red lantern, west row",
+      "personality": "wry",
+      "temper": 0.4,
+      "lever": {
+        "id": "safe_upstairs",
+        "name": "A room nobody searches",
+        "text": "Weronika's upstairs room hides you (and her pillow talk reaches you by day)."
+      },
+      "meet": {
+        "label": "Pillow talk with Mother Weronika",
+        "desc": "What the officers and clerks said upstairs last night: hear two watch rumours. Underworld influence +3.",
+        "effects": {
+          "influence": {
+            "underworld": 3
+          },
+          "hear_group": "watch",
+          "hear_loudest": 1
+        },
+        "repeat": true
+      },
+      "heir": {
+        "origin": "merchant",
+        "gender": "f",
+        "inclination": "both"
+      },
+      "heir_if": [
+        "found:weronika",
+        "influence:underworld>=35|loyalty:underworld>=60"
+      ]
     }
   },
   "endings": [
@@ -1133,12 +1220,12 @@
         "inclination": "both"
       },
       "underworld": {
-        "id": "smuggler_jedrek",
-        "name": "Jędrek the Smuggler",
-        "role": "The smuggler of the cellar door, the Underworld's candidate",
-        "origin": "veteran",
-        "gender": "m",
-        "inclination": "women"
+        "id": "weronika",
+        "name": "Mother Weronika",
+        "role": "Madam of the red lantern, the Underworld's candidate",
+        "origin": "merchant",
+        "gender": "f",
+        "inclination": "both"
       },
       "street": {
         "id": "wojtek",
@@ -1220,14 +1307,15 @@
       ]
     },
     "underworld": {
-      "id": "jedrek",
-      "name": "Jędrek the Smuggler",
+      "id": "weronika",
+      "name": "Mother Weronika",
       "historical": false,
-      "model": "hist_jedrek",
+      "model": "brothel_madam",
       "fallback": [
-        "cast_smuggler",
-        "dist_raftsman"
-      ]
+        "town_market_woman_f",
+        "dist_market_woman_f"
+      ],
+      "note": "The Underworld's leader in the Old Town; Wilk the river king taxes her house, which is why she wants him drowned."
     },
     "austria": {
       "id": "margelik",
@@ -1633,6 +1721,359 @@
           },
           "text": "You traded with the fence below the Rynek."
         }
+      }
+    }
+  },
+  "feuds": {
+    "_doc": "Leader feuds shown on the day panel while both live. Grievance: a found leader left without a favour for `neglect_days` gains grievance for her faction.",
+    "weronika": {
+      "against": "wilk",
+      "until": "night:kingpin",
+      "text": "Mother Weronika pays Wilk a third of her take and would dance at his wake. Do her favours and she will help you reach him.",
+      "neglect_days": 2,
+      "grievance": 10
+    }
+  },
+  "favours": {
+    "weronika": {
+      "ally_at": 2,
+      "ally_flag": "weronika_ally",
+      "text": "Mother Weronika counts you a friend of the house: her ledger is open to you, and she will help against Wilk."
+    }
+  },
+  "notables": {
+    "_doc": "Holds on people (docs/GDD.md 'Holds on people'). Notables are invented office-holders (no real person is accused; docs/HISTORY.md). Each has `weaknesses` (vice, debt, secret, dependent, ambition, fear, faith, greed) that rumours reveal (`reveals` in rumours.json) or play uncovers (the madam's ledger, the keyhole), `resistance` 0-3 (pride, protection: adds to what a demand needs), and `gender` (for courtship gates). Holds (`hold_types`): bribe, blackmail, debt, romance, fear, removal, rumour, ward; each with strength 0-3, stability and risks. A demand needs hold strength >= need (+1 if resistance >= 2); its `use` is consume, strain (-1) or keep. Proof tiers for blackmail: witness 1, ledger 2, testimony 2, peep 3, token 3 (capped at 3).",
+    "proof_strength": {
+      "witness": 1,
+      "ledger": 2,
+      "testimony": 2,
+      "peep": 3,
+      "token": 3
+    },
+    "demands": {
+      "coin": {
+        "need": 1,
+        "label": "coin",
+        "text": "He pays, and hates you in instalments.",
+        "effects": {
+          "coins": 8
+        },
+        "use": "strain"
+      },
+      "informer": {
+        "need": 2,
+        "label": "the informer's name",
+        "text": "He names the grey informer's paymaster.",
+        "effects": {
+          "notoriety": -10,
+          "hear": [
+            "informer_master"
+          ]
+        },
+        "use": "consume"
+      },
+      "rumour": {
+        "need": 2,
+        "label": "a rumour from his own mouth",
+        "text": "He repeats your tale at his club; it spreads with his authority and nobody traces it to you.",
+        "effects": {
+          "plant_best": true
+        },
+        "use": "strain"
+      },
+      "pass": {
+        "need": 2,
+        "label": "a pass for tonight",
+        "text": "A signed pass: tonight one post waves you through.",
+        "effects": {
+          "tonight": [
+            "pass_signed"
+          ]
+        },
+        "use": "strain"
+      },
+      "warrant": {
+        "need": 3,
+        "label": "a warrant withdrawn",
+        "text": "A warrant is torn up in the Town Hall. Crackdown -8.",
+        "effects": {
+          "crackdown": -8
+        },
+        "use": "consume"
+      },
+      "vote": {
+        "need": 3,
+        "label": "his vote",
+        "text": "He votes your way in the council.",
+        "effects": {
+          "loyalty": {
+            "guilds": 5,
+            "magnates": 3
+          }
+        },
+        "use": "strain"
+      },
+      "weaken": {
+        "need": 3,
+        "label": "tonight's door left unbarred",
+        "text": "Tonight a patrol is sent the wrong way and a side door is left unbarred.",
+        "effects": {
+          "tonight": [
+            "institution_weakened"
+          ]
+        },
+        "use": "consume"
+      },
+      "install": {
+        "need": 2,
+        "label": "his voice for you",
+        "use": "keep",
+        "text": "He speaks for you in his circle: his faction's influence +2 every dawn while the hold lasts.",
+        "effects": {}
+      },
+      "silence": {
+        "need": 2,
+        "label": "a witness silenced",
+        "use": "consume",
+        "text": "A witness against the movement forgets what he saw. Notoriety -8.",
+        "effects": {
+          "notoriety": -8
+        }
+      }
+    },
+    "people": {
+      "rajca": {
+        "name": "Rajca Tobiasz Grodzicki",
+        "office": "a town councillor (invented)",
+        "faction": "guilds",
+        "nights": [
+          2,
+          5
+        ],
+        "model": [
+          "town_councillor",
+          "figure_merchant"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern on Tuesdays and Fridays",
+          "debt": "three hundred złoty owed to Wilk",
+          "dependent": "a son, Marcin, at the Collegium"
+        },
+        "resistance": 1,
+        "gender": "m"
+      },
+      "magistrate": {
+        "name": "Magistrate Ignaz Pölzl",
+        "office": "a magistrate of the Town Hall court (invented)",
+        "faction": "austria",
+        "nights": [
+          3,
+          6
+        ],
+        "model": [
+          "town_judge",
+          "figure_noble"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern's back door",
+          "greed": "takes fees for sentences",
+          "fear": "the Commissioner's temper"
+        },
+        "resistance": 2,
+        "gender": "m"
+      },
+      "clerk": {
+        "name": "Herr Anton Wlach",
+        "office": "the commissary's first clerk (invented)",
+        "faction": "austria",
+        "nights": [
+          2,
+          4,
+          7
+        ],
+        "model": [
+          "town_notary",
+          "npc_m_02"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern, often",
+          "debt": "gambling notes held by Herr Lindner",
+          "ambition": "a post in Vienna"
+        },
+        "resistance": 0,
+        "gender": "m"
+      },
+      "elder": {
+        "name": "Master Kacper Lis",
+        "office": "an elder of the goldsmiths' guild (invented)",
+        "faction": "guilds",
+        "nights": [
+          4
+        ],
+        "model": [
+          "dist_goldsmith",
+          "town_cloth_merchant"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern",
+          "secret": "a forged guild patent",
+          "dependent": "an old mother in Kazimierz"
+        },
+        "resistance": 1,
+        "gender": "m"
+      },
+      "canon": {
+        "name": "Canon Józef Wąsowicz",
+        "office": "a canon of the chapter (invented)",
+        "faction": "church",
+        "nights": [
+          5
+        ],
+        "model": [
+          "cast_chaplain",
+          "figure_priest"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern",
+          "faith": "he fears for his soul more than his benefice",
+          "secret": "he served the last king's cabinet"
+        },
+        "resistance": 2,
+        "gender": "m"
+      },
+      "prussian": {
+        "name": "Herr Ruprecht Stolle",
+        "office": "a Prussian trade agent (invented)",
+        "faction": "prussia",
+        "nights": [
+          3
+        ],
+        "model": [
+          "cast_prussian_banker",
+          "figure_merchant"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern",
+          "greed": "thalers"
+        },
+        "resistance": 1,
+        "gender": "m"
+      },
+      "rusofficer": {
+        "name": "Rotmistrz Kiriłł Sablin",
+        "office": "a Russian cavalry captain on leave (invented)",
+        "faction": "russia",
+        "nights": [
+          6
+        ],
+        "model": [
+          "cast_officer",
+          "watchman"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern",
+          "debt": "cards",
+          "ambition": "a colonelcy"
+        },
+        "resistance": 2,
+        "gender": "m"
+      },
+      "steward": {
+        "name": "Pan Jacek Mrozowski",
+        "office": "a magnate's steward (invented)",
+        "faction": "magnates",
+        "nights": [
+          7
+        ],
+        "model": [
+          "dist_steward",
+          "npc_m_02"
+        ],
+        "weaknesses": {
+          "vice": "the red lantern",
+          "greed": "his lord's money",
+          "dependent": "a daughter, Zosia, who wants to sing"
+        },
+        "resistance": 0,
+        "gender": "m"
+      },
+      "widow": {
+        "name": "Pani Helena Rostworowska",
+        "office": "a councillor's widow who holds the Town Hall's purse strings (invented)",
+        "faction": "magnates",
+        "nights": [],
+        "model": [
+          "figure_noble_f",
+          "cast_hostess_f"
+        ],
+        "weaknesses": {
+          "secret": "letters from a Jacobin in Paris",
+          "ambition": "her son's seat on the council"
+        },
+        "resistance": 1,
+        "gender": "f"
+      }
+    },
+    "hold_types": {
+      "bribe": {
+        "label": "bought",
+        "base": 1,
+        "cost": 6,
+        "cost_step": 2,
+        "yours_after": 3,
+        "decay": 1,
+        "tell": "a purse"
+      },
+      "blackmail": {
+        "label": "blackmailed",
+        "tell": "a letter",
+        "leak": 0.3,
+        "retaliate": 0.25,
+        "confess": 0.1
+      },
+      "debt": {
+        "label": "in your debt",
+        "base": 2,
+        "cost": 10,
+        "alt_need": "influence:underworld>=25",
+        "default": 0.08,
+        "tell": "his notes"
+      },
+      "romance": {
+        "label": "in love with you",
+        "steps": 4,
+        "base": 3,
+        "expose": 0.08,
+        "tell": "a ribbon"
+      },
+      "fear": {
+        "label": "afraid of you",
+        "base": 2,
+        "need": "influence:street>=20|influence:underworld>=20",
+        "crackdown": 3,
+        "notoriety": 5,
+        "hatred": 0.15,
+        "tell": "a dead dog on the step"
+      },
+      "removal": {
+        "label": "removed",
+        "crackdown": 8,
+        "grievance": 20,
+        "fear": 10,
+        "tell": "a grave"
+      },
+      "rumour": {
+        "label": "smeared",
+        "base": 1,
+        "trace": 0.2,
+        "tell": "a whisper"
+      },
+      "ward": {
+        "label": "his dependent under your protection",
+        "base": 3,
+        "cost": 3,
+        "seize": 0.1,
+        "tell": "a ward"
       }
     }
   }

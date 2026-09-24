@@ -182,6 +182,7 @@ func _day(n: int) -> void:
 			notes.append(camp.do_action("tavern").left(60))
 			notes.append(camp.plant("raid_kazimierz", "ballad").left(60))
 		3:
+			await _holds_chains()
 			notes.append(camp.urchin_buy("rumour").left(60))
 			notes.append(camp.do_action("nominate:apprentice").left(60))
 			camp.choose_lead("deserter")
@@ -257,6 +258,8 @@ func _night(n: int, mid: String) -> String:
 			await ms.talk(who)
 			await ms.run_dialogue([])
 			print("[smoke]   lead found %s=%s" % [who, camp.found(who)])
+	if n == 2:
+		await _brothel()
 	if n == 3:
 		await _capture_test()
 	if n == 4:
@@ -457,6 +460,17 @@ func _kingpin_replays() -> void:
 				break
 			print("[smoke]   kingpin knife try %d: %s" % [tries, res2])
 	print("[smoke] kingpin method=knife killed=%s blocked=%s" % [Mission.has_flag("killed_knife"), Mission.has_flag("approach_blocked")])
+	# folklore: the quiet kill dressed as a strzyga's work, then debunked
+	var fk: Dictionary = camp.rumours.folklore
+	print("[smoke] folklore rumours=%d chatter=%d stagings=%d file=%s" % [(fk.get("rumours", {}) as Dictionary).size() if fk.get("rumours") is Dictionary else 0,
+			(fk.get("chatter", {}) as Dictionary).size() if fk.get("chatter") is Dictionary else 0, camp.stagings().size(), not fk.is_empty()])
+	var ck0 := GameState.crackdown
+	r._verb("stage:strzyga", "")
+	var ck1 := GameState.crackdown
+	var dl: Array = []
+	camp._stagings_dawn(dl, true)
+	print("[smoke] folklore chain kill=%s staged=%s crackdown %d->%d rumour=%s debunked=%s" % [Mission.has_flag("killed_knife"), camp.st()["tonight"].get("staged", false),
+			ck0, ck1, camp.rumours.heard("strzyga_killing"), not dl.is_empty()])
 	var knife_coat := coat
 	if Mission.is_active():
 		Mission.fail("smoke: replay over")
@@ -540,3 +554,62 @@ func _undercroft() -> void:
 	if entered and r.interiors and r.interiors.has_method("_go_out_now"):
 		r.interiors.call("_go_out_now", ms.player())
 		await frames(4)
+
+
+# ------------------------------------------------------------------ the red lantern and holds on people
+
+func _brothel() -> void:
+	var r := runner()
+	var sl: Node = r.world.find_child("StreetLife", true, false) if r else null
+	if sl == null or not sl.has_method("smoke_brothel"):
+		print("[smoke] brothel street_life=missing")
+		return
+	camp.rumours.seed_rumour("visits_rajca")
+	camp.rumours.hear("visits_rajca", "smoke: learned from the tavern")
+	var res: Dictionary = await sl.smoke_brothel()
+	print("[smoke] brothel madam=%s found=%s room=%s scene=%s inside=%s house=%d ledger_refused=%s ledger=%s proofs=%s raid_window=%s" % [res.get("madam"),
+			res.get("found"), res.get("room"), res.get("scene"), res.get("inside"), int(res.get("house", 0)), res.get("ledger_refused"), res.get("ledger"),
+			res.get("proofs"), res.get("raid")])
+	var p: Player = ms.player()
+	if p and p.global_position.y < -50.0 and r.interiors and r.interiors.has_method("_go_out_now"):
+		r.interiors.call("_go_out_now", p)
+	await frames(4)
+	var infl := GameState.get_influence("underworld")
+	GameState.set_influence("underworld", maxi(infl, 40))
+	print("[smoke] brothel heir weronika=%s leader=%s" % ["weronika" in camp.heirs(), camp.db.get("leaders", {}).get("underworld", {}).get("model", "?")])
+	GameState.set_influence("underworld", infl)
+
+
+func _holds_chains() -> void:
+	var lines: Array = []
+	GameState.coins = maxi(GameState.coins, 40)
+	# blackmail: schedule learned (rumour) -> proof at the house (ledger/keyhole/glove) -> press -> effect
+	var ck := GameState.crackdown
+	var bs: int = camp.hold_strength("rajca")
+	var t1: String = camp._press("rajca", "warrant", lines)
+	print("[smoke] blackmail chain notable=rajca learned=%s proof=%s strength=%d press=warrant ok=%s crackdown %d->%d" % [
+			"vice" in camp.weak_known("rajca"), camp.proofs().get("rajca", {}).get("kind", "none"), bs, t1 != "", ck, GameState.crackdown])
+	# bribe -> install (the clerk: three purses make him yours, then his voice)
+	camp.learn_weakness("clerk", "vice")
+	for i in 3:
+		camp._acquire("clerk", "bribe", lines)
+	var bstr: int = camp.hold_strength("clerk")
+	var t2: String = camp._press("clerk", "install", lines)
+	print("[smoke] holds bribe->install notable=clerk strength=%d installed=%s" % [bstr, bool(camp._sub("installed").get("clerk", false)) and t2 != ""])
+	# debt -> pass (the councillor's notes to Wilk, bought)
+	camp.rumours.seed_rumour("debts_rajca")
+	camp.rumours.hear("debts_rajca", "smoke")
+	var t3: String = camp._acquire("rajca", "debt", lines)
+	var t4: String = camp._press("rajca", "pass", lines)
+	print("[smoke] holds debt->pass notable=rajca debt=%s pass=%s tonight=%s" % [t3 != "", t4 != "", camp.st()["tonight"].get("pass_signed", false)])
+	# wardship -> seized -> rescue lead
+	camp.rumours.seed_rumour("steward_daughter")
+	camp.rumours.hear("steward_daughter", "smoke")
+	var t5: String = camp._acquire("steward", "ward", lines)
+	camp.holds()["steward"]["ward"]["safe"] = false
+	camp.holds()["steward"]["ward"]["strength"] = 1
+	var lead_ok: bool = camp.leads().any(func(l) -> bool: return str(l["id"]) == "ward:steward")
+	camp.ward_rescued("steward")
+	print("[smoke] holds ward->rescue notable=steward ward=%s lead=%s rescued_strength=%d" % [t5 != "", lead_ok, camp.hold_strength("steward")])
+	var jp: Dictionary = Mission.journal["people"]
+	print("[smoke] holds journal=%s | %s" % [jp.get("notable_rajca", {}).get("holds", "-"), jp.get("notable_clerk", {}).get("holds", "-")])

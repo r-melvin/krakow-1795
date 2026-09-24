@@ -286,6 +286,15 @@ func apply_effects(eff: Dictionary, lines: Array = [], _why := "") -> void:
 		rumours.hear(str(rid), "told")
 	for pr in eff.get("plant", []):
 		plant(str(pr[0]), str(pr[1]), true)
+	if eff.has("favour"):
+		_favour(str(eff["favour"]), lines)
+	if bool(eff.get("plant_best", false)):
+		var pl: Array = rumours.plantable()
+		if not pl.is_empty():
+			var rid := str(pl[0])
+			plant(rid, "madam", true)
+			rumours.state_of(rid)["traced"] = true      # from his mouth: it will not be traced to you
+			parts.append("\"%s\" planted" % rumours.def(rid).get("subject", rid))
 	if eff.has("hear_group"):
 		for rid in rumours.loudest_unheard():
 			var cs: Array = rumours.state_of(rid).get("carriers", [])
@@ -314,6 +323,455 @@ func apply_effects(eff: Dictionary, lines: Array = [], _why := "") -> void:
 	elif not parts.is_empty() and _why != "silent":
 		lines.append(", ".join(parts))
 	changed.emit()
+
+
+func _favour(who: String, lines: Array) -> void:
+	if not st().has("favours") or not (st()["favours"] is Dictionary):
+		st()["favours"] = {}
+	var f: Dictionary = st()["favours"]
+	f[who] = int(f.get(who, 0)) + 1
+	st()["contact"]["favour_" + who] = GameState.day
+	var fd: Dictionary = db.get("favours", {}).get(who, {})
+	if int(f[who]) >= int(fd.get("ally_at", 2)) and not flag(str(fd.get("ally_flag", "ally_" + who))):
+		set_flag(str(fd.get("ally_flag", "ally_" + who)))
+		lines.append(str(fd.get("text", "")))
+
+
+# ------------------------------------------------------------------ holds on people (campaign.json notables)
+## GameState.campaign.holds: {nid: {type: {strength, ...}}}; weak: {nid: [weakness keys known]};
+## installed: {nid: true}; removed: {nid: true}; bribes/courtship counters per nid. Holds pass to an heir.
+
+func notable(nid: String) -> Dictionary:
+	return db.get("notables", {}).get("people", {}).get(nid, {})
+
+
+func _nd() -> Dictionary:
+	return db.get("notables", {})
+
+
+func _sub(key: String) -> Dictionary:
+	if not st().has(key) or not (st()[key] is Dictionary):
+		st()[key] = {}
+	return st()[key]
+
+
+func holds() -> Dictionary:
+	return _sub("holds")
+
+
+## Blackmail holds only (kept for the brothel code).
+func proofs() -> Dictionary:
+	var out := {}
+	for nid in holds():
+		if (holds()[nid] as Dictionary).has("blackmail"):
+			out[nid] = holds()[nid]["blackmail"]
+	return out
+
+
+func removed(nid: String) -> bool:
+	return bool(_sub("removed").get(nid, false))
+
+
+## Notables who visit the red lantern tonight (the arc night).
+func notables_tonight() -> Array:
+	var out: Array = []
+	var nb: Dictionary = _nd().get("people", {})
+	for nid in nb:
+		if removed(nid):
+			continue
+		if night() in (nb[nid].get("nights", []) as Array).map(func(x) -> int: return int(x)):
+			out.append(nid)
+	return out
+
+
+func weak_known(nid: String) -> Array:
+	return _sub("weak").get(nid, [])
+
+
+func learn_weakness(nid: String, w: String) -> void:
+	var nd := notable(nid)
+	if nd.is_empty() or not (nd.get("weaknesses", {}) as Dictionary).has(w):
+		return
+	var k: Array = _sub("weak").get(nid, [])
+	if not w in k:
+		k.append(w)
+		_sub("weak")[nid] = k
+		_journal_notable(nid)
+
+
+func hold_strength(nid: String) -> int:
+	var best := 0
+	for t in holds().get(nid, {}):
+		best = maxi(best, int(holds()[nid][t].get("strength", 0)))
+	return best
+
+
+func add_hold(nid: String, type: String, strength: int, extra: Dictionary = {}) -> bool:
+	var nd := notable(nid)
+	if nd.is_empty() or removed(nid):
+		return false
+	var hs: Dictionary = holds().get(nid, {})
+	var h: Dictionary = hs.get(type, {})
+	var better := strength > int(h.get("strength", 0))
+	if better:
+		h["strength"] = clampi(strength, 0, 3)
+	h["since"] = int(h.get("since", GameState.day))
+	for k in extra:
+		h[k] = extra[k]
+	hs[type] = h
+	holds()[nid] = hs
+	_journal_notable(nid)
+	changed.emit()
+	return better
+
+
+func drop_hold(nid: String, type: String) -> void:
+	if holds().has(nid):
+		(holds()[nid] as Dictionary).erase(type)
+		if (holds()[nid] as Dictionary).is_empty():
+			holds().erase(nid)
+	_journal_notable(nid)
+
+
+## The People-tab entry of a notable: weaknesses learned, holds held (tell + strength).
+func _journal_notable(nid: String) -> void:
+	var nd := notable(nid)
+	var jp: Dictionary = Mission.journal["people"]
+	var e: Dictionary = jp.get("notable_" + nid, {})
+	e["name"] = str(nd.get("name", nid))
+	e["role"] = str(nd.get("office", ""))
+	e["faction"] = fname(str(nd.get("faction", "")))
+	e["where"] = e.get("where", "about the Rynek")
+	e["t"] = e.get("t", GameState.time_string())
+	e["night"] = e.get("night", GameState.day)
+	var ws: Dictionary = nd.get("weaknesses", {})
+	e["weaknesses"] = ", ".join(weak_known(nid).map(func(w) -> String: return "%s: %s" % [w, ws.get(w, "")]))
+	var ht: Dictionary = _nd().get("hold_types", {})
+	var hs: Array = []
+	for t in holds().get(nid, {}):
+		hs.append("%s %s" % [ht.get(t, {}).get("label", t), "●".repeat(int(holds()[nid][t].get("strength", 0))) + "○".repeat(3 - int(holds()[nid][t].get("strength", 0)))])
+	e["holds"] = "; ".join(hs)
+	if removed(nid):
+		e["holds"] = "removed"
+	e["notable"] = true
+	jp["notable_" + nid] = e
+
+
+## Proof of `nid`'s visit to the red lantern: a blackmail hold of the proof's strength (the strongest kept).
+func add_proof(nid: String, kind: String) -> bool:
+	var sgs: Dictionary = _nd().get("proof_strength", {})
+	var k := int(sgs.get(kind, 1))
+	var h: Dictionary = holds().get(nid, {}).get("blackmail", {})
+	var kinds: Array = h.get("kinds", [])
+	if not kind in kinds:
+		kinds.append(kind)
+	learn_weakness(nid, "vice")
+	var better := add_hold(nid, "blackmail", k, {"kinds": kinds, "kind": kind if k > int(h.get("strength", 0)) else str(h.get("kind", kind))})
+	if better and Mission.is_active():
+		Mission.message.emit("Proof: %s at the red lantern (%s, strength %d)." % [notable(nid).get("name", nid), kind, mini(k, 3)], 4.0)
+	return better
+
+
+func _can_acquire(nid: String, type: String) -> String:
+	var nd := notable(nid)
+	var ht: Dictionary = _nd().get("hold_types", {}).get(type, {})
+	var wk := weak_known(nid)
+	match type:
+		"bribe":
+			var cost := int(ht.get("cost", 6)) + int(ht.get("cost_step", 2)) * int(_sub("bribes").get(nid, 0))
+			if not ("greed" in wk or "debt" in wk or "vice" in wk):
+				return "You know nothing about what he wants."
+			return "" if GameState.coins >= cost else "Not enough coin (%d zł)." % cost
+		"debt":
+			if not "debt" in wk:
+				return "You do not know whom he owes."
+			return "" if GameState.coins >= int(ht.get("cost", 10)) or cond(str(ht.get("alt_need", "false"))) else "Not enough coin or Underworld friends."
+		"ward":
+			if not "dependent" in wk:
+				return "You know of no one he would protect."
+			return "" if GameState.coins >= int(ht.get("cost", 3)) else "Not enough coin."
+		"fear":
+			return "" if cond(str(ht.get("need", "true"))) else "You have no one to send."
+		"rumour":
+			return "" if not wk.is_empty() else "You know nothing to whisper."
+		"removal":
+			return "" if cond("influence:underworld>=20|influence:street>=30") else "You have no one who would do it."
+		"romance":
+			var g := str(nd.get("gender", "m"))
+			var want := "men" if g == "m" else "women"
+			if GameState.inclination == "unspoken" or not (GameState.inclination == want or GameState.inclination == "both"):
+				return "Not your inclination."
+			return ""
+	return "?"
+
+
+func _hold_actions(out: Array) -> void:
+	var nb: Dictionary = _nd().get("people", {})
+	var ht: Dictionary = _nd().get("hold_types", {})
+	var dm: Dictionary = _nd().get("demands", {})
+	for nid in nb:
+		if removed(nid) or (weak_known(nid).is_empty() and not holds().has(nid)):
+			continue
+		var nd: Dictionary = nb[nid]
+		var name := str(nd.get("name", nid))
+		for t in ["bribe", "debt", "ward", "fear", "rumour", "romance", "removal"]:
+			if t == "romance" and int(_sub("court").get(nid, 0)) >= int(ht["romance"].get("steps", 4)):
+				continue
+			if t in ["debt", "ward", "fear"] and holds().get(nid, {}).has(t):
+				continue
+			var why := _can_acquire(nid, t)
+			if t == "romance" and why == "Not your inclination.":
+				continue
+			var label: String = {"bribe": "Bribe %s", "debt": "Buy %s's debts", "ward": "Take %s's dependent under your protection",
+					"fear": "Frighten %s", "rumour": "Start a whisper about %s", "romance": "Court %s", "removal": "Have %s removed"}[t] % name
+			out.append({"id": "hold:%s:%s" % [t, nid], "label": label, "kind": "hold", "desc": _hold_desc(nid, t), "enabled": why == "" and actions_left() > 0, "why": why})
+		var s := hold_strength(nid)
+		if s <= 0:
+			continue
+		for d in dm:
+			var need := int(dm[d]["need"]) + (1 if int(nd.get("resistance", 0)) >= 2 else 0)
+			var ok := s >= need
+			if not ok and need > 3:
+				continue
+			out.append({"id": "press:%s:%s" % [nid, d], "label": "Use your hold on %s: %s" % [name, dm[d]["label"]], "kind": "press",
+					"desc": "%s (Hold %d of 3; this needs %d; %s.)" % [dm[d]["text"], s, need, {"consume": "uses it up", "strain": "strains it", "keep": "keeps it"}.get(str(dm[d].get("use", "strain")), "")],
+					"enabled": ok and actions_left() > 0, "why": "" if ok else "Your hold is too weak for that."})
+		if holds().get(nid, {}).has("debt"):
+			out.append({"id": "sell:%s:debt" % nid, "label": "Sell %s's debts to the Underworld" % name, "kind": "press", "desc": "Coins +6, Underworld influence +3; the hold goes.", "enabled": actions_left() > 0, "why": ""})
+		if holds().get(nid, {}).has("blackmail"):
+			out.append({"id": "sell:%s:blackmail" % nid, "label": "Sell what you hold on %s to the salon" % name, "kind": "press", "desc": "Salon influence +4; the hold goes.", "enabled": actions_left() > 0, "why": ""})
+			out.append({"id": "release:" + nid, "label": "Burn what you hold on %s" % name, "kind": "press",
+					"desc": "Mercy: the proof goes in the stove and he knows it. %s loyalty +5." % fname(str(nd.get("faction", ""))), "enabled": actions_left() > 0, "why": ""})
+
+
+func _hold_desc(nid: String, t: String) -> String:
+	var ht: Dictionary = _nd().get("hold_types", {}).get(t, {})
+	match t:
+		"bribe":
+			return "%d zł now. Weak and fading each night, unless you keep paying: after %d purses he is simply yours." % [int(ht.get("cost", 6)) + int(ht.get("cost_step", 2)) * int(_sub("bribes").get(nid, 0)), int(ht.get("yours_after", 3))]
+		"debt":
+			return "Buy his notes (%d zł, or through Underworld friends). Steady; he may flee the city instead of paying." % int(ht.get("cost", 10))
+		"ward":
+			return "His dependent placed safe under the movement's roof (%d zł). Strong and a kindness while the ward is safe; the occupier may seize the ward." % int(ht.get("cost", 3))
+		"fear":
+			return "A dead dog on his step. Crackdown +3, notoriety +5. He may turn to hatred and inform."
+		"rumour":
+			return "A whisper about him through the ballad seller: slow, deniable, it may be traced."
+		"romance":
+			return "A meeting, a gift, a letter, a walk. Slow and strong, and it may become something real. Nothing is shown."
+		"removal":
+			return "He is gone. His faction grieves and fears, the watch investigates, and the night counts as blood."
+	return ""
+
+
+func _acquire(nid: String, t: String, lines: Array) -> String:
+	if _can_acquire(nid, t) != "":
+		return ""
+	var nd := notable(nid)
+	var ht: Dictionary = _nd().get("hold_types", {}).get(t, {})
+	var name := str(nd.get("name", nid))
+	var fac := str(nd.get("faction", ""))
+	match t:
+		"bribe":
+			var n := int(_sub("bribes").get(nid, 0))
+			GameState.coins -= int(ht.get("cost", 6)) + int(ht.get("cost_step", 2)) * n
+			_sub("bribes")[nid] = n + 1
+			var yours := n + 1 >= int(ht.get("yours_after", 3))
+			add_hold(nid, "bribe", 2 if yours else 1, {"yours": yours})
+			return "%s takes the purse%s." % [name, ", and at last he is simply yours" if yours else ""]
+		"debt":
+			if GameState.coins >= int(ht.get("cost", 10)):
+				GameState.coins -= int(ht.get("cost", 10))
+			add_hold(nid, "debt", int(ht.get("base", 2)))
+			return "You bought %s's notes. He owes the movement now." % name
+		"ward":
+			GameState.coins -= int(ht.get("cost", 3))
+			add_hold(nid, "ward", int(ht.get("base", 3)), {"ward": str(nd.get("weaknesses", {}).get("dependent", "a dependent")), "safe": true})
+			return "You took %s under the movement's protection: %s. He is grateful, and bound." % [str(nd.get("weaknesses", {}).get("dependent", "his dependent")), name]
+		"fear":
+			GameState.crackdown = clampi(GameState.crackdown + int(ht.get("crackdown", 3)), 0, 100)
+			GameState.add_notoriety(float(ht.get("notoriety", 5)))
+			add_hold(nid, "fear", int(ht.get("base", 2)))
+			return "A dead dog on %s's step, and a man at the corner who did not look away. He is afraid of you." % name
+		"rumour":
+			var w := str(weak_known(nid)[0])
+			var rid := "smear_" + nid
+			rumours.db["rumours"][rid] = {"subject": name, "truth": true, "spread": 0.35, "seed": ["tavern", "market"],
+					"text": "%s: %s." % [name, nd.get("weaknesses", {}).get(w, w)], "line": ["Słyszałeś o %s?" % name, "Heard about %s?" % name],
+					"effects": {"loyalty": {fac: -2} if fac in LOCAL else {}, "text": "The whisper about %s has done its work; his friends are cooler." % name}}
+			plant(rid, "ballad", true)
+			add_hold(nid, "rumour", int(ht.get("base", 1)))
+			return "A verse about %s goes round the Cloth Hall arcades." % name
+		"romance":
+			var k := int(_sub("court").get(nid, 0)) + 1
+			_sub("court")[nid] = k
+			var step: String = ["a meeting by chance at the apothecary's", "a gift, well chosen", "a letter, carefully unsigned", "a walk along the walls in the snow"][mini(k, 4) - 1]
+			if k >= int(ht.get("steps", 4)):
+				add_hold(nid, "romance", int(ht.get("base", 3)))
+				return "Courting %s: %s. Something has changed between you; whether it is love or leverage is for you to decide." % [name, step]
+			return "Courting %s: %s (%d of %d)." % [name, step, k, int(ht.get("steps", 4))]
+		"removal":
+			_sub("removed")[nid] = true
+			holds().erase(nid)
+			GameState.crackdown = clampi(GameState.crackdown + int(ht.get("crackdown", 8)), 0, 100)
+			if fac in LOCAL:
+				add_grievance(fac, int(ht.get("grievance", 20)))
+			if GameState.factions.has(fac):
+				GameState.add_fear(fac, int(ht.get("fear", 10)))
+			st()["tonight"]["blood_day"] = int(st()["tonight"].get("blood_day", 0)) + 1
+			_journal_notable(nid)
+			return "%s was found in the Vistula ice. The watch asks questions; his people are afraid." % name
+	return ""
+
+
+func _press(nid: String, demand: String, lines: Array) -> String:
+	var dm: Dictionary = _nd().get("demands", {}).get(demand, {})
+	var nd := notable(nid)
+	var s := hold_strength(nid)
+	var need := int(dm.get("need", 9)) + (1 if int(nd.get("resistance", 0)) >= 2 else 0)
+	if dm.is_empty() or s < need:
+		return ""
+	# the hold spent is the strongest one
+	var best := ""
+	for t in holds().get(nid, {}):
+		if best == "" or int(holds()[nid][t].get("strength", 0)) > int(holds()[nid][best].get("strength", 0)):
+			best = t
+	var fac := str(nd.get("faction", ""))
+	st()["presses"] = int(st().get("presses", 0)) + 1
+	apply_effects(dm.get("effects", {}), lines)
+	if demand == "install":
+		_sub("installed")[nid] = true
+	if GameState.factions.has(fac):
+		GameState.add_fear(fac, 3)
+	st()["tonight"]["blackmail_" + nid] = true
+	match str(dm.get("use", "strain")):
+		"consume":
+			drop_hold(nid, best)
+		"strain":
+			holds()[nid][best]["strength"] = int(holds()[nid][best]["strength"]) - 1
+			if int(holds()[nid][best]["strength"]) <= 0:
+				drop_hold(nid, best)
+	if int(st()["presses"]) > 3:
+		GameState.add_notoriety(5.0)
+		lines.append("Too many letters in too many hands: notoriety +5.")
+	var ht: Dictionary = _nd().get("hold_types", {}).get(best, {})
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("press|%s|%d|%s" % [nid, GameState.day, demand])
+	if best == "blackmail":
+		if rng.randf() < float(ht.get("leak", 0.3)) * (1.0 if s < 3 else 0.5) and fac in LOCAL:
+			GameState.add_loyalty(fac, -4)
+			lines.append("It leaked: the %s know one of theirs is being squeezed (loyalty -4)." % fname(fac))
+		var roll := rng.randf()
+		if roll < float(ht.get("retaliate", 0.25)):
+			st()["tonight"]["retaliation"] = nid
+			lines.append("%s has hired men to get his letter back." % nd.get("name", nid))
+		elif roll < float(ht.get("retaliate", 0.25)) + float(ht.get("confess", 0.1)):
+			GameState.crackdown = clampi(GameState.crackdown + 8, 0, 100)
+			lines.append("%s confessed everything to the Commissioner rather than pay: crackdown +8." % nd.get("name", nid))
+	_journal_notable(nid)
+	if "--smoke" in OS.get_cmdline_user_args():
+		print("[smoke] holds press notable=%s demand=%s hold=%s strength=%d" % [nid, demand, best, s])
+	return "%s: %s. %s" % [nd.get("name", nid), dm.get("label", demand), dm.get("text", "")]
+
+
+## Dawn: holds decay, fail, turn or pay out (bribes fade, debtors flee, the frightened inform, wards are seized,
+## installed men speak for you, the madam sells what you hold if her loyalty is low).
+func _holds_dawn(lines: Array) -> void:
+	var ht: Dictionary = _nd().get("hold_types", {})
+	for nid in holds().keys():
+		var nd := notable(nid)
+		var name := str(nd.get("name", nid))
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("holds|%s|%d" % [nid, GameState.day])
+		var hs: Dictionary = holds()[nid]
+		if hs.has("bribe") and not bool(hs["bribe"].get("yours", false)):
+			hs["bribe"]["strength"] = int(hs["bribe"]["strength"]) - int(ht["bribe"].get("decay", 1))
+			if int(hs["bribe"]["strength"]) <= 0:
+				drop_hold(nid, "bribe")
+				lines.append("%s's purse is spent; he no longer remembers your name." % name)
+		if hs.has("debt") and rng.randf() < float(ht["debt"].get("default", 0.08)):
+			drop_hold(nid, "debt")
+			lines.append("%s fled the city rather than pay his notes." % name)
+		if hs.has("fear") and rng.randf() < float(ht["fear"].get("hatred", 0.15)):
+			drop_hold(nid, "fear")
+			GameState.crackdown = clampi(GameState.crackdown + 6, 0, 100)
+			lines.append("Fear turned to hatred: %s went to the Commissioner. Crackdown +6." % name)
+		if hs.has("ward") and bool(hs["ward"].get("safe", true)) and rng.randf() < float(ht["ward"].get("seize", 0.1)):
+			hs["ward"]["safe"] = false
+			hs["ward"]["strength"] = 1
+			set_flag("ward_seized_" + nid)
+			lines.append("The Polizei have taken %s's %s from under your roof. A rescue is a lead now." % [name, hs["ward"].get("ward", "ward")])
+		if hs.has("blackmail") and GameState.get_loyalty("underworld") < 40 and rng.randf() < 0.2:
+			drop_hold(nid, "blackmail")
+			lines.append("Mother Weronika sold %s the proof you held on him. Her loyalty was for sale; so was yours." % name)
+		if bool(_sub("installed").get(nid, false)) and hold_strength(nid) > 0:
+			var fac := str(nd.get("faction", ""))
+			if GameState.factions.has(fac) and not bool(GameState.factions[fac].get("external", false)):
+				GameState.add_influence(fac, 2)
+				lines.append("%s spoke for you in his circle (%s influence +2)." % [name, fname(fac)])
+		_journal_notable(nid)
+
+
+# ------------------------------------------------------------------ folklore: staging a death (data/folklore.json)
+
+const DEFAULT_STAGINGS := {"strzyga": {"label": "dress it as a strzyga's work: salt in a ring, a sickle on the throat, the eyes weighted with coins",
+		"rumour": "strzyga_killing", "crackdown_relief": 6, "fear": 10, "debunk": 0.3, "debunker": "the Austrian garrison surgeon"}}
+
+
+func stagings() -> Dictionary:
+	var fs: Variant = rumours.folklore.get("stagings", {})
+	return fs if fs is Dictionary and not (fs as Dictionary).is_empty() else DEFAULT_STAGINGS
+
+
+## A death dressed as the supernatural: the watch's crackdown for it is relieved, a folklore rumour seeds itself
+## where it happened, district fear rises; a sceptic may debunk it over the following days.
+func stage_death(staging: String, district: String, lines: Array) -> bool:
+	var sd: Dictionary = stagings().get(staging, {})
+	if sd.is_empty():
+		return false
+	GameState.crackdown = clampi(GameState.crackdown - int(sd.get("crackdown_relief", 6)), 0, 100)
+	var rid := str(sd.get("rumour", "strzyga_killing"))
+	if not rumours.defs().has(rid):
+		rumours.db["rumours"][rid] = {"kind": "curse", "subject": "The strzyga", "truth": false, "spread": 0.5, "seed": ["passage", "well", "tavern"],
+				"text": "A strzyga walks the quays: a dead man with salt round him and coins on his eyes. The soldiers will not go there after dark.",
+				"line": ["Strzyga chodzi po nabrzeżu. Trup w kole z soli, z monetami na oczach.", "A strzyga walks the quay. A corpse in a ring of salt, coins on its eyes."],
+				"effects": {"camp": ["haunted_watch"], "text": "The watch keeps to the lit streets: the strzyga walks the quays."}}
+	rumours.seed_rumour(rid)
+	rumours.hear(rid, "you started it")
+	var dd: Dictionary = GameState.districts.get(district, {})
+	if not dd.is_empty():
+		dd["fear"] = clampi(int(dd.get("fear", 0)) + int(sd.get("fear", 10)), 0, 100)
+	var sts: Array = st().get("stagings", []) if st().get("stagings") is Array else []
+	sts.append({"id": staging, "day": GameState.day, "district": district, "debunked": false})
+	st()["stagings"] = sts
+	st()["tonight"]["staged"] = true
+	lines.append("You dressed the death as the supernatural: crackdown -%d, fear in %s +%d." % [int(sd.get("crackdown_relief", 6)), dd.get("name", district), int(sd.get("fear", 10))])
+	return true
+
+
+func _stagings_dawn(lines: Array, force_debunk := false) -> void:
+	for e in st().get("stagings", []):
+		if bool(e.get("debunked", false)):
+			continue
+		var sd: Dictionary = stagings().get(str(e["id"]), {})
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash("debunk|%s|%d" % [e["id"], GameState.day])
+		if force_debunk or rng.randf() < float(sd.get("debunk", 0.3)):
+			e["debunked"] = true
+			GameState.add_notoriety(8.0)
+			GameState.add_loyalty("church", -4)
+			lines.append("%s examined the body and laughed at the salt: a man's work, not a strzyga's. Notoriety +8, Church loyalty -4." % str(sd.get("debunker", "A sceptic")).capitalize())
+
+
+## A seized ward is a lead: following it and coming through the night brings the ward home (the hold restored).
+func ward_rescued(nid: String) -> void:
+	var h: Dictionary = holds().get(nid, {}).get("ward", {})
+	if h.is_empty():
+		return
+	h["safe"] = true
+	h["strength"] = 3
+	set_flag("ward_seized_" + nid, false)
+	_journal_notable(nid)
 
 
 func gain_lever(id: String, from: String = "", lines: Array = []) -> void:
@@ -386,6 +844,12 @@ func night_people() -> Array:
 ## Leads the day panel offers: persons not yet found whose rumour the player has heard.
 func leads() -> Array:
 	var out: Array = []
+	for nid in holds():
+		var wh: Dictionary = holds()[nid].get("ward", {})
+		if not wh.is_empty() and not bool(wh.get("safe", true)):
+			out.append({"id": "ward:" + nid, "rumour": "", "label": "Rescue %s from the watch post cells" % wh.get("ward", "the ward"),
+					"desc": "Seized by the Polizei from under your roof. Follow this lead and come through the night to bring them home.",
+					"chosen": str(st().get("lead", "")) == "ward:" + nid, "mission_only": false})
 	for rid in rumours.known():
 		var sq := str(rumours.def(rid).get("side_quest", ""))
 		var sqd: Dictionary = db.get("side_quests", {}).get(sq, {})
@@ -501,6 +965,12 @@ func relation_lines() -> Array:
 			var pair := ks.trim_prefix("hurt:")
 			if texts.has(pair) and out.size() < 4:
 				out.append({"text": str(texts[pair]), "bad": false})
+	for who in db.get("feuds", {}):
+		if who.begins_with("_"):
+			continue
+		var fd: Dictionary = db["feuds"][who]
+		if found(who) and not cond(str(fd.get("until", "false"))):
+			out.append({"text": str(fd.get("text", "")), "bad": false})
 	var sab := int(db.get("grievance", {}).get("sabotage_at", 60))
 	for fid in LOCAL:
 		var gv := grievance(fid)
@@ -529,6 +999,13 @@ func _dawn_grievance(lines: Array) -> void:
 		var last := int(st()["contact"].get(fid, 1))
 		if GameState.day - last >= int(g.get("neglect_nights", 2)):
 			add_grievance(fid, int(g.get("neglect", 12)))
+	for who in db.get("feuds", {}):
+		if who.begins_with("_") or not found(who):
+			continue
+		var fd: Dictionary = db["feuds"][who]
+		var last2 := int(st()["contact"].get("favour_" + who, int(st()["people"].get(who, {}).get("day", GameState.day))))
+		if GameState.day - last2 >= int(fd.get("neglect_days", 2)):
+			add_grievance(str(person(who).get("faction", "underworld")), int(fd.get("grievance", 10)))
 	var promises: Dictionary = g.get("promises", {})
 	for fl in promises:
 		if Mission.has_flag(str(fl)) and not flag("promise_" + str(fl)):
@@ -595,6 +1072,7 @@ func day_actions() -> Array:
 		var ok := GameState.coins >= int(m.get("cost", 0))
 		out.append({"id": "meet:" + pid, "label": str(m.get("label", "Meet " + str(p.get("name", pid)))), "desc": str(m.get("desc", "")),
 				"kind": "meet", "enabled": ok and actions_left() > 0, "why": "" if ok else "Not enough coin."})
+	_hold_actions(out)
 	for rid in rumours.known():
 		var ct: Dictionary = rumours.def(rid).get("counter", {})
 		if not ct.is_empty() and rumours.in_play(rid) and not rumours.took_hold(rid):
@@ -630,6 +1108,40 @@ func do_action(id: String) -> String:
 	var label := id
 	if id.begins_with("nominate:"):
 		return nominate(id.trim_prefix("nominate:"))
+	if id.begins_with("press:") or id.begins_with("release:") or id.begins_with("hold:") or id.begins_with("sell:"):
+		var tx2 := ""
+		if id.begins_with("press:"):
+			tx2 = _press(id.get_slice(":", 1), id.get_slice(":", 2), lines)
+		elif id.begins_with("hold:"):
+			tx2 = _acquire(id.get_slice(":", 2), id.get_slice(":", 1), lines)
+		elif id.begins_with("sell:"):
+			var sn := id.get_slice(":", 1)
+			var ty := id.get_slice(":", 2)
+			if holds().get(sn, {}).has(ty):
+				drop_hold(sn, ty)
+				if ty == "debt":
+					GameState.coins += 6
+					GameState.add_influence("underworld", 3)
+					tx2 = "The Underworld bought %s's notes from you." % notable(sn).get("name", sn)
+				else:
+					GameState.add_influence("salon", 4)
+					tx2 = "The salon bought what you held on %s." % notable(sn).get("name", sn)
+		else:
+			var nid := id.trim_prefix("release:")
+			var nd := notable(nid)
+			if holds().get(nid, {}).has("blackmail"):
+				drop_hold(nid, "blackmail")
+				if GameState.factions.has(str(nd.get("faction", ""))):
+					GameState.add_loyalty(str(nd.get("faction", "")), 5)
+				tx2 = "You burned what you held on %s, and let him know it. His people will remember the mercy." % nd.get("name", nid)
+		if tx2 == "":
+			return ""
+		day_state()["left"] = actions_left() - 1
+		(day_state()["done"] as Array).append(id)
+		tx2 += (" " + " ".join(lines)) if not lines.is_empty() else ""
+		_feed(tx2)
+		changed.emit()
+		return tx2
 	if id.begins_with("counter:"):
 		var rid := id.trim_prefix("counter:")
 		var ct: Dictionary = rumours.def(rid).get("counter", {})
@@ -1130,6 +1642,15 @@ func night_setup() -> Dictionary:
 	if bool(tn.get("urchin_sweep_lie", false)):
 		out["add_guards"].append({"name": "Rynek patrol C", "wps": [[-20, 0, -12], [18, 0, -13], [18, 0, -20], [-20, 0, -20]]})
 		out["messages"].append("The urchins lied: there is an extra patrol on the north side.")
+	if bool(tn.get("pass_signed", false)):
+		out["remove_guards"].append("St Mary's post")
+		out["messages"].append("A signed pass in your coat: St Mary's post waves you through tonight.")
+	if bool(tn.get("institution_weakened", false)):
+		if not "Rynek patrol A" in out["remove_guards"]:
+			out["remove_guards"].append("Rynek patrol A")
+		out["messages"].append("Your blackmailed man kept his word: a patrol has been sent the wrong way.")
+	if str(tn.get("retaliation", "")) != "":
+		out["sabotage"].append({"faction": "none", "kind": "patrol", "text": "Hired men are looking for you tonight: someone wants his letter back."})
 	if flag("corporal_disgraced"):
 		out["remove_guards"].append("St Mary's post")
 	if flag("informer_arrested"):
@@ -1221,6 +1742,11 @@ func _on_mission_ended(success: bool, _summary: String) -> void:
 	if not succession_pending():
 		_faith_check(lines)
 	var lead := str(s.get("lead", ""))
+	if lead.begins_with("ward:") and success:
+		ward_rescued(lead.trim_prefix("ward:"))
+		lines.append("The ward is home, shaken and safe. The hold is whole again.")
+	_holds_dawn(lines)
+	_stagings_dawn(lines)
 	if lead.begins_with("sq:"):
 		var sqd: Dictionary = db.get("side_quests", {}).get(lead.trim_prefix("sq:"), {})
 		var eff: Dictionary = sqd.get("effects", {})

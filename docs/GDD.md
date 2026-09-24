@@ -204,6 +204,58 @@ occupation) without gratuitous detail; sexual matters stay behind the door (no n
   fires a volley after a minute. `Fire.ignite(pos)` (`scripts/city/fire.gd`) burns and spreads between flammable
   props, draws a bucket line from the wells and leaves them charred; snow and rain slow it.
 
+
+**The house as a faction seat** (street_life.gd, data/street_life.json `brothel`, campaign.json `people.weronika`).
+Mother Weronika (model `brothel_madam`) is the Underworld's leader in the Old Town: shrewd, funny, unsentimental,
+sells to anyone, and hates Wilk the river king, who takes a third of her house (the `feuds` entry; it is her
+motive for helping in the finale: two favours make her an ally, and on the Kingpin night one of her girls slips
+you a vial and a seat at Wilk's cards). Business with her finds her (journal People) and opens: her day meeting
+(pillow talk: two watch rumours, Underworld +3), the madam channel for planting rumours, favours (a debtor
+frightened, a girl's brother out of the guardhouse, a rival house's lantern smashed; neglect raises Underworld
+grievance), her client ledger, and an heir candidacy when the Underworld is strong (influence 35 or loyalty 60).
+Inside (int_salon_brothel, the Post markers of data/interiors.json): women and men who work there (a woman doing
+her hair, a card game with a soldier client, someone asleep on the settle, the house's man at the stair foot, a
+woman by the stove), and the madam at her desk with the ledger when you are inside.
+Choices at the door follow `option_allowed`-style gates: company offered by inclination (a woman upstairs, the
+young man from Tarnów, a gentleman), a bolted room to hide in for anyone, work "with the tray" for a woman (the
+witness inside), talk for anyone. NPCs may voice the period's bigotry; the UI never does.
+
+**Implied, never shown.** Taking the room with company: the door closes, the view fades to black over the
+landing, a caption on the black ("A door closes on the landing." / "Below, a fiddle; through the wall, a
+laugh."), the house heard muffled through the wall (tools/gen_sfx.py `brothel_*`: an upstairs door and latch, a
+parlour fiddle through the floor, a low murmur and a laugh, a card-table slap, an old bed frame, all low-passed at
+the source), the clock moves on twenty minutes, and the view fades back with the player on the landing
+("Nobody on the stairs looks at anybody."). No animation of the act exists. Clients going up are heard the same
+way from the street if you stand close.
+
+**Stealth and the Visitation.** The room still hides you. An officer seen going upstairs becomes a lever. If the
+Visitation raid comes while you are in the house: bribe the corporal, go out of the back window over the woodshed
+roof into the yard (notoriety +4), or go with them (the watch's capture choice).
+
+### Holds on people
+Notables (campaign.json `notables`: invented office-holders; no real person is accused, see docs/HISTORY.md) have
+weaknesses (vice, debt, secret, dependent, ambition, fear, faith, greed) revealed by rumours (`reveals`), the
+madam's ledger and the keyhole. Holds, with strength 0-3 shown in the journal People tab ("Weak spots", "Your
+hold ●●○"), are acquired as day actions and spent on demands.
+
+| Hold | How | Strength | Risk |
+|---|---|---|---|
+| Bribe | a purse (6 zł, +2 each time) | 1, fades nightly; 2 and stable after three | greed |
+| Blackmail | proof from the red lantern: witness 1, ledger 2, testimony 2, keyhole 3, his glove 3 | proof | leaks (loyalty), hired thugs (next night), confession (crackdown) |
+| Debt | buy his notes (10 zł or Underworld 25) | 2 | he may flee |
+| Ward | take his dependent under your protection (3 zł) | 3 | the Polizei may seize the ward: a rescue lead |
+| Fear | a dead dog on his step (Street or Underworld 20) | 2 | crackdown, notoriety; fear may turn to informing |
+| Rumour | a whisper about him through the ballad seller | 1 | traced |
+| Romance | four meetings over days, gated by inclination; nothing shown | 3 | exposure |
+| Removal | he is gone | - | grievance, fear, crackdown; the next night counts as blood |
+
+Demands (need +1 against a proud man, resistance 2+): coin, the informer's name, a rumour from his mouth (untraceable),
+a pass for tonight (a post waves you through), a witness silenced, a warrant withdrawn, his vote, tonight's door
+left unbarred (a patrol sent the wrong way), and install (his faction's influence +2 each dawn). A demand
+consumes, strains (-1) or keeps the hold. Holds can be sold (debts to the Underworld, secrets to the salon), burned
+for mercy (loyalty), and pass to an heir. If the Underworld's loyalty falls below 40, Weronika may sell your proof
+to its subject. Nights when a hold was used show "blackmail" on the score card.
+
 ## The countryside (farmland as a faction avenue)
 Kraków fed on the villages around it: manor farms (folwarki) of the Church, the university, the town and the
 magnates, worked by serfs; free peasant villages under royal (now Austrian) law; mills on the Rudawa and Prądnik.
@@ -292,6 +344,17 @@ gate with round flanking towers and a lowered drawbridge.
 
 **Justice.** Pillory (pręgierz) in front of the Town Hall; stocks, whipping post with the town drum and gallows are
 exported for the street-life scenes.
+
+**Snow in the streets.** Doorways and the main routes are shovelled, as they were: a trodden strip down the
+middle of the main streets and across the Rynek (to the church doors, the Town Hall, the Cloth Hall passage, the
+stall rows), with ridged banks of thrown snow either side, grey-brown at the foot, and heaps waiting for the cart to
+the river. The side lanes, the wall streets, the yards, the churchyard green and the moat edge stay deep (a 15-30 cm
+layer that rises and sinks with the night's ground cover) with one single-file track trodden through, and every
+walker's footprints cut troughs that fill in again while it snows. Drifts bank up on the lee side of the wind
+against the town walls, building walls and yard corners and trail behind stalls, carts and the well; the big ones by
+the square hide a crouched player. Deep snow slows everyone (x0.6, x0.85 in the trodden track), muffles footsteps,
+and a guard who crosses the player's fresh trail follows it. Drifts sink in a thaw, slump and grey in rain, glaze
+under sleet (scripts/city/snow_drifts.gd, data/snow.json, assets/blender/build_snow.py).
 
 **Runtime markers.** Buildings export empties as children of the asset root: `Chimney_<n>` at each flue top,
 `Window_<n>` on the sill of each openable ground- and first-floor street window (its Blender -Y, which is

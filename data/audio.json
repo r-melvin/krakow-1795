@@ -505,6 +505,41 @@
    "class": "ui",
    "volume_db": -8.0,
    "pitch_var": 0.06
+  },
+  "brothel_wall_murmur": {
+   "set": "brothel_wall_murmur",
+   "class": "voice_soft",
+   "volume_db": -22.0,
+   "max_distance": 9.0,
+   "bus": "SFX"
+  },
+  "brothel_bed_creak": {
+   "set": "brothel_bed_creak",
+   "class": "rustle",
+   "volume_db": -26.0,
+   "max_distance": 7.0,
+   "bus": "SFX"
+  },
+  "brothel_table_slap": {
+   "set": "brothel_table_slap",
+   "class": "impact",
+   "volume_db": -20.0,
+   "max_distance": 14.0,
+   "bus": "SFX"
+  },
+  "brothel_fiddle": {
+   "set": "brothel_fiddle",
+   "class": "voice_soft",
+   "volume_db": -20.0,
+   "max_distance": 14.0,
+   "bus": "SFX"
+  },
+  "brothel_door_close": {
+   "set": "brothel_door_close",
+   "class": "impact",
+   "volume_db": -16.0,
+   "max_distance": 16.0,
+   "bus": "SFX"
   }
  },
  "watch_kinds": {

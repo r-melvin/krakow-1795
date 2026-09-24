@@ -1472,6 +1472,63 @@ def _door_close(r, i):
     return x
 
 
+# ---- the house with the red lantern: heard through a wall or a floor, never seen (docs/GDD.md "Night life").
+# Everything here is muffled at the source: a wall (low-pass ~500-900 Hz, a little room boom) between the listener
+# and the sound. The act itself is only implied: voices, a laugh, a bed frame, a fiddle downstairs.
+
+def _through_wall(x, fc=700.0, boom=0.25):
+    y = lp(x, fc, 2)
+    y = y + lp(x, 180, 2) * boom
+    return reverb(y, 0.6, 0.25, 0.008, 1200)
+
+
+@snd("brothel_wall_murmur", n=2, fmt="ogg", desc="through a wall: a man and a woman talking low, a laugh, muffled (4 s)")
+def _brothel_murmur(r, i):
+    n = secs(4.0)
+    x = babble(r, n, 2, 2200, 0.5, 4.0, (0.5, 1.4), (0.8, 1.8), 4)
+    mix(x, _laugh(r, 1 - i) * rms(x) * 2.2, r.uniform(1.2, 2.4))
+    return fit(_through_wall(x, 650), n)
+
+
+@snd("brothel_bed_creak", n=2, fmt="ogg", desc="through a floor: an old bed frame creaking, slow and irregular, muffled (5 s)")
+def _brothel_bed(r, i):
+    n = secs(5.0)
+    x = np.zeros(n)
+    t = r.uniform(0.1, 0.4)
+    while t < 4.6:
+        mix(x, _creak(r, r.uniform(0.25, 0.4), (r.uniform(80, 100), r.uniform(150, 190))), t, r.uniform(0.6, 1.0))
+        t += r.uniform(0.7, 1.3)
+    return fit(_through_wall(x, 520, 0.4), n)
+
+
+@snd("brothel_table_slap", n=2, desc="downstairs: a hand slapped flat on a table, a shout of laughter after (card game), through the floor")
+def _brothel_slap(r, i):
+    n = secs(1.4)
+    x = fit(_knock(r, 1.0, r.uniform(110, 140)) + hp(burst(r, secs(0.2), 0.002), 1200) * 0.6, n)
+    mix(x, _laugh(r, 0) * 0.5, r.uniform(0.25, 0.4))
+    return fit(_through_wall(x, 1100, 0.3), n)
+
+
+@snd("brothel_fiddle", n=1, fmt="ogg", desc="a fiddle in the parlour below, a slow mazurka phrase through the floor (6 s)")
+def _brothel_fiddle(r, i):
+    fl = secs(6.0)
+    notes = [0, 3, 7, 5, 3, 2, 0, -2, 0, 3, 5, 3]
+    f0 = np.concatenate([np.full(fl // len(notes), 330 * 2 ** (s / 12)) for s in notes])
+    f0 = fit(f0, fl)
+    fid = saw(lp(f0, 25, 1) * vibrato(fl, 5.5, 0.01, 0, r))
+    fid = bp(fid, 650, 1.2) + bp(fid, 2400, 1.5) * 0.3
+    return _through_wall(fid * env_pts(fl, [(0, 0), (0.4, 1), (5.4, 1), (6.0, 0)]), 900, 0.15)
+
+
+@snd("brothel_door_close", n=1, desc="an upstairs door shut gently, the latch dropping, a key turned")
+def _brothel_door(r, i):
+    n = secs(1.1)
+    x = thud(n, 80, 0.05) * 0.5 + fit(_knock(r, 0.35, 130), n)
+    mix(x, modes(r, secs(0.12), [2600, 3900], [0.4, 0.25], [0.012, 0.006]), 0.12)
+    mix(x, modes(r, secs(0.15), [1800, 3100, 4700], [0.3, 0.25, 0.15], [0.02, 0.012, 0.006]), 0.62)
+    return lp(x, 3500)
+
+
 @snd("shutter_open", n=2, desc="window shutters creaking open and banging back")
 def _shutter(r, i):
     n = secs(0.9)

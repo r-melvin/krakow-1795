@@ -29,6 +29,7 @@ func _init(c: Node = null) -> void:
 		var d: Variant = JSON.parse_string(f.get_as_text())
 		if d is Dictionary:
 			db = d
+	_merge_folklore()
 	var net: Dictionary = db.get("network", {})
 	for g in net:
 		for a in net[g]:
@@ -39,6 +40,41 @@ func _init(c: Node = null) -> void:
 			for b in net[g]:
 				if b != a and not b in _links[a]:
 					_links[a].append(b)
+
+
+## data/folklore.json (the folklore agent's file; optional): its `rumours` join the network in this schema, its
+## `chatter` pools ({trigger: {class: [[text, gloss], ...]}}) and `stagings` are read through `folklore`.
+var folklore: Dictionary = {}
+
+
+func _merge_folklore() -> void:
+	var path := "res://data/folklore.json"
+	if not FileAccess.file_exists(path):
+		return
+	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not (d is Dictionary):
+		push_warning("Rumours: data/folklore.json is not a dictionary")
+		return
+	folklore = d
+	var fr: Variant = d.get("rumours", {})
+	if fr is Dictionary:
+		for id in fr:
+			if not db["rumours"].has(id):
+				db["rumours"][id] = fr[id]
+
+
+## Chatter lines for a trigger ("murder_nearby", "comet_up", "halo", "fog", "body_found", "visitation") and a
+## speaker class (street_life.json lines are the model). Empty without folklore.json.
+func chatter(trigger: String, klass: String = "") -> Array:
+	var pools: Variant = folklore.get("chatter", {})
+	if not (pools is Dictionary):
+		return []
+	var t: Variant = pools.get(trigger, {})
+	if t is Array:
+		return t
+	if t is Dictionary:
+		return t.get(klass, t.get("any", []))
+	return []
 
 
 func defs() -> Dictionary:
@@ -170,6 +206,9 @@ func hear(id: String, where: String = "") -> bool:
 		_log("rumour: " + str(d.get("text", id)) + ("  (%s)" % where if where != "" else ""))
 		if campaign:
 			campaign.note_heard(id)
+			var rv := str(d.get("reveals", ""))
+			if rv != "" and campaign.has_method("learn_weakness"):
+				campaign.learn_weakness(rv.get_slice(":", 0), rv.get_slice(":", 1))
 	return first
 
 

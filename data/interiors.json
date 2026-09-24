@@ -797,7 +797,17 @@
           1.1,
           -5.0
         ]
-      ]
+      ],
+      "posts": {
+        "0": "a woman doing her hair (sit)",
+        "1": "card game, seat 1",
+        "2": "card game, seat 2",
+        "3": "card game, a client (the soldier)",
+        "4": "asleep on the settle (lie)",
+        "5": "the stair foot (the house's man)",
+        "6": "by the stove",
+        "7": "the madam's desk with the client ledger"
+      }
     },
     "int_flat_garret": {
       "title": "garret",

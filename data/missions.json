@@ -6315,6 +6315,16 @@
             }
           ],
           "message": "The grey informer sold word of you to Wilk. He has an extra man on the quay."
+        },
+        {
+          "if": [
+            "camp:weronika_ally"
+          ],
+          "flags": [
+            "has_poison",
+            "card_invite"
+          ],
+          "message": "One of Mother Weronika's girls slips a little bottle into your coat and a word to Wilk's card table: a cousin from Sandomierz who plays badly is expected. The house wants its third back."
         }
       ],
       "stealth": {

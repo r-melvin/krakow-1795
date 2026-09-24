@@ -1082,6 +1082,191 @@
         "Pan Kuna pod Rynkiem kupi wszystko. Wejście przez kratę przy studni. Ma księgę każdego złodzieja.",
         "Pan Kuna under the square buys anything. In through the well grate. He keeps a book on every thief."
       ]
+    },
+    "visits_rajca": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "passage",
+        "well"
+      ],
+      "text": "Rajca Grodzicki visits the house with the red lantern on the second and fifth nights of the campaign.",
+      "line": [
+        "Rajca Grodzicki chodzi pod czerwoną latarnię. We wtorki i w piątki.",
+        "Councillor Grodzicki goes under the red lantern. Tuesdays and Fridays."
+      ],
+      "notable": "rajca",
+      "reveals": "rajca:vice"
+    },
+    "visits_magistrate": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "Magistrate Pölzl visits the house with the red lantern on the third and sixth nights of the campaign.",
+      "line": [
+        "Sędzia Pölzl wchodzi tylnymi drzwiami do Matki Weroniki.",
+        "Judge Pölzl goes in by Mother Weronika's back door."
+      ],
+      "notable": "magistrate",
+      "reveals": "magistrate:vice"
+    },
+    "visits_clerk": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "The commissary's clerk visits the house with the red lantern on the second, fourth and seventh nights of the campaign.",
+      "line": [
+        "Pisarz komisarza, Wlach, bywa na górze u Weroniki. Często.",
+        "The commissary's clerk, Wlach, is upstairs at Weronika's. Often."
+      ],
+      "notable": "clerk",
+      "reveals": "clerk:vice"
+    },
+    "visits_elder": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "passage",
+        "well"
+      ],
+      "text": "Master Lis of the goldsmiths visits the house with the red lantern on the fourth night of the campaign.",
+      "line": [
+        "Stary Lis od złotników też chodzi pod latarnię, choć ma żonę jak dragon.",
+        "Old Lis of the goldsmiths goes under the lantern too, though his wife is a dragoon."
+      ],
+      "notable": "elder",
+      "reveals": "elder:vice"
+    },
+    "visits_canon": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "passage",
+        "well"
+      ],
+      "text": "A canon of the chapter visits the house with the red lantern on the fifth night of the campaign.",
+      "line": [
+        "Kanonik Wąsowicz chodzi do Weroniki. Na spowiedź, mówi.",
+        "Canon Wąsowicz goes to Weronika's. To hear confession, he says."
+      ],
+      "notable": "canon",
+      "reveals": "canon:vice"
+    },
+    "visits_prussian": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "The Prussian agent Stolle visits the house with the red lantern on the third night of the campaign.",
+      "line": [
+        "Prusak Stolle płaci u Weroniki talarami.",
+        "The Prussian Stolle pays at Weronika's in thalers."
+      ],
+      "notable": "prussian",
+      "reveals": "prussian:vice"
+    },
+    "visits_rusofficer": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "A Russian captain visits the house with the red lantern on the sixth night of the campaign.",
+      "line": [
+        "Moskiewski rotmistrz Sablin ma pokój u Weroniki na szósty dzień.",
+        "The Muscovite captain Sablin has a room at Weronika's for the sixth day."
+      ],
+      "notable": "rusofficer",
+      "reveals": "rusofficer:vice"
+    },
+    "visits_steward": {
+      "subject": "Who visits the red lantern",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "passage",
+        "well"
+      ],
+      "text": "A magnate's steward visits the house with the red lantern on the seventh night of the campaign.",
+      "line": [
+        "Rządca Mrozowski przepija pańskie pieniądze u Weroniki.",
+        "The steward Mrozowski drinks his lord's money at Weronika's."
+      ],
+      "notable": "steward",
+      "reveals": "steward:vice"
+    },
+    "debts_rajca": {
+      "subject": "The councillor's debts",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern"
+      ],
+      "reveals": "rajca:debt",
+      "text": "Rajca Grodzicki owes Wilk three hundred złoty and dares not tell his wife.",
+      "line": [
+        "Rajca Grodzicki winien Wilkowi trzysta złotych. Żona nie wie.",
+        "Councillor Grodzicki owes Wilk three hundred złoty. His wife doesn't know."
+      ]
+    },
+    "son_rajca": {
+      "subject": "The councillor's son",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "crossing"
+      ],
+      "reveals": "rajca:dependent",
+      "text": "Rajca Grodzicki's son Marcin is at the Collegium and in with the Jacobin students; the Austrians have his name.",
+      "line": [
+        "Syn rajcy, Marcin, siedzi z jakobinami na Kolegium. Austriacy mają jego nazwisko.",
+        "The councillor's son Marcin sits with the Jacobins at the Collegium. The Austrians have his name."
+      ]
+    },
+    "clerk_notes": {
+      "subject": "The clerk's notes",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "watch",
+        "market"
+      ],
+      "reveals": "clerk:debt",
+      "text": "The commissary's clerk Wlach has lost a year's salary at cards, and Herr Lindner holds his notes.",
+      "line": [
+        "Pisarz Wlach przegrał roczną pensję w karty. Weksle ma Lindner.",
+        "The clerk Wlach lost a year's pay at cards. Lindner holds the notes."
+      ]
+    },
+    "steward_daughter": {
+      "subject": "The steward's daughter",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "well"
+      ],
+      "reveals": "steward:dependent",
+      "text": "The steward Mrozowski's daughter Zosia wants to sing, and her father would do anything to keep her off the stage and out of the barracks' eye.",
+      "line": [
+        "Córka rządcy, Zosia, chce śpiewać. Ojciec zrobi wszystko, żeby nie poszła na scenę.",
+        "The steward's daughter Zosia wants to sing. Her father would do anything to keep her off the stage."
+      ]
     }
   },
   "kind_spread": {

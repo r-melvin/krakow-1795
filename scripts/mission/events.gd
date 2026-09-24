@@ -34,6 +34,13 @@ func _ready() -> void:
 		if d is Dictionary:
 			db = d
 	_rng.seed = hash("events|%d|%s" % [GameState.day, GameState.origin_id])
+	# data/folklore.json events (omens and the like) join the pool when present
+	if FileAccess.file_exists("res://data/folklore.json"):
+		var fd: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/folklore.json"))
+		if fd is Dictionary and fd.get("events") is Dictionary:
+			for k in fd["events"]:
+				if not db.get("events", {}).has(k):
+					db["events"][k] = fd["events"][k]
 	_smoke = "--smoke" in OS.get_cmdline_user_args()
 	_next_at = GameState.parse_clock(str(db.get("first_at", "21:06")))
 

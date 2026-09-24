@@ -783,6 +783,10 @@ func _campaign_ready() -> void:
 	_spawn_people()
 	_urchin_contacts()
 	score["coins0"] = GameState.coins
+	if camp and not GameState.campaign.is_empty():
+		score["kills"] = int(camp.st()["tonight"].get("blood_day", 0))
+		if int(score["kills"]) > 0:
+			score["methods"]["removal"] = true
 	score["clock0"] = GameState.clock_minutes
 	var wt: Variant = world.get("watch")
 	if wt:
@@ -1077,6 +1081,12 @@ func _verb(v: String, id: String) -> String:
 			else:
 				Mission.set_flag("below")
 				score["methods"]["the drains"] = true
+		"stage":
+			if camp:
+				var sl: Array = []
+				if camp.stage_death(arg if arg != "" else "strzyga", str(data.get("district", "rynek")), sl):
+					score["methods"]["superstition"] = true
+					Mission.message.emit(" ".join(sl), 4.5)
 		"slip":
 			_slip_away()
 		"cells":
@@ -1784,6 +1794,8 @@ func _kill(method: String) -> String:
 	if Mission.data.get("approaches", {}).has(method):
 		Mission.set_approach(method)
 	Mission.complete_objective("kill_target")
+	if method in ["knife", "poison"] and camp and k:
+		_offer_staging(k)
 	if method == "pistol":
 		GameState.add_notoriety(30.0)
 		for g in bodyguards():
@@ -1840,6 +1852,10 @@ func score_card() -> Dictionary:
 		sc["allies"]["Mother Weronika"] = true
 	if Mission.has_flag("decoy_planted"):
 		sc["methods"]["false leaf"] = true
+	if camp and not GameState.campaign.is_empty():
+		for k in camp.st()["tonight"]:
+			if str(k).begins_with("blackmail_"):
+				sc["methods"]["blackmail"] = true
 	if Mission.has_flag("slipped"):
 		sc["methods"]["slipping away"] = true
 	if events and events.fired.size() > 0:
@@ -1904,3 +1920,21 @@ func _merge_side_quest() -> void:
 		Mission.objectives.append(lo.duplicate())
 	Mission.objectives_changed.emit()
 	print("[mission] side quest: %s (%d people placed below)" % [sq.get("title", "?"), n])
+
+
+## After a quiet kill: an interactable on the body to dress the death as the supernatural (folklore stagings).
+func _offer_staging(body: Node3D) -> void:
+	if body.get_node_or_null("Staging"):
+		return
+	var sts: Dictionary = camp.stagings()
+	var sid := str(sts.keys()[0]) if not sts.is_empty() else "strzyga"
+	var ia := InteractableScript.new()
+	ia.name = "Staging"
+	ia.display_name = "The body"
+	ia.marker_height = 0.8
+	ia.prompt_func = func() -> String: return "" if Mission.has_flag("staged") else str(sts.get(sid, {}).get("label", "stage the body"))
+	ia.handler = func(_a: Node) -> bool:
+		Mission.set_flag("staged")
+		_verb("stage:" + sid, "")
+		return true
+	body.add_child(ia)

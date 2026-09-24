@@ -1142,6 +1142,7 @@ func _brothel_loop() -> void:
 	var cough_t := 6.0
 	while is_inside_tree():
 		await get_tree().create_timer(1.0, false).timeout
+		_house_tick()
 		if _women.is_empty() or _raid_on:
 			continue
 		cry_t -= 1.0 * GameState.clock_scale
@@ -1216,6 +1217,7 @@ func _customer(soldier := -1) -> void:
 		return
 	a._set_hidden(true)
 	a.set_meta("inside", true)
+	_client_upstairs(a, is_soldier)
 	await get_tree().create_timer(maxf(_range(D["brothel"]["customers"]["inside"]) / maxf(GameState.clock_scale, 0.1), 2.0) * (0.3 if _smoke else 1.0), false).timeout
 	while _raid_on:
 		await get_tree().create_timer(2.0, false).timeout
@@ -1275,7 +1277,7 @@ func _on_madam(_actor_node: Node) -> bool:
 		return false
 	var md: Dictionary = D["brothel"]
 	_dlg_names = {"$madam": str(md["madam"]["name"]), "$them": str(md["madam"]["name"]), "$you": "You"}
-	_dlg_vars = {"room": int(md["room_cost"]), "gossip": 0 if _gossip_free else int(md["gossip_cost"])}
+	_dlg_vars = {"room": int(md["room_cost"]), "gossip": 0 if _gossip_free else int(md["gossip_cost"]), "bribe": int(md["raid"]["catch"]["bribe"])}
 	_dlg_handler = _madam_action
 	_dlg_graph = D["madam"]
 	_dlg_personality = str(D["people"]["madam"]["personality"])
@@ -1317,9 +1319,83 @@ func _madam_action(action: String) -> String:
 			var k: String = left[0]
 			_tell_gossip(k)
 			return "gossip_" + k
+		"company", "talk_room":
+			var n2 := int(md["room_cost"])
+			if GameState.coins < n2:
+				return ""
+			GameState.coins -= n2
+			_take_room()
+			_room_scene.call_deferred("company" if action == "company" else "talk")
+			return "company"
+		"job":
+			_camp_flag("weronika_job")
+			if Mission.campaign:
+				Mission.campaign.gain_lever("pillow_talk", "Mother Weronika", [])
+			_meet_weronika()
+			return "job"
+		"business":
+			_meet_weronika()
+			return "business"
+		"favour":
+			return "favour"
+		"testimony", "testimony_free":
+			var nt: Array = _notables_tonight()
+			if nt.is_empty():
+				return "testimony_none"
+			if action == "testimony":
+				GameState.coins = maxi(GameState.coins - int(md["raid"]["catch"]["bribe"]), 0)
+			Mission.campaign.add_proof(str(nt[0]), "testimony")
+			_stat["proof_testimony"] = str(nt[0])
+			return "testimony"
+		"ledger_page":
+			if Mission.campaign and not Mission.campaign.flag("weronika_ally"):
+				return "favours_needed"
+			_ledger_lever("the madam's own word")
+			return "ledger_page"
+		"raid_bribe":
+			GameState.coins = maxi(GameState.coins - int(md["raid"]["catch"]["bribe"]), 0)
+			_raid_out("bribe")
+			return ""
+		"raid_window":
+			_raid_out("window")
+			return ""
+		"raid_surrender":
+			_raid_out("surrender")
+			return ""
 		"leave":
 			return ""
 	return ""
+
+
+func _camp_flag(f: String) -> void:
+	if Mission.campaign and not GameState.campaign.is_empty():
+		Mission.campaign.set_flag(f)
+
+
+## Mother Weronika, the Underworld's leader (data/campaign.json people.weronika): met here, found in the journal.
+func _meet_weronika() -> void:
+	if Mission.campaign and not GameState.campaign.is_empty() and not Mission.campaign.found("weronika"):
+		Mission.campaign.find_person("weronika", [], _madam)
+	_stat["weronika"] = true
+
+
+func _notables_tonight() -> Array:
+	if Mission.campaign == null or GameState.campaign.is_empty() or not Mission.campaign.has_method("notables_tonight"):
+		return []
+	return Mission.campaign.notables_tonight()
+
+
+func _ledger_lever(how: String) -> void:
+	for nid in _notables_tonight():
+		Mission.campaign.add_proof(str(nid), "ledger")
+		_stat["proof_ledger"] = str(nid)
+	if Mission.campaign and not GameState.campaign.is_empty():
+		Mission.campaign.gain_lever("officer_ledger", "Mother Weronika's client ledger", [])
+		Mission.campaign.rumours.seed_rumour("salis_upstairs")
+		Mission.campaign.rumours.hear("salis_upstairs", how)
+	_flag("brothel_ledger")
+	_stat["ledger"] = true
+	Mission.message.emit("The client ledger, page three: Kapitan von Salis, Thursdays, a month unpaid. A lever, if you use it gently.", 5.0)
 
 
 func _tell_gossip(k: String) -> void:
@@ -1365,6 +1441,363 @@ func _take_room() -> void:
 		p.enter_spot(hs)
 
 
+# ------------------------------------------------------------------ the house inside, the implied scene, the raid catch
+
+var _house_done := false
+var _house_figs: Array = []
+var _scene_on := false
+var _madam_home := Vector3.ZERO
+
+
+func _house_key() -> String:
+	return str(D["brothel"].get("house", {}).get("room", "int_salon_brothel"))
+
+
+func _player_in_house() -> bool:
+	return interiors != null and interiors.has_method("inside") and str(interiors.inside()).begins_with(_house_key())
+
+
+## Inside the house: the people of data/street_life.json brothel.house at the room's Post markers (or fallback
+## offsets), a card table, and the madam at her desk with the client ledger. She goes back to the door when you leave.
+func _house_tick() -> void:
+	if interiors == null or not interiors.has_method("interior_origin"):
+		return
+	var inside := _player_in_house()
+	if inside and not _house_done:
+		_populate_house()
+	if _madam and _house_done:
+		var desk: Vector3 = get_meta("desk_pos", Vector3.ZERO)
+		if inside and desk != Vector3.ZERO and _madam.global_position.distance_to(desk) > 0.5:
+			if _madam_home == Vector3.ZERO:
+				_madam_home = _madam.global_position
+			_madam.global_position = desk
+			_madam.rotation.y = float(get_meta("desk_yaw", 0.0))
+		elif not inside and _madam_home != Vector3.ZERO and _madam.global_position.distance_to(_madam_home) > 0.5:
+			_madam.global_position = _madam_home
+
+
+func _populate_house() -> void:
+	var h: Dictionary = D["brothel"].get("house", {})
+	var key := _house_key()
+	var o: Vector3 = interiors.interior_origin(key)
+	if o == Vector3.INF:
+		return
+	_house_done = true
+	var posts: Array = interiors.post_markers(key) if interiors.has_method("post_markers") else []
+	var at_post := func(e: Dictionary) -> Array:
+		var pi := int(e.get("post", -1))
+		if pi >= 0 and pi < posts.size() and is_instance_valid(posts[pi]):
+			var pn: Node3D = posts[pi]
+			return [pn.global_position, pn.global_rotation.y]
+		var a: Array = e.get("at", [0, -3])
+		return [o + Vector3(float(a[0]), 0.0, float(a[1])), float(e.get("facing", 0.0))]
+	for e in h.get("people", []):
+		var pr: Array = at_post.call(e)
+		var f := _fig(e["models"], pr[0], pr[1], str(e.get("clip", "idle")))
+		if f:
+			f.set_meta("house_role", str(e.get("role", "")))
+			_house_figs.append(f)
+	var tb: Array = h.get("table", {}).get("at", [2.1, -4.5])
+	Assets.place(self, "cafe_table_set", o + Vector3(float(tb[0]), 0, float(tb[1])), 0.0)
+	var dk: Array = at_post.call(h.get("desk", {"at": [1.8, -2.2]}))
+	set_meta("desk_pos", dk[0])
+	set_meta("desk_yaw", dk[1])
+	var book := Node3D.new()
+	book.name = "ClientLedger"
+	add_child(book)
+	book.global_position = (dk[0] as Vector3) + Basis(Vector3.UP, float(dk[1])) * Vector3(0, 0, -0.7)
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.32, 0.06, 0.24)
+	mi.mesh = bm
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.35, 0.1, 0.12)
+	mi.material_override = mat
+	mi.position.y = 0.8
+	book.add_child(mi)
+	var ia := InteractableScript.new()
+	ia.display_name = "The client ledger"
+	ia.marker_height = 1.1
+	ia.highlight_root = mi
+	ia.prompt_func = func() -> String: return "" if _stat.get("ledger", false) else "look at Weronika's client ledger"
+	ia.handler = _use_ledger
+	book.add_child(ia)
+	set_meta("ledger_node", book)
+	var ld: Array = at_post.call(h.get("landing", {"at": [0.8, -7.8]}))
+	var door := Node3D.new()
+	door.name = "LandingDoor"
+	add_child(door)
+	door.global_position = ld[0]
+	var ia2 := InteractableScript.new()
+	ia2.display_name = "An upstairs door"
+	ia2.marker_height = 1.5
+	ia2.prompt_func = func() -> String: return "" if _stat.has("proof_peep") or _scene_on else "put your eye to the keyhole"
+	ia2.handler = _peep
+	door.add_child(ia2)
+	set_meta("landing_node", door)
+	_stat["house"] = _house_figs.size()
+	print("[street_life] the house: %d people inside, ledger at %s" % [_house_figs.size(), book.global_position])
+
+
+func _use_ledger(_a: Node) -> bool:
+	if _stat.get("ledger", false):
+		return false
+	var trusted: bool = Mission.campaign != null and not GameState.campaign.is_empty() and (Mission.campaign.flag("weronika_ally") or int(Mission.campaign.st().get("favours", {}).get("weronika", 0)) >= 1)
+	if trusted:
+		_ledger_lever("read at her desk, with her leave")
+	else:
+		if _madam:
+			bubble(_madam, ["Ręce przy sobie, kochanie. (Hands to yourself, darling.)", "My book is my dowry."], 3.4)
+		if Mission.campaign and not GameState.campaign.is_empty():
+			Mission.campaign.add_grievance("underworld", 5)
+		Mission.message.emit("Weronika's hand comes down flat on the ledger. She has not stopped smiling. Do her a favour first.", 4.0)
+	return true
+
+
+## The landing keyhole: a glimpse, never the act. A coat on a chair, a signet ring on the washstand, a face in the
+## mirror: proof (strength 3) against tonight's notable, and his glove left on the stair to lift (strength 4).
+func _peep(_a: Node) -> bool:
+	var nt: Array = _notables_tonight()
+	var who := str(nt[0]) if not nt.is_empty() else ""
+	var nd: Dictionary = Mission.campaign.notable(who) if who != "" else {}
+	var line := "Through the keyhole: a coat with a councillor's chain over a chair, a signet ring on the washstand, and in the mirror a face you know: %s. You look away before there is anything else to see." % nd.get("name", "") if who != "" else "Through the keyhole: a candle, somebody's stockings over a chair, a snore. Nobody worth the ink tonight."
+	Mission.message.emit(line, 6.0)
+	Sfx.play2d("brothel_wall_murmur", -12.0)
+	if who != "":
+		Mission.campaign.add_proof(who, "peep")
+		_stat["proof_peep"] = who
+		var door: Node3D = get_meta("landing_node", null)
+		if door:
+			var glove := Node3D.new()
+			glove.name = "Glove"
+			add_child(glove)
+			glove.global_position = door.global_position + Vector3(0.6, 0, 0.5)
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.18, 0.04, 0.1)
+			mi.mesh = bm
+			mi.position.y = 0.05
+			glove.add_child(mi)
+			var ia := InteractableScript.new()
+			ia.display_name = "A kid glove with a crest"
+			ia.marker_height = 0.6
+			ia.highlight_root = mi
+			ia.prompt_func = func() -> String: return "" if _stat.has("proof_token") else "pocket the glove on the stair"
+			ia.handler = func(_x: Node) -> bool:
+				Mission.campaign.add_proof(who, "token")
+				_stat["proof_token"] = who
+				glove.visible = false
+				return true
+			glove.add_child(ia)
+			set_meta("glove_node", glove)
+	else:
+		_stat["proof_peep"] = "none"
+	return true
+
+
+## Someone goes upstairs: the door, and a moment later something muffled through the wall if you stand close.
+## An officer seen going up is remembered (a lever for later).
+func _client_upstairs(a, soldier: bool) -> void:
+	var p := _player()
+	if p == null or _flat(p.global_position, brothel_door) > 12.0:
+		return
+	Sfx.play("brothel_door_close", brothel_door + Vector3(0, 3.0, 0))
+	get_tree().create_timer(3.5, false).timeout.connect(func() -> void:
+		if is_inside_tree():
+			Sfx.play("brothel_wall_murmur", brothel_door + Vector3(0, 3.2, 0)))
+	var nt: Array = _notables_tonight()
+	var seen: Array = get_meta("notables_seen", [])
+	for nid in nt:
+		if not nid in seen:
+			seen.append(nid)
+			set_meta("notables_seen", seen)
+			Mission.campaign.add_proof(str(nid), "witness")
+			_stat["proof_witness"] = str(nid)
+			break
+	if soldier and a and a.has_meta("soldier"):
+		_stat["officer_seen"] = true
+		if Mission.campaign and not GameState.campaign.is_empty() and not Mission.campaign.lever("officer_seen"):
+			Mission.campaign.gain_lever("officer_seen", "the red lantern", [])
+			Mission.message.emit("An officer's boots go up the stairs of the red lantern. You will remember his face, and he will not want you to.", 4.0)
+
+
+## The paid room with company, implied and never shown: the door closes, the view fades to black over the landing,
+## the house is heard muffled through the wall (audio.json brothel_*), the clock moves on, the view fades back with
+## the player on the landing. `kind`: company, hide or talk.
+func _room_scene(kind: String) -> void:
+	if _scene_on:
+		return
+	_scene_on = true
+	var sc: Dictionary = D["brothel"]["scene"]
+	var tscale := 0.12 if _smoke else 1.0
+	var layer := CanvasLayer.new()
+	layer.layer = 60
+	add_child(layer)
+	var veil := ColorRect.new()
+	veil.color = Color(0, 0, 0, 0)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(veil)
+	var cap := Label.new()
+	cap.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cap.add_theme_font_size_override("font_size", 26)
+	cap.add_theme_color_override("font_color", Color(0.9, 0.86, 0.76, 0.0))
+	cap.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	cap.grow_vertical = Control.GROW_DIRECTION_BOTH
+	layer.add_child(cap)
+	var c0 := GameState.clock_minutes
+	print("[smoke] brothel scene start kind=%s clock=%s" % [kind, GameState.time_string()]) if _smoke else null
+	var tw := create_tween()
+	tw.tween_property(veil, "color:a", 1.0, float(sc.get("fade_in", 1.4)) * tscale)
+	await tw.finished
+	var caps: Array = sc.get("captions", {}).get(kind, [])
+	var cues := 0
+	var ci := 0
+	for c in sc.get("cues", []):
+		await get_tree().create_timer(float(c[1]) * tscale, false).timeout
+		if not is_inside_tree():
+			return
+		Sfx.play2d(str(c[0]), float(c[2]))
+		cues += 1
+		if _smoke:
+			print("[smoke] brothel sound cue=%s db=%.0f" % [c[0], float(c[2])])
+		if ci < caps.size() and cues % 2 == 1:
+			cap.text = str(caps[ci])
+			cap.add_theme_color_override("font_color", Color(0.9, 0.86, 0.76, 0.9))
+			ci += 1
+	GameState.clock_minutes += float(sc.get("skip_minutes", 20))
+	if ci < caps.size():
+		cap.text = str(caps[caps.size() - 1])
+	await get_tree().create_timer(1.2 * tscale, false).timeout
+	var tw2 := create_tween()
+	tw2.tween_property(veil, "color:a", 0.0, float(sc.get("fade_out", 1.6)) * tscale)
+	tw2.parallel().tween_property(cap, "theme_override_colors/font_color:a", 0.0, float(sc.get("fade_out", 1.6)) * tscale)
+	await tw2.finished
+	layer.queue_free()
+	_scene_on = false
+	_flag("brothel_scene_" + kind)
+	_stat["scene"] = "%s skip=%d cues=%d" % [kind, int(GameState.clock_minutes - c0), cues]
+	if _smoke:
+		print("[smoke] brothel scene fade=ok kind=%s skip=%d cues=%d clock=%s" % [kind, int(GameState.clock_minutes - c0), cues, GameState.time_string()])
+
+
+## The Visitation finds the player in the house: bribe the corporal, go out of the window (woodshed roof, the yard
+## behind the row), or go with them (the watch's capture: Mission.fail -> the runner's cells choice).
+func _raid_caught() -> void:
+	if _dlg.is_open or Mission.dialogue_blocking():
+		return
+	var md: Dictionary = D["brothel"]
+	_dlg_names = {"$madam": str(md["madam"]["name"]), "$them": str(md["madam"]["name"]), "$you": "You"}
+	_dlg_vars["bribe"] = int(md["raid"]["catch"]["bribe"])
+	_dlg_handler = _madam_action
+	_dlg_graph = D["madam"]
+	_dlg_personality = "stern"
+	_dlg_resp = {}
+	_stat["raid_caught"] = true
+	_dlg_play("raid_caught")
+
+
+func _raid_out(how: String) -> void:
+	var p := _player()
+	_dlg.close()
+	_stat["raid_out"] = how
+	match how:
+		"bribe":
+			Mission.message.emit("The corporal's glove closes on the coins. 'Pox,' he says loudly, and goes downstairs.", 4.0)
+		"window":
+			if interiors and interiors.has_method("_go_out_now") and p and _player_in_house():
+				interiors.call("_go_out_now", p)
+			if p:
+				p.global_position = brothel_door + Basis(Vector3.UP, _b_rot) * Vector3(4.5, 0, 0) - _b_out * 0.2 + _b_out * 2.2 + Vector3(0, 0.1, 0)
+				p.reset_physics_interpolation()
+			GameState.add_notoriety(float(D["brothel"]["raid"]["catch"]["window_notoriety"]))
+			Mission.message.emit("Out of the back window, across the woodshed roof and down into the yard behind the row. Snow down your collar.", 4.0)
+		"surrender":
+			if Mission.is_active():
+				Mission.fail("Caught by the watch: the Visitation at the red lantern")
+	if _smoke:
+		print("[smoke] brothel raid caught out=%s" % how)
+
+
+## `--smoke` (campaign_smoke.gd): the madam meeting, a favour-free ledger refusal then the ledger, the implied scene.
+func smoke_brothel() -> Dictionary:
+	var out := {}
+	if _madam == null:
+		return {"madam": false}
+	_dlg.close()
+	_on_madam(null)
+	out["madam"] = _dlg.is_open
+	out["business"] = await _smoke_pick("business")
+	out["found"] = Mission.campaign != null and Mission.campaign.found("weronika")
+	await get_tree().create_timer(0.3, false).timeout
+	_dlg.close()
+	await get_tree().create_timer(0.3, false).timeout
+	var coins := GameState.coins
+	GameState.coins = maxi(coins, 5)
+	var incl := GameState.inclination
+	GameState.inclination = "women"
+	_on_madam(null)
+	var took := await _smoke_pick("company")
+	GameState.inclination = incl
+	out["room"] = took
+	for i in 200:
+		if not _scene_on and _stat.has("scene"):
+			break
+		await get_tree().process_frame
+	out["scene"] = str(_stat.get("scene", "none"))
+	out["inside"] = _player_in_house()
+	_house_tick()
+	out["house"] = int(_stat.get("house", 0))
+	var book: Node = get_meta("ledger_node", null)
+	if book:
+		_use_ledger(null)
+		out["ledger_refused"] = not bool(_stat.get("ledger", false))
+		if Mission.campaign and not GameState.campaign.is_empty():
+			Mission.campaign.set_flag("weronika_ally")
+		_use_ledger(null)
+	out["ledger"] = bool(_stat.get("ledger", false))
+	var ld: Node = get_meta("landing_node", null)
+	if ld:
+		_peep(null)
+		var gl: Node = get_meta("glove_node", null)
+		if gl:
+			for c in gl.get_children():
+				if c.has_method("on_interact"):
+					c.handler.call(null)
+	out["proofs"] = "%s/%s/%s" % [_stat.get("proof_ledger", "-"), _stat.get("proof_peep", "-"), _stat.get("proof_token", "-")]
+	_raid_caught()
+	out["raid"] = await _smoke_pick("raid_window")
+	return out
+
+
+func _smoke_pick(action: String) -> bool:
+	await get_tree().process_frame
+	if not _dlg.is_open:
+		return false
+	while _dlg.is_open and not _dlg.is_choosing():
+		_dlg.advance()
+		await get_tree().process_frame
+	for k in _dlg_choices.size():
+		if str(_dlg_choices[k].get("action", "")) == action:
+			if not _dlg_need(str(_dlg_choices[k].get("need", ""))):
+				_dlg.close()
+				return false
+			_dlg.choose(k)
+			await get_tree().process_frame
+			for i in 20:
+				if not _dlg.is_open:
+					break
+				if _dlg.is_choosing():
+					_dlg.close()
+					break
+				_dlg.advance()
+				await get_tree().process_frame
+			return true
+	_dlg.close()
+	return false
+
+
 # ------------------------------------------------------------------ dialogue runner (own box: the mission's runner owns its own)
 
 func _dlg_play(node_name: String) -> void:
@@ -1376,9 +1809,15 @@ func _dlg_play(node_name: String) -> void:
 	var lines: Array = []
 	for l in node.get("lines", []):
 		lines.append([_dlg_fmt(str(_dlg_names.get(str(l[0]), l[0]))), _dlg_fmt(str(l[1]))])
+	if node_name == "greet" and _dlg_graph == D.get("madam") and GameState.gender == "f" and _dlg_graph.has("greet_f"):
+		lines = []
+		for l in _dlg_graph["greet_f"].get("lines", []):
+			lines.append([_dlg_fmt(str(_dlg_names.get(str(l[0]), l[0]))), _dlg_fmt(str(l[1]))])
 	_dlg_choices = []
 	var shown: Array = []
 	for c in node.get("choices", []):
+		if c.has("if") and not _dlg_need(str(c["if"])):
+			continue
 		_dlg_choices.append(c)
 		shown.append({"text": _dlg_fmt(str(c.get("text", "..."))), "enabled": _dlg_need(str(c.get("need", ""))), "why": str(c.get("why", "not possible"))})
 	_dlg.show_node(lines, shown)
@@ -1390,12 +1829,25 @@ func _dlg_fmt(t: String) -> String:
 	return t.replace("{coins}", str(GameState.coins))
 
 
+## A choice's `need` / `if`: "coins>=<var|n>" and, separated by ";", campaign conditions (gender:f,
+## inclination:men|both, found:<person>, camp:<flag>, lever:<id>; "!" negates), via Mission.campaign.cond.
 func _dlg_need(c: String) -> bool:
-	if c == "" or not ">=" in c:
+	if c == "":
 		return true
-	var rhs := c.get_slice(">=", 1).strip_edges()
-	var n := int(_dlg_vars.get(rhs, int(rhs)))
-	return GameState.coins >= n
+	for part in c.split(";", false):
+		var t := str(part).strip_edges()
+		if t.begins_with("coins>="):
+			var rhs := t.get_slice(">=", 1).strip_edges()
+			if GameState.coins < int(_dlg_vars.get(rhs, int(rhs))):
+				return false
+		elif ">=" in t and not ":" in t:
+			var rhs2 := t.get_slice(">=", 1).strip_edges()
+			if GameState.coins < int(_dlg_vars.get(rhs2, int(rhs2))):
+				return false
+		elif Mission.campaign and Mission.campaign.has_method("cond"):
+			if not Mission.campaign.cond(t):
+				return false
+	return true
 
 
 func _on_dlg_choice(i: int) -> void:
@@ -3574,6 +4026,8 @@ func _ev_raid(_o: Dictionary) -> void:
 	if brothel_door == Vector3.ZERO:
 		return
 	_raid_on = true
+	if _player_in_house():
+		_raid_caught.call_deferred()
 	_anchors["raid"] = [brothel_door, _b_out * 6.0 + Vector3(0, 2.0, 0) + Basis(Vector3.UP, _b_rot) * Vector3(-2.5, 0, 0), 1.2]
 	_stat["raid"] = true
 	var start := _nearest(_entries(), brothel_door, 12.0) if not _instant else brothel_door + _b_out * 4.0

@@ -105,6 +105,49 @@
    ],
    "loop": true
   },
+  "brothel_bed_creak": {
+   "cat": "sfx",
+   "desc": "through a floor: an old bed frame creaking, slow and irregular, muffled (5 s)",
+   "files": [
+    "brothel_bed_creak_1",
+    "brothel_bed_creak_2"
+   ],
+   "loop": false
+  },
+  "brothel_door_close": {
+   "cat": "sfx",
+   "desc": "an upstairs door shut gently, the latch dropping, a key turned",
+   "files": [
+    "brothel_door_close"
+   ],
+   "loop": false
+  },
+  "brothel_fiddle": {
+   "cat": "sfx",
+   "desc": "a fiddle in the parlour below, a slow mazurka phrase through the floor (6 s)",
+   "files": [
+    "brothel_fiddle"
+   ],
+   "loop": false
+  },
+  "brothel_table_slap": {
+   "cat": "sfx",
+   "desc": "downstairs: a hand slapped flat on a table, a shout of laughter after (card game), through the floor",
+   "files": [
+    "brothel_table_slap_1",
+    "brothel_table_slap_2"
+   ],
+   "loop": false
+  },
+  "brothel_wall_murmur": {
+   "cat": "sfx",
+   "desc": "through a wall: a man and a woman talking low, a laugh, muffled (4 s)",
+   "files": [
+    "brothel_wall_murmur_1",
+    "brothel_wall_murmur_2"
+   ],
+   "loop": false
+  },
   "cabbage_thud": {
    "cat": "sfx",
    "desc": "a cabbage (or bone, or rag) thumping onto the street",
@@ -1268,6 +1311,86 @@
    "peak_db": -1.0,
    "rms_db": -20.0,
    "set": "brazier_loop"
+  },
+  "brothel_bed_creak_1": {
+   "cat": "sfx",
+   "dur": 5.0,
+   "file": "res://assets/audio/brothel_bed_creak_1.ogg",
+   "loop": false,
+   "loudness_db": -19.9,
+   "peak_db": -6.2,
+   "rms_db": -24.3,
+   "set": "brothel_bed_creak"
+  },
+  "brothel_bed_creak_2": {
+   "cat": "sfx",
+   "dur": 5.0,
+   "file": "res://assets/audio/brothel_bed_creak_2.ogg",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -6.6,
+   "rms_db": -23.8,
+   "set": "brothel_bed_creak"
+  },
+  "brothel_door_close": {
+   "cat": "sfx",
+   "dur": 1.1,
+   "file": "res://assets/audio/brothel_door_close.wav",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -7.8,
+   "rms_db": -26.3,
+   "set": "brothel_door_close"
+  },
+  "brothel_fiddle": {
+   "cat": "sfx",
+   "dur": 6.698,
+   "file": "res://assets/audio/brothel_fiddle.ogg",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -11.7,
+   "rms_db": -20.5,
+   "set": "brothel_fiddle"
+  },
+  "brothel_table_slap_1": {
+   "cat": "sfx",
+   "dur": 1.4,
+   "file": "res://assets/audio/brothel_table_slap_1.wav",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -7.2,
+   "rms_db": -28.1,
+   "set": "brothel_table_slap"
+  },
+  "brothel_table_slap_2": {
+   "cat": "sfx",
+   "dur": 1.4,
+   "file": "res://assets/audio/brothel_table_slap_2.wav",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -5.1,
+   "rms_db": -28.0,
+   "set": "brothel_table_slap"
+  },
+  "brothel_wall_murmur_1": {
+   "cat": "sfx",
+   "dur": 4.0,
+   "file": "res://assets/audio/brothel_wall_murmur_1.ogg",
+   "loop": false,
+   "loudness_db": -20.0,
+   "peak_db": -6.5,
+   "rms_db": -20.2,
+   "set": "brothel_wall_murmur"
+  },
+  "brothel_wall_murmur_2": {
+   "cat": "sfx",
+   "dur": 4.0,
+   "file": "res://assets/audio/brothel_wall_murmur_2.ogg",
+   "loop": false,
+   "loudness_db": -20.6,
+   "peak_db": -7.5,
+   "rms_db": -21.7,
+   "set": "brothel_wall_murmur"
   },
   "cabbage_thud_1": {
    "cat": "sfx",
