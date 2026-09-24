@@ -114,7 +114,8 @@ Tools:
 | `tools/fetch_animals.sh` | downloads the CC0/CC-BY animal sources into `assets/third_party/` |
 | `tools/import_settings.py` | sets VRAM compression and size caps on every extracted texture's `.import` |
 | `tools/with_gpu.sh`, `tools/with_cpu.sh` | machine-wide locks and core slices so parallel builds and test runs do not fight (one Godot at a time) |
-| `tools/make_release.sh <tag>` | zips the generated models and attaches them to a GitHub release |
+| `tools/refresh_screenshots.sh` | captures every screenshot set from the running game into `docs/screenshots/` and prints the windowed performance line |
+| `tools/make_release.sh <tag>` | zips the generated models (three parts) and attaches them to a GitHub release |
 
 ## Building from a fresh clone
 The generated models (`assets/models/*.glb`, about 2.4 GB) are not in git. Two ways to get them:
