@@ -11,7 +11,7 @@ signal settings_changed
 const NIGHT_START_MINUTES := 21 * 60   ## night missions begin at 21:00
 const SETTINGS_PATH := "user://settings.json"
 const SAVE_PATH := "user://save.json"
-const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true, "ambience": false, "bells": true}
+const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true, "ambience": false, "bells": true, "hejnal": false}
 
 enum Phase { SPLASH, MENU, ORIGIN_SELECT, DAY, NIGHT, DAWN }
 

@@ -514,6 +514,8 @@ func _enqueue(kind: String, args: Array) -> void:
 	# mission signal and still rings once, quietly, so the player knows the hour.
 	if not bool(GameState.settings.get("bells", true)) and kind != "curfew":
 		return
+	if kind == "hejnal" and not bool(GameState.settings.get("hejnal", false)):
+		return          # the trumpet call is off unless asked for: it reads as a music cue
 	if _queue.size() >= 4 and kind != "curfew":
 		return
 	_queue.append([kind, args])
