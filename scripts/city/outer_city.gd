@@ -56,6 +56,7 @@ func _process(_delta: float) -> void:
 	built = true
 	print("[smoke] city built: load %d ms, place %d ms" % [t1 - _t0, Time.get_ticks_msec() - t1])
 	_fires()
+	_street_lights()
 	_climbables()
 	_bake_nav()
 var _mesh_cache: Dictionary = {}
@@ -442,6 +443,8 @@ func _chunked_multimesh(mesh: Mesh, xforms: Array, nm: String) -> void:
 	var cells := {}
 	for t in xforms:
 		var tr: Transform3D = t
+		if nm.begins_with("gutter_"):
+			tr.origin.y += 0.012      # clear of the parallax cobble surface: no z-fighting flicker
 		var key := Vector2i(int(floor(tr.origin.x / 64.0)), int(floor(tr.origin.z / 64.0)))
 		if not cells.has(key):
 			cells[key] = [] as Array[Transform3D]
@@ -521,6 +524,81 @@ func _fires() -> void:
 		add_child(g)
 
 
+# ------------------------------------------------------------------ street lighting beyond the square
+## Kraków lit its main streets with oil lanterns from the 1770s: posts every ~30 m on the cobbled streets inside
+## the walls, sparse ones on the dirt roads outside, and candle-lit windows on a quarter of the outer houses (from
+## their Window_n anchors), so the outer town is dim but readable and the stealth light sampling has pools to skirt.
+## Lights never cast shadows themselves; the shadow budget grants shadows to the nearest few.
+func _street_lights() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1795
+	var posts := 0
+	for st in data.get("streets", []):
+		var surf := str(st.get("surface", "cobbles"))
+		var pts: Array = st["pts"]
+		var spacing := 30.0 if surf in ["cobbles", "rough"] else 60.0
+		var w := float(st.get("w", 8.0))
+		var side := 1.0
+		var carry := spacing * 0.5
+		for i in pts.size() - 1:
+			var a := Vector3(float(pts[i][0]), 0.0, float(pts[i][1]))
+			var b := Vector3(float(pts[i + 1][0]), 0.0, float(pts[i + 1][1]))
+			var seg := b - a
+			var len := seg.length()
+			if len < 1.0:
+				continue
+			var dir := seg / len
+			var right := Vector3(dir.z, 0.0, -dir.x)
+			var d := carry
+			while d < len:
+				var p := a + dir * d + right * side * (w * 0.5 - 1.2)
+				if absf(p.x) > 46.0 or absf(p.z) > 46.0:      # the square has its own lanterns
+					var post := Assets.place(self, "lantern_post", p, atan2(-right.x * side, -right.z * side))
+					var l := FlickerLight.new()
+					l.amount = 0.10
+					l.speed = 7.0
+					l.position = p + Vector3(0.9, 2.9, 0).rotated(Vector3.UP, atan2(-right.x * side, -right.z * side))
+					l.light_color = Color(1.0, 0.70, 0.40)
+					l.light_energy = 7 if surf in ["cobbles", "rough"] else 5
+					l.omni_range = 20
+					l.omni_attenuation = 1.5
+					l.shadow_enabled = false
+					l.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+					l.light_specular = 0.6
+					l.light_volumetric_fog_energy = 1.2
+					l.add_to_group("flame_lights")
+					l.add_to_group("shadow_capable")
+					add_child(l)
+					if post:
+						post.add_to_group("douseable")
+					posts += 1
+				side = -side
+				d += spacing
+			carry = d - len
+	var windows := 0
+	for n in find_children("Window_*", "", true, false):
+		var w3 := n as Node3D
+		if w3 == null or rng.randf() > 0.25:
+			continue
+		var pos := w3.global_position
+		if absf(pos.x) < 30.0 and absf(pos.z) < 30.0:
+			continue
+		var c := FlickerLight.new()
+		c.amount = 0.18
+		c.speed = 4.0
+		c.light_color = Color(1.0, 0.76, 0.42)
+		c.light_energy = 2.6
+		c.omni_range = 9
+		c.omni_attenuation = 1.3
+		c.shadow_enabled = false
+		c.light_volumetric_fog_energy = 0.6
+		c.add_to_group("flame_lights")
+		add_child(c)
+		c.global_position = pos + w3.global_transform.basis.z * 0.8 + Vector3(0, 0.3, 0)
+		windows += 1
+	print("[smoke] city lights lanterns=%d candle_windows=%d" % [posts, windows])
+
+
 # ------------------------------------------------------------------ navigation: chunks round the square
 ## The square's region (greybox_district.gd) covers +-45 m exactly (baked with a border); the rest of the town is
 ## baked here in chunks from one parse of the static colliders, each chunk grown by 4 m and trimmed back with
@@ -550,7 +628,7 @@ func _bake_nav() -> void:
 			var aabb := AABB(Vector3(x0, -1.0, z0), Vector3(NAV_X[ix + 1] - x0, 2.0, NAV_Z[iz + 1] - z0))
 			var nm := NavigationMesh.new()
 			nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-			nm.agent_radius = 0.4
+			nm.agent_radius = 0.5
 			nm.agent_height = 1.75
 			nm.agent_max_climb = 0.25
 			nm.agent_max_slope = 30.0

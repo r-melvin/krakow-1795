@@ -288,6 +288,7 @@ static func button(text: String, cb: Callable, min_w: float = 0.0) -> Button:
 	b.text = text
 	b.custom_minimum_size.x = min_w
 	b.pressed.connect(cb)
+	focus_on_hover(b)
 	return b
 
 
@@ -304,7 +305,15 @@ static func menu_button(text: String, cb: Callable) -> Button:
 	b.theme_type_variation = "MenuButtonFlat"
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.pressed.connect(cb)
+	focus_on_hover(b)
 	return b
+
+
+## Hovering a button moves keyboard focus to it, so the focus box and the hover box never sit on two rows at once.
+static func focus_on_hover(b: BaseButton) -> void:
+	b.mouse_entered.connect(func() -> void:
+		if is_instance_valid(b) and b.focus_mode != Control.FOCUS_NONE and not b.disabled:
+			b.grab_focus())
 
 
 static func bar(value: float, max_value: float = 100.0, col: Color = BRASS, height: float = 14.0) -> ProgressBar:

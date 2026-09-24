@@ -20,6 +20,13 @@ extends RefCounted
 
 const Zones := preload("res://scripts/stealth/zones.gd")
 const LANDMARKS := {"sukiennice": "Cloth Hall", "town_hall": "Town Hall", "st_marys": "St Mary's", "st_adalbert": "St Adalbert's"}
+## Outer-town buildings the map draws, with the labels the full sheet shows (blank: drawn, unlabelled).
+const OUTER_NAMES := {"florian_gate": "Florian Gate", "barbican": "Barbican", "city_tower": "", "castle_gate": "Castle gate",
+	"collegium_maius": "Collegium", "campanile": "", "synagogue": "Old Synagogue", "synagogue_wooden": "Synagogue",
+	"uniate_church": "Uniate church", "prayer_house": "", "monastery_wall": "", "monastery_gate": "Monastery",
+	"kingpin_house": "", "kingpin_warehouse": "Warehouse", "bathhouse": "Bathhouse", "windmill": "Mill", "watermill": "Water mill",
+	"brewery": "Brewery", "forge": "Forge", "bell_foundry": "Foundry", "cooper_yard": "", "carpenter_yard": "", "wawel_far": "Wawel",
+	"old_synagogue": "Old Synagogue", "sien_passage": ""}
 const PAPER := Color(0.82, 0.74, 0.57)
 const INK := Color(0.2, 0.13, 0.08)
 const INK_SOFT := Color(0.2, 0.13, 0.08, 0.55)
@@ -77,16 +84,22 @@ static func footprints(world: Node3D) -> Array:
 	if _foot_for == world.get_instance_id() and not _foot.is_empty():
 		return _foot
 	var out: Array = []
-	for c in world.get_children():
+	var pool: Array = world.get_children()
+	for c in world.get_children():          # the outer town keeps its buildings under its own node
+		if c.get_script() and str(c.get_script().resource_path).ends_with("outer_city.gd"):
+			pool += c.get_children()
+	for c in pool:
 		var n3 := c as Node3D
 		if n3 == null:
 			continue
 		var base := n3.scene_file_path.get_file().get_basename()
-		if not (LANDMARKS.has(base) or base.begins_with("tenement_")):
+		var named: Variant = OUTER_NAMES.get(base, null)
+		if not (LANDMARKS.has(base) or base.begins_with("tenement_") or base.begins_with("ten_") or named != null
+				or base.begins_with("kaz_") or base.begins_with("garb_") or base.begins_with("dock_") or base.begins_with("klep_")):
 			continue
 		var r := _aabb_xz(n3)
 		if r.size.x > 0.5 and r.size.y > 0.5:
-			out.append([r, LANDMARKS.get(base, "")])
+			out.append([r, LANDMARKS.get(base, str(named) if named != null else "")])
 	if out.size() < 5:
 		return fallback()
 	_foot_for = world.get_instance_id()

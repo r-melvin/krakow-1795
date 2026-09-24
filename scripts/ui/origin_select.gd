@@ -79,6 +79,7 @@ func _ready() -> void:
 		b.text = GameState.origins[id]["name"]
 		b.toggle_mode = true
 		b.button_group = group
+		UiTheme.focus_on_hover(b)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.theme_type_variation = "MenuButtonFlat"
 		b.add_theme_font_size_override("font_size", 25)
@@ -96,6 +97,7 @@ func _ready() -> void:
 		b.text = opt[1]
 		b.toggle_mode = true
 		b.button_group = sg
+		UiTheme.focus_on_hover(b)
 		b.button_pressed = opt[0] == _sex
 		b.custom_minimum_size.x = 130
 		b.pressed.connect(_set_sex.bind(opt[0]))
@@ -110,6 +112,7 @@ func _ready() -> void:
 		var ib := Button.new()
 		ib.text = opt[1]
 		ib.toggle_mode = true
+		UiTheme.focus_on_hover(ib)
 		ib.button_pressed = opt[0] == _incl
 		ib.custom_minimum_size = Vector2(0, 34)
 		ib.pressed.connect(_set_incl.bind(opt[0]))

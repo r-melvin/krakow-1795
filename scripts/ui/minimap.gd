@@ -12,7 +12,7 @@ const Intel := preload("res://scripts/stealth/intel.gd")
 const Perception := preload("res://scripts/stealth/perception.gd")
 
 const DIAMETER := 190.0
-const RADIUS_M := 30.0          ## metres from the centre to the rim
+const RADIUS_M := 48.0          ## metres from the centre to the rim
 const SEE_DIST := 32.0
 const HZ := 10.0
 

@@ -1088,7 +1088,7 @@ class Spine extends Control:
 ## (shared with the HUD minimap): footprints, disguise zones, and what intel.gd has gathered.
 class MapView extends Control:
 	const CityMap := preload("res://scripts/ui/city_map.gd")
-	const VIEW := Rect2(-50, -53, 100, 100)        ## x, z range drawn
+	const VIEW := Rect2(-200, -190, 410, 400)      ## x, z range drawn: the whole walled town and its suburbs
 
 	var intel: Dictionary = {}
 	var world: Node3D

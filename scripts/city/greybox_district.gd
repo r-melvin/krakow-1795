@@ -165,10 +165,10 @@ func _environment() -> void:
 
 	# The dragon's cave, south-west beyond the Town Hall: a sulphurous glow (easter egg).
 	var cave := OmniLight3D.new()
-	cave.position = Vector3(-36, 2.5, 33)
+	cave.position = Vector3(-72, 2.5, 138)      # beyond the walls, below the Wawel skyline; a glow to stumble on
 	cave.light_color = Color(0.55, 0.95, 0.45)
-	cave.light_energy = 5
-	cave.omni_range = 16
+	cave.light_energy = 3
+	cave.omni_range = 11
 	cave.shadow_enabled = false
 	cave.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
 	cave.add_to_group("shadow_capable")
@@ -528,7 +528,7 @@ func _navigation() -> void:
 	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
 	nm.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
 	nm.geometry_source_group_name = NAV_GROUP
-	nm.agent_radius = 0.4
+	nm.agent_radius = 0.5
 	nm.agent_height = 1.75
 	nm.agent_max_climb = 0.25
 	nm.agent_max_slope = 30.0
