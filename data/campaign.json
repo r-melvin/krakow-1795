@@ -1,0 +1,1350 @@
+{
+  "_doc": "The campaign (scripts/mission/campaign.gd, docs/GDD.md 'Campaign'). Seven nights, one per `arc` entry: the first `options` entry whose `if` conditions hold is tonight's mission (conditions: camp:<flag>, lever:<id>, found:<person>, heard:<rumour>, rumour:<rumour> (taken hold or planted), night:<mission> (won), lost:<mission>, crackdown>=N, notoriety>=N, loyalty:<faction>>=N, influence:<faction>>=N, origin:<a|b>, gender:<m|f>, coins>=N; '!' negates). Each night takes one `institution` from the occupier when won. Day: `actions_per_day` actions (one more after a won night), chosen from `day_actions` (effects: influence, loyalty, fear, strength, crackdown, coins, notoriety, camp flags, tonight flags, hear: [rumours], levers), plus planting a rumour through a `channel` and choosing one lead to follow. `people`: persons to find; each is brought into the night by following the lead of its rumour (or by a rumour's `camp` flag like deserter_in_open) and yields a `lever` when spoken to; `meet` is the day meeting once found. `endings`: first match after the seventh night. `estimate`: pacing constants for `[smoke] campaign est_minutes`. `relations`: rival pairs (weight w): an influence gain of D with one side costs the other round(D*w) loyalty; if one side's influence exceeds the other's by more than `arms_length_gap` the lesser keeps you at arm's length (its influence gates fail until you make amends in the day phase). `grievance`: neglect (no influence gained for `neglect_nights` nights) or a broken promise raises it; at `sabotage_at` or more the faction sabotages the next night (`sabotage` kinds) unless appeased. `urchins`: the passage children's day and night trade in news (they lie with chance 1 - (truth_base + street influence x truth_per_street)). `heirs`: people who can take up the movement if the figurehead dies (origin-like modifiers). `historical`: real people (docs/HISTORY.md).",
+  "actions_per_day": 2,
+  "bonus_action_after_win": 1,
+  "arc": [
+    {
+      "night": 1,
+      "institution": "The press",
+      "options": [
+        {
+          "mission": "printers_bundle"
+        }
+      ],
+      "teaser": "A printer, a bundle, a salon. Begin small."
+    },
+    {
+      "night": 2,
+      "institution": "The watch's book",
+      "options": [
+        {
+          "mission": "corporals_ledger"
+        }
+      ],
+      "teaser": "Whoever knows the watch's hours owns the night. Corporal Brandt writes them down."
+    },
+    {
+      "night": 3,
+      "institution": "The muskets",
+      "options": [
+        {
+          "mission": "salt_barge"
+        }
+      ],
+      "teaser": "Forty muskets are coming down the Vistula in salt barrels. Someone must land them."
+    },
+    {
+      "night": 4,
+      "institution": "The Church",
+      "options": [
+        {
+          "mission": "bishops_letter"
+        }
+      ],
+      "teaser": "The Bishop has written to Vienna. The morning post must not carry his letter."
+    },
+    {
+      "night": 5,
+      "institution": "The Town Hall",
+      "options": [
+        {
+          "mission": "magnates_ball"
+        }
+      ],
+      "teaser": "A masquerade at the Town Hall. The Commissioner will be there, and so will every magnate who matters."
+    },
+    {
+      "night": 6,
+      "institution": "The street",
+      "options": [
+        {
+          "mission": "pillory"
+        }
+      ],
+      "teaser": "A prisoner in the pillory, a flogging, a crowd. Start a riot, or stop one."
+    },
+    {
+      "night": 7,
+      "institution": "The river",
+      "finale": true,
+      "options": [
+        {
+          "mission": "kingpin"
+        }
+      ],
+      "teaser": "Wilk, the river king, holds the Vistula quays. Kill him, by any means, and claim the docks for the movement."
+    }
+  ],
+  "channels": {
+    "ballad": {
+      "name": "The ballad seller",
+      "desc": "A verse under the Cloth Hall arcades. Cheap and hard to trace, slow to spread. Omens and miracles travel fastest this way.",
+      "cost": 1,
+      "boost": 0.0,
+      "extra": 1,
+      "trace": 0.08,
+      "faction": "street"
+    },
+    "madam": {
+      "name": "Mother Weronika",
+      "desc": "Whispered to soldiers upstairs at the red lantern. Reaches the watch first.",
+      "cost": 2,
+      "boost": 0.1,
+      "extra": 2,
+      "trace": 0.15,
+      "faction": "underworld"
+    },
+    "press": {
+      "name": "The printer's press",
+      "desc": "A broadsheet in every coffee house by noon. Spreads fast; the paper can be traced.",
+      "cost": 3,
+      "boost": 0.25,
+      "extra": 3,
+      "trace": 0.3,
+      "faction": "salon",
+      "need": [
+        "night:printers_bundle|lever:press_access|influence:salon>=25"
+      ],
+      "why": "No press will print for you yet."
+    },
+    "crier": {
+      "name": "Wit the town crier",
+      "desc": "Cried from the Town Hall steps. Everyone hears it at once; everyone saw who paid him.",
+      "cost": 4,
+      "cost_with": {
+        "lever:crier": 1
+      },
+      "boost": 0.15,
+      "extra": 5,
+      "trace": 0.4,
+      "faction": "guilds",
+      "need": [
+        "found:crier|coins>=4"
+      ],
+      "why": "You do not know the crier."
+    },
+    "bill": {
+      "name": "A forged bill",
+      "desc": "Pasted on the notice board with a borrowed seal. Official-looking, and checked by officials.",
+      "cost": 2,
+      "boost": 0.1,
+      "extra": 3,
+      "trace": 0.22,
+      "faction": "guilds",
+      "disprove_mult": 1.5,
+      "need": [
+        "origin:artist|merchant|lever:forged_seal"
+      ],
+      "why": "You cannot forge a seal. Someone could teach you."
+    }
+  },
+  "day_actions": [
+    {
+      "id": "rest",
+      "label": "Lie low in the boatmen's cellar",
+      "desc": "Notoriety -15, crackdown -2. The city forgets a face if you let it.",
+      "effects": {
+        "notoriety": -15,
+        "crackdown": -2
+      },
+      "repeat": true
+    },
+    {
+      "id": "tavern",
+      "label": "Drink with the raftsmen at the Zajazd (1 zł)",
+      "desc": "Hear the two rumours the city is loudest about. Underworld +2.",
+      "cost": 1,
+      "effects": {
+        "influence": {
+          "underworld": 2
+        },
+        "hear_loudest": 2
+      },
+      "repeat": true
+    },
+    {
+      "id": "alms",
+      "label": "Give alms at St Mary's (2 zł)",
+      "desc": "Church influence +4, loyalty +3. The beggars on the steps talk to those who give.",
+      "cost": 2,
+      "effects": {
+        "influence": {
+          "church": 4
+        },
+        "loyalty": {
+          "church": 3
+        },
+        "hear_group": "church"
+      }
+    },
+    {
+      "id": "guild_dinner",
+      "label": "Dine with the guild elders",
+      "desc": "Guilds influence +5, loyalty +3. They will ask for something one day.",
+      "need": [
+        "origin:merchant|kazimierz|influence:guilds>=20|night:salt_barge"
+      ],
+      "why": "The elders do not dine with strangers.",
+      "effects": {
+        "influence": {
+          "guilds": 5
+        },
+        "loyalty": {
+          "guilds": 3
+        }
+      }
+    },
+    {
+      "id": "salon_visit",
+      "label": "Call on Pani Zofia's salon",
+      "desc": "Salon influence +4. Hear what the drawing rooms whisper.",
+      "need": [
+        "night:printers_bundle|influence:salon>=15|origin:noble|artist"
+      ],
+      "why": "Pani Zofia is not at home to you.",
+      "effects": {
+        "influence": {
+          "salon": 4
+        },
+        "loyalty": {
+          "salon": 2
+        },
+        "hear_group": "crossing"
+      }
+    },
+    {
+      "id": "street_speech",
+      "label": "Speak under the Cloth Hall arcades",
+      "desc": "Street influence +5, loyalty +4. Notoriety +10, crackdown +3.",
+      "effects": {
+        "influence": {
+          "street": 5
+        },
+        "loyalty": {
+          "street": 4
+        },
+        "notoriety": 10,
+        "crackdown": 3
+      }
+    },
+    {
+      "id": "bribe_watch",
+      "label": "Stand the watch sergeant a barrel (3 zł)",
+      "desc": "Tonight one patrol drinks instead of walking (Rynek patrol B stays in).",
+      "cost": 3,
+      "effects": {
+        "tonight": [
+          "watch_bribed"
+        ]
+      }
+    },
+    {
+      "id": "bribe_clerk",
+      "label": "Grease the Town Hall clerk (4 zł)",
+      "desc": "Crackdown -6. Reports go missing.",
+      "cost": 4,
+      "effects": {
+        "crackdown": -6
+      }
+    },
+    {
+      "id": "sell_favours",
+      "label": "Carry a smuggler's parcel",
+      "desc": "Coins +4, underworld +2. Notoriety +5.",
+      "effects": {
+        "coins": 4,
+        "influence": {
+          "underworld": 2
+        },
+        "notoriety": 5
+      },
+      "repeat": true
+    },
+    {
+      "id": "stage_miracle",
+      "label": "Bribe the sacristan to stage a miracle (3 zł)",
+      "desc": "Wax tears for Our Lady in St Mary's north aisle: plants the weeping icon with a head start. If it is traced, the Church cries blasphemy. Salon -2.",
+      "cost": 3,
+      "effects": {
+        "camp": [
+          "miracle_staged"
+        ],
+        "plant": [
+          [
+            "weeping_icon",
+            "ballad"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "buy_curse",
+      "label": "Buy a curse from the fortune-teller (1 zł)",
+      "desc": "Old Salomea by the Cloth Hall curses the Commissioner's house for a złoty, and tells you who else has bought one. Salon -2.",
+      "cost": 1,
+      "effects": {
+        "plant": [
+          [
+            "commissioner_curse",
+            "ballad"
+          ]
+        ],
+        "hear_loudest": 1
+      }
+    },
+    {
+      "id": "holy_cards",
+      "label": "Print holy pictures on the pamphlet press",
+      "desc": "The Black Madonna on one side, the Third of May on the other. Church influence +3, street loyalty +3.",
+      "need": [
+        "night:printers_bundle|lever:press_access"
+      ],
+      "why": "You have no press.",
+      "effects": {
+        "influence": {
+          "church": 3
+        },
+        "loyalty": {
+          "street": 3
+        }
+      }
+    }
+  ],
+  "people": {
+    "deserter": {
+      "name": "Jan Wróbel",
+      "role": "A deserter from the Austrian line, hiding among the tanners of Garbary",
+      "faction": "street",
+      "model": [
+        "dist_tanner",
+        "figure_veteran",
+        "npc_m_03"
+      ],
+      "pos": [
+        -148.0,
+        0,
+        5.5
+      ],
+      "facing": 3.1,
+      "where": "the tanners' frames in Garbary, outside the west gate",
+      "open_pos": [
+        -24.5,
+        0,
+        5.5
+      ],
+      "open_flag": "deserter_in_open",
+      "lines": [
+        [
+          "$npc",
+          "Don't shout. If you're from the Commandant, I'll drown myself in the tan-pit first."
+        ],
+        [
+          "$you",
+          "I'm from the other side."
+        ],
+        [
+          "$npc",
+          "Then take this. My coat. White, with the regiment's facings. I'll not wear it again, and a man in it walks where he likes."
+        ]
+      ],
+      "lever": {
+        "id": "austrian_coat",
+        "name": "An Austrian coat",
+        "text": "Jan Wróbel's regimental coat: pass as a soldier at the Florian Gate and the watch post."
+      },
+      "meet": {
+        "label": "Visit Jan in Garbary",
+        "desc": "He drills the tanners' boys with broom handles. Street loyalty +4.",
+        "effects": {
+          "loyalty": {
+            "street": 4
+          },
+          "hear": [
+            "levies_ready"
+          ]
+        }
+      },
+      "heir": {
+        "origin": "veteran",
+        "gender": "m",
+        "inclination": "both"
+      },
+      "personality": "fearful",
+      "temper": 0.4
+    },
+    "marianna": {
+      "name": "Marianna",
+      "role": "Laundress; the Corporal's woman, who hates him",
+      "faction": "street",
+      "model": [
+        "town_washerwoman_f",
+        "npc_f_05",
+        "figure_townswoman"
+      ],
+      "pos": [
+        -21.5,
+        0,
+        -29.6
+      ],
+      "facing": 0.3,
+      "where": "the drying lines by the Winiarnia",
+      "mission_only": "corporals_ledger",
+      "lines": [
+        [
+          "$npc",
+          "He takes his glass at the Winiarnia at half past ten and his pleasure with me at midnight. Neither is paid for."
+        ],
+        [
+          "$npc",
+          "He sells the garrison's firewood to Kazimierz, you know. Keeps it in a book with a red ribbon."
+        ]
+      ],
+      "lever": {
+        "id": "laundry_pass",
+        "name": "Marianna's word",
+        "text": "The Corporal's firewood swindle is true, and the laundress will carry baskets into the watch post for you."
+      },
+      "meet": {
+        "label": "Help Marianna at the lines",
+        "desc": "She tells you what the soldiers say over their shirts. Hear two watch rumours.",
+        "effects": {
+          "hear_group": "watch",
+          "hear_loudest": 1
+        }
+      },
+      "heir": {
+        "origin": "veteran",
+        "gender": "f",
+        "inclination": "men"
+      },
+      "personality": "vengeful",
+      "temper": 0.6
+    },
+    "russian": {
+      "name": "Monsieur Orlov",
+      "role": "A Russian 'merchant' in the coffee house, paying gold",
+      "faction": "russia",
+      "model": [
+        "cast_russian_envoy",
+        "figure_noble",
+        "npc_m_02"
+      ],
+      "pos": [
+        -18.6,
+        0,
+        25.4
+      ],
+      "facing": 3.14,
+      "where": "the coffee house on the south row",
+      "lines": [
+        [
+          "$npc",
+          "Ah. The famous figurehead. Sit. The coffee is Turkish and the company is Russian: both are strong."
+        ],
+        [
+          "$npc",
+          "My masters would be glad to see Vienna embarrassed in Kraków. Take this purse. There is no price. Yet."
+        ]
+      ],
+      "lever": {
+        "id": "russian_gold",
+        "name": "Russian gold",
+        "text": "Orlov's purse (12 złoty) and his friendship. Russia will remember it at the end."
+      },
+      "found_effects": {
+        "coins": 12,
+        "influence": {
+          "russia": 10
+        }
+      },
+      "meet": {
+        "label": "Take coffee with Orlov",
+        "desc": "Coins +6. Russia's grip tightens (it will count at the end).",
+        "effects": {
+          "coins": 6,
+          "influence": {
+            "russia": 8
+          },
+          "camp": [
+            "russian_friend"
+          ]
+        }
+      },
+      "personality": "wry",
+      "temper": 0.3
+    },
+    "crier": {
+      "name": "Wit the crier",
+      "role": "Town crier of the Rynek, thirsty and venal",
+      "faction": "guilds",
+      "model": [
+        "town_night_watchman",
+        "town_lamplighter",
+        "npc_m_01"
+      ],
+      "pos": [
+        -7.0,
+        0,
+        15.2
+      ],
+      "facing": 3.14,
+      "where": "the Town Hall front",
+      "lines": [
+        [
+          "$npc",
+          "Hear ye! Hear ye! ...What? Oh. You. Four złoty for the Emperor's news, one for yours, if it comes with a bottle."
+        ],
+        [
+          "$npc",
+          "I cry what I'm paid to cry. The Austrians pay late."
+        ]
+      ],
+      "lever": {
+        "id": "crier",
+        "name": "The crier's price",
+        "text": "Wit will cry a rumour from the Town Hall steps for one złoty."
+      },
+      "meet": {
+        "label": "Stand Wit a bottle",
+        "desc": "He cries your praises in passing. Guilds influence +3.",
+        "effects": {
+          "influence": {
+            "guilds": 3
+          }
+        }
+      },
+      "personality": "drunk-philosopher",
+      "temper": 0.2
+    },
+    "apprentice": {
+      "name": "Tadeusz",
+      "role": "The printer's apprentice, a Jacobin, setting type by night",
+      "faction": "salon",
+      "model": [
+        "cast_student",
+        "cast_jacobin",
+        "npc_m_07"
+      ],
+      "pos": [
+        -66.5,
+        0,
+        12.0
+      ],
+      "facing": 1.57,
+      "where": "a cellar on Jagiellońska by the Collegium",
+      "lines": [
+        [
+          "$npc",
+          "My master ran. I didn't. The press is in pieces in this cellar and the pieces still print."
+        ],
+        [
+          "$npc",
+          "I can cut you a seal, too. The Governor's, the Bishop's, the Emperor's own. Paper believes anything."
+        ]
+      ],
+      "lever": {
+        "id": "forged_seal",
+        "name": "Tadeusz's seals",
+        "text": "Forged seals for bills and letters; and the press prints for you."
+      },
+      "extra_levers": [
+        "press_access"
+      ],
+      "meet": {
+        "label": "Print a broadsheet with Tadeusz",
+        "desc": "Salon influence +4; your next press rumour costs nothing.",
+        "effects": {
+          "influence": {
+            "salon": 4
+          },
+          "camp": [
+            "free_press"
+          ]
+        }
+      },
+      "heir": {
+        "origin": "artist",
+        "gender": "m",
+        "inclination": "men"
+      },
+      "personality": "ambitious",
+      "temper": 0.5
+    },
+    "banker": {
+      "name": "Herr Lindner",
+      "role": "A Prussian banker on the Little Market who holds the officers' notes",
+      "faction": "prussia",
+      "model": [
+        "cast_prussian_banker",
+        "town_banker",
+        "figure_merchant"
+      ],
+      "pos": [
+        56.0,
+        0,
+        -31.0
+      ],
+      "facing": -1.57,
+      "where": "the Little Market, east of St Mary's",
+      "lines": [
+        [
+          "$npc",
+          "Business at this hour is either very good or very bad. Which is yours?"
+        ],
+        [
+          "$npc",
+          "The Commissioner's notes? I hold eleven thousand gulden of Baron von Hauer. Berlin would not weep to see Vienna's man embarrassed. Copies, only copies."
+        ]
+      ],
+      "lever": {
+        "id": "hauer_debts",
+        "name": "The Commissioner's notes",
+        "text": "Copies of von Hauer's debts: blackmail at the ball, and the truth behind a rumour."
+      },
+      "meet": {
+        "label": "Borrow from Herr Lindner",
+        "desc": "Coins +8. Prussia will want the river trade.",
+        "effects": {
+          "coins": 8,
+          "influence": {
+            "prussia": 6
+          }
+        }
+      },
+      "personality": "cynical-merchant",
+      "temper": 0.4
+    },
+    "fence": {
+      "name": "Rózia Kluczniczka",
+      "role": "A fence at the fish market, who sells keys",
+      "faction": "underworld",
+      "model": [
+        "dist_market_woman_f",
+        "town_market_woman_f",
+        "npc_f_02"
+      ],
+      "pos": [
+        -97.0,
+        0,
+        133.5
+      ],
+      "facing": 0.0,
+      "where": "the fish market by the Vistula quays",
+      "lines": [
+        [
+          "$npc",
+          "Eels, carp, keys. Keys are dearer."
+        ],
+        [
+          "$npc",
+          "Pillory locks, gate posterns, the Town Hall cellar. I had a smith in the Austrian armoury till he drank himself honest. Here: a ring of them."
+        ]
+      ],
+      "lever": {
+        "id": "fence_key",
+        "name": "Rózia's ring of keys",
+        "text": "Keys to the pillory, the Florian postern and more."
+      },
+      "meet": {
+        "label": "Buy from Rózia (2 zł)",
+        "desc": "A vial from under the eels (a poison) and underworld +3.",
+        "cost": 2,
+        "effects": {
+          "influence": {
+            "underworld": 3
+          },
+          "levers": [
+            "vial"
+          ]
+        }
+      },
+      "heir": {
+        "origin": "kazimierz",
+        "gender": "f",
+        "inclination": "unspoken"
+      },
+      "personality": "wry",
+      "temper": 0.4
+    },
+    "hryhorij": {
+      "name": "Father Hryhorij",
+      "role": "The Uniate priest of Kazimierz, confessor to those nobody else will hear",
+      "faction": "church",
+      "model": [
+        "figure_priest",
+        "cast_priest",
+        "npc_m_05"
+      ],
+      "pos": [
+        62.0,
+        0,
+        166.0
+      ],
+      "facing": 3.14,
+      "where": "the Uniate church in Kazimierz",
+      "lines": [
+        [
+          "$npc",
+          "Slava Isusu Khrystu. You look like a man who needs confessing, or a man who needs a confessional."
+        ],
+        [
+          "$npc",
+          "I served St Mary's sacristy before the Latin canons threw me out. The confessional by the north aisle has a second door. Take this key and my blessing: I cannot tell which you will need."
+        ]
+      ],
+      "lever": {
+        "id": "confession_key",
+        "name": "The confessional's second door",
+        "text": "Hear the Bishop's secretary confess, from the priest's side of the grille."
+      },
+      "meet": {
+        "label": "Hear Mass in Kazimierz",
+        "desc": "Church loyalty +5. The Uniates and the Jews of Kazimierz trust you more.",
+        "effects": {
+          "loyalty": {
+            "church": 5,
+            "guilds": 2
+          }
+        }
+      },
+      "heir": {
+        "origin": "priest",
+        "gender": "m",
+        "inclination": "unspoken"
+      },
+      "personality": "pious",
+      "temper": 0.3
+    },
+    "sergeant": {
+      "name": "Sergeant Kmita",
+      "role": "Kościuszko's sergeant from Racławice, selling horses at Kleparz",
+      "faction": "street",
+      "model": [
+        "figure_veteran",
+        "cast_beggar",
+        "npc_m_03"
+      ],
+      "pos": [
+        8.0,
+        0,
+        -156.0
+      ],
+      "facing": 3.14,
+      "where": "Kleparz market, beyond the Barbican",
+      "lines": [
+        [
+          "$npc",
+          "Racławice. Szczekociny. Maciejowice. I have been beaten by the best, sir."
+        ],
+        [
+          "$npc",
+          "The villages will come if the city calls. Send the word by the Florian Gate, and open it, and you'll have two thousand scythes by morning."
+        ]
+      ],
+      "lever": {
+        "id": "veterans",
+        "name": "Kmita's veterans",
+        "text": "The Kościuszko veterans will stand with you in the square, and the levies will come to the gate."
+      },
+      "meet": {
+        "label": "Drill with Kmita's veterans",
+        "desc": "Street loyalty +6; the levies are truly ready.",
+        "effects": {
+          "loyalty": {
+            "street": 6
+          },
+          "camp": [
+            "veterans"
+          ],
+          "hear": [
+            "levies_ready"
+          ]
+        }
+      },
+      "heir": {
+        "origin": "veteran",
+        "gender": "m",
+        "inclination": "women"
+      },
+      "personality": "vengeful",
+      "temper": 0.5
+    },
+    "sniadecki": {
+      "name": "Jan Śniadecki",
+      "historical": true,
+      "role": "Professor of mathematics and astronomy at the Kraków Main School (historical, 1756-1830)",
+      "faction": "salon",
+      "model": [
+        "town_professor",
+        "town_scholar",
+        "figure_noble"
+      ],
+      "pos": [
+        -72.0,
+        0,
+        6.0
+      ],
+      "facing": 1.57,
+      "where": "Jagiellońska, by the Collegium Maius",
+      "lines": [
+        [
+          "$npc",
+          "You are standing in my light, sir. The moon sets at a quarter past one tonight; I would like to see it go."
+        ],
+        [
+          "$npc",
+          "Politics? I measure the heavens. But I will tell you this for nothing: on the nights of the new moon the Rynek is darker than any lantern-man can mend. Here are my tables."
+        ]
+      ],
+      "lever": {
+        "id": "almanac",
+        "name": "Śniadecki's moon tables",
+        "text": "You know the dark nights: the watch sees a little less far (x0.9) on the nights you plan by them."
+      },
+      "meet": {
+        "label": "Attend Śniadecki's lecture",
+        "desc": "Salon loyalty +4. The students listen to you.",
+        "effects": {
+          "loyalty": {
+            "salon": 4,
+            "street": 1
+          }
+        }
+      },
+      "heir": {
+        "origin": "noble",
+        "gender": "m",
+        "inclination": "unspoken"
+      },
+      "personality": "wry",
+      "temper": 0.4
+    },
+    "zofia": {
+      "name": "Pani Zofia",
+      "role": "Hostess of the salon behind the Town Hall door",
+      "faction": "salon",
+      "offstage": true,
+      "heir": {
+        "origin": "noble",
+        "gender": "f",
+        "inclination": "both"
+      },
+      "heir_if": [
+        "camp:zofia_friend"
+      ],
+      "personality": "ambitious",
+      "temper": 0.5
+    }
+  },
+  "endings": [
+    {
+      "id": "crushed",
+      "if": [
+        "lost:kingpin",
+        "crackdown>=50"
+      ],
+      "title": "Martial Law",
+      "text": "Wilk lived, and sold the movement to the Commandant piece by piece. By Candlemas the gallows outside the rows had company and the salon was shuttered. The city will remember your name, in a whisper, for a hundred years."
+    },
+    {
+      "id": "candle",
+      "if": [
+        "lost:kingpin"
+      ],
+      "title": "A Candle in the Window",
+      "text": "The river king still holds the quays. But the press survives, the ballads are sung to carol tunes, and on the Third of May a candle burns in a hundred windows. The movement lives, patient, for another winter."
+    },
+    {
+      "id": "tsar",
+      "if": [
+        "lever:russian_gold",
+        "camp:russian_friend"
+      ],
+      "title": "The Tsar's Friends",
+      "text": "The docks are yours, one district of eight, and Monsieur Orlov was the first to congratulate you, with a purse. Russian gold will pay for the next district too, and for the one after, until one morning you find the Tsar's smile on every decree. The salon calls it statecraft. The street calls it something else."
+    },
+    {
+      "id": "tribunal",
+      "if": [
+        "camp:tribunal"
+      ],
+      "title": "The Razor on the River",
+      "text": "The docks are yours, one district of eight, claimed with a French machine and a torchlit tribunal. The street sings, the Church preaches against you, the salon will not say your name, and the Austrians have declared a curfew sweep that will last until spring. It is a beginning, and it frightens even you."
+    },
+    {
+      "id": "commonwealth",
+      "if": [
+        "loyal_count>=4"
+      ],
+      "title": "One District of Eight: the Commonwealth Stirs",
+      "text": "The Vistula docks answer to the movement: the first district taken back. Church bells, guild ledgers, the salon's pamphlets, the raftsmen's muskets and the street's scythes all pulled the same way to do it. Seven districts remain, and the Austrians still hold Wawel. But the thing is lit."
+    },
+    {
+      "id": "river",
+      "if": [
+        "camp:underworld_split"
+      ],
+      "title": "No More Kings on the River",
+      "text": "The docks are yours and nobody else's: no king on the river, a committee of raftsmen and guildsmen in the fish market, and half of Wilk's old men selling your secrets to the Austrians out of spite. One district of eight, won the hard way."
+    },
+    {
+      "id": "jedrek",
+      "if": [],
+      "title": "King Jędrek, by Grace of the Movement",
+      "text": "The docks answer to the movement through Jędrek, who collects the tenth barrel now in your name and keeps a little of it in his own. One district of eight. It will do, for a first act."
+    }
+  ],
+  "estimate": {
+    "_doc": "Pacing model for [smoke] campaign est_minutes. travel: path length from the player's entry through each required objective's map mark (map_marks, npc positions), x detour, at walk_mps; stealth_per_objective: watching, waiting, hiding and retries per required objective; dialogue at read_wpm (lines + choices on the smoke route); briefing and day panel at brief_wpm; waits for clock times the route needs (1 game minute = 1 s); events_per_night x event_minutes; one lead person per night from night 2 (travel + dialogue); day_choice_minutes per day action.",
+    "walk_mps": 2.2,
+    "detour": 1.6,
+    "stealth_per_objective": 1.4,
+    "optional_minutes": 1.2,
+    "read_wpm": 150,
+    "brief_wpm": 170,
+    "events_per_night": 2,
+    "event_minutes": 1.0,
+    "lead_minutes": 2.0,
+    "day_choice_minutes": 0.6,
+    "spawn": [
+      -27,
+      -27
+    ]
+  },
+  "relations": {
+    "_doc": "Rival pairs. 'a|b': weight. Austria is everyone's enemy (the player never gains its influence); Russia and Prussia are spoilers: their favour costs the trust of the salon, the street and the guilds.",
+    "church|salon": 0.5,
+    "guilds|underworld": 0.5,
+    "magnates|street": 0.6,
+    "church|underworld": 0.3,
+    "guilds|street": 0.3,
+    "russia|salon": 0.5,
+    "russia|street": 0.4,
+    "prussia|guilds": 0.5,
+    "prussia|magnates": 0.3
+  },
+  "rivalry_text": {
+    "church|salon": "The Church keeps its distance: you run with the Salon's Jacobins.",
+    "salon|church": "The Salon sneers: you kneel too often to the Bishop.",
+    "guilds|underworld": "The guilds bar their doors: you drink with smugglers.",
+    "underworld|guilds": "The raftsmen spit: you dine with the guild's tax-farmers.",
+    "magnates|street": "The magnates will not receive you: you stand with the mob.",
+    "street|magnates": "The street mutters: you bow to the great lords.",
+    "church|underworld": "The canons cross themselves: your friends are thieves.",
+    "underworld|church": "The fences laugh: you have turned pious.",
+    "guilds|street": "The burghers fear you will bring the riot to their shutters.",
+    "street|guilds": "The street thinks you have gone over to the moneybags.",
+    "salon|russia": "The Salon whispers that Russian gold buys you.",
+    "street|russia": "The street will not follow a Muscovite's man.",
+    "guilds|prussia": "The guilds see Prussian bankers behind you and their river trade.",
+    "magnates|prussia": "The magnates distrust your Berlin friends."
+  },
+  "arms_length_gap": 30,
+  "grievance": {
+    "neglect_nights": 2,
+    "neglect": 12,
+    "contact_min": 3,
+    "contact_relief": 10,
+    "promise": 25,
+    "rival_favour": 4,
+    "sabotage_at": 60,
+    "appease": 40,
+    "appease_cost": 3,
+    "promises": {
+      "owe_urchins": "street"
+    },
+    "sabotage": {
+      "street": {
+        "kind": "riot",
+        "text": "The Street has not forgotten you ignored it. A mob you did not call is gathering, and the watch will come running to wherever you stand."
+      },
+      "underworld": {
+        "kind": "patrol",
+        "text": "The raftsmen sold your plans to the watch. A patrol you did not expect walks where you are going."
+      },
+      "magnates": {
+        "kind": "patrol",
+        "text": "A slighted magnate lent the Commandant his hajduks. They walk your road tonight."
+      },
+      "guilds": {
+        "kind": "toll",
+        "text": "The guilds shut their doors on you. The night costs you three złoty in tolls and bribes."
+      },
+      "salon": {
+        "kind": "tongue",
+        "text": "A loose tongue in the Salon has described you to the Polizei. The wanted bills are fresh tonight."
+      },
+      "church": {
+        "kind": "sanctuary",
+        "text": "The Church refuses you sanctuary. Tonight there is no slipping away to a quiet corner."
+      }
+    }
+  },
+  "urchins": {
+    "_doc": "Staś, Kasia and their friends from the Cloth Hall passage. Day: one purchase costs no day action. Night: talk to Staś or Kasia (when tonight's mission has no other use for them).",
+    "cost": 1,
+    "truth_base": 0.6,
+    "truth_per_street": 0.005,
+    "truth_max": 0.95,
+    "offers": {
+      "sweep": {
+        "label": "Where will the watch sweep tonight?",
+        "desc": "Tonight one patrol's round is known (and it avoids you), if they tell the truth."
+      },
+      "rumour": {
+        "label": "What's the talk in the passage?",
+        "desc": "Hear the loudest rumour you have not heard."
+      },
+      "seen": {
+        "label": "Seen anyone I'm looking for?",
+        "desc": "Learn where a person you have not found hides."
+      },
+      "window": {
+        "label": "Any window unlatched?",
+        "desc": "Tonight you may slip away once more if caught."
+      },
+      "shadow": {
+        "label": "Shadow someone for me",
+        "desc": "A found person's day favour without spending a day action."
+      },
+      "message": {
+        "label": "Carry a message",
+        "desc": "A faction's grievance -20."
+      }
+    },
+    "lies": [
+      [
+        "Kapral dziś pilnuje studni, słowo honoru!",
+        "The Corporal's guarding the well tonight, word of honour!",
+        "The Corporal guards the west well tonight."
+      ],
+      [
+        "Smok zjadł wczoraj sierżanta. Całego.",
+        "The dragon ate a sergeant yesterday. All of him.",
+        "The dragon ate a sergeant."
+      ],
+      [
+        "Austriacy wyjeżdżają w czwartek. Wszyscy.",
+        "The Austrians leave on Thursday. All of them.",
+        "The Austrians are leaving on Thursday."
+      ]
+    ]
+  },
+  "historical": {
+    "_doc": "Real people in the game world; sources in docs/HISTORY.md. `as`: npc (walks the night), offstage (named in briefings, rumours and letters). Events involving them are invented unless HISTORY.md says otherwise.",
+    "turski": {
+      "name": "Bishop Feliks Paweł Turski",
+      "years": "1729-1800",
+      "as": "npc",
+      "npc": "bishop",
+      "note": "Bishop of Kraków 1790-1800. The letter of Night 4 is fiction, drafted in his name by the fictional Canon Wolski."
+    },
+    "sniadecki": {
+      "name": "Jan Śniadecki",
+      "years": "1756-1830",
+      "as": "npc",
+      "npc": "sniadecki",
+      "note": "Astronomer; professor at the Kraków Main School from 1781, observing in Kraków 1788-1803."
+    },
+    "sierakowski": {
+      "name": "Canon Sebastian Sierakowski",
+      "years": "1743-1824",
+      "as": "npc",
+      "npc": "sierakowski",
+      "note": "Canon of Wawel cathedral, architect of the 1787 Wawel restoration plan. His part in Night 4 is fiction."
+    },
+    "kollataj": {
+      "name": "Hugo Kołłątaj",
+      "years": "1750-1812",
+      "as": "offstage",
+      "note": "Co-author of the Constitution of 3 May; an Austrian state prisoner at Olomouc and Josefstadt 1794-1802. The smuggled letter is fiction."
+    },
+    "kosciuszko": {
+      "name": "Tadeusz Kościuszko",
+      "years": "1746-1817",
+      "as": "offstage",
+      "note": "Wounded and captured at Maciejowice (October 1794), held in St Petersburg until released by Paul I in 1796. In the winter of 1795/96 he is a prisoner; the rumours of his escape are false."
+    },
+    "boguslawski": {
+      "name": "Wojciech Bogusławski",
+      "years": "1757-1829",
+      "as": "offstage",
+      "note": "Author of 'Cud mniemany, czyli Krakowiacy i Górale' (premiered Warsaw, 1 March 1794); ran the theatre in Lwów 1795-1799. A Kraków tour is only a rumour."
+    },
+    "margelik": {
+      "name": "Johann Wenzel von Margelik",
+      "years": "c.1750-?",
+      "as": "offstage",
+      "note": "First Austrian commissioner (Einrichtungshofkommissär) of West Galicia from March 1796; the fictional Baron von Hauer is his man in Kraków."
+    }
+  },
+  "succession": {
+    "_doc": "Nomination: a day action names an heir among the people found (heir field); the nominee's faction gains `nominee_influence`, its rivals notice through the relations matrix; a nominee with a `scandal` gives the Austrians a blackmail rumour; `ambitious` nominees raise their faction's grievance if kept waiting. Changing the heir costs `drop_loyalty` with the dropped nominee's faction. Forced succession: the figurehead dies or is taken with no nominee, or the movement loses faith (the movement's strongest faction at grievance >= faith_grievance, notoriety >= faith_notoriety, or `faith_failures` nights lost in a row): the strongest faction's protégé takes over; influence carries at 70% (100% with the backer), the backer gains `backer_influence`, its rivals lose `rival_loss`, planted rumours lapse. Coup: when the movement loses faith while the figurehead lives, the day briefing opens a confrontation (concede, stand firm on eloquence, or yield).",
+    "nominee_influence": 4,
+    "drop_loyalty": 5,
+    "backer_influence": 10,
+    "rival_loss": 6,
+    "faith_grievance": 80,
+    "faith_notoriety": 90,
+    "faith_failures": 2,
+    "concession": {
+      "coins": 3,
+      "rival_influence": -4,
+      "grievance": -50
+    },
+    "scandals": {
+      "apprentice": {
+        "kind": "inclination",
+        "text": "The Polizei whisper that your heir, Tadeusz, loves men: a crime under the Austrian code, and a lever against him."
+      },
+      "deserter": {
+        "kind": "desertion",
+        "text": "Your heir is a deserter with a price on his head."
+      },
+      "fence": {
+        "kind": "origin",
+        "text": "Your heir is a Jewish fence; half the Rynek's doors close to her, and the Polizei know her ledger."
+      },
+      "zofia": {
+        "kind": "debt",
+        "text": "Pani Zofia's debts are the talk of the Prussian bankers."
+      }
+    },
+    "ambitious": [
+      "sergeant",
+      "zofia",
+      "apprentice"
+    ],
+    "proteges": {
+      "church": {
+        "id": "canon_rydel",
+        "name": "Canon Tomasz Rydel",
+        "role": "A canon of the Kraków chapter, the Church's candidate",
+        "origin": "priest",
+        "gender": "m",
+        "inclination": "unspoken"
+      },
+      "salon": {
+        "id": "zofia",
+        "name": "Pani Zofia",
+        "role": "Hostess of the salon, the Salon's candidate",
+        "origin": "noble",
+        "gender": "f",
+        "inclination": "both"
+      },
+      "underworld": {
+        "id": "smuggler_jedrek",
+        "name": "Jędrek the Smuggler",
+        "role": "The smuggler of the cellar door, the Underworld's candidate",
+        "origin": "veteran",
+        "gender": "m",
+        "inclination": "women"
+      },
+      "street": {
+        "id": "wojtek",
+        "name": "Wojtek the Carter",
+        "role": "A carter and Kościuszko veteran, the Street's candidate",
+        "origin": "veteran",
+        "gender": "m",
+        "inclination": "unspoken"
+      },
+      "guilds": {
+        "id": "wierzbieta",
+        "name": "Master Wierzbięta",
+        "role": "Elder of the salt merchants, the Guilds' candidate",
+        "origin": "merchant",
+        "gender": "m",
+        "inclination": "unspoken"
+      },
+      "magnates": {
+        "id": "pan_ignacy",
+        "name": "Pan Ignacy",
+        "role": "A magnate's client with a good coat and a better name, the Magnates' candidate",
+        "origin": "noble",
+        "gender": "m",
+        "inclination": "men"
+      }
+    }
+  },
+  "leaders": {
+    "_doc": "Faction leaders (docs/HISTORY.md). `model`: hist_<id> once built, `fallback` models until then.",
+    "church": {
+      "id": "turski",
+      "name": "Bishop Feliks Paweł Turski",
+      "historical": true,
+      "model": "hist_turski",
+      "fallback": [
+        "cast_bishop",
+        "figure_priest"
+      ]
+    },
+    "salon": {
+      "id": "sniadecki",
+      "name": "Jan Śniadecki",
+      "historical": true,
+      "model": "hist_sniadecki",
+      "fallback": [
+        "town_professor",
+        "town_scholar"
+      ]
+    },
+    "magnates": {
+      "id": "wodzicki",
+      "name": "Stanisław Wodzicki",
+      "historical": true,
+      "model": "hist_wodzicki",
+      "fallback": [
+        "cast_magnate",
+        "figure_noble"
+      ]
+    },
+    "guilds": {
+      "id": "lichocki",
+      "name": "Filip Nereusz Lichocki",
+      "historical": true,
+      "model": "hist_lichocki",
+      "fallback": [
+        "town_mayor",
+        "town_councillor",
+        "figure_merchant"
+      ]
+    },
+    "street": {
+      "id": "kmita",
+      "name": "Sergeant Kmita",
+      "historical": false,
+      "model": "hist_kmita",
+      "fallback": [
+        "figure_veteran",
+        "cast_beggar"
+      ]
+    },
+    "underworld": {
+      "id": "jedrek",
+      "name": "Jędrek the Smuggler",
+      "historical": false,
+      "model": "hist_jedrek",
+      "fallback": [
+        "cast_smuggler",
+        "dist_raftsman"
+      ]
+    },
+    "austria": {
+      "id": "margelik",
+      "name": "Johann Wenzel von Margelik",
+      "historical": true,
+      "model": "hist_margelik",
+      "fallback": [
+        "cast_governor"
+      ]
+    },
+    "russia": {
+      "id": "orlov",
+      "name": "Monsieur Orlov",
+      "historical": false,
+      "model": "hist_orlov",
+      "fallback": [
+        "cast_russian_envoy"
+      ]
+    },
+    "prussia": {
+      "id": "lindner",
+      "name": "Herr Lindner",
+      "historical": false,
+      "model": "hist_lindner",
+      "fallback": [
+        "cast_prussian_banker"
+      ]
+    }
+  },
+  "tones": {
+    "_doc": "Tone x personality (mission_runner.gd). A dialogue choice with `tone` reads the listening NPC's `personality` here: good (the choice's `on_good` node if any; the NPC is charmed: campaign flag charmed_<npc>, a discount or a hint later), bad (`on_bad`, or with temper >= 0.6 the NPC throws you out; grudge_<npc> is remembered), neutral (the choice's `next`). Missing entries are neutral.",
+    "personalities": [
+      "wry",
+      "gallows-humour",
+      "stern",
+      "pious",
+      "vengeful",
+      "cynical-merchant",
+      "fearful",
+      "ambitious",
+      "tender",
+      "drunk-philosopher"
+    ],
+    "table": {
+      "joke": {
+        "wry": "good",
+        "gallows-humour": "good",
+        "drunk-philosopher": "good",
+        "stern": "bad",
+        "pious": "bad",
+        "vengeful": "bad",
+        "fearful": "neutral"
+      },
+      "blunt": {
+        "stern": "good",
+        "vengeful": "good",
+        "cynical-merchant": "good",
+        "tender": "bad",
+        "ambitious": "neutral"
+      },
+      "humble": {
+        "pious": "good",
+        "tender": "good",
+        "stern": "good",
+        "ambitious": "bad",
+        "cynical-merchant": "bad"
+      },
+      "threat": {
+        "fearful": "good",
+        "cynical-merchant": "neutral",
+        "vengeful": "bad",
+        "stern": "bad",
+        "gallows-humour": "bad",
+        "ambitious": "bad"
+      },
+      "flatter": {
+        "ambitious": "good",
+        "drunk-philosopher": "good",
+        "stern": "bad",
+        "cynical-merchant": "bad",
+        "vengeful": "bad"
+      },
+      "appeal-to-faith": {
+        "pious": "good",
+        "tender": "good",
+        "wry": "bad",
+        "cynical-merchant": "bad",
+        "gallows-humour": "neutral"
+      },
+      "appeal-to-country": {
+        "vengeful": "good",
+        "stern": "good",
+        "tender": "good",
+        "cynical-merchant": "bad",
+        "fearful": "bad"
+      },
+      "bribe": {
+        "cynical-merchant": "good",
+        "fearful": "good",
+        "drunk-philosopher": "good",
+        "pious": "bad",
+        "stern": "bad",
+        "vengeful": "bad"
+      }
+    },
+    "thrown_out": {
+      "stern": "Enough. Out of my sight.",
+      "vengeful": "Say that again and I will remember your face longer than the Austrians do.",
+      "pious": "God forgive you. I shan't, today.",
+      "ambitious": "You mistake me for someone who needs you. Good night.",
+      "default": "We are done talking."
+    },
+    "charmed_line": {
+      "wry": "Ha! All right. For that, a crumb:",
+      "cynical-merchant": "Now you speak my language. A crumb, free:",
+      "ambitious": "You see me clearly. Few do. Listen:",
+      "default": "You've a way with you. Listen:"
+    }
+  }
+}

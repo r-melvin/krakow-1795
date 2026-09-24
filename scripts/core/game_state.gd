@@ -46,6 +46,13 @@ var settings: Dictionary = DEFAULT_SETTINGS.duplicate()
 ## Influence and crackdown at the start of the current night, for the dawn report's deltas.
 var night_start_influence: Dictionary = {}
 var night_start_crackdown: int = 0
+## Campaign (scripts/mission/campaign.gd, data/campaign.json): the arc, the whisper network (rumours), people found,
+## levers, day actions and the dawn consequences. Plain JSON-able data so it saves as-is. Reset by new_game().
+var campaign: Dictionary = {}
+## Mission id the campaign chose for tonight ("" = the default). Mission.start() uses it in place of the default id.
+var tonight_mission: String = ""
+var night_start_loyalty: Dictionary = {}
+var night_start_notoriety: float = 0.0
 var last_night_success := false
 var last_night_summary := ""
 
@@ -113,6 +120,8 @@ func new_game() -> void:
 	coins = 12
 	origin_id = ""
 	origin = {}
+	campaign = {}
+	tonight_mission = ""
 	for id in factions:
 		factions[id]["influence"] = 0
 		factions[id]["loyalty"] = 50
@@ -155,6 +164,37 @@ func add_influence(fid: String, delta: int) -> void:
 	set_influence(fid, get_influence(fid) + delta)
 
 
+## Loyalty (0..100): how far a faction leans to the movement rather than to the occupiers (50 = on the fence).
+func get_loyalty(fid: String) -> int:
+	return int(factions.get(fid, {}).get("loyalty", 50))
+
+
+func add_loyalty(fid: String, delta: int) -> void:
+	if factions.has(fid):
+		factions[fid]["loyalty"] = clampi(get_loyalty(fid) + delta, 0, 100)
+
+
+## Fear (0..100): how much a faction fears Austria (data/factions.json seeds it).
+func add_fear(fid: String, delta: int) -> void:
+	if factions.has(fid):
+		factions[fid]["fear"] = clampi(int(factions[fid].get("fear", 0)) + delta, 0, 100)
+
+
+## Notoriety lives in the intel store (scripts/stealth/intel.gd, Mission.journal["intel"]); read/write it by day too.
+func notoriety() -> float:
+	var j: Dictionary = get_node("/root/Mission").journal if has_node("/root/Mission") else {}
+	return float(j.get("intel", {}).get("notoriety", 0.0))
+
+
+func add_notoriety(delta: float) -> void:
+	if not has_node("/root/Mission"):
+		return
+	var j: Dictionary = get_node("/root/Mission").journal
+	if not j.has("intel") or not (j["intel"] is Dictionary):
+		j["intel"] = load("res://scripts/stealth/intel.gd").default_store()
+	j["intel"]["notoriety"] = clampf(float(j["intel"].get("notoriety", 0.0)) + delta, 0.0, 100.0)
+
+
 func figure_name() -> String:
 	return figure_name_for(origin_id, gender)
 
@@ -179,6 +219,10 @@ func begin_night() -> void:
 	for fid in factions:
 		night_start_influence[fid] = get_influence(fid)
 	night_start_crackdown = crackdown
+	night_start_loyalty = {}
+	for fid in factions:
+		night_start_loyalty[fid] = get_loyalty(fid)
+	night_start_notoriety = notoriety()
 	night_alarm_count = 0
 	night_objective_done = false
 	clock_minutes = NIGHT_START_MINUTES
@@ -278,6 +322,21 @@ func save_game() -> void:
 	for fid in factions:
 		infl[fid] = get_influence(fid)
 	var data := {"day": day, "origin": origin_id, "gender": gender, "influence": infl, "crackdown": crackdown, "coins": coins, "inclination": inclination}
+	# Campaign (additive): loyalty/fear per faction, district state, the arc and the journal (rumours, people, intel).
+	var loy := {}
+	var fear := {}
+	for fid in factions:
+		loy[fid] = get_loyalty(fid)
+		fear[fid] = int(factions[fid].get("fear", 0))
+	data["loyalty"] = loy
+	data["fear"] = fear
+	data["districts"] = districts
+	data["campaign"] = campaign
+	data["tonight"] = tonight_mission
+	data["version"] = 2
+	if has_node("/root/Mission"):
+		data["journal"] = get_node("/root/Mission").journal
+		data["flags"] = get_node("/root/Mission").flags
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data, "  "))
@@ -303,6 +362,25 @@ func continue_game() -> bool:
 	var infl: Dictionary = d.get("influence", {})
 	for fid in infl:
 		set_influence(fid, int(infl[fid]))
+	var loy: Dictionary = d.get("loyalty", {})
+	for fid in loy:
+		if factions.has(fid):
+			factions[fid]["loyalty"] = int(loy[fid])
+	var fear: Dictionary = d.get("fear", {})
+	for fid in fear:
+		if factions.has(fid):
+			factions[fid]["fear"] = int(fear[fid])
+	if d.get("districts") is Dictionary and not (d["districts"] as Dictionary).is_empty():
+		districts = d["districts"]
+	campaign = d.get("campaign", {}) if d.get("campaign") is Dictionary else {}
+	tonight_mission = str(d.get("tonight", ""))
+	if has_node("/root/Mission") and d.get("journal") is Dictionary:
+		var mj: Dictionary = get_node("/root/Mission").journal
+		var sj: Dictionary = d["journal"]
+		for k in sj:
+			mj[k] = sj[k]
+	if has_node("/root/Mission") and int(d.get("version", 1)) >= 2 and d.get("flags") is Dictionary:
+		get_node("/root/Mission").flags = d["flags"]
 	set_phase(Phase.DAY)
 	return true
 

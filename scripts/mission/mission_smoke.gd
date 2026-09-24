@@ -19,6 +19,9 @@ func run_all(host: Node) -> void:
 		shot_dir = ""
 	Mission.completed.connect(func(_s: String) -> void: _state = "completed")
 	Mission.failed.connect(func(_r: String) -> void: _state = "failed")
+	var cs: Node = preload("res://scripts/mission/campaign_smoke.gd").new()
+	add_child(cs)
+	await cs.preview_shots(main, self)
 	for approach in ["underworld", "street", "salon"]:
 		GameState.begin_night()
 		print(await run_approach(approach))
@@ -27,6 +30,9 @@ func run_all(host: Node) -> void:
 	GameState.begin_night()
 	print(await run_combat())
 	print("[smoke]   mission smoke done at frame %d" % Engine.get_process_frames())
+	# the campaign: seven nights, the day phases, events, the failure loop, succession (campaign_smoke.gd)
+	await cs.run(main, self)
+	print("[smoke]   campaign smoke done at frame %d" % Engine.get_process_frames())
 
 
 # ------------------------------------------------------------------ helpers

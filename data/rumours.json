@@ -1,0 +1,1102 @@
+{
+  "_doc": "The Whisper Network (scripts/mission/rumours.gd, docs/GDD.md 'Campaign'). A rumour is carried by named townsfolk of data/npcs.json (its `carriers`); every dawn it spreads along the `network` links (each carrier passes it to each neighbour with probability `spread` x the channel boost x (1 - crackdown/200)). reach = carriers / roster, in percent. At reach >= `threshold` (default 35) its `effects` apply once ('it takes hold'). A false rumour that has taken hold may be disproved each dawn (chance `disprove` x reach/100): `disproved` effects apply, and if the player planted it the channel's faction loses influence. A planted rumour may be traced to the player each dawn (channel `trace` x (1 + crackdown/100) x reach/100): notoriety +12, crackdown +3. At night each carrier present in the square says the rumour (intel.gd overhearing: stand within 4 m for 5 s); heard rumours go to Mission.journal.rumours and the Log ('rumour: ...'). `truth`: true, false, or a campaign condition string (e.g. 'lever:hauer_debts') evaluated when the rumour is planted or tested. `person`: following this lead (day panel) brings that person into the night (data/campaign.json people). `plantable` rumours can be planted from the day panel through a channel (data/campaign.json channels). `seed`: network groups it starts in. `start`: in play from the first day. `kind` (omen, miracle, curse, relic, prophecy: superstition and religion) multiplies the spread through the network groups in `kind_spread` (fastest among the street and the pious, slowest in the salon); planting a superstition costs Salon influence (`superstition_salon_cost`); a staged miracle that is traced is blasphemy (`blasphemy`).",
+  "threshold": 35,
+  "network": {
+    "well": [
+      "well_gossip_a",
+      "well_gossip_b",
+      "water_carrier",
+      "stallholder_east"
+    ],
+    "passage": [
+      "urchin_a",
+      "urchin_b",
+      "beggar",
+      "townswoman_crossing_s"
+    ],
+    "church": [
+      "priest",
+      "bishop_chaplain",
+      "beggar",
+      "bishop"
+    ],
+    "tavern": [
+      "tavern_keeper",
+      "boatman",
+      "smuggler",
+      "townsman_crossing_n"
+    ],
+    "watch": [
+      "informer",
+      "spy",
+      "bishop_noble",
+      "tavern_keeper"
+    ],
+    "market": [
+      "stallholder_west",
+      "stallholder_east",
+      "townsman_crossing_w",
+      "well_gossip_b"
+    ],
+    "crossing": [
+      "townsman_crossing_n",
+      "townswoman_crossing_s",
+      "falconer",
+      "urchin_a"
+    ]
+  },
+  "channels_seed": {
+    "press": [
+      "crossing",
+      "church",
+      "market"
+    ],
+    "ballad": [
+      "passage",
+      "market"
+    ],
+    "madam": [
+      "watch",
+      "tavern"
+    ],
+    "crier": [
+      "well",
+      "market",
+      "crossing",
+      "church"
+    ],
+    "bill": [
+      "market",
+      "watch"
+    ]
+  },
+  "flag_sources": {
+    "gossip_rota": "rota_midnight",
+    "gossip_officer": "salis_upstairs",
+    "gossip_informer": "informer_master",
+    "ballad_sheet": "ballad_third_may",
+    "flogging_seen": "flogging_shame"
+  },
+  "rumours": {
+    "deserter_tannery": {
+      "subject": "A deserter",
+      "truth": true,
+      "source": "the raftsmen at the Zajazd",
+      "spread": 0.35,
+      "start": true,
+      "seed": [
+        "tavern"
+      ],
+      "text": "A Polish deserter from the Austrian line hides among the tanners of Garbary, beyond the west gate.",
+      "line": [
+        "W Garbarach, u garbarzy, siedzi dezerter od Austriaków. Nie chce wracać.",
+        "In Garbary, among the tanners, sits a deserter from the Austrians. He won't go back."
+      ],
+      "person": "deserter"
+    },
+    "corporal_laundress": {
+      "subject": "The Corporal",
+      "truth": true,
+      "source": "the women at the west well",
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "well"
+      ],
+      "text": "Corporal Brandt keeps a laundress, Marianna, by the drying lines in the north-west corner. She hates him and washes his shirts.",
+      "line": [
+        "Kapral chodzi do praczki Marianny, tej od sznurów przy Winiarni. Ona go nie cierpi.",
+        "The Corporal visits Marianna the laundress, by the lines at the Winiarnia. She can't stand him."
+      ],
+      "person": "marianna"
+    },
+    "russian_coffee": {
+      "subject": "A Russian",
+      "truth": true,
+      "source": "the stallholders",
+      "spread": 0.3,
+      "start": true,
+      "seed": [
+        "market"
+      ],
+      "text": "A Russian with too much money reads the Gazette at the coffee house on the south row every night.",
+      "line": [
+        "W kawiarni siedzi Moskal, co płaci złotem za kawę. Czyta gazetę do góry nogami.",
+        "In the coffee house sits a Muscovite who pays gold for coffee. Reads his paper upside down."
+      ],
+      "person": "russian"
+    },
+    "crier_price": {
+      "subject": "The town crier",
+      "truth": true,
+      "source": "the passage urchins",
+      "spread": 0.35,
+      "start": true,
+      "seed": [
+        "passage"
+      ],
+      "text": "Wit the town crier will cry anything for four złoty and a bottle. He stands at the Town Hall front after the bell.",
+      "line": [
+        "Wit, obwoływacz, wykrzyczy wszystko za cztery złote i flaszkę.",
+        "Wit the crier will shout anything for four złoty and a bottle."
+      ],
+      "person": "crier"
+    },
+    "bishop_mistress": {
+      "subject": "The Bishop",
+      "truth": false,
+      "source": "someone at the Zajazd",
+      "spread": 0.45,
+      "start": true,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "The Bishop keeps a Russian mistress in Kanonicza street. (If this spreads, the Church suffers with him.)",
+      "line": [
+        "Biskup trzyma Moskalkę na Kanoniczej. Wszyscy wiedzą.",
+        "The Bishop keeps a Russian woman on Kanonicza. Everybody knows."
+      ],
+      "disprove": 0.5,
+      "effects": {
+        "loyalty": {
+          "church": -4
+        },
+        "text": "The tale of the Bishop's Russian mistress is in every tavern; the canons blame the movement."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": 2
+        },
+        "text": "The Bishop's 'mistress' turned out to be his widowed sister. The slander dies."
+      }
+    },
+    "dragon_wawel": {
+      "subject": "The dragon",
+      "truth": false,
+      "source": "the children",
+      "spread": 0.55,
+      "start": true,
+      "seed": [
+        "passage",
+        "crossing"
+      ],
+      "text": "The Wawel dragon has come back up from his cave and eats only Austrians.",
+      "line": [
+        "Smok wrócił spod Wawelu. Je tylko Austriaków, bo Polacy za chudzi.",
+        "The dragon is back from under Wawel. Eats only Austrians: Poles are too thin."
+      ],
+      "disprove": 0.1,
+      "effects": {
+        "fear": {
+          "austria": 0
+        },
+        "loyalty": {
+          "street": 2
+        },
+        "text": "Children sing that the dragon eats Austrians. Soldiers pretend not to hear; the street laughs."
+      }
+    },
+    "salt_tax": {
+      "subject": "The salt excise",
+      "truth": true,
+      "source": "the market",
+      "spread": 0.3,
+      "start": true,
+      "seed": [
+        "market",
+        "well"
+      ],
+      "text": "The Austrian excise will double the salt tax at the New Year.",
+      "line": [
+        "Od Nowego Roku akcyza na sól podwójna. Z czego żyć?",
+        "From the New Year the salt excise doubles. What are we to live on?"
+      ],
+      "effects": {
+        "loyalty": {
+          "guilds": 4,
+          "street": 2
+        },
+        "district": {
+          "rynek": {
+            "unrest": 6
+          }
+        },
+        "text": "The salt excise is all the market talks of. The guilds grumble louder than they dare."
+      }
+    },
+    "apprentice_press": {
+      "subject": "The printer's apprentice",
+      "truth": true,
+      "source": "the printer's friends",
+      "spread": 0.3,
+      "seed": [
+        "crossing"
+      ],
+      "text": "The printer's apprentice, Tadeusz, a Jacobin, sets type at night in a cellar on Jagiellońska by the Collegium.",
+      "line": [
+        "Czeladnik drukarza, Tadek, składa czcionki nocą przy Kolegium. Jakobin, mówią.",
+        "The printer's journeyman, Tadek, sets type at night by the Collegium. A Jacobin, they say."
+      ],
+      "person": "apprentice"
+    },
+    "banker_little_market": {
+      "subject": "A Prussian banker",
+      "truth": true,
+      "source": "the customs clerks",
+      "spread": 0.3,
+      "seed": [
+        "watch",
+        "market"
+      ],
+      "text": "A Prussian banker on the Little Market, east of St Mary's, holds half the Austrian officers' notes, the Commissioner's among them.",
+      "line": [
+        "Pruski bankier na Małym Rynku ma weksle połowy oficerów. I komisarza.",
+        "A Prussian banker on the Little Market holds half the officers' notes. And the Commissioner's."
+      ],
+      "person": "banker"
+    },
+    "fence_fish_market": {
+      "subject": "A fence",
+      "truth": true,
+      "source": "the smuggler",
+      "spread": 0.3,
+      "seed": [
+        "tavern"
+      ],
+      "text": "A fence at the fish market by the Vistula quays buys anything with a lock on it, and sells the keys.",
+      "line": [
+        "Na targu rybnym pod Wisłą jest paser. Kupi każdy zamek, sprzeda każdy klucz.",
+        "At the fish market by the Vistula there's a fence. Buys any lock, sells any key."
+      ],
+      "person": "fence"
+    },
+    "uniate_priest": {
+      "subject": "The Uniate priest",
+      "truth": true,
+      "source": "the beggar at St Adalbert's",
+      "spread": 0.25,
+      "seed": [
+        "church"
+      ],
+      "text": "Father Hryhorij, the Uniate priest in Kazimierz, hears confessions no Latin priest will, and knows the sacristy of St Mary's from the old days.",
+      "line": [
+        "Ojciec Hryhorij, unita z Kazimierza, spowiada tych, których nikt nie chce. Zna zakrystię Mariacką.",
+        "Father Hryhorij, the Uniate from Kazimierz, confesses those no one else will. He knows St Mary's sacristy."
+      ],
+      "person": "hryhorij"
+    },
+    "sergeant_kleparz": {
+      "subject": "Sergeant Kmita",
+      "truth": true,
+      "source": "the veterans on the church steps",
+      "spread": 0.3,
+      "seed": [
+        "church",
+        "passage"
+      ],
+      "text": "Old Sergeant Kmita of Racławice sells horses at Kleparz market beyond the Barbican, and still keeps his scythe on the wall.",
+      "line": [
+        "Stary Kmita spod Racławic handluje końmi na Kleparzu. Kosę trzyma na ścianie.",
+        "Old Kmita of Racławice trades horses at Kleparz. Keeps his scythe on the wall."
+      ],
+      "person": "sergeant"
+    },
+    "raid_kazimierz": {
+      "subject": "Powder in Kazimierz",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.35,
+      "text": "Jacobins keep powder in a cellar in Kazimierz.",
+      "line": [
+        "Jakobini trzymają proch w piwnicy na Kazimierzu.",
+        "Jacobins keep powder in a cellar in Kazimierz."
+      ],
+      "plant_note": "The watch goes to Kazimierz: the Rynek loses a patrol for a night. Kazimierz pays for it.",
+      "disprove": 0.5,
+      "effects": {
+        "camp": [
+          "watch_in_kazimierz"
+        ],
+        "loyalty": {
+          "guilds": -3
+        },
+        "fear": {
+          "guilds": 5
+        },
+        "text": "The watch turned out half a company to search the cellars of Kazimierz. One patrol fewer walks the Rynek tonight."
+      },
+      "disproved": {
+        "crackdown": 4,
+        "text": "No powder in Kazimierz, only frightened families. The Commandant wants to know who started the tale."
+      }
+    },
+    "commissioner_debts": {
+      "subject": "Commissioner von Hauer",
+      "truth": "lever:hauer_debts",
+      "plantable": true,
+      "spread": 0.35,
+      "text": "Commissioner von Hauer owes the Prussian bankers more than his salary.",
+      "line": [
+        "Komisarz von Hauer winien Prusakom więcej, niż zarabia.",
+        "Commissioner von Hauer owes the Prussians more than he earns."
+      ],
+      "plant_note": "True only if you hold the banker's notes. The magnates love a debtor's fall.",
+      "disprove": 0.6,
+      "effects": {
+        "camp": [
+          "hauer_shamed"
+        ],
+        "loyalty": {
+          "magnates": 6,
+          "salon": 3
+        },
+        "strength": {
+          "austria": -4
+        },
+        "text": "In the salons they count the Commissioner's debts on their fingers. He will be a nervous host."
+      },
+      "disproved": {
+        "influence": {
+          "salon": -4
+        },
+        "text": "The Commissioner produced his accounts at the Governor's table. The salon looks foolish."
+      }
+    },
+    "corporal_skims": {
+      "subject": "Corporal Brandt",
+      "truth": "found:marianna",
+      "plantable": true,
+      "spread": 0.4,
+      "text": "Corporal Brandt sells the garrison's firewood to the Jews of Kazimierz and pockets the price.",
+      "line": [
+        "Kapral Brandt sprzedaje drewno garnizonu i chowa pieniądze do kieszeni.",
+        "Corporal Brandt sells the garrison's firewood and pockets the money."
+      ],
+      "plant_note": "True if Marianna has talked to you. A disgraced corporal is a corporal sent away.",
+      "disprove": 0.6,
+      "effects": {
+        "camp": [
+          "corporal_disgraced"
+        ],
+        "strength": {
+          "austria": -3
+        },
+        "text": "Corporal Brandt has been called to the Commandant about the firewood. St Mary's post stands without him."
+      },
+      "disproved": {
+        "notoriety": 6,
+        "text": "The Corporal's woodpile was counted and found whole. Someone lied about him, and he wants to know who."
+      }
+    },
+    "informer_russian": {
+      "subject": "The man in grey",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.35,
+      "text": "The grey informer sells what he hears to the Russians as well as the Austrians.",
+      "line": [
+        "Ten szary sprzedaje Moskalom to samo, co Austriakom.",
+        "The man in grey sells the Muscovites the same as he sells the Austrians."
+      ],
+      "plant_note": "A trap for an enforcer: if it takes hold, the Austrians arrest their own informer.",
+      "disprove": 0.35,
+      "effects": {
+        "camp": [
+          "informer_arrested"
+        ],
+        "strength": {
+          "austria": -2
+        },
+        "text": "The Polizei took the grey informer from his lantern in irons. No one will point at your face there again."
+      },
+      "disproved": {
+        "notoriety": 10,
+        "text": "The informer cleared his name, and he has a good idea whose tale it was."
+      }
+    },
+    "amnesty": {
+      "subject": "An amnesty",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.4,
+      "text": "The Emperor grants an amnesty to deserters who report at the Town Hall by Sunday.",
+      "line": [
+        "Cesarz daje amnestię dezerterom, co się zgłoszą do Ratusza do niedzieli.",
+        "The Emperor grants amnesty to deserters who report to the Town Hall by Sunday."
+      ],
+      "plant_note": "Draws a person into the open: the deserter comes into the Rynek to see if it is true.",
+      "disprove": 0.5,
+      "effects": {
+        "camp": [
+          "deserter_in_open"
+        ],
+        "text": "Deserters are creeping into the Rynek to read the notice board. The man from the tannery among them."
+      },
+      "disproved": {
+        "loyalty": {
+          "street": -3
+        },
+        "text": "There was no amnesty. Two deserters were taken at the Town Hall door; the street blames whoever started it."
+      }
+    },
+    "levies_marching": {
+      "subject": "The levies",
+      "truth": "found:sergeant",
+      "plantable": true,
+      "spread": 0.4,
+      "text": "The peasant levies of Kościuszko's villages are marching on the Florian Gate.",
+      "line": [
+        "Chłopi z kosami idą na Bramę Floriańską. Jak w dziewięćdziesiątym czwartym.",
+        "Peasants with scythes are marching on the Florian Gate. Like in ninety-four."
+      ],
+      "plant_note": "True if Sergeant Kmita is with you. Frightens the garrison, heartens the street.",
+      "disprove": 0.5,
+      "effects": {
+        "camp": [
+          "levies_rumoured"
+        ],
+        "loyalty": {
+          "street": 5
+        },
+        "fear": {
+          "magnates": -5
+        },
+        "crackdown": 3,
+        "text": "The garrison doubled the Florian Gate and the street is whispering 'Racławice'."
+      },
+      "disproved": {
+        "crackdown": 3,
+        "loyalty": {
+          "street": -2
+        },
+        "text": "No scythes came. The garrison relaxes, and laughs."
+      }
+    },
+    "bishop_sermon": {
+      "subject": "The Bishop's sermon",
+      "truth": "camp:bishop_turned",
+      "plantable": true,
+      "spread": 0.35,
+      "text": "The Bishop will preach the Third of May from the pulpit of St Mary's on Sunday.",
+      "line": [
+        "Biskup w niedzielę będzie kazał o Trzecim Maja. Z ambony Mariackiej!",
+        "On Sunday the Bishop will preach the Third of May. From St Mary's pulpit!"
+      ],
+      "plant_note": "True only if the Bishop has been turned. Crowds follow a bishop.",
+      "disprove": 0.6,
+      "effects": {
+        "loyalty": {
+          "church": 6,
+          "street": 3
+        },
+        "crackdown": 3,
+        "text": "The faithful talk of nothing but Sunday's sermon."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -5
+        },
+        "text": "The Bishop denied it from the pulpit, coldly. The canons are furious with the movement."
+      }
+    },
+    "russian_gold": {
+      "subject": "Russian gold",
+      "truth": "found:russian",
+      "plantable": true,
+      "spread": 0.35,
+      "text": "Russian gold pays the Austrian officers' gambling debts.",
+      "line": [
+        "Moskiewskie złoto płaci karciane długi austriackich oficerów.",
+        "Muscovite gold pays the Austrian officers' card debts."
+      ],
+      "plant_note": "True if you have met the Russian. Austrians trust each other less; Russia notices.",
+      "disprove": 0.5,
+      "effects": {
+        "camp": [
+          "watch_distrust"
+        ],
+        "strength": {
+          "austria": -4
+        },
+        "influence": {
+          "underworld": 2
+        },
+        "text": "Austrian officers eye each other over the card tables. The watch is sloppier for it."
+      },
+      "disproved": {
+        "notoriety": 6,
+        "text": "The Russian envoy protested loudly. The Austrians look for the source."
+      }
+    },
+    "rota_midnight": {
+      "subject": "The watch change",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "watch"
+      ],
+      "text": "At midnight the Cloth Hall sentry walks to St Mary's for the change: the passage stands empty for a few minutes.",
+      "line": [
+        "O północy żołnierz spod Sukiennic idzie na zmianę. Przejście puste.",
+        "At midnight the Cloth Hall soldier goes to the change. The passage is empty."
+      ]
+    },
+    "salis_upstairs": {
+      "subject": "Captain von Salis",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "watch"
+      ],
+      "text": "Captain von Salis of the garrison visits Mother Weronika's on Thursdays and owes her for a month.",
+      "line": [
+        "Kapitan von Salis bywa u Matki Weroniki w czwartki. Winien jej za miesiąc.",
+        "Captain von Salis visits Mother Weronika on Thursdays. Owes her a month."
+      ],
+      "effects": {
+        "camp": [
+          "salis_secret"
+        ],
+        "text": "Captain von Salis's Thursdays are known in every tavern. He will look away when asked nicely."
+      }
+    },
+    "informer_master": {
+      "subject": "The informer's master",
+      "truth": true,
+      "spread": 0.25,
+      "seed": [
+        "watch"
+      ],
+      "text": "The grey informer reports to the Corporal at St Mary's post, never to the Commandant: the Corporal keeps the reward.",
+      "line": [
+        "Szary donosi kapralowi, nie komendantowi. Kapral bierze nagrodę.",
+        "The grey one reports to the Corporal, not the Commandant. The Corporal takes the reward."
+      ]
+    },
+    "ballad_third_may": {
+      "subject": "The ballad of the Third of May",
+      "truth": true,
+      "spread": 0.45,
+      "seed": [
+        "passage",
+        "market"
+      ],
+      "text": "A new ballad of the Third of May is sung under the Cloth Hall arcades, to a tune the Austrians think is a hymn.",
+      "line": [
+        "Nowa piosenka o Trzecim Maja, na nutę kolędy. Austriacy myślą, że to pobożne.",
+        "A new song of the Third of May, to a carol tune. The Austrians think it's pious."
+      ],
+      "effects": {
+        "loyalty": {
+          "street": 3,
+          "salon": 2
+        },
+        "text": "The ballad of the Third of May is hummed in every queue for bread."
+      }
+    },
+    "flogging_shame": {
+      "subject": "The flogging",
+      "truth": true,
+      "spread": 0.4,
+      "seed": [
+        "passage",
+        "well"
+      ],
+      "text": "They flogged a boy for a seditious song under the Town Hall, and the crowd did not jeer: it wept.",
+      "line": [
+        "Wychłostali chłopaka za piosenkę. Ludzie nie szydzili, płakali.",
+        "They flogged a boy for a song. People didn't jeer, they wept."
+      ],
+      "effects": {
+        "loyalty": {
+          "street": 4
+        },
+        "district": {
+          "rynek": {
+            "unrest": 8
+          }
+        },
+        "text": "The flogged boy's name is chalked on the Cloth Hall pillars."
+      }
+    },
+    "bishop_names": {
+      "subject": "The Bishop's list",
+      "truth": true,
+      "spread": 0.35,
+      "seed": [
+        "church"
+      ],
+      "text": "The Bishop's letter to Vienna named three 'Jacobin' priests for the Emperor's prisons.",
+      "line": [
+        "Biskup posłał do Wiednia trzy nazwiska księży. Jakobinów, pisze.",
+        "The Bishop sent three priests' names to Vienna. Jacobins, he writes."
+      ],
+      "effects": {
+        "loyalty": {
+          "church": -2,
+          "street": 3
+        },
+        "text": "Parish priests whisper the three names the Bishop sent to Vienna."
+      }
+    },
+    "hauer_arnim": {
+      "subject": "The Commissioner's lieutenant",
+      "truth": true,
+      "spread": 0.2,
+      "seed": [
+        "watch"
+      ],
+      "text": "Commissioner von Hauer never goes anywhere without young Lieutenant von Arnim, and never lets him dance with the ladies.",
+      "line": [
+        "Komisarz nigdzie bez porucznika von Arnima. I nie da mu tańczyć z pannami.",
+        "The Commissioner goes nowhere without Lieutenant von Arnim. Won't let him dance with the girls."
+      ]
+    },
+    "levies_ready": {
+      "subject": "The villages",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "crossing"
+      ],
+      "text": "The villages round Kraków have scythes straightened into pikes and wait for a signal from the city.",
+      "line": [
+        "We wsiach kosy już na sztorc. Czekają na znak z miasta.",
+        "In the villages the scythes are already set upright. They wait for a sign from the city."
+      ],
+      "effects": {
+        "loyalty": {
+          "street": 3
+        },
+        "text": "Carters swear the villages have their scythes set upright and wait for the city's sign."
+      }
+    },
+    "kollataj_letter": {
+      "subject": "Kołłątaj's letter",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "crossing",
+        "church"
+      ],
+      "historical": "kollataj",
+      "text": "A letter from Hugo Kołłątaj, the Austrians' prisoner at Olomouc, is copied from hand to hand: 'the Constitution is not dead while one man reads it'. (The letter is fiction; his imprisonment is not.)",
+      "line": [
+        "List od Kołłątaja z Ołomuńca krąży po mieście. Przepisują go po nocach.",
+        "A letter from Kołłątaj in Olomouc goes round the city. They copy it by night."
+      ],
+      "effects": {
+        "loyalty": {
+          "salon": 4
+        },
+        "text": "Kołłątaj's letter from his Austrian prison is read aloud in the salons."
+      }
+    },
+    "kosciuszko_escaped": {
+      "subject": "Kościuszko",
+      "truth": false,
+      "spread": 0.5,
+      "start": true,
+      "seed": [
+        "passage",
+        "tavern"
+      ],
+      "historical": "kosciuszko",
+      "text": "Kościuszko has escaped from St Petersburg and is riding for Kraków. (False: he is a prisoner of the Russians until 1796.)",
+      "line": [
+        "Kościuszko uciekł z Petersburga! Jedzie na Kraków!",
+        "Kościuszko has escaped from Petersburg! He's riding for Kraków!"
+      ],
+      "disprove": 0.6,
+      "effects": {
+        "loyalty": {
+          "street": 4
+        },
+        "crackdown": 2,
+        "text": "The street talks of nothing but Kościuszko's escape. The garrison doubles the gates."
+      },
+      "disproved": {
+        "loyalty": {
+          "street": -3
+        },
+        "text": "Kościuszko is still in the Tsar's prison. The disappointment is bitter."
+      }
+    },
+    "boguslawski_tour": {
+      "subject": "The Krakowiacy",
+      "truth": false,
+      "spread": 0.4,
+      "seed": [
+        "crossing",
+        "market"
+      ],
+      "historical": "boguslawski",
+      "text": "Bogusławski's players are coming from Lwów to play the Krakowiacy i Górale in the Town Hall. (Only a rumour: his company stayed in Lwów.)",
+      "line": [
+        "Bogusławski przyjedzie ze Lwowa grać Krakowiaków i Górali!",
+        "Bogusławski is coming from Lwów to play the Krakowiacy i Górale!"
+      ],
+      "disprove": 0.4,
+      "effects": {
+        "loyalty": {
+          "salon": 2,
+          "street": 2
+        },
+        "text": "The whole town hums the Krakowiacy airs, waiting for players who will not come."
+      }
+    },
+    "weeping_icon": {
+      "kind": "miracle",
+      "subject": "The weeping icon",
+      "truth": "camp:miracle_staged",
+      "plantable": true,
+      "spread": 0.45,
+      "text": "The Madonna in St Mary's north aisle weeps real tears for Poland.",
+      "line": [
+        "Matka Boska w Mariackim płacze! Prawdziwymi łzami, za Polskę!",
+        "Our Lady in St Mary's is weeping! Real tears, for Poland!"
+      ],
+      "plant_note": "A miracle draws crowds to St Mary's (cover to blend in) and pulls the watch. If it is exposed as staged, the Church cries blasphemy.",
+      "disprove": 0.35,
+      "effects": {
+        "camp": [
+          "pilgrims_at_marys"
+        ],
+        "loyalty": {
+          "church": 4,
+          "street": 3
+        },
+        "text": "Crowds kneel on St Mary's steps day and night; the watch cannot move them."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -4
+        },
+        "text": "The canons declared the tears to be damp. The crowds go home, disappointed and cold."
+      }
+    },
+    "commissioner_curse": {
+      "kind": "curse",
+      "subject": "The curse on the Commissioner",
+      "truth": true,
+      "plantable": true,
+      "spread": 0.4,
+      "text": "A Kazimierz wise-woman has cursed Commissioner von Hauer's house: his servants hear knocking in the walls.",
+      "line": [
+        "Znachorka przeklęła dom komisarza. Służba słyszy stukanie w ścianach.",
+        "A wise-woman has cursed the Commissioner's house. The servants hear knocking in the walls."
+      ],
+      "plant_note": "Servants desert, the guards grow uneasy (the watch sees a little less far at night).",
+      "disprove": 0.2,
+      "effects": {
+        "camp": [
+          "haunted_watch"
+        ],
+        "strength": {
+          "austria": -3
+        },
+        "text": "Two of the Commissioner's maids have run home to their villages, and the sentries cross themselves at the Town Hall."
+      }
+    },
+    "marian_prophecy": {
+      "kind": "prophecy",
+      "subject": "The Marian prophecy",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.45,
+      "text": "A shepherdess at Kalwaria saw the Virgin, who promised the Commonwealth would rise again before the thaw.",
+      "line": [
+        "Pastuszka w Kalwarii widziała Matkę Boską. Rzeczpospolita wstanie przed roztopami!",
+        "A shepherd girl at Kalwaria saw Our Lady. The Commonwealth will rise before the thaw!"
+      ],
+      "plant_note": "The street takes heart; the Bishop demands a say in what the Virgin promises. If it fails, it hurts everyone.",
+      "disprove": 0.3,
+      "effects": {
+        "loyalty": {
+          "street": 6,
+          "church": 2
+        },
+        "grievance": {
+          "church": 10
+        },
+        "text": "Pilgrims set out for Kalwaria in the snow. The Bishop wants to know who is putting words in Our Lady's mouth."
+      },
+      "disproved": {
+        "loyalty": {
+          "street": -3,
+          "church": -3,
+          "salon": -2
+        },
+        "text": "The shepherdess recanted before the canons. A failed prophecy leaves everyone colder."
+      }
+    },
+    "stanislaus_relic": {
+      "kind": "relic",
+      "subject": "St Stanislaus' bone",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.4,
+      "text": "A bone of St Stanislaus, taken from Wawel before the Austrians came, will be carried before the rising.",
+      "line": [
+        "Kość świętego Stanisława, wyniesiona z Wawelu, pójdzie przed powstaniem.",
+        "A bone of St Stanislaus, carried out of Wawel, will go before the rising."
+      ],
+      "plant_note": "A rallying object: the crowd follows a relic more easily (the riot needs less street loyalty).",
+      "disprove": 0.25,
+      "effects": {
+        "camp": [
+          "relic"
+        ],
+        "loyalty": {
+          "street": 3,
+          "church": 3
+        },
+        "text": "Old women kiss the air where the relic is said to have passed."
+      },
+      "disproved": {
+        "loyalty": {
+          "church": -3
+        },
+        "text": "The Wawel chapter counted its relics: all present. The tale dies, and the canons are cross."
+      }
+    },
+    "kosciuszko_sabre": {
+      "kind": "relic",
+      "subject": "Kościuszko's sabre",
+      "truth": "lever:veterans",
+      "plantable": true,
+      "spread": 0.4,
+      "text": "Kościuszko's sabre from Racławice is hidden in the city, waiting for a hand to lift it.",
+      "line": [
+        "Szabla Kościuszki spod Racławic jest w mieście. Czeka na rękę.",
+        "Kościuszko's sabre from Racławice is in the city. It's waiting for a hand."
+      ],
+      "plant_note": "True if Kmita's veterans stand with you (the sergeant has a sabre, at least). The street rallies to it.",
+      "disprove": 0.4,
+      "effects": {
+        "camp": [
+          "relic"
+        ],
+        "loyalty": {
+          "street": 5
+        },
+        "text": "Veterans touch their caps when they pass the Cloth Hall, as if a sabre hung there."
+      },
+      "disproved": {
+        "loyalty": {
+          "street": -2
+        },
+        "text": "The sabre was an old cavalry blade from a pawnshop."
+      }
+    },
+    "black_dog": {
+      "kind": "omen",
+      "subject": "The black dog of Kazimierz",
+      "truth": false,
+      "start": true,
+      "spread": 0.4,
+      "seed": [
+        "well",
+        "market"
+      ],
+      "text": "A black dog with burning eyes runs the streets of Kazimierz at night: an omen, they say, sent by the Jews. (A dangerous tale: counter it before it takes hold.)",
+      "line": [
+        "Czarny pies z ognistymi oczami biega nocą po Kazimierzu. Mówią, że to Żydzi go puszczają.",
+        "A black dog with fiery eyes runs through Kazimierz by night. They say the Jews let it loose."
+      ],
+      "counter": {
+        "label": "Counter the black-dog tale with the rabbi and the Uniate priest",
+        "desc": "Walk Kazimierz with Rabbi and Father Hryhorij, and say what the dog is: a tanner's mastiff. Salon +3, guilds loyalty +3, church loyalty -2.",
+        "effects": {
+          "influence": {
+            "salon": 3
+          },
+          "loyalty": {
+            "guilds": 3,
+            "church": -2
+          },
+          "text": "You walked Kazimierz with the rabbi and a Uniate priest, and named the black dog: a tanner's mastiff. The tale shrivels."
+        }
+      },
+      "disprove": 0.2,
+      "effects": {
+        "loyalty": {
+          "guilds": -6,
+          "street": 2
+        },
+        "fear": {
+          "guilds": 8
+        },
+        "district": {
+          "kazimierz": {
+            "unrest": 15
+          }
+        },
+        "text": "Stones were thrown at Kazimierz windows over a black dog. The guilds of Kazimierz will not forget who stood by."
+      },
+      "disproved": {
+        "text": "The black dog turned out to be a tanner's mastiff with a cold. The tale dies."
+      }
+    },
+    "hejnal_sign": {
+      "kind": "omen",
+      "subject": "The broken hejnał",
+      "truth": true,
+      "spread": 0.4,
+      "start": true,
+      "seed": [
+        "church",
+        "passage"
+      ],
+      "text": "Last night the trumpeter on St Mary's tower broke off the hejnał mid-note, as for the Tatar arrow of old, and did not finish it: a sign.",
+      "line": [
+        "Hejnał urwał się w pół nuty, jak za Tatarów. I nie skończył. To znak.",
+        "The hejnał broke off mid-note, like in the Tatar days. And didn't finish. It's a sign."
+      ],
+      "effects": {
+        "loyalty": {
+          "street": 3,
+          "church": 1
+        },
+        "text": "People stop in the square at every hour to hear whether the hejnał breaks off again."
+      }
+    },
+    "wilk_tithe": {
+      "subject": "Wilk",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "watch"
+      ],
+      "text": "Wilk, the river king, takes a tenth of every barrel landed on the Vistula quays, and sells the smugglers who will not pay to the Austrians.",
+      "line": [
+        "Wilk bierze dziesiątą beczkę z każdej barki. Kto nie płaci, tego sprzedaje Austriakom.",
+        "Wilk takes every tenth barrel off every barge. Anyone who won't pay, he sells to the Austrians."
+      ]
+    },
+    "wilk_cards": {
+      "subject": "Wilk's card game",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern"
+      ],
+      "text": "Wilk plays cards in the yard behind the fishermen's tavern on the quay from a quarter to ten, and drinks from his own jug.",
+      "line": [
+        "Wilk gra w karty za karczmą rybacką od trzy kwadranse na dziesiątą. Pije z własnego dzbana.",
+        "Wilk plays cards behind the fishermen's tavern from a quarter to ten. Drinks from his own jug."
+      ]
+    },
+    "wilk_bathhouse": {
+      "subject": "Wilk's bath",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "well",
+        "tavern"
+      ],
+      "text": "Wilk takes the steam at the riverside bathhouse at twenty to eleven, with a jug of kvass and one bodyguard at the door.",
+      "line": [
+        "Wilk chodzi do łaźni nad rzeką za dwadzieścia jedenasta. Kwas i jeden goryl przy drzwiach.",
+        "Wilk goes to the riverside bathhouse at twenty to eleven. Kvass, and one heavy at the door."
+      ]
+    },
+    "wilk_barge": {
+      "subject": "Wilk's barges",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "tavern",
+        "passage"
+      ],
+      "text": "Wilk inspects his salt barges himself at half past eleven, standing under the cargo hook.",
+      "line": [
+        "Wilk sam ogląda barki o wpół do dwunastej. Stoi pod hakiem.",
+        "Wilk checks his barges himself at half past eleven. Stands right under the hook."
+      ]
+    },
+    "wilk_madam": {
+      "subject": "Wilk's take",
+      "truth": true,
+      "spread": 0.3,
+      "seed": [
+        "watch",
+        "tavern"
+      ],
+      "text": "Mother Weronika pays Wilk a third of the red lantern's take, and Jędrek collects it and hates him for it.",
+      "line": [
+        "Matka Weronika płaci Wilkowi trzecią część. Jędrek zbiera i nienawidzi go za to.",
+        "Mother Weronika pays Wilk a third. Jędrek collects it, and hates him for it."
+      ]
+    },
+    "raid_warehouse": {
+      "subject": "A raid on Wilk's warehouse",
+      "truth": false,
+      "plantable": true,
+      "spread": 0.4,
+      "text": "The Austrians will raid Wilk's warehouse on the quay tonight.",
+      "line": [
+        "Austriacy dziś w nocy robią nalot na magazyn Wilka.",
+        "The Austrians are raiding Wilk's warehouse tonight."
+      ],
+      "plant_note": "Pulls a bodyguard away from Wilk to guard the warehouse (it isolates him).",
+      "disprove": 0.6,
+      "effects": {
+        "camp": [
+          "warehouse_raid_feared"
+        ],
+        "text": "Wilk has put one of his bodyguards and half his men on the warehouse doors, waiting for a raid."
+      },
+      "disproved": {
+        "text": "No raid came. Wilk's men laugh, and look harder at strangers."
+      }
+    }
+  },
+  "kind_spread": {
+    "omen": {
+      "church": 1.5,
+      "passage": 1.4,
+      "well": 1.3,
+      "market": 1.1,
+      "crossing": 0.6,
+      "watch": 0.9
+    },
+    "miracle": {
+      "church": 1.7,
+      "well": 1.4,
+      "passage": 1.2,
+      "crossing": 0.5,
+      "watch": 0.8
+    },
+    "curse": {
+      "well": 1.4,
+      "passage": 1.3,
+      "tavern": 1.2,
+      "crossing": 0.6,
+      "watch": 1.1
+    },
+    "relic": {
+      "church": 1.6,
+      "passage": 1.3,
+      "tavern": 1.1,
+      "crossing": 0.7
+    },
+    "prophecy": {
+      "church": 1.5,
+      "well": 1.4,
+      "passage": 1.4,
+      "crossing": 0.5
+    }
+  },
+  "superstition_salon_cost": 2,
+  "blasphemy": {
+    "loyalty": {
+      "church": -10
+    },
+    "notoriety": 8,
+    "text": "The staged miracle was exposed: wax tears and a hidden pulley. The Church cries blasphemy, and it cries your name."
+  }
+}

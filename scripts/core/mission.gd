@@ -17,6 +17,7 @@ signal approach_changed(approach: String)
 
 const DATA_PATH := "res://data/missions.json"
 const RunnerScript := preload("res://scripts/mission/mission_runner.gd")
+const CampaignScript := preload("res://scripts/mission/campaign.gd")
 
 var active := false
 var mission_id := ""
@@ -34,7 +35,13 @@ var runner: Node = null          ## mission_runner.gd under the night world, nul
 ##   log:        [{night, t: "HH:MM", text, kind: "message"|"announcement"|"story"|"note"}]   newest last
 ##   people:     {npc id: {name, role, faction, where, t, night}}
 ##   missions:   [{id, title, night, success, approach}]   finished nights
-var journal: Dictionary = {"storylines": {}, "log": [], "people": {}, "missions": []}
+##   rumours:    {rumour id: {text, gloss, truth: "unknown"|"true"|"false", reach, status, planted, night, where}}
+##               the whisper network as the player knows it (scripts/mission/rumours.gd keeps it; journal.gd may
+##               render it as a "Rumours" section; until then each rumour also goes to the Log as "rumour: ...")
+##   people entries of persons found by the campaign also carry {found: true, lever: text}.
+var journal: Dictionary = {"storylines": {}, "log": [], "people": {}, "missions": [], "rumours": {}}
+## The campaign (scripts/mission/campaign.gd): arc, whisper network, day actions, dawn consequences.
+var campaign: Node = null
 
 var _db: Dictionary = {}
 
@@ -46,7 +53,10 @@ func _ready() -> void:
 	GameState.mission_ended.connect(_journal_mission_ended)
 	GameState.phase_changed.connect(func(p: int) -> void:
 		if p == GameState.Phase.ORIGIN_SELECT:
-			journal = {"storylines": {}, "log": [], "people": {}, "missions": []})
+			journal = {"storylines": {}, "log": [], "people": {}, "missions": [], "rumours": {}})
+	campaign = CampaignScript.new()
+	campaign.name = "Campaign"
+	add_child(campaign)
 	var f := FileAccess.open(DATA_PATH, FileAccess.READ)
 	if f:
 		var parsed: Variant = JSON.parse_string(f.get_as_text())
@@ -79,12 +89,17 @@ func mission_data(id: String) -> Dictionary:
 ## Day briefing: title, briefing and the opening objectives, nothing spawned, not active.
 func prepare_for_day(id: String = "") -> void:
 	_reset()
-	_configure(id if id != "" else default_id())
+	var tn := GameState.tonight_mission
+	_configure(id if id != "" else (tn if tn != "" and not mission_data(tn).is_empty() else default_id()))
 	objectives_changed.emit()
 
 
 ## Night: load `id` and, given the freshly built night world, spawn its actors. Safe to call again on restart.
+## The campaign's choice for tonight (GameState.tonight_mission) replaces the default mission id, so main.gd's
+## `Mission.start("printers_bundle", world)` plays whatever night the arc has reached.
 func start(id: String, world: Node = null) -> void:
+	if GameState.tonight_mission != "" and (id == "" or id == default_id()) and not mission_data(GameState.tonight_mission).is_empty():
+		id = GameState.tonight_mission
 	_reset()
 	_configure(id)
 	active = true
@@ -118,7 +133,7 @@ func _reset() -> void:
 
 func _configure(id: String) -> void:
 	mission_id = id
-	data = mission_data(id)
+	data = mission_data(id).duplicate(true)   # the runner and the campaign add to it (lead marks, items); keep the db clean
 	if data.is_empty():
 		# Legacy night: reach the safe house.
 		title = "Night %d" % GameState.day
@@ -227,6 +242,9 @@ func finish(success: bool) -> void:
 
 func fail(reason: String) -> void:
 	if not active:
+		return
+	# The failure loop (mission_runner.gd): slip away to a checkpoint, the cells, or a restart.
+	if runner and is_instance_valid(runner) and runner.has_method("intercept_fail") and runner.call("intercept_fail", reason):
 		return
 	active = false
 	summary = _failure_summary(reason)
