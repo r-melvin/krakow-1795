@@ -441,7 +441,8 @@ func _clock_tick() -> void:
 				var ev: Array = sk.get("every", [7.0, 14.0])
 				_schul_t = _rng.randf_range(float(ev[0]), float(ev[1]))
 				var spread := float(sk.get("spread", 40.0))
-				Sfx.play("schulklopfer", place(str(sk.get("place", "kazimierz"))) + Vector3(_rng.randf_range(-spread, spread), 0, _rng.randf_range(-spread, spread)))
+				if bool(GameState.settings.get("bells", true)):
+					Sfx.play("schulklopfer", place(str(sk.get("place", "kazimierz"))) + Vector3(_rng.randf_range(-spread, spread), 0, _rng.randf_range(-spread, spread)))
 				if not "schulklopfer" in sequences:
 					sequences.append("schulklopfer")
 
@@ -509,6 +510,10 @@ func _watch() -> Node:
 
 
 func _enqueue(kind: String, args: Array) -> void:
+	# The "bells" option silences the whole schedule (bells, hejnał, Angelus, schulklopfer); the curfew bell is a
+	# mission signal and still rings once, quietly, so the player knows the hour.
+	if not bool(GameState.settings.get("bells", true)) and kind != "curfew":
+		return
 	if _queue.size() >= 4 and kind != "curfew":
 		return
 	_queue.append([kind, args])

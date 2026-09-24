@@ -26,6 +26,8 @@ func _ready() -> void:
 	var s: Dictionary = GameState.settings
 	_first = _slider_row(grid, "Master volume", "master_volume", 0.0, 1.0, 0.05, func(x: float) -> String: return "%d%%" % roundi(x * 100))
 	_slider_row(grid, "Mouse sensitivity", "mouse_sens", 0.2, 3.0, 0.05, func(x: float) -> String: return "%.2f×" % x)
+	_toggle_row(grid, "Ambient beds (wind, murmur)", "ambience")
+	_toggle_row(grid, "Bells and the hejnał", "bells")
 	_toggle_row(grid, "Invert vertical look", "invert_y")
 	_toggle_row(grid, "Fullscreen", "fullscreen")
 	_toggle_row(grid, "Vertical sync", "vsync")

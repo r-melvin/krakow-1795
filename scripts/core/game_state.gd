@@ -11,7 +11,7 @@ signal settings_changed
 const NIGHT_START_MINUTES := 21 * 60   ## night missions begin at 21:00
 const SETTINGS_PATH := "user://settings.json"
 const SAVE_PATH := "user://save.json"
-const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true}
+const DEFAULT_SETTINGS := {"master_volume": 1.0, "mouse_sens": 1.0, "invert_y": false, "fullscreen": false, "vsync": true, "gi": true, "msaa": true, "taa": true, "ambience": false, "bells": true}
 
 enum Phase { SPLASH, MENU, ORIGIN_SELECT, DAY, NIGHT, DAWN }
 
@@ -293,6 +293,11 @@ func apply_settings() -> void:
 	var vol := clampf(float(settings["master_volume"]), 0.0, 1.0)
 	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(vol, 0.0001)))
 	AudioServer.set_bus_mute(bus, vol <= 0.001)
+	# Ambient beds (wind, city murmur, tavern and crowd loops) are off by default: they read as a music track.
+	# Point sounds stay on the SFX bus. Bells and the hejnał have their own switch (read by ambience.gd).
+	var amb := AudioServer.get_bus_index("Ambience")
+	if amb >= 0:
+		AudioServer.set_bus_mute(amb, not bool(settings.get("ambience", false)))
 	if DisplayServer.get_name() != "headless":
 		var want_full: bool = settings["fullscreen"]
 		var mode := DisplayServer.window_get_mode()
