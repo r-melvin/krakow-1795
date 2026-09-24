@@ -1,9 +1,10 @@
 {
- "_doc": "Sound tables for scripts/audio/sfx.gd, footsteps.gd and ambience.gd (docs/AUDIO.md). Sets and files come from assets/audio/manifest.json (tools/gen_sfx.py). volume_db is added to the sample (normalised to -1 dBFS); radius is the max hearing distance in metres (beyond it a sound is not started); unit is the fraction of radius at which the level is 0 dB (inverse-distance falloff after it); priority 0-3 decides voice stealing.",
+ "_doc": "Sound tables for scripts/audio/sfx.gd, footsteps.gd and ambience.gd (docs/AUDIO.md). Every file is loudness-normalised by tools/gen_sfx.py to -20 dBFS gated RMS, so volume_db here is the source's real-world loudness class. Distance: Godot's attenuation model (inv = inverse distance, -6 dB per doubling past unit_size; inv2 = inverse square, -12 dB per doubling) from unit_size metres, clamped at max_db, silent past max_distance. Effective level = min(volume_db + att(d), max_db), -7 dB more behind a wall. Events pick a class and may override any field.",
  "buses": {
   "SFX": 0.0,
   "Ambience": -2.0,
-  "UI": -8.0
+  "UI": -8.0,
+  "Bells": -1.0
  },
  "reverb_buses": {
   "Reverb_Arcade": {
@@ -46,7 +47,7 @@
  },
  "occlusion": {
   "cutoff_hz": 900,
-  "volume_db": -8.0,
+  "volume_db": -7.0,
   "clear_cutoff_hz": 14000,
   "update_secs": 0.25,
   "air_filter_db": -10.0,
@@ -54,9 +55,11 @@
   "lp_far_hz": 6000.0
  },
  "defaults": {
-  "volume_db": 0.0,
-  "radius": 25.0,
-  "unit": 0.1,
+  "volume_db": -10.0,
+  "unit_size": 3.0,
+  "max_distance": 25.0,
+  "model": "inv",
+  "max_db": 3.0,
   "pitch_var": 0.05,
   "priority": 1,
   "bus": "SFX"
@@ -64,87 +67,89 @@
  "events": {
   "stone": {
    "set": "stone_land",
-   "volume_db": -2,
-   "radius": 30
+   "class": "impact",
+   "volume_db": -10.0
   },
   "bottle": {
    "set": "bottle_smash",
-   "volume_db": 0,
-   "radius": 45,
-   "priority": 2
+   "class": "loud",
+   "volume_db": -6.0
   },
   "coin": {
    "set": "coin_chink",
-   "volume_db": -4,
-   "radius": 15
+   "class": "impact",
+   "volume_db": -16.0,
+   "max_distance": 15.0
   },
   "food": {
    "set": "cabbage_thud",
-   "volume_db": -4,
-   "radius": 18
+   "class": "impact",
+   "volume_db": -14.0
   },
   "cabbage": {
    "set": "cabbage_thud",
-   "volume_db": -3,
-   "radius": 20
+   "class": "impact",
+   "volume_db": -12.0
   },
   "smoke_charge": {
    "set": "smoke_charge",
-   "volume_db": -2,
-   "radius": 40,
-   "priority": 2
+   "class": "loud",
+   "volume_db": -6.0
   },
   "flash": {
    "set": "flash_crack",
-   "volume_db": 0,
-   "radius": 60,
-   "priority": 2
+   "class": "loud",
+   "volume_db": -2.0
   },
   "barrel_roll": {
    "set": "barrel_roll_loop",
-   "volume_db": -4,
-   "radius": 30,
+   "class": "impact",
+   "volume_db": -10.0,
    "secs": 0.7
   },
   "barrel_clonk": {
    "set": "barrel_clonk",
-   "volume_db": -2,
-   "radius": 30
+   "class": "impact",
+   "volume_db": -9.0
   },
   "knock": {
    "set": "door_knock",
-   "volume_db": -2,
-   "radius": 30
+   "class": "impact",
+   "volume_db": -10.0
   },
   "door_open": {
    "set": "door_open",
-   "volume_db": -6,
-   "radius": 18
+   "class": "impact",
+   "volume_db": -14.0,
+   "max_distance": 20.0
   },
   "door_close": {
    "set": "door_close",
-   "volume_db": -4,
-   "radius": 20
+   "class": "impact",
+   "volume_db": -11.0
   },
   "shutter_open": {
    "set": "shutter_open",
-   "volume_db": -6,
-   "radius": 25
+   "class": "impact",
+   "volume_db": -12.0
   },
   "lamp_douse": {
    "set": "lamp_douse",
-   "volume_db": -6,
-   "radius": 15
+   "class": "rustle",
+   "volume_db": -18.0,
+   "max_distance": 14.0
   },
   "lamp_relight": {
    "set": "lamp_relight",
-   "volume_db": -6,
-   "radius": 15
+   "class": "impact",
+   "volume_db": -16.0,
+   "max_distance": 15.0
   },
   "horse_loose": {
    "set": "horse_whinny",
-   "volume_db": -2,
-   "radius": 60,
+   "class": "voice",
+   "volume_db": -4.0,
+   "max_distance": 70.0,
    "also": [
     [
      "horse_stamp",
@@ -154,29 +159,28 @@
   },
   "musket": {
    "set": "musket_shot",
-   "volume_db": 0,
-   "radius": 260,
-   "unit": 0.06,
-   "priority": 3,
+   "class": "gunshot",
+   "volume_db": 0.0,
    "pitch_var": 0.03
   },
   "pistol": {
    "set": "pistol_shot",
-   "volume_db": 0,
-   "radius": 180,
-   "unit": 0.06,
-   "priority": 3,
+   "class": "gunshot",
+   "volume_db": -3.0,
+   "unit_size": 20.0,
+   "max_distance": 200.0,
    "pitch_var": 0.03
   },
   "knife": {
    "set": "knife_slash",
-   "volume_db": -4,
-   "radius": 15
+   "class": "impact",
+   "volume_db": -14.0,
+   "max_distance": 15.0
   },
   "fight": {
    "set": "punch",
-   "volume_db": -2,
-   "radius": 30,
+   "class": "fight",
+   "volume_db": -8.0,
    "also": [
     [
      "grunt",
@@ -186,301 +190,320 @@
   },
   "blow": {
    "set": "punch",
-   "volume_db": -3,
-   "radius": 25,
+   "class": "fight",
+   "volume_db": -8.0,
    "pitch_var": 0.1
   },
   "grunt": {
    "set": "grunt",
-   "volume_db": -5,
-   "radius": 25,
+   "class": "voice_soft",
+   "volume_db": -10.0,
    "pitch_var": 0.08
   },
   "body_fall": {
    "set": "body_fall",
-   "volume_db": -2,
-   "radius": 25
+   "class": "fight",
+   "volume_db": -8.0
   },
   "lash": {
    "set": "lash",
-   "volume_db": -1,
-   "radius": 40,
-   "priority": 2
+   "class": "loud",
+   "volume_db": -4.0
   },
   "drum_roll": {
    "set": "drum_roll",
-   "volume_db": -1,
-   "radius": 60,
-   "priority": 2,
+   "class": "loud",
+   "volume_db": -4.0,
    "pitch_var": 0.0
   },
   "drum_beat": {
    "set": "drum_beat",
-   "volume_db": -2,
-   "radius": 50,
-   "priority": 2,
+   "class": "loud",
+   "volume_db": -5.0,
    "pitch_var": 0.0
   },
   "crowd_jeer": {
    "set": "crowd_jeer",
-   "volume_db": -6,
-   "radius": 40
+   "class": "voice",
+   "volume_db": -8.0,
+   "unit_size": 5.0
   },
   "snore": {
    "set": "snore",
-   "volume_db": -10,
-   "radius": 12
+   "class": "rustle",
+   "volume_db": -18.0,
+   "max_distance": 12.0
   },
   "hiccup": {
    "set": "hiccup",
-   "volume_db": -8,
-   "radius": 12,
+   "class": "voice_soft",
+   "volume_db": -14.0,
    "pitch_var": 0.1
   },
   "drunk_song": {
    "set": "drunk_song",
-   "volume_db": -6,
-   "radius": 30
+   "class": "voice",
+   "volume_db": -8.0
   },
   "cough": {
    "set": "cough",
-   "volume_db": -8,
-   "radius": 25,
+   "class": "voice_soft",
+   "volume_db": -12.0,
    "pitch_var": 0.1
   },
   "laugh": {
    "set": "laugh",
-   "volume_db": -8,
-   "radius": 25
+   "class": "voice_soft",
+   "volume_db": -10.0
   },
   "baby_cry": {
    "set": "baby_cry",
-   "volume_db": -12,
-   "radius": 35
+   "class": "voice_soft",
+   "volume_db": -10.0,
+   "max_distance": 35.0
   },
   "splash": {
    "set": "splash_slops",
-   "volume_db": -2,
-   "radius": 30
+   "class": "impact",
+   "volume_db": -8.0
   },
   "hoof_walk": {
    "set": "hoof_walk",
-   "volume_db": -6,
-   "radius": 40,
-   "priority": 0,
+   "class": "cart",
+   "volume_db": -10.0,
    "pitch_var": 0.06
   },
   "hoof_trot": {
    "set": "hoof_trot",
-   "volume_db": -4,
-   "radius": 45,
-   "priority": 0,
+   "class": "cart",
+   "volume_db": -8.0,
    "pitch_var": 0.06
   },
   "hoof_soft": {
    "set": "hoof_soft",
-   "volume_db": -8,
-   "radius": 30,
-   "priority": 0
+   "class": "cart",
+   "volume_db": -14.0
   },
   "horse_whinny": {
    "set": "horse_whinny",
-   "volume_db": -4,
-   "radius": 70
+   "class": "voice",
+   "volume_db": -4.0,
+   "max_distance": 70.0
   },
   "horse_snort": {
    "set": "horse_snort",
-   "volume_db": -8,
-   "radius": 25
+   "class": "voice_soft",
+   "volume_db": -12.0
   },
   "horse_stamp": {
    "set": "horse_stamp",
-   "volume_db": -5,
-   "radius": 30
+   "class": "impact",
+   "volume_db": -10.0
   },
   "coachman_hoo": {
    "set": "coachman_hoo",
-   "volume_db": -3,
-   "radius": 50,
+   "class": "voice",
+   "volume_db": -6.0,
    "priority": 2
   },
   "harness_jingle": {
    "set": "harness_jingle",
-   "volume_db": -10,
-   "radius": 30,
-   "priority": 0
+   "class": "cart",
+   "volume_db": -16.0,
+   "max_distance": 30.0
   },
   "wheel_clack": {
    "set": "wheel_clack",
-   "volume_db": -4,
-   "radius": 45
+   "class": "cart",
+   "volume_db": -8.0
   },
   "cart_creak": {
    "set": "cart_creak",
-   "volume_db": -12,
-   "radius": 25,
-   "priority": 0
+   "class": "cart",
+   "volume_db": -16.0,
+   "max_distance": 25.0
+  },
+  "wheel_loop": {
+   "set": "wheel_loop",
+   "class": "cart",
+   "volume_db": -8.0
+  },
+  "wheel_mud_loop": {
+   "set": "wheel_mud_loop",
+   "class": "cart",
+   "volume_db": -10.0
   },
   "dog_bark": {
    "set": "dog_bark",
-   "volume_db": -3,
-   "radius": 70
+   "class": "voice",
+   "volume_db": -6.0,
+   "max_distance": 70.0
   },
   "dog_bark_far": {
    "set": "dog_bark_far",
-   "volume_db": -4,
-   "radius": 200,
-   "unit": 0.2,
-   "bus": "Ambience"
+   "class": "distant",
+   "volume_db": -6.0
   },
   "dog_growl": {
    "set": "dog_growl",
-   "volume_db": -6,
-   "radius": 15
+   "class": "voice_soft",
+   "volume_db": -14.0,
+   "max_distance": 15.0
   },
   "dog_pant": {
    "set": "dog_pant",
-   "volume_db": -12,
-   "radius": 10,
-   "priority": 0
+   "class": "rustle",
+   "volume_db": -20.0
   },
   "cat_meow": {
    "set": "cat_meow",
-   "volume_db": -8,
-   "radius": 25
+   "class": "voice_soft",
+   "volume_db": -12.0
+  },
+  "cat_purr": {
+   "set": "cat_purr",
+   "class": "rustle",
+   "volume_db": -24.0,
+   "max_distance": 6.0
   },
   "pigeon_coo": {
    "set": "pigeon_coo",
-   "volume_db": -14,
-   "radius": 15,
-   "priority": 0
+   "class": "rustle",
+   "volume_db": -20.0,
+   "max_distance": 15.0
   },
   "pigeon_flap": {
    "set": "pigeon_flap",
-   "volume_db": -6,
-   "radius": 25
+   "class": "impact",
+   "volume_db": -14.0,
+   "max_distance": 25.0
   },
   "crow_caw": {
    "set": "crow_caw",
-   "volume_db": -6,
-   "radius": 70
+   "class": "voice",
+   "volume_db": -8.0,
+   "max_distance": 70.0
   },
   "hawk_cry": {
    "set": "hawk_cry",
-   "volume_db": -6,
-   "radius": 120
+   "class": "voice",
+   "volume_db": -8.0,
+   "unit_size": 6.0,
+   "max_distance": 120.0
   },
   "owl_hoot": {
    "set": "owl_hoot",
-   "volume_db": -8,
-   "radius": 120,
-   "unit": 0.2,
-   "bus": "Ambience"
+   "class": "distant",
+   "volume_db": -10.0,
+   "max_distance": 120.0
   },
   "wind_gust": {
    "set": "wind_gust",
-   "volume_db": -8,
-   "radius": 60,
-   "unit": 0.3,
-   "bus": "Ambience"
+   "class": "distant",
+   "volume_db": -10.0,
+   "unit_size": 10.0,
+   "max_distance": 60.0
+  },
+  "tavern_loop": {
+   "set": "tavern_loop",
+   "class": "bed",
+   "volume_db": -8.0,
+   "max_distance": 24.0
+  },
+  "crowd_talk_loop": {
+   "set": "crowd_talk_loop",
+   "class": "bed",
+   "volume_db": -12.0,
+   "max_distance": 40.0,
+   "unit_size": 5.0
+  },
+  "prayer_murmur_loop": {
+   "set": "prayer_murmur_loop",
+   "class": "distant",
+   "volume_db": -14.0,
+   "max_distance": 400.0
+  },
+  "brazier_loop": {
+   "set": "brazier_loop",
+   "class": "fire",
+   "volume_db": -16.0
+  },
+  "grinder_loop": {
+   "set": "grinder_loop",
+   "class": "fire",
+   "volume_db": -12.0,
+   "unit_size": 2.0,
+   "max_distance": 25.0
   },
   "bell": {
    "set": "bell_great",
-   "volume_db": 0,
-   "radius": 3000,
-   "unit": 0.02,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": 0.0
   },
   "bell_great": {
    "set": "bell_great",
-   "volume_db": 0,
-   "radius": 3000,
-   "unit": 0.02,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": 0.0
   },
   "bell_small": {
    "set": "bell_small",
-   "volume_db": -3,
-   "radius": 3000,
-   "unit": 0.015,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": -3.0
   },
   "bell_peal": {
    "set": "bell_peal",
-   "volume_db": -2,
-   "radius": 3000,
-   "unit": 0.015,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": -2.0
   },
   "bell_townhall": {
    "set": "bell_townhall",
-   "volume_db": -3,
-   "radius": 3000,
-   "unit": 0.015,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": -3.0,
+   "unit_size": 30.0
   },
   "bell_uniate": {
    "set": "bell_uniate",
-   "volume_db": -6,
-   "radius": 3000,
-   "unit": 0.01,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": -6.0,
+   "unit_size": 20.0
   },
   "bell_sigismund": {
    "set": "bell_sigismund",
-   "volume_db": 0,
-   "radius": 5000,
-   "unit": 0.03,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": 0.0,
+   "unit_size": 80.0,
+   "max_distance": 5000.0
   },
   "hejnal": {
    "set": "hejnal",
-   "volume_db": -2,
-   "radius": 3000,
-   "unit": 0.02,
-   "priority": 3,
-   "pitch_var": 0.0,
-   "bus": "Ambience"
+   "class": "bell",
+   "volume_db": -4.0,
+   "unit_size": 30.0
   },
   "schulklopfer": {
    "set": "schulklopfer_knock",
-   "volume_db": -6,
-   "radius": 1000,
-   "unit": 0.02,
-   "priority": 2,
-   "pitch_var": 0.03,
-   "bus": "Ambience"
+   "class": "distant",
+   "volume_db": -10.0,
+   "unit_size": 15.0,
+   "max_distance": 1000.0,
+   "bus": "Bells",
+   "pitch_var": 0.03
   },
   "ui_click": {
    "set": "ui_click",
-   "volume_db": -4,
-   "bus": "UI",
-   "pitch_var": 0.04
+   "class": "ui",
+   "volume_db": -8.0
   },
   "ui_hover": {
    "set": "ui_hover",
-   "volume_db": -10,
-   "bus": "UI",
+   "class": "ui",
+   "volume_db": -16.0,
    "pitch_var": 0.06
   },
   "ui_page": {
    "set": "ui_page",
-   "volume_db": -2,
-   "bus": "UI",
+   "class": "ui",
+   "volume_db": -8.0,
    "pitch_var": 0.06
   }
  },
@@ -614,7 +637,7 @@
   "kinds": {
    "shoe": {
     "shoe": "shoe",
-    "volume_db": -15.0,
+    "volume_db": 0.0,
     "pitch": 1.0,
     "walk": 0.72,
     "run": 1.15,
@@ -622,7 +645,7 @@
    },
    "boot": {
     "shoe": "boot",
-    "volume_db": -12.0,
+    "volume_db": 3.0,
     "pitch": 0.96,
     "walk": 0.78,
     "run": 1.2,
@@ -630,7 +653,7 @@
    },
    "heel": {
     "shoe": "shoe",
-    "volume_db": -17.0,
+    "volume_db": -1.0,
     "pitch": 1.1,
     "walk": 0.6,
     "run": 1.0,
@@ -638,7 +661,7 @@
    },
    "bare": {
     "shoe": "bare",
-    "volume_db": -20.0,
+    "volume_db": -3.0,
     "pitch": 1.05,
     "walk": 0.62,
     "run": 1.0,
@@ -646,7 +669,7 @@
    },
    "player": {
     "shoe": "shoe",
-    "volume_db": -13.0,
+    "volume_db": -3.0,
     "pitch": 1.0,
     "walk": 0.75,
     "run": 1.25,
@@ -656,12 +679,13 @@
     "sneak_scuff_db": 2.0,
     "sprint_db": 3.0,
     "swish_chance": 0.3,
-    "rustle_chance": 0.12
+    "rustle_chance": 0.12,
+    "_doc": "a notch (3 dB) under an NPC's shoe at the same distance: the listener stands on them"
    }
   },
   "scuff_turn": 3.0,
-  "scuff_volume_db": -16.0,
-  "_doc": "Steps are 'step_<surface>_<shoe>' (10 variants each). A step fires on each heel strike of the locomotion clip (heel_phases of clips matching loco_clips; crawl_clips drag once a cycle), else once a stride of distance. Level +-vary_db, pitch +-pitch_var. Kinds pick the shoe set and level; steps sit ~6-10 dB under the city murmur.",
+  "scuff_volume_db": 0.0,
+  "_doc": "Steps are 'step_<surface>_<shoe>' (10 variants each). A step fires on each heel strike of the locomotion clip (heel_phases of clips matching loco_clips; crawl_clips drag once a cycle), else once a stride of distance. Level +-vary_db, pitch +-pitch_var. Kinds pick the shoe set and level; kind volume_db is relative to the step class (-15 dB).",
   "heel_phases": [
    0.0,
    0.5
@@ -681,7 +705,7 @@
   ],
   "vary_db": 3.0,
   "pitch_var": 0.06,
-  "drag_volume_db": -14.0
+  "drag_volume_db": 0.0
  },
  "animals": {
   "horse": {
@@ -764,7 +788,7 @@
   }
  },
  "vehicles": {
-  "wheel_volume_db": -6.0,
+  "wheel_volume_db": 0.0,
   "radius": 45.0,
   "ref_speed": 2.0,
   "clack_every": [
@@ -953,7 +977,7 @@
    ],
    "flag": "sabbath_eve",
    "place": "synagogue_door",
-   "volume_db": -10.0,
+   "volume_db": 0.0,
    "radius": 400.0
   }
  },
@@ -993,11 +1017,11 @@
    "idle_min": 3,
    "max_players": 4,
    "radius": 40.0,
-   "volume_db": -12.0,
+   "volume_db": 0.0,
    "per_doubling_db": 3.0
   },
   "tavern": {
-   "volume_db": -4.0,
+   "volume_db": 0.0,
    "radius": 24.0,
    "cutoff_hz": 2200,
    "inside_db": -3.0,
@@ -1134,40 +1158,203 @@
   }
  },
  "prefix_events": {
-  "_doc": "Defaults for every set name starting with the key (before the events table). lp_near / lp_far_hz: the distance low-pass.",
+  "_doc": "Defaults for set names starting with the key (footsteps call sets directly): class + overrides.",
   "step_": {
-   "radius": 28.0,
-   "unit": 0.08,
+   "class": "step",
+   "pitch_var": 0.06
+  },
+  "scuff": {
+   "class": "scuff"
+  },
+  "drag": {
+   "class": "scuff",
+   "volume_db": -18.0
+  },
+  "cloth_rustle": {
+   "class": "rustle",
+   "volume_db": -24.0
+  },
+  "coat_swish": {
+   "class": "rustle",
+   "volume_db": -22.0
+  }
+ },
+ "classes": {
+  "_doc": "Loudness classes: volume_db, unit_size (m, 0 dB distance), max_distance (m), model (inv | inv2), max_db, priority, lp_near (m) / lp_far_hz (distance low-pass).",
+  "rustle": {
+   "volume_db": -24.0,
+   "unit_size": 1.0,
+   "max_distance": 10.0,
+   "model": "inv2",
+   "max_db": 0.0,
    "priority": 0,
-   "pitch_var": 0.06,
+   "lp_near": 2.0,
+   "lp_far_hz": 2500.0
+  },
+  "step": {
+   "volume_db": -15.0,
+   "unit_size": 1.5,
+   "max_distance": 18.0,
+   "model": "inv",
+   "max_db": 0.0,
+   "priority": 0,
    "lp_near": 3.0,
    "lp_far_hz": 1800.0
   },
   "scuff": {
-   "radius": 20.0,
-   "unit": 0.08,
+   "volume_db": -20.0,
+   "unit_size": 1.5,
+   "max_distance": 14.0,
+   "model": "inv2",
+   "max_db": 0.0,
    "priority": 0,
    "lp_near": 3.0,
    "lp_far_hz": 1800.0
   },
-  "drag": {
-   "radius": 15.0,
-   "unit": 0.1,
-   "priority": 0,
-   "lp_near": 3.0,
-   "lp_far_hz": 1800.0
+  "fire": {
+   "volume_db": -16.0,
+   "unit_size": 1.5,
+   "max_distance": 15.0,
+   "model": "inv",
+   "max_db": 0.0,
+   "priority": 0
   },
-  "cloth_rustle": {
-   "radius": 8.0,
-   "unit": 0.15,
-   "priority": 0,
-   "volume_db": -10.0
+  "impact": {
+   "volume_db": -10.0,
+   "unit_size": 3.0,
+   "max_distance": 35.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 1
   },
-  "coat_swish": {
-   "radius": 10.0,
-   "unit": 0.15,
+  "voice_soft": {
+   "volume_db": -12.0,
+   "unit_size": 3.0,
+   "max_distance": 30.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 1
+  },
+  "voice": {
+   "volume_db": -6.0,
+   "unit_size": 3.0,
+   "max_distance": 60.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 1
+  },
+  "fight": {
+   "volume_db": -8.0,
+   "unit_size": 3.0,
+   "max_distance": 35.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 1
+  },
+  "cart": {
+   "volume_db": -8.0,
+   "unit_size": 6.0,
+   "max_distance": 50.0,
+   "model": "inv",
+   "max_db": 3.0,
    "priority": 0,
-   "volume_db": -8.0
+   "lp_near": 8.0,
+   "lp_far_hz": 2500.0
+  },
+  "loud": {
+   "volume_db": -4.0,
+   "unit_size": 6.0,
+   "max_distance": 60.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 2
+  },
+  "bed": {
+   "volume_db": -10.0,
+   "unit_size": 4.0,
+   "max_distance": 30.0,
+   "model": "inv",
+   "max_db": 0.0,
+   "priority": 1
+  },
+  "distant": {
+   "volume_db": -6.0,
+   "unit_size": 20.0,
+   "max_distance": 250.0,
+   "model": "inv",
+   "max_db": 0.0,
+   "priority": 1,
+   "bus": "Ambience"
+  },
+  "gunshot": {
+   "volume_db": 0.0,
+   "unit_size": 30.0,
+   "max_distance": 300.0,
+   "model": "inv",
+   "max_db": 6.0,
+   "priority": 3,
+   "lp_near": 40.0,
+   "lp_far_hz": 2500.0
+  },
+  "bell": {
+   "volume_db": 0.0,
+   "unit_size": 40.0,
+   "max_distance": 3000.0,
+   "model": "inv",
+   "max_db": 3.0,
+   "priority": 3,
+   "bus": "Bells",
+   "pitch_var": 0.0,
+   "lp_near": 150.0,
+   "lp_far_hz": 2500.0
+  },
+  "ui": {
+   "volume_db": -6.0,
+   "bus": "UI",
+   "pitch_var": 0.04
   }
- }
+ },
+ "reference_levels": [
+  [
+   "footstep (NPC shoe, cobbles) 1 m",
+   "step_cobbles_shoe",
+   1.0
+  ],
+  [
+   "footstep (NPC shoe, cobbles) 10 m",
+   "step_cobbles_shoe",
+   10.0
+  ],
+  [
+   "player's own footstep 1.6 m",
+   "step_cobbles_shoe",
+   1.6,
+   -3.0
+  ],
+  [
+   "NPC footstep 1.6 m",
+   "step_cobbles_shoe",
+   1.6
+  ],
+  [
+   "hoof (trot) 5 m",
+   "hoof_trot",
+   5.0
+  ],
+  [
+   "door knock 8 m",
+   "knock",
+   8.0
+  ],
+  [
+   "great bell 200 m",
+   "bell_great",
+   200.0
+  ],
+  [
+   "musket 50 m",
+   "musket",
+   50.0
+  ]
+ ]
 }

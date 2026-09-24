@@ -4,16 +4,17 @@ class_name Sfx
 ##   Sfx.play(name, pos, volume_db := 0.0, pitch_var := -1.0, pitch := 1.0) -> AudioStreamPlayer3D (null if culled)
 ##   Sfx.play2d(name, volume_db := 0.0, bus := "")     non-positional one-shot (ambience layers)
 ##   Sfx.ui(name)                                     UI bus, keeps playing while the game is paused
-##   Sfx.attach_loop(node, name, volume_db, radius)   a looping 3D source that rides on `node` (caller owns it)
+##   Sfx.attach_loop(node, name, volume_db, max_dist) a looping 3D source that rides on `node` (caller owns it)
 ##   Sfx.watch_hooks(watch), Sfx.say_hook(node, key), Sfx.act_hook(node, clip)   glue (data/audio.json tables)
-## `name` is an event of data/audio.json "events" (set, volume, radius, unit, pitch variance, priority, extra layers,
+## `name` is an event of data/audio.json "events" (set, loudness class, volume, unit size, max distance, attenuation model,
+## pitch variance, priority, extra layers,
 ## max seconds, bus), else a set of assets/audio/manifest.json (a random variant, never the same one twice running),
 ## else a single file name.
 ## Voices: a pool of AudioStreamPlayer3D (voices.max). When all are busy the oldest voice of lower or equal priority
-## is stolen, else the new sound is dropped. A sound farther than its radius from the listener is never started.
+## is stolen, else the new sound is dropped. A sound beyond its max distance from the listener is never started.
 ## Occlusion: a ray from the listener (the current Camera3D) to the source when it starts, refreshed every
 ## occlusion.update_secs for long voices and loops: blocked -> lowpass + volume drop.
-## Buses SFX, Ambience, UI and the reverb buses of the Area3D zones (ambience.gd) are created under Master (whose
+## Buses SFX, Ambience, UI, Bells and the reverb buses of the Area3D zones (ambience.gd) are created under Master (whose
 ## volume GameState.apply_settings() sets); a hard limiter guards Master.
 ## Also attaches footsteps (scripts/audio/footsteps.gd) to guards and the player once a second, and wires UI sounds
 ## (UiTheme.wire_sound) into every node added to the tree.
@@ -38,6 +39,7 @@ var _pool: Array[AudioStreamPlayer3D] = []
 var _ui_pool: Array[AudioStreamPlayer] = []
 var _flat_pool: Array[AudioStreamPlayer] = []
 var _loops: Array[AudioStreamPlayer3D] = []
+var _listener: AudioListener3D
 var _occ_t := 0.0
 var _scan_t := 0.0
 var _rng := RandomNumberGenerator.new()
@@ -110,25 +112,53 @@ static func file_count() -> int:
 
 
 ## Resolved event parameters for `name` (event table over defaults; a bare set or file name gets the defaults).
+## Layers: built-in defaults < data "defaults" < the loudness class (data "classes", named by the prefix rule or the
+## event) < the prefix rule < the event.
 static func event(name: String) -> Dictionary:
 	_load()
-	var ev: Dictionary = (_data.get("defaults", {}) as Dictionary).duplicate()
-	for k in ["volume_db", "radius", "unit", "pitch_var", "priority", "bus"]:
-		if not ev.has(k):
-			ev[k] = {"volume_db": 0.0, "radius": 25.0, "unit": 0.1, "pitch_var": 0.05, "priority": 1, "bus": "SFX"}[k]
+	var ev := {"volume_db": -10.0, "unit_size": 3.0, "max_distance": 25.0, "model": "inv", "max_db": 3.0,
+			"pitch_var": 0.05, "priority": 1, "bus": "SFX"}
+	ev.merge(_data.get("defaults", {}), true)
 	ev["set"] = name
 	ev["pitch"] = 1.0
 	ev["secs"] = 0.0
 	ev["also"] = []
+	var own := {}
 	var pre: Dictionary = _data.get("prefix_events", {})
 	for k in pre:
-		if name.begins_with(str(k)):
-			ev.merge(pre[k], true)
+		if not str(k).begins_with("_") and name.begins_with(str(k)):
+			own.merge(pre[k], true)
 			break
 	var evs: Dictionary = _data.get("events", {})
 	if evs.has(name):
-		ev.merge(evs[name], true)
+		own.merge(evs[name], true)
+	var classes: Dictionary = _data.get("classes", {})
+	var cls := str(own.get("class", ""))
+	if classes.has(cls):
+		ev.merge(classes[cls], true)
+	ev.merge(own, true)
 	return ev
+
+
+## Godot's distance attenuation for these parameters (AudioStreamPlayer3D::_get_attenuation_db): the level in dB
+## relative to the file's -20 dBFS reference loudness at distance `d`, before occlusion. -INF past max_distance.
+static func level_at(ev: Dictionary, d: float, extra_db: float = 0.0) -> float:
+	if d > float(ev["max_distance"]):
+		return -INF
+	var r := d / maxf(float(ev["unit_size"]), 0.01)
+	var att := linear_to_db(1.0 / (r * r + 0.00001)) if str(ev["model"]) == "inv2" else linear_to_db(1.0 / (r + 0.00001))
+	return minf(att + float(ev["volume_db"]) + extra_db, float(ev["max_db"]))
+
+
+static func _apply_distance(p: AudioStreamPlayer3D, ev: Dictionary, max_override: float = -1.0) -> void:
+	p.max_distance = max_override if max_override > 0.0 else float(ev["max_distance"])
+	p.unit_size = maxf(0.1, float(ev["unit_size"]))
+	p.attenuation_model = AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE if str(ev["model"]) == "inv2" \
+			else AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE
+	p.max_db = float(ev["max_db"])
+	var oc: Dictionary = _data.get("occlusion", {})
+	p.set_meta("lp_near", float(ev.get("lp_near", oc.get("lp_near", 10.0))))
+	p.set_meta("lp_far_hz", float(ev.get("lp_far_hz", oc.get("lp_far_hz", 6000.0))))
 
 
 ## A file of the set (random, not the last one picked), or the name itself if it is a file; "" if unknown.
@@ -183,10 +213,12 @@ static func stream(fname: String) -> AudioStream:
 # ------------------------------------------------------------------ buses
 
 func _make_buses() -> void:
-	var levels: Dictionary = _data.get("buses", {"SFX": 0.0, "Ambience": 0.0, "UI": 0.0})
-	for b in ["SFX", "Ambience", "UI"]:
+	var levels: Dictionary = _data.get("buses", {"SFX": 0.0, "Ambience": 0.0, "UI": 0.0, "Bells": 0.0})
+	for b in ["SFX", "Ambience", "UI", "Bells"]:     # Bells: its own bus, so the "ambience" switch leaves the bells
 		var i := _bus(b)
 		AudioServer.set_bus_volume_db(i, float(levels.get(b, 0.0)))
+	# GameState.apply_settings() ran before these buses existed: honour its "ambience" switch now
+	AudioServer.set_bus_mute(_bus("Ambience"), not bool(GameState.settings.get("ambience", false)))
 	var rbs: Dictionary = _data.get("reverb_buses", {})
 	for rb in rbs:
 		var i := _bus(rb)
@@ -256,8 +288,8 @@ static func attach_loop(node: Node3D, name: String, volume_db: float = 0.0, radi
 	p.stream = s
 	p.bus = str(ev["bus"])
 	p.area_mask = ZONE_LAYER
-	p.max_distance = radius if radius > 0.0 else float(ev["radius"])
-	p.unit_size = maxf(0.5, p.max_distance * float(ev["unit"]))
+	_apply_distance(p, ev, radius)
+	p.set_meta("ev_db", float(ev["volume_db"]))
 	p.volume_db = float(ev["volume_db"]) + volume_db
 	p.attenuation_filter_db = float(_data.get("occlusion", {}).get("air_filter_db", -10.0))
 	p.doppler_tracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
@@ -270,18 +302,44 @@ static func attach_loop(node: Node3D, name: String, volume_db: float = 0.0, radi
 	return p
 
 
-## Sets a loop's level while keeping occlusion (use instead of writing volume_db directly).
+## Sets a loop's level relative to its event's class level, keeping occlusion (use instead of writing volume_db).
 static func set_loop_db(p: AudioStreamPlayer3D, db: float) -> void:
 	if p and is_instance_valid(p):
-		p.set_meta("base_db", db)
-		p.volume_db = db + float(p.get_meta("occ_db", 0.0))
+		var full := float(p.get_meta("ev_db", 0.0)) + db
+		p.set_meta("base_db", full)
+		p.volume_db = full + float(p.get_meta("occ_db", 0.0))
 
 
 static func listener_pos() -> Variant:
 	if _inst == null or not is_instance_valid(_inst) or not _inst.is_inside_tree():
 		return null
+	if _inst._listener and _inst._listener.is_current():
+		return _inst._listener.global_position
 	var cam := _inst.get_viewport().get_camera_3d()
 	return cam.global_position if cam else null
+
+
+## The ears: an AudioListener3D at the player's head, turned like the camera (so panning follows the view), made
+## current while a player and a camera exist. Without it Godot listens from the camera, which rides 4 m behind the
+## player on its spring arm and would put the player's own steps 4 m away. Falls back to the camera otherwise.
+func _update_listener() -> void:
+	var cam := get_viewport().get_camera_3d()
+	var player := get_tree().get_first_node_in_group("player") as Node3D
+	var follow := cam != null and player != null and player.is_inside_tree() and cam.is_inside_tree() \
+			and cam.get_parent() != null and player.is_ancestor_of(cam)
+	if not follow:
+		if _listener and _listener.is_current():
+			_listener.clear_current()
+		return
+	if _listener == null:
+		_listener = AudioListener3D.new()
+		_listener.name = "Ears"
+		_listener.top_level = true
+		add_child(_listener)
+	var head: Vector3 = player.call("head_position") if player.has_method("head_position") else player.global_position + Vector3(0, 1.6, 0)
+	_listener.global_transform = Transform3D(cam.global_transform.basis, head)
+	if not _listener.is_current():
+		_listener.make_current()
 
 
 # ------------------------------------------------------------------ glue for the game systems
@@ -364,7 +422,7 @@ func _play3d(name: String, pos: Vector3, vol: float, pv: float, pitch: float, fo
 	var fname := pick(str(ev["set"]))
 	if fname == "":
 		return null
-	var radius := float(ev["radius"])
+	var radius := float(ev["max_distance"])
 	var lpos: Variant = listener_pos()
 	if not force and lpos != null and pos.distance_to(lpos) > radius:
 		culled += 1
@@ -380,13 +438,10 @@ func _play3d(name: String, pos: Vector3, vol: float, pv: float, pitch: float, fo
 	p.stream = s
 	p.bus = str(ev["bus"])
 	p.global_position = pos
-	p.max_distance = radius
-	p.unit_size = maxf(0.5, radius * float(ev["unit"]))
+	_apply_distance(p, ev)
 	var pvv := float(ev["pitch_var"]) if pv < 0.0 else pv
 	p.pitch_scale = clampf(float(ev["pitch"]) * pitch * (1.0 + _rng.randf_range(-pvv, pvv)), 0.3, 3.0)
 	p.set_meta("base_db", float(ev["volume_db"]) + vol)
-	p.set_meta("lp_near", float(ev.get("lp_near", _data.get("occlusion", {}).get("lp_near", 10.0))))
-	p.set_meta("lp_far_hz", float(ev.get("lp_far_hz", _data.get("occlusion", {}).get("lp_far_hz", 6000.0))))
 	_occlude(p, lpos)
 	p.play()
 	var dur := float(_sounds[fname]["dur"]) / p.pitch_scale
@@ -512,6 +567,7 @@ func _occlude(p: AudioStreamPlayer3D, lpos: Variant) -> void:
 
 
 func _process(delta: float) -> void:
+	_update_listener()
 	_occ_t -= delta
 	if _occ_t <= 0.0:
 		_occ_t = float(_data.get("occlusion", {}).get("update_secs", 0.25))
@@ -537,6 +593,24 @@ func _process(delta: float) -> void:
 
 
 # ------------------------------------------------------------------ smoke
+
+## data "reference_levels": [label, event, metres, extra dB?] -> "label=-31.2dBFS ..." from level_at (the formula
+## Godot applies) on top of the files' -20 dBFS reference loudness. Also names the listener in use.
+static func reference_levels() -> String:
+	_load()
+	var ref := -20.0
+	var out := PackedStringArray()
+	for r in _data.get("reference_levels", []):
+		var ev := event(str(r[1]))
+		var lv := level_at(ev, float(r[2]), float(r[3]) if r.size() > 3 else 0.0)
+		out.append("%s=%s" % [str(r[0]).replace(" ", "_"), ("%.1fdBFS" % (ref + lv)) if lv > -INF else "silent"])
+	var who := "none"
+	if _inst and _inst._listener and _inst._listener.is_current():
+		who = "player_head"
+	elif _inst and _inst.get_viewport().get_camera_3d():
+		who = "camera"
+	return "listener=%s %s" % [who, " ".join(out)]
+
 
 ## Headless smoke: loads every file, forces one of each event (ignoring distance and priority) in front of the
 ## listener and returns "files=<loaded>/<total> voices_peak=<n> events=<started,...>" (failures listed after).
@@ -568,6 +642,7 @@ static func smoke() -> String:
 		else:
 			failed.append(n)
 	var s := "files=%d/%d voices_peak=%d events=%s" % [ok, _sounds.size(), _inst.voices_peak, ",".join(started)]
+	s += "\n[smoke] audio levels " + reference_levels()
 	if not failed.is_empty():
 		s += " FAILED=%s" % ",".join(failed)
 	return s

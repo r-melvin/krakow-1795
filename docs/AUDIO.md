@@ -56,12 +56,46 @@ echoes, soft limiting, equal-power loop crossfades.
 - Bells: hum, prime, tierce, quint, nominal and upper partials, each a slowly beating pair, long per-partial decays,
   a clapper transient, baked reverb. St Mary's great bell has a 98 Hz prime; the Sigismund bell a deep 46 Hz prime,
   lowpassed as heard from far off; the Town Hall clock bell is small and hammer-struck.
-- Hejnał: bandlimited brass (harmonics brighten with loudness, a formant bump near 1.3 kHz), attack scoop, delayed
-  vibrato, playing an approximation of the Hejnał mariacki in F (rising triad, held C, the turn and fall, the call
-  again) that breaks off mid-note with no release, after the legend of the watchman shot as he sounded the alarm
-  (a legend popularised much later; the hourly call itself is documented for centuries before 1795). Facade echoes
-  and reverb are baked in.
+- Hejnał: transcribed from the public-domain recording "Cracow trumpet signal.ogg" on Wikimedia Commons (St Mary's
+  tower) by pitch-tracking it, and checked against the Polish Wikipedia article (F major, only the natural-trumpet
+  tones c1 f1 a1 c2 f2, broken off mid-phrase). Five phrases, 29 notes, the recording's own free timing (about 37 s):
+  f1 a1 c2 f2 | c2 a1 f1 c2 | a1 c2 a1 f1 c1  f1 a1 c2 a1 f1 c1 | f1 a1 f1 a1 c2 a1 f1 c2 | a1 c2 (broken off after 0.2 s).
+  Natural-trumpet synthesis: tongued notes with a brassy flare on the attack, a scoop into sustained notes, a little
+  late vibrato, breath noise, brightness that follows loudness, a touch of waveshaping; facade echoes and a long
+  tail are baked in. Off by default (Options: "The hejnał trumpet call"). The legend of the watchman shot in
+  mid-call was popularised much later; the hourly call itself is centuries older than 1795.
 - Weapons: flint snap and pan fizz before the charge; musket = crack + low boom + long echoing tail; pistol sharper.
+
+## Loudness model
+
+Every file is normalised by `gen_sfx.py` to -20 dBFS gated RMS (the level while it sounds; soft peak limit at
+-1 dBFS), so `volume_db` in `data/audio.json` means the source's real-world loudness. Each event names a class:
+
+| Class | volume_db | unit size | max distance | model | used for |
+|---|---|---|---|---|---|
+| rustle | -24 | 1 m | 10 m | inverse square | cloth, purr, snore, coo, pant |
+| step | -15 (bare -18, heel -16, boot -12, player -18) | 1.5 m | 18 m | inverse | footsteps |
+| scuff | -20 | 1.5 m | 14 m | inverse square | scuffs, prone drag |
+| fire | -16 | 1.5 m | 15 m | inverse | brazier, grinder |
+| impact | -10 | 3 m | 35 m | inverse | knock, doors, stone, barrel, shutters |
+| voice_soft | -12 | 3 m | 30 m | inverse | cough, laugh, hiccup, grunt, meow |
+| voice | -6 | 3 m | 60 m | inverse | bark, whinny, coachman, crow, song |
+| fight | -8 | 3 m | 35 m | inverse | blows, falls |
+| cart | -8 | 6 m | 50 m | inverse | hooves, wheels, clacks, jingle |
+| loud | -4 | 6 m | 60 m | inverse | bottle, lash, drum, flash, smoke |
+| bed | -10 | 4 m | 30 m | inverse | tavern doors, crowd knots |
+| distant | -6 | 20 m | 250 m | inverse | far dogs, owl, gusts, schulklopfer |
+| gunshot | 0 | 30 m | 300 m | inverse (max +6 dB) | musket, pistol |
+| bell | 0 | 40 m | 3000 m | inverse | bells, the hejnał |
+
+Godot's formula (`Sfx.level_at`): level = min(volume_db + 20 log10(unit / d) (x2 for inverse square), max_db),
+silent past max distance, then -7 dB and a 900 Hz low-pass behind a wall, and a distance low-pass. The smoke prints
+reference levels (`[smoke] audio levels`): NPC footstep 1 m -31.5 dBFS, 10 m -51.5; the player's own step (1.6 m
+below the ears) -38.6 against an NPC's -35.6 at the same distance; trotting hoof at 5 m -26.4; knock at 8 m -38.5;
+great bell at 200 m -34.0; musket at 50 m -24.4.
+
+The listener is an AudioListener3D at the player's head, turned with the camera (Sfx), not the camera 4 m behind on
+its spring arm; with no player it falls back to the current camera.
 
 ## Runtime
 
@@ -76,7 +110,8 @@ echoes, soft limiting, equal-power loop crossfades.
   900 Hz lowpass and -8 dB.
 - `Sfx.play2d`, `Sfx.ui` (UI bus, runs while paused), `Sfx.attach_loop(node, name, db, radius)`, `Sfx.set_loop_db`.
 - Buses (created at start): SFX, Ambience, UI, and reverb buses Reverb_Arcade / Reverb_Passage / Reverb_Interior /
-  Reverb_Church; a hard limiter on Master. The Master volume setting (GameState) still controls everything.
+  Reverb_Church, plus a Bells bus (bells, the hejnał, the schulklopfer) so the Options "ambience" switch, which mutes
+  the Ambience bus, leaves them alone; a hard limiter on Master. The Master volume setting (GameState) still controls everything.
 - Glue: `Sfx.watch_hooks(watch)` voices `sound_event` kinds (`watch_kinds` table: stone, bottle, coin, food, smoke,
   flash, barrel roll / clonk, knock, horse, bell, fight, splash; the player's `step` is left to footsteps) and
   `lamp_changed`; `Sfx.say_hook` and `Sfx.act_hook` map street-life bubbles and clips to sounds.

@@ -28,7 +28,10 @@ const FlickerLight := preload("res://scripts/city/flicker.gd")
 const DATA := "res://data/vendors.json"
 const BUBBLE_H := 2.2
 
-enum St { OPEN, WALKING, CLOSING, LEAVING, GONE, FLEEING, HIDDEN, RETURNING }
+enum St { OPEN, WALKING, CLOSING, LEAVING, GONE, FLEEING, HIDDEN, RETURNING, PUSH, TURN, LOWER, STEP_BACK, STEP_IN, LIFT }
+const PUSH_SPEED := 0.75
+const STEP_BACK := 0.35         ## metres the seller steps back from the shafts to sell
+const MAX_TILT := 0.5           ## radians a barrow may tip up on its axle
 
 ## One seller.
 class V:
@@ -60,6 +63,26 @@ class V:
 	var calm := 0.0
 	var gossip_i := 0
 	var crowd := false
+	# pushed barrows ("cart" in vendors.json): the prop is posed from the seller's hands every frame while moving
+	var cart := false
+	var axle := Vector3.ZERO        ## cart-local pivot (the axle the barrow tips on)
+	var du := 0.6                   ## axle -> grip, along the shafts (horizontal, at rest)
+	var dv := 0.3                   ## axle -> grip, up (at rest)
+	var wheel_r := 0.28
+	var wheels: Array = []
+	var wheel_ang := 0.0
+	var last_axle := Vector3.INF
+	var lift := 1.0                 ## 0 resting on its legs .. 1 shafts in the hands
+	var grip_f := 0.32              ## hand midpoint, metres in front of the body
+	var grip_h := 0.9               ## hand midpoint height
+	var prop_rot := PI
+	var pitches: Array = []         ## [[Vector3 selling spot, yaw], ...]
+	var pitch_i := 0
+	var leaving := false
+	var obstacle: NavigationObstacle3D
+	var sk: Skeleton3D
+	var sk_in_body := Transform3D.IDENTITY
+	var hands := Vector2i(-1, -1)
 
 
 var cfg: Dictionary = {}
@@ -194,6 +217,8 @@ func _spawn(vd: Dictionary) -> void:
 	v.ia = ia
 	v.cry_t = _rng.randf_range(1.0, 9.0)
 	v.sale_t = _rng.randf_range(8.0, 30.0)
+	if v.cart:
+		_start_cart(v)
 	vendors.append(v)
 
 
@@ -224,6 +249,8 @@ func _make_prop(v: V) -> void:
 	p.position = v.body.transform * at
 	p.rotation.y = v.yaw + rot
 	add_child(p)
+	if v.d.has("cart"):
+		_setup_cart(v, p, rot)
 	if v.d.has("prop_col"):
 		var size := _vec(v.d["prop_col"], Vector3.ONE)
 		var sb := StaticBody3D.new()
@@ -285,6 +312,9 @@ func _make_lamp(v: V) -> void:
 	if bool(ld.get("on_body", false)):
 		l.position = at
 		v.body.add_child(l)
+	elif v.cart and v.prop:
+		l.position = v.prop.transform.affine_inverse() * (v.body.transform * at)     # rides on the barrow
+		v.prop.add_child(l)
 	else:
 		l.position = v.body.transform * at
 		add_child(l)
@@ -355,7 +385,11 @@ func _make_fx(v: V) -> void:
 	ps.position = v.body.transform * _vec(v.d.get("fx_at"))
 	ps.rotation.y = v.yaw                # emission directions are in the seller's frame (forward -Z)
 	ps.visibility_aabb = AABB(Vector3(-2, -1, -2), Vector3(4, 5, 4))
-	add_child(ps)
+	if v.cart and v.prop:
+		ps.transform = v.prop.transform.affine_inverse() * ps.transform      # rides on the barrow
+		v.prop.add_child(ps)
+	else:
+		add_child(ps)
 	v.fx = ps
 
 
@@ -376,6 +410,182 @@ func _soft_dot() -> Texture2D:
 	return t
 
 
+# ------------------------------------------------------------------ pushed barrows
+## vendors.json "cart": {axle: [y, z], grip: [y, z], wheel_r, arrive: [x, z]} in the model's Blender coordinates
+## (y toward the handles, z up; see build_vendor_props.py). The barrow tips on its axle: resting on its legs when
+## set down, shafts lifted into the seller's hands to push. Its wheels (child nodes wheel_*) turn with ground speed.
+func _setup_cart(v: V, p: Node3D, rot: float) -> void:
+	var cd: Dictionary = v.d["cart"]
+	var ax: Array = cd.get("axle", [0.0, 0.3])
+	var gr: Array = cd.get("grip", [0.65, 0.65])
+	v.cart = true
+	v.prop_rot = rot
+	v.axle = Vector3(0.0, float(ax[1]), -float(ax[0]))
+	v.du = float(gr[0]) - float(ax[0])
+	v.dv = float(gr[1]) - float(ax[1])
+	v.wheel_r = float(cd.get("wheel_r", 0.28))
+	for w in p.find_children("wheel_*", "Node3D", true, false):
+		v.wheels.append(w)
+	v.obstacle = NavigationObstacle3D.new()
+	v.obstacle.radius = 0.75
+	v.obstacle.avoidance_enabled = false
+	p.add_child(v.obstacle)
+	for pt in v.d.get("pitches", []):
+		v.pitches.append([Vector3(float(pt[0]), 0.0, float(pt[1])), float(pt[2]) if pt.size() > 2 else v.yaw])
+	if v.pitches.is_empty():
+		v.pitches.append([v.home, v.yaw])
+
+
+## Where the seller stands at the shafts for the selling spot `pos` facing `yaw` (a step in front of it).
+func _push_stand(pos: Vector3, yaw: float) -> Vector3:
+	return pos + Vector3(-sin(yaw), 0.0, -cos(yaw)) * STEP_BACK
+
+
+## Spawned at the "arrive" point with the barrow in hand, pushing to the first pitch.
+func _start_cart(v: V) -> void:
+	var cd: Dictionary = v.d["cart"]
+	v.home = v.pitches[0][0]
+	v.yaw = v.pitches[0][1]
+	var stand := _push_stand(v.home, v.yaw)
+	if cd.has("arrive"):
+		var a: Array = cd["arrive"]
+		var from := Vector3(float(a[0]), 0.0, float(a[1]))
+		v.body.position = from
+		var dir := stand - from
+		v.body.rotation.y = atan2(-dir.x, -dir.z)
+		v.state = St.PUSH
+		v.target = stand
+		v.lift = 1.0
+	else:
+		v.body.position = v.home
+		v.lift = 0.0
+		v.state = St.OPEN
+	_cart_down(v, v.state == St.OPEN)
+	_pose_cart(v, 0.0)
+
+
+## Leave the pitch: back to the shafts, pick the barrow up, push it to `to` (a new pitch's stand, or a door).
+func _move_on(v: V, to: Vector3) -> void:
+	v.target = to
+	v.state = St.STEP_IN
+
+
+func _cart_down(v: V, down: bool) -> void:
+	if v.prop_body:
+		v.prop_body.process_mode = Node.PROCESS_MODE_INHERIT if down else Node.PROCESS_MODE_DISABLED
+	if v.obstacle:
+		v.obstacle.avoidance_enabled = down
+	v.last_axle = Vector3.INF
+
+
+## Cart states. Returns true when it handled the frame.
+func _cart_tick(v: V, delta: float) -> bool:
+	var b = v.body
+	match v.state:
+		St.PUSH:
+			_read_hands(v)
+			if b.walk_to(v.target, PUSH_SPEED, delta):
+				if v.leaving:
+					_set_hidden(v, true)
+					v.state = St.GONE
+					return true
+				v.home = v.pitches[v.pitch_i][0]
+				v.yaw = v.pitches[v.pitch_i][1]
+				v.state = St.TURN
+			else:
+				Assets.play_move(v.fig, _push_clip(v), PUSH_SPEED)
+			_pose_cart(v, delta)
+			return true
+		St.TURN:
+			b.halt(delta)
+			b.turn_toward_yaw(v.yaw, delta, 2.5)
+			Assets.play(v.fig, _push_clip(v), 0.5)
+			_pose_cart(v, delta)
+			if absf(angle_difference(b.rotation.y, v.yaw)) < 0.06:
+				v.state = St.LOWER
+			return true
+		St.LOWER, St.LIFT:
+			b.halt(delta)
+			Assets.play(v.fig, "idle")
+			v.lift = clampf(v.lift + (delta / 0.7 if v.state == St.LIFT else -delta / 0.8), 0.0, 1.0)
+			_pose_cart(v, delta)
+			if v.state == St.LOWER and v.lift <= 0.0:
+				_cart_down(v, true)
+				v.state = St.STEP_BACK
+			elif v.state == St.LIFT and v.lift >= 1.0:
+				v.state = St.PUSH
+			return true
+		St.STEP_BACK, St.STEP_IN:
+			# a small step straight back from the shafts (or in to them), keeping the facing
+			var goal: Vector3 = v.home if v.state == St.STEP_BACK else _push_stand(v.home, v.yaw)
+			var p: Vector3 = b.global_position
+			var flat := Vector3(goal.x - p.x, 0.0, goal.z - p.z)
+			b.turn_toward_yaw(v.yaw, delta, 3.0)
+			Assets.play(v.fig, "idle")
+			if flat.length() < 0.03:
+				if v.state == St.STEP_BACK:
+					v.state = St.OPEN
+					var sd: Array = v.d.get("stop_secs", [60, 100])
+					v.wait = _rng.randf_range(float(sd[0]), float(sd[1]))
+				else:
+					_cart_down(v, false)
+					v.state = St.LIFT
+			else:
+				b.global_position = p + flat.normalized() * minf(flat.length(), 0.6 * delta)
+			return true
+	return false
+
+
+func _push_clip(v: V) -> String:
+	return "push_cart" if Assets.has_clip(v.fig, "push_cart") else "walk_carry"
+
+
+## Hand midpoint of the seller in body space (forward, height), smoothed; the barrow's grips follow it.
+func _read_hands(v: V) -> void:
+	if v.sk == null:
+		var sks := v.fig.find_children("*", "Skeleton3D", true, false)
+		if sks.is_empty():
+			return
+		v.sk = sks[0]
+		v.hands = Vector2i(v.sk.find_bone("hand_l"), v.sk.find_bone("hand_r"))
+		var n: Node = v.sk
+		while n != null and n != v.body:
+			if n is Node3D:
+				v.sk_in_body = (n as Node3D).transform * v.sk_in_body
+			n = n.get_parent()
+	if v.hands.x < 0 or v.hands.y < 0:
+		return
+	var m: Vector3 = v.sk_in_body * ((v.sk.get_bone_global_pose(v.hands.x).origin + v.sk.get_bone_global_pose(v.hands.y).origin) * 0.5)
+	var k := 0.15
+	v.grip_f = lerpf(v.grip_f, clampf(-m.z + 0.05, 0.12, 0.55), k)
+	v.grip_h = lerpf(v.grip_h, clampf(m.y - 0.03, 0.6, 1.25), k)
+
+
+## Places the barrow: tipped on its axle by `lift` x the tilt that brings the grips to the hands, shafts ending in
+## the seller's hands, wheels on the ground; while it is resting (lift 0 after LOWER) it stays where it was put.
+func _pose_cart(v: V, _delta: float) -> void:
+	if v.prop == null or not is_instance_valid(v.body):
+		return
+	var b: Node3D = v.body
+	var r := sqrt(v.du * v.du + v.dv * v.dv)
+	var phi := atan2(v.dv, v.du)
+	var full := clampf(asin(clampf((v.grip_h - v.axle.y) / r, -1.0, 1.0)) - phi, 0.0, MAX_TILT)
+	var th := full * smoothstep(0.0, 1.0, v.lift)
+	var yaw: float = b.rotation.y
+	var fwd := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var reach := v.du * cos(th) - v.dv * sin(th)
+	var axle_w: Vector3 = b.global_position + fwd * (v.grip_f + reach)
+	axle_w.y = b.global_position.y + v.axle.y
+	var basis := Basis(Vector3.UP, yaw + v.prop_rot) * Basis(Vector3.RIGHT, th)
+	v.prop.global_transform = Transform3D(basis, axle_w - basis * v.axle)
+	if v.last_axle != Vector3.INF:
+		var dist := (axle_w - v.last_axle).dot(fwd)
+		v.wheel_ang += dist / maxf(v.wheel_r, 0.05)
+		for w in v.wheels:
+			(w as Node3D).rotation.x = v.wheel_ang
+	v.last_axle = axle_w
+
+
 # ------------------------------------------------------------------ per frame
 func _physics_process(delta: float) -> void:
 	_check_t -= delta
@@ -394,6 +604,8 @@ func _tick(v: V, delta: float, check: bool, alarm: bool) -> void:
 		return
 	if check:
 		_check_state(v, alarm)
+	if v.cart and _cart_tick(v, delta):
+		return
 	match v.state:
 		St.GONE, St.HIDDEN:
 			return
@@ -442,6 +654,12 @@ func _tick(v: V, delta: float, check: bool, alarm: bool) -> void:
 		v.wait -= delta
 		if v.wait <= 0.0:
 			_next_stop(v)
+			return
+	if v.cart and v.pitches.size() > 1 and v.customers.is_empty():
+		v.wait -= delta
+		if v.wait <= 0.0:                  # on to the next pitch: back to the shafts, lift, push
+			v.pitch_i = (v.pitch_i + 1) % v.pitches.size()
+			_move_on(v, _push_stand(v.pitches[v.pitch_i][0], v.pitches[v.pitch_i][1]))
 			return
 	# pose
 	var haggling: Node3D = null
@@ -497,6 +715,15 @@ func _check_state(v: V, alarm: bool) -> void:
 				v.state = St.RETURNING
 				v.target = v.home if not v.roaming else v.loop[v.loop_i][0]
 			return
+	if open and _past_closing(v) and v.cart:
+		_drop_customers(v)
+		_end_talk_with(v)
+		_bubble(v.body, _pick("closing_lines"), 3.0)
+		v.leaving = true
+		if v.fx:
+			v.fx.emitting = false
+		_move_on(v, _nearest_exit(v.body.global_position))
+		return
 	if open and _past_closing(v):
 		_drop_customers(v)
 		_end_talk_with(v)
@@ -534,6 +761,8 @@ func _arrived(v: V) -> void:
 
 func _set_hidden(v: V, h: bool) -> void:
 	v.body.visible = not h
+	if v.cart and v.prop:
+		v.prop.visible = not h
 	v.shape.disabled = h
 	if v.body.nav_agent:
 		v.body.nav_agent.avoidance_enabled = not h
@@ -959,7 +1188,7 @@ func _smoke_run() -> void:
 	await get_tree().create_timer(0.5, false).timeout
 	if not is_inside_tree():
 		return
-	var kv := vendor("kasztany")
+	var kv := vendor("grzaniec")
 	if kv:
 		var npc := _nearest_customer(kv.body.global_position, 999.0)
 		if npc:
@@ -976,10 +1205,41 @@ func _smoke_run() -> void:
 
 
 # ------------------------------------------------------------------ inspection shots (`-- --vendor-shot=/dir`)
+## The barrow sellers arrive pushing their carts at the start of the night: side and three-quarter views of each.
+func _push_shots(dir: String) -> void:
+	var hidden: Array = []
+	for c in get_tree().root.find_children("*", "CanvasLayer", true, false):
+		if (c as CanvasLayer).visible:
+			hidden.append(c)
+			(c as CanvasLayer).visible = false
+	var cam := Camera3D.new()
+	cam.fov = 50
+	add_child(cam)
+	cam.current = true
+	for id in ["kasztany", "szlifierz", "ryby"]:
+		var v := vendor(id)
+		if v == null or v.state != St.PUSH:
+			continue
+		for view in [["side", Vector3(3.0, 1.2, -0.7), Vector3(0, 0.75, -0.75)], ["34", Vector3(2.3, 1.7, -3.2), Vector3(0, 0.8, -0.7)]]:
+			var bt: Transform3D = v.body.global_transform
+			cam.look_at_from_position(bt * (view[1] as Vector3), bt * (view[2] as Vector3))
+			for f in 3:
+				await get_tree().process_frame
+			get_viewport().get_texture().get_image().save_png("%s/vendor_push_%s_%s.png" % [dir, id, view[0]])
+		print("[smoke] vendor push %s state=%s lift=%.2f grip_f=%.2f grip_h=%.2f clip=%s wheel=%.2f" % [id, St.keys()[v.state], v.lift, v.grip_f, v.grip_h, _push_clip(v), v.wheel_ang])
+	cam.queue_free()
+	for c in hidden:
+		if is_instance_valid(c):
+			(c as CanvasLayer).visible = true
+
+
 ## The smoke run replaces this night after ~10 s, so everything is staged at once: two customers put straight
 ## into their places at the ring-bread woman, the grinder at his stone.
 func _shots(dir: String) -> void:
-	await get_tree().create_timer(0.6, false).timeout
+	await get_tree().create_timer(1.5, false).timeout
+	if not is_inside_tree():
+		return
+	await _push_shots(dir)
 	if not is_inside_tree():
 		return
 	var ob := vendor("obwarzanki")
@@ -1009,7 +1269,7 @@ func _shots(dir: String) -> void:
 	add_child(cam)
 	cam.current = true
 	# the buy dialogue first (HUD visible), over the player's shoulder
-	var kv := vendor("kasztany")
+	var kv := vendor("grzaniec")
 	if kv:
 		cam.look_at_from_position(kv.body.global_transform * Vector3(0.7, 1.75, -3.2), kv.body.global_transform * Vector3(0, 1.2, 0))
 		var opened := open_dialogue(kv)
@@ -1041,6 +1301,19 @@ func _shots(dir: String) -> void:
 		for f in 4:
 			await get_tree().process_frame
 		get_viewport().get_texture().get_image().save_png("%s/vendor_%s.png" % [dir, v.id])
+	# the chestnut roaster set down at his pitch, stepped back from the shafts
+	var kc := vendor("kasztany")
+	var w := 0.0
+	while kc and kc.state != St.OPEN and w < 10.0 and is_inside_tree():
+		await get_tree().create_timer(0.25, false).timeout
+		w += 0.25
+	if kc and is_inside_tree():
+		for view in [["side", Vector3(3.0, 1.2, -0.7), Vector3(0, 0.75, -0.9)], ["34", Vector3(2.3, 1.7, -3.2), Vector3(0, 0.8, -0.8)]]:
+			cam.look_at_from_position(kc.body.global_transform * (view[1] as Vector3), kc.body.global_transform * (view[2] as Vector3))
+			for f in 3:
+				await get_tree().process_frame
+			get_viewport().get_texture().get_image().save_png("%s/vendor_setdown_kasztany_%s.png" % [dir, view[0]])
+		print("[smoke] vendor setdown kasztany state=%s lift=%.2f after %.1fs" % [St.keys()[kc.state], kc.lift, w])
 	for c in layers:
 		if is_instance_valid(c):
 			(c as CanvasLayer).visible = true
@@ -1056,7 +1329,7 @@ func _make_sound(v: V) -> void:
 	if set_name == "" or not is_instance_valid(v.body):
 		return
 	var at: Variant = v.d.get("fx_at", [0.0, 1.0, -0.8])
-	var p := Sfx.attach_loop(v.body, set_name, -6.0 if fx == "smoke" else (-12.0 if fx == "steam" else -4.0), 20.0,
+	var p := Sfx.attach_loop(v.body, set_name, 0.0 if fx == "smoke" else (-4.0 if fx == "steam" else 0.0), -1.0,
 			Vector3(float(at[0]), float(at[1]), float(at[2])))
 	if p:
 		p.stream_paused = fx == "sparks"

@@ -298,14 +298,40 @@ def loopify(x, n_loop, xf):
     return y
 
 
+REF_LOUDNESS_DB = -20.0     # every file's gated RMS (see gated_rms); data/audio.json volume_db is relative to this
+CEILING_DB = -1.0
+
+
+def gated_rms(x):
+    """RMS over the 10 ms blocks within 30 dB of the loudest block: the level of the sound while it sounds, so a
+    short click and a long bell tail normalised to the same value read as equally loud when heard."""
+    b = secs(0.01)
+    m = len(x) // b
+    if m < 1:
+        return rms(x)
+    blk = np.sqrt(np.mean(x[:m * b].reshape(m, b) ** 2, axis=1) + 1e-20)
+    keep = blk > blk.max() * 10 ** (-30 / 20)
+    return float(np.sqrt(np.mean(blk[keep] ** 2)))
+
+
+def peak_limit(x, ceiling):
+    """Soft knee above 70 % of the ceiling, never past it (transient-heavy sounds lose only their very tips)."""
+    t = ceiling * 0.7
+    a = np.abs(x)
+    over = a > t
+    y = x.copy()
+    y[over] = np.sign(x[over]) * (t + (ceiling - t) * np.tanh((a[over] - t) / (ceiling - t)))
+    return y
+
+
 def finalize(x, loop=False, peak_db=-1.0, drive=1.3, fade_out=0.004):
+    """DC / rumble removal, then loudness normalisation to REF_LOUDNESS_DB gated RMS with a soft peak limit at
+    CEILING_DB. (`peak_db` and `drive` are kept for signature compatibility; levels now live in data/audio.json.)"""
     x = np.asarray(x, dtype=np.float64)
     x = x - np.mean(x)
     x = hp(x, 28, 2, circular=loop)
-    if drive > 0:
-        x = soft_limit(x, drive)
-    p = np.max(np.abs(x)) + 1e-12
-    x = x / p * 10 ** (peak_db / 20)
+    x = x * (10 ** (REF_LOUDNESS_DB / 20) / (gated_rms(x) + 1e-12))
+    x = peak_limit(x, 10 ** (CEILING_DB / 20))
     if not loop:
         na = min(secs(0.0008), len(x))
         x[:na] *= np.linspace(0, 1, na)
@@ -1653,51 +1679,85 @@ def _peal(r, i):
     return fit(reverb(out, 3.0, 0.3, 0.03), n)
 
 
-NOTE = {"F4": 349.23, "G4": 392.0, "A4": 440.0, "Bb4": 466.16, "C5": 523.25, "D5": 587.33, "F5": 698.46}
-# An approximation of the Hejnal mariacki: the rising F-major triad, the held C, the turn and the fall, then the call
-# again, broken off mid-note (the legend of the watchman shot through the throat as he sounded the alarm).
-HEJNAL = [("F4", 1.0), ("A4", 1.0), ("C5", 2.6), ("C5", 0.5), ("D5", 0.5), ("C5", 0.5), ("Bb4", 0.5), ("A4", 2.2),
-          ("A4", 0.5), ("Bb4", 0.5), ("C5", 1.0), ("A4", 1.0), ("F4", 2.6),
-          ("F4", 1.0), ("A4", 1.0), ("C5", 2.6), ("C5", 0.5), ("D5", 0.5), ("C5", 0.5), ("Bb4", 0.5), ("A4", 1.2),
-          ("Bb4", 0.5), ("C5", -0.38)]   # negative: cut off without release after that many beats
-BEAT = 0.55
+NOTE = {"C4": 261.63, "F4": 349.23, "A4": 440.0, "C5": 523.25, "F5": 698.46}
+# The Hejnal mariacki, transcribed from the public-domain recording "Cracow trumpet signal.ogg" (Wikimedia Commons,
+# https://commons.wikimedia.org/wiki/File:Cracow_trumpet_signal.ogg, "Cracow trumpet signal from the St. Mary church
+# tower", uploader Szczebrzeszynski) by pitch-tracking it (harmonic product spectrum, 30 ms frames) and splitting at
+# the articulation dips; checked against pl.wikipedia "Hejnal mariacki": F major, built only on the natural-trumpet
+# tones c1 f1 a1 c2 f2, played four times an hour (south, west, north, east) and broken off mid-phrase. The recording
+# plays at about A = 444 (+15 cents); we keep A = 440. Durations are the recording's own (free, unmetred), in seconds.
+# Phrases are separated by breaths; within a phrase every note is tongued (the recording shows a 6+ dB dip at each).
+HEJNAL = [
+    [("F4", 3.00), ("A4", 0.30), ("C5", 0.20), ("F5", 2.30)],                                       # 0.3-6.3 s
+    [("C5", 0.80), ("A4", 0.30), ("F4", 0.40), ("C5", 4.10)],                                       # 7.2-12.8 s
+    [("A4", 1.65), ("C5", 0.15), ("A4", 0.20), ("F4", 0.25), ("C4", 1.55),                          # 13.6-17.5 s
+     ("F4", 0.30), ("A4", 0.35), ("C5", 1.90), ("A4", 0.70), ("F4", 0.55), ("C4", 1.60)],           # 17.5-23.0 s
+    [("F4", 1.90), ("A4", 0.20), ("F4", 0.20), ("A4", 0.25), ("C5", 1.45), ("A4", 0.40), ("F4", 0.40),
+     ("C5", 3.55)],                                                                                 # 24.1-32.6 s
+    [("A4", 3.60), ("C5", -0.21)],   # 33.7-37.5 s: the held a1, then c2 breaks off after 0.2 s (negative = cut)
+]
+HEJNAL_BREATHS = [0.85, 0.85, 1.1, 1.1]   # rests between the phrases (s)
 
 
-def trumpet_note(r, f, dur, cut=False, loud=1.0):
-    n = secs(dur + (0.0 if cut else 0.12))
-    t = tt(n)
-    scoop = 1 - 0.03 * np.exp(-t / 0.03)
-    f0 = f * scoop * vibrato(n, 5.3, 0.004, 0.35, r) * (1 + 0.0015 * ctrl(r, n, 6))
-    rel = 0.008 if cut else 0.1
-    e = env_pts(n, [(0, 0), (0.04, 1.0), (0.12, 0.85), (max(dur - 0.05, 0.13), 0.9), (dur, 0.9 if cut else 0.7),
-                    (dur + rel, 0.0), (n / SR + 1, 0.0)]) * loud
-    K = int(NYQ * 0.9 / f)
+def trumpet(r, notes):
+    """One tongued phrase of natural trumpet: per-note attack with a brassy flare (the spectrum opens then settles),
+    a scoop into sustained notes, slight late vibrato, breath noise, loudness-dependent brightness and a touch of
+    waveshaping for the brass edge. A negative duration is cut off dead."""
+    total = sum(abs(d) for _, d in notes) + 0.15
+    n = secs(total)
+    f0 = np.zeros(n)
+    amp = np.zeros(n)
+    flare = np.zeros(n)
+    t0 = 0.0
+    for name, d in notes:
+        cut = d < 0
+        d = abs(d)
+        i0, i1 = secs(t0), secs(t0 + d)
+        m = i1 - i0
+        t = tt(m)
+        f = NOTE[name]
+        scoop = 1.0 - (0.022 * np.exp(-t / 0.035) if d > 0.4 else 0.008 * np.exp(-t / 0.015))
+        vib = 1 + 0.0035 * np.clip((t - 0.6) / 0.5, 0, 1) * np.sin(TAU * 5.2 * t + r.uniform(0, TAU))
+        f0[i0:i1] = f * scoop * vib * (1 + 0.001 * ctrl(r, m, 4))
+        rel = 0.002 if cut else min(0.05, d * 0.25)
+        gap = 0.0 if cut else 0.03                         # the tongue stops the air between notes
+        loud = 0.85 + 0.15 * min(d / 1.5, 1.0)
+        e = env_pts(m, [(0, 0.0), (0.018, loud * 1.1), (0.08, loud), (max(d - rel - gap, 0.09), loud * 0.95),
+                        (max(d - gap, 0.1), 0.0), (d + 1, 0.0)])
+        if d > 1.2:                                        # long notes swell and ease a little
+            e *= 1 + 0.08 * np.sin(math.pi * np.clip(t / d, 0, 1))
+        amp[i0:i1] = e
+        flare[i0:i1] = np.exp(-t / 0.05)
+        if not cut and i1 < n:
+            f0[i1:] = f
+        t0 += d
+    f0[f0 <= 0] = NOTE["F4"]
     ph = TAU * np.cumsum(f0) / SR
+    K = int(NYQ * 0.9 / NOTE["C4"])
     x = np.zeros(n)
+    bright = np.clip(amp * 0.8 + flare * 0.6, 0, 1.2)
+    p = 2.1 - 1.1 * bright                                 # harmonic rolloff exponent: louder = brighter
     for k in range(1, K + 1):
-        hf = k * f
-        bump = 1 + 1.8 * math.exp(-((hf - 1300) / 700) ** 2)
-        p = 1.9 - 1.1 * e                       # brighter when louder
-        x += bump * k ** (-p) * np.sin(k * ph)
-    x *= e
-    x += bp(noise(r, n), 1500, 0.8) * env(n, 0.005, 0.03) * 0.25 * loud
-    return x
+        hf = k * f0
+        a = np.where(hf < NYQ * 0.9, k ** (-p), 0.0)
+        a *= 1 + 1.6 * np.exp(-((hf - 1200) / 600) ** 2) + 0.6 * np.exp(-((hf - 2600) / 900) ** 2)
+        x += a * np.sin(k * ph)
+    x *= amp
+    x = np.tanh(1.6 * x / (np.max(np.abs(x)) + 1e-9))      # brass edge
+    breath = bp(noise(r, n), 1800, 0.7) * (0.02 + 0.12 * flare) * np.clip(amp * 3, 0, 1)
+    return x + breath
 
 
-@snd("hejnal", n=1, fmt="ogg", cat="bell", desc="the hejnal mariacki: synthesised trumpet phrase from St Mary's tower, broken off mid-phrase")
+@snd("hejnal", n=1, fmt="ogg", cat="bell", desc="the Hejnal mariacki (transcribed from a St Mary's tower recording): natural trumpet, F major, broken off on the rising c2")
 def _hejnal(r, i):
-    total = sum(abs(b) for _, b in HEJNAL) * BEAT
-    n = secs(total + 4.0)
-    out = np.zeros(n)
-    t = 0.2
-    for k, (name, beats) in enumerate(HEJNAL):
-        cut = beats < 0
-        d = abs(beats) * BEAT
-        hold = 1.25 if beats >= 2.0 else 1.0      # fermatas on the long notes
-        mix(out, trumpet_note(r, NOTE[name], d * hold - 0.03, cut, 0.8 + 0.2 * (beats >= 1.0)), t)
-        t += d * hold
-    out = fit(out, n)
-    return fit(reverb(out, 2.4, 0.4, 0.03, 4500, early=[(0.21, 0.35), (0.38, 0.2), (0.55, 0.1)]), n)
+    parts = []
+    for k, ph in enumerate(HEJNAL):
+        parts.append(trumpet(r, ph))
+        if k < len(HEJNAL_BREATHS):
+            parts.append(np.zeros(secs(HEJNAL_BREATHS[k])))
+    out = np.concatenate([np.zeros(secs(0.25))] + parts + [np.zeros(secs(4.5))])
+    # 70 m up the tower over a square of stone fronts: late facade echoes, then a long open-air tail
+    return reverb(out, 2.8, 0.42, 0.02, 5000, early=[(0.24, 0.35), (0.41, 0.25), (0.62, 0.15)])[:len(out)]
 
 
 # ====================================================================== UI
@@ -1758,7 +1818,8 @@ def render(name, spec, idx):
 def generate(only):
     OUT.mkdir(parents=True, exist_ok=True)
     man_path = OUT / "manifest.json"
-    manifest = {"sample_rate": SR, "generator": "tools/gen_sfx.py", "licence": "CC BY 4.0", "sounds": {}, "sets": {}}
+    manifest = {"sample_rate": SR, "generator": "tools/gen_sfx.py", "licence": "CC BY 4.0", "sounds": {}, "sets": {},
+                "loudness_ref_db": REF_LOUDNESS_DB}
     if only and man_path.exists():
         manifest = json.loads(man_path.read_text())
     total = 0
@@ -1776,7 +1837,8 @@ def generate(only):
             (write_wav if ext == "wav" else write_ogg)(path, x)
             manifest["sounds"][fname] = {"file": "res://assets/audio/%s.%s" % (fname, ext), "set": name,
                                          "dur": round(len(x) / SR, 3), "loop": spec["loop"], "cat": spec["cat"],
-                                         "peak_db": round(db(np.max(np.abs(x))), 1), "rms_db": round(db(rms(x)), 1)}
+                                         "peak_db": round(db(np.max(np.abs(x))), 1), "rms_db": round(db(rms(x)), 1),
+                                         "loudness_db": round(db(gated_rms(x)), 1)}
             files.append(fname)
             total += 1
         manifest["sets"][name] = {"files": files, "desc": spec["desc"], "loop": spec["loop"], "cat": spec["cat"]}
@@ -1896,10 +1958,11 @@ def demo():
 # Power-weighted spectral centroid ranges (the heel thud carries most of a step's energy, so a hard-soled step on
 # stone centres around 1-2.5 kHz, a hollow board or wet mud well under 1 kHz, crunchy snow / gravel / straw above
 # 1.5 kHz), and the longest acceptable onset-to-peak time (hard ground: the heel is the peak; crunchy ground: the
-# peak may land in the crunch just after). All sets: crest (peak/RMS) 10-24 dB, RMS -30..-12 dBFS at -1 dBFS peak.
+# peak may land in the crunch just after). All sets: crest (peak/RMS) 10-24 dB, whole-file RMS -32..-18 dBFS (files are
+# loudness-normalised to -20 dBFS gated RMS).
 STEP_TARGETS = {
-    "cobbles": ((900, 2600), 6.0), "flags": ((500, 1800), 6.0), "snow": ((1500, 4200), 40.0),
-    "mud": ((200, 1000), 40.0), "gravel": ((1500, 4500), 25.0), "planks": ((200, 900), 8.0),
+    "cobbles": ((900, 2600), 6.0), "flags": ((500, 1800), 6.0), "snow": ((1500, 4200), 60.0),
+    "mud": ((180, 1000), 40.0), "gravel": ((1500, 4500), 25.0), "planks": ((200, 900), 8.0),
     "straw": ((1200, 4200), 40.0),
 }
 
@@ -1932,7 +1995,7 @@ def step_stats():
                 st.append(analyse(x))
             a = np.array(st)
             ok = (a[:, 0].min() >= c_lo and a[:, 0].max() <= c_hi and a[:, 1].max() <= a_max
-                  and a[:, 3].min() >= 10 and a[:, 3].max() <= 24 and a[:, 2].min() >= -30 and a[:, 2].max() <= -12)
+                  and a[:, 3].min() >= 10 and a[:, 3].max() <= 24 and a[:, 2].min() >= -32 and a[:, 2].max() <= -18)
             fails += 0 if ok else 1
             print("  %-22s %5.0f/%5.0f/%5.0f | %5.1f | %6.1f | %4.1f/%4.1f | %d-%d Hz, <=%.0f ms  %s" % (
                 name, a[:, 0].min(), a[:, 0].mean(), a[:, 0].max(), a[:, 1].max(), a[:, 2].mean(), a[:, 3].min(),
