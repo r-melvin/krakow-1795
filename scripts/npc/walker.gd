@@ -38,6 +38,7 @@ func setup_navigation(avoid_radius: float, height: float, max_speed: float) -> v
 	nav_agent.time_horizon_obstacles = 0.5
 	add_child(nav_agent)
 	nav_agent.velocity_computed.connect(func(v: Vector3) -> void: _safe_velocity = v)
+	_lod_start()
 
 
 ## True once the district's runtime navmesh is baked and synced into the navigation map.
@@ -108,6 +109,49 @@ func walk_to(target: Vector3, speed: float, delta: float) -> bool:
 		_detour = global_position + side * 1.3 - dir * 0.4
 		_detour_left = 1.0
 	return false
+
+
+## Distance LOD: townsfolk and animals far from the player step at 4 Hz without avoidance and with their
+## animation paused, instead of every physics tick. Guards, mission people and vehicles are never throttled.
+const LOD_FAR := 55.0
+const LOD_STEP := 0.25
+var _lod_far := false
+var _lod_timer: Timer
+var _lod_anim: AnimationPlayer
+
+
+func _lod_start() -> void:
+	if _lod_timer or is_in_group("guards") or is_in_group("mission") or is_in_group("vehicles"):
+		return
+	_lod_timer = Timer.new()
+	_lod_timer.wait_time = LOD_STEP
+	_lod_timer.autostart = true
+	_lod_timer.timeout.connect(_lod_tick)
+	add_child(_lod_timer)
+
+
+func _lod_tick() -> void:
+	var player := get_tree().get_first_node_in_group("player") as Node3D
+	if player == null or is_in_group("mission"):
+		if _lod_far:
+			_lod_set(false)
+		return
+	var far := global_position.distance_to(player.global_position) > LOD_FAR
+	if far != _lod_far:
+		_lod_set(far)
+	if _lod_far and has_method("_physics_process"):
+		call("_physics_process", LOD_STEP)   # one coarse step, through the subclass override
+
+
+func _lod_set(far: bool) -> void:
+	_lod_far = far
+	set_physics_process(not far)
+	if nav_agent:
+		nav_agent.avoidance_enabled = not far
+	if _lod_anim == null:
+		_lod_anim = find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _lod_anim:
+		_lod_anim.active = not far
 
 
 ## Standing still: zero planar velocity, tell avoidance we are stationary, keep gravity.

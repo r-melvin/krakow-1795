@@ -43,6 +43,26 @@ func _ready() -> void:
 	_on_phase(GameState.phase)
 	if "--smoke" in OS.get_cmdline_user_args():
 		_smoke()
+	elif "--perf" in OS.get_cmdline_user_args():
+		_perf_run()
+
+
+## `-- --perf`: a plain night with no smoke sandboxes, a settle time, one perf report, quit. Add `--perf-view`
+## windowed for the same with the player camera (numbers then include rendering).
+func _perf_run() -> void:
+	await get_tree().process_frame
+	GameState.to_menu()
+	await get_tree().process_frame
+	GameState.new_game()
+	await get_tree().process_frame
+	GameState.choose_origin("veteran", "m")
+	await get_tree().process_frame
+	GameState.begin_night()
+	for i in 2400:          # ~40 s: the outer town has loaded and the late-evening street life has spawned
+		await get_tree().process_frame
+	await _perf_report()
+	await _perf_report()
+	get_tree().quit()
 
 
 func _clear() -> void:
@@ -233,8 +253,21 @@ func _perf_report() -> void:
 	var nodes := Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
 	var lights := get_tree().get_nodes_in_group("flame_lights").size()
 	var mem := Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
+	var t_proc := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var t_phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var t_nav := Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0
+	var bodies := Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)
+	var walkers := get_tree().get_nodes_in_group("npcs").size() + get_tree().get_nodes_in_group("guards").size()
 	print("[smoke] perf frame_ms=%.2f fps=%.0f objects=%d primitives=%d draw_calls=%d vram_mb=%.0f tex_mb=%.0f nodes=%d lights=%d ram_mb=%.0f load_s=%.1f" % [
 		ms, 1000.0 / maxf(ms, 0.01), objs, prims, draws, vram, tex, nodes, lights, mem, Time.get_ticks_msec() / 1000.0])
+	print("[smoke] perf cpu process_ms=%.2f physics_ms=%.2f navigation_ms=%.2f active_bodies=%d walkers=%d orphans=%d" % [
+		t_proc, t_phys, t_nav, bodies, walkers, Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)])
+	# Per-script cost: how many nodes of each script run _process / _physics_process (the usual CPU hogs).
+	var counts := {}
+	for n in get_tree().get_nodes_in_group("npcs") + get_tree().get_nodes_in_group("guards") + get_tree().get_nodes_in_group("animals"):
+		var k := str((n.get_script() as Script).resource_path.get_file()) if n.get_script() else "?"
+		counts[k] = int(counts.get(k, 0)) + 1
+	print("[smoke] perf agents ", counts)
 
 
 func _shots(player: Player) -> void:
