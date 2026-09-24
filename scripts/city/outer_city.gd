@@ -554,7 +554,7 @@ func _bake_nav() -> void:
 			nm.agent_height = 1.75
 			nm.agent_max_climb = 0.25
 			nm.agent_max_slope = 30.0
-			nm.cell_size = 0.2
+			nm.cell_size = 0.25          # 4.0 / 0.25 is an exact 16 voxels: no "border_size is ceiled" warning
 			nm.cell_height = 0.25
 			nm.edge_max_error = 1.0
 			nm.filter_baking_aabb = aabb.grow(4.0)
@@ -647,9 +647,11 @@ func _shot_dir() -> String:
 
 
 func _shots(dir: String) -> void:
+	print("[smoke] outer shots: waiting for the town to build")
 	await get_tree().create_timer(1.0).timeout
 	while is_inside_tree() and not built:
 		await get_tree().process_frame
+	print("[smoke] outer shots: town built, capturing to ", dir)
 	for i in 30:
 		await get_tree().process_frame
 	if not is_inside_tree():
@@ -694,7 +696,10 @@ func _shots(dir: String) -> void:
 				await get_tree().process_frame
 			if not is_inside_tree():
 				return
-			get_viewport().get_texture().get_image().save_png("%s/outer_%s%s.png" % [dir, s[0], "_lit" if lit else ""])
+			var err := get_viewport().get_texture().get_image().save_png("%s/outer_%s%s.png" % [dir, s[0], "_lit" if lit else ""])
+			if err != OK:
+				print("[smoke] outer shot %s failed: %d" % [s[0], err])
+	print("[smoke] outer shots: %d views saved" % shots.size())
 	sun.queue_free()
 	cam.queue_free()
 	for c in get_tree().root.find_children("*", "CanvasLayer", true, false):

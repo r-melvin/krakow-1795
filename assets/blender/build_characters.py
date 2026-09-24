@@ -1243,8 +1243,41 @@ def over_garment_ease(bm, name, dom, ctx):
             push += 0.25 * max(0.0, top - 0.06 - v.co.z)          # flares as it falls from the shoulders
         v.co += r.normalized() * push
     inner = [v for v in bm.verts if not v.is_boundary]
-    for _ in range(6):
+    for _ in range(8):
         bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    # the cloth hangs: fronts part open (2-3 cm gap at the top widening toward the hem, panels swinging slightly out),
+    # soft vertical folds over the fronts (and the back of the cape), a slightly uneven hem, and for the vest some sag
+    # of the armholes under the arms
+    zs = [v.co.z for v in bm.verts]
+    z0, z1 = min(zs), max(zs)
+    cy = B["spine_02"][0].y
+    seed = ctx.get("seed", 0) * 0.37 + (3.1 if name == "delia" else 0.0)
+    arms = [B["upperarm_l"][0], B["upperarm_r"][0]]
+    for v in bm.verts:
+        co = v.co
+        t = max(0.0, min(1.0, (z1 - co.z) / max(1e-3, z1 - z0)))          # 0 at the top, 1 at the hem
+        front = co.y < cy - 0.02
+        if front and abs(co.x) < 0.14:
+            fall = max(0.0, 1.0 - abs(co.x) / 0.14)
+            side = 1.0 if co.x >= 0 else -1.0
+            gap = (0.012 + 0.014 * t) if name == "vest" else (0.004 + 0.012 * t)   # delia is cut wider already
+            co.x += side * gap * fall                                     # half of the widening gap
+            co.y -= 0.012 * t * t * fall                                  # panels swing out at the hem
+        c = Vector((co.x, co.y - cy, 0.0))
+        if c.length > 1e-5:
+            th = math.atan2(c.y, c.x)
+            folds = 0.5 + 0.5 * math.sin(th * (7 if name == "vest" else 9) + 2.2 * mnoise.noise(Vector((co.x * 4 + seed, co.y * 4, co.z * 2))))
+            amp = (0.006 if name == "vest" else 0.012) * t ** 1.2
+            co += c.normalized() * folds * amp
+        if name == "vest":
+            for a in arms:
+                d = Vector((co.x - a.x, co.y - a.y, 0.0)).length
+                if d < 0.09 and co.z > a.z - 0.16:
+                    co.z -= 0.015 * (1 - d / 0.09)                        # armhole sags under the arm
+    for v in bm.verts:
+        if v.is_boundary and v.co.z < z0 + 0.04:
+            v.co.z += 0.01 * mnoise.noise(Vector((v.co.x * 18 + seed, v.co.y * 18, 0.0)))   # uneven hem
+    bmesh.ops.smooth_vert(bm, verts=inner, factor=0.3, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.verts.index_update()
     ctx["edge_" + name] = [(e.verts[0].co.copy(), e.verts[1].co.copy()) for e in bm.edges if e.is_boundary]
 
@@ -1283,12 +1316,20 @@ def fur_trim(name, edges, key, src, rig, r=0.012):
     for path, closed in loops:
         # thin the path, then sweep a lumpy fleece roll along it
         path = path[::2] if len(path) > 40 else path
-        _sweep(bm, path, [(r * math.cos(a) * (1 + 0.25 * math.sin(a * 3)), r * math.sin(a)) for a in [math.tau * i / 7 for i in range(7)]],
-               closed=closed, scale=lambda t: 1.0 + 0.2 * mnoise.noise(Vector((t * 40, 0.0, 0.0))))
+        # flattened band (fleece turned over the edge), thicker in lumps along its length
+        _sweep(bm, path, [(r * 0.6 * math.cos(a), r * math.sin(a)) for a in [math.tau * i / 8 for i in range(8)]],
+               closed=closed, scale=lambda t, o=len(loops): 1.0 + 0.35 * mnoise.noise(Vector((t * 25 + o, 0.3, 0.0))))
     if not bm.verts:
         bm.free()
         return None
-    o = _mk(name, bm, M(key, tex="fur"), rig, bone=None, angle=80, uv=0.15)
+    # shaggy surface: every vertex pushed in or out along its normal by fine noise (tufts), plus coarse lumps
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.normal_update()
+    for v in bm.verts:
+        n1 = mnoise.noise(v.co * 90.0)
+        n2 = mnoise.noise(v.co * 25.0 + Vector((5.0, 1.0, 2.0)))
+        v.co += v.normal * r * (0.45 * n1 + 0.3 * n2)
+    o = _mk(name, bm, M(key, tex="fur"), rig, bone=None, angle=80, uv=0.15, recalc=False)
     names = {g.index: g.name for g in src.vertex_groups}
     kd = KDTree(len(src.data.vertices))
     for v in src.data.vertices:
@@ -2525,7 +2566,7 @@ def build_clothes(h, rig, spec):
         vk = spec["vest_garment"]
         top_v = B["neck_01"][0].z - 0.015          # over the shoulders to the neck (sleeveless: arm faces are not kept)
         vo = garment(h, rig, me, info, "vest", lambda i, co, g, dom: helper(g, "helper-tights") and dom in TORSO - {"neck_01"}
-                     and waist_z - 0.14 < co.z < top_v and not (abs(co.x) < 0.055 and co.y < 0.0), M(vk, tex="fur"), 0.008, offset=0.8)
+                     and waist_z - 0.14 < co.z < top_v and not (abs(co.x) < 0.02 and co.y < 0.0), M(vk, tex="fur"), 0.008, offset=0.8)
         if vo:
             out.append(vo)
             ft = fur_trim("vest_fleece", DRAPE_CTX.get("edge_vest", []), vk, vo, rig, 0.013)
@@ -2536,7 +2577,7 @@ def build_clothes(h, rig, spec):
         low = B["spine_03"][0].z - 0.16
         do = garment(h, rig, me, info, "delia", lambda i, co, g, dom: helper(g, "helper-tights") and co.z > low
                      and (dom in TORSO - {"neck_01"} or (dom in ("upperarm_l", "upperarm_r") and co.z > low + 0.05))
-                     and not (abs(co.x) < 0.035 and co.y < 0.0), M(dk), 0.008, offset=0.8)
+                     and not (abs(co.x) < 0.045 and co.y < 0.0), M(dk), 0.008, offset=0.8)
         if do:
             gi = {g.name: g for g in do.vertex_groups}
             for side in ("l", "r"):

@@ -3712,6 +3712,8 @@ func _clear_cam(look: Vector3, pref: Vector3) -> Vector3:
 	for k in 16:
 		var ang := (k / 2) * 0.4 * (1.0 if k % 2 == 0 else -1.0)
 		var off := flat.rotated(Vector3.UP, ang)
+		if off.normalized().dot(flat.normalized()) < 0.35:
+			continue          # never swing round behind the façade line: that lands the camera inside the house
 		var cp := Vector3(look.x + off.x, pref.y, look.z + off.z)
 		var pq := PhysicsPointQueryParameters3D.new()      # not inside a building's collision box
 		pq.position = cp

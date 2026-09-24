@@ -433,6 +433,8 @@ func _kingpin_replays() -> void:
 		kb.y = 0.0
 		for tries in 4:
 			await frames(50)
+			if not is_instance_valid(k) or not k.is_inside_tree():
+				break          # the night can end (or the kingpin die) while we wait
 			kb = k.global_transform.basis.z
 			kb.y = 0.0
 			await ms.tp(k.global_position + kb.normalized() * 1.0, k.global_position, 2)

@@ -679,13 +679,23 @@ func _shot_room(key: String, path: String, v: Array = []) -> void:
 		prev.make_current()
 
 
+## Rooms already captured in this process: the smoke rebuilds the world every night, and each new district would
+## otherwise start the list again from the first room and never reach the last ones.
+static var _shots_taken: Dictionary = {}
+
+
 func _interior_shots(spec: String) -> void:
 	var dir := spec.get_slice(":", 0)
 	var only: PackedStringArray = spec.get_slice(":", 1).split(",", false) if ":" in spec else PackedStringArray()
 	for i in 30:
 		await get_tree().process_frame
 	for k in _rooms.keys():
+		if not is_inside_tree():
+			return
+		if _shots_taken.has(k):
+			continue
 		if only.is_empty() or only.has(k):
+			_shots_taken[k] = true
 			var was_loaded: bool = _rooms[k]["node"] != null
 			await _shot_room(k, "%s/shot_%s.png" % [dir, k])
 			var extra: Array = data.get("rooms", {}).get(k, {}).get("views", [])
