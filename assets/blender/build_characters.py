@@ -424,11 +424,12 @@ def face_info(h, me, rig):
     return info
 
 
-DRAPE = {"coat", "coat_skirt", "skirt", "breeches", "cuffs"}
+DRAPE = {"coat", "coat_skirt", "skirt", "breeches", "cuffs", "vest", "delia"}
+OVER_EASE = {"vest": 0.022, "delia": 0.034}      # m outside the eased coat: garments worn over the coat
 DRAPE_CTX = {}
 GARMENT_EXTRA = []      # seam strips made inside garment(), collected by build_clothes
 MAT_KEY = {}
-SOFTEN = {"coat": (8, 0.7), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (6, 0.6), "stockings": (1, 0.3), "cuffs": (2, 0.4)}
+SOFTEN = {"vest": (8, 0.7), "delia": (10, 0.7), "coat": (8, 0.7), "coat_skirt": (3, 0.5), "skirt": (4, 0.6), "breeches": (6, 0.6), "stockings": (1, 0.3), "cuffs": (2, 0.4)}
 
 
 def garment(h, rig, me, info, name, keep_fn, mat, thickness=0.012, smooth=True, offset=0.0):
@@ -1224,6 +1225,87 @@ def wearing_ease(bm, name, dom, ctx):
                 v.co += d * (0.014 - gap)
 
 
+def over_garment_ease(bm, name, dom, ctx):
+    """Vest and delia are cut from the same helper as the coat: the coat's wearing ease, then OVER_EASE more so they
+    sit on top of it. The delia also flares away from the body as it falls from the shoulders (a cape, not a shell).
+    The free edges are stored in ctx["edge_" + name] for the fleece / fur trim."""
+    wearing_ease(bm, "coat", dom, ctx)
+    B = ctx["B"]
+    sp = [B["pelvis"][0], B["spine_02"][0], B["neck_01"][0]]
+    top = B["neck_01"][0].z
+    for v in bm.verts:
+        c = sp[0].lerp(sp[-1], max(0.0, min(1.0, (v.co.z - sp[0].z) / max(1e-3, sp[-1].z - sp[0].z))))
+        r = Vector((v.co.x - c.x, v.co.y - c.y, 0.0))
+        if r.length < 1e-5:
+            continue
+        push = OVER_EASE[name]
+        if name == "delia":
+            push += 0.25 * max(0.0, top - 0.06 - v.co.z)          # flares as it falls from the shoulders
+        v.co += r.normalized() * push
+    inner = [v for v in bm.verts if not v.is_boundary]
+    for _ in range(6):
+        bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.verts.index_update()
+    ctx["edge_" + name] = [(e.verts[0].co.copy(), e.verts[1].co.copy()) for e in bm.edges if e.is_boundary]
+
+
+def fur_trim(name, edges, key, src, rig, r=0.012):
+    """Shaggy fleece / fur strip along a garment's free edges (chained into loops), skinned like the garment."""
+    from mathutils.kdtree import KDTree
+    pts = {}
+    adj = {}
+    def kid(p):
+        k = (round(p.x, 4), round(p.y, 4), round(p.z, 4))
+        pts[k] = p
+        return k
+    for a, b in edges:
+        ka, kb = kid(a), kid(b)
+        adj.setdefault(ka, []).append(kb)
+        adj.setdefault(kb, []).append(ka)
+    seen = set()
+    loops = []
+    for start in adj:
+        if start in seen:
+            continue
+        path = [start]
+        seen.add(start)
+        cur = start
+        while True:
+            nxt = [n for n in adj[cur] if n not in seen]
+            if not nxt:
+                break
+            cur = nxt[0]
+            seen.add(cur)
+            path.append(cur)
+        if len(path) >= 4:
+            loops.append(([pts[k] for k in path], start in adj[cur] and len(path) > 4))
+    bm = bmesh.new()
+    for path, closed in loops:
+        # thin the path, then sweep a lumpy fleece roll along it
+        path = path[::2] if len(path) > 40 else path
+        _sweep(bm, path, [(r * math.cos(a) * (1 + 0.25 * math.sin(a * 3)), r * math.sin(a)) for a in [math.tau * i / 7 for i in range(7)]],
+               closed=closed, scale=lambda t: 1.0 + 0.2 * mnoise.noise(Vector((t * 40, 0.0, 0.0))))
+    if not bm.verts:
+        bm.free()
+        return None
+    o = _mk(name, bm, M(key, tex="fur"), rig, bone=None, angle=80, uv=0.15)
+    names = {g.index: g.name for g in src.vertex_groups}
+    kd = KDTree(len(src.data.vertices))
+    for v in src.data.vertices:
+        kd.insert(v.co, v.index)
+    kd.balance()
+    for g in src.vertex_groups:
+        o.vertex_groups.new(name=g.name)
+    for v in o.data.vertices:
+        _, i, _ = kd.find(v.co)
+        for g in src.data.vertices[i].groups:
+            o.vertex_groups[names[g.group]].add([v.index], g.weight, "REPLACE")
+    am = o.modifiers.new("arm", "ARMATURE")
+    am.object = rig
+    o.parent = rig
+    return o
+
+
 def drape(obj, name, rig, ctx):
     """Real folds in the garment mesh (before thickening): simple subdivision for resolution, then outward-only
     displacement so nothing moves into the body.
@@ -1258,6 +1340,11 @@ def drape(obj, name, rig, ctx):
             return None
         d = v[dl]
         return max(((w, names.get(i)) for i, w in d.items() if names.get(i) in bones), default=(0, None))[1]
+    if name in OVER_EASE:
+        over_garment_ease(bm, name, dom, ctx)
+        bm.to_mesh(obj.data)
+        bm.free()
+        return None
     if name in ("coat", "breeches", "cuffs"):
         wearing_ease(bm, name, dom, ctx)
         if name == "cuffs":
@@ -2432,6 +2519,40 @@ def build_clothes(h, rig, spec):
             hem_z = min(v.co.z for v in sk.data.vertices)
             spec = dict(spec, boot_height=max(0.06, min(spec.get("boot_height", 0.12), hem_z + 0.02 - ankle_z)))
 
+    # garments worn over the coat, cut from the helper like the coat: a sleeveless sheepskin vest open at the front,
+    # and a delia (shoulder cape) whose weights ramp from the arms onto the clavicles and chest
+    if spec.get("vest_garment"):
+        vk = spec["vest_garment"]
+        top_v = B["neck_01"][0].z - 0.015          # over the shoulders to the neck (sleeveless: arm faces are not kept)
+        vo = garment(h, rig, me, info, "vest", lambda i, co, g, dom: helper(g, "helper-tights") and dom in TORSO - {"neck_01"}
+                     and waist_z - 0.14 < co.z < top_v and not (abs(co.x) < 0.055 and co.y < 0.0), M(vk, tex="fur"), 0.008, offset=0.8)
+        if vo:
+            out.append(vo)
+            ft = fur_trim("vest_fleece", DRAPE_CTX.get("edge_vest", []), vk, vo, rig, 0.013)
+            if ft:
+                out.append(ft)
+    if spec.get("delia"):
+        dk, fk = spec["delia"]
+        low = B["spine_03"][0].z - 0.16
+        do = garment(h, rig, me, info, "delia", lambda i, co, g, dom: helper(g, "helper-tights") and co.z > low
+                     and (dom in TORSO - {"neck_01"} or (dom in ("upperarm_l", "upperarm_r") and co.z > low + 0.05))
+                     and not (abs(co.x) < 0.035 and co.y < 0.0), M(dk), 0.008, offset=0.8)
+        if do:
+            gi = {g.name: g for g in do.vertex_groups}
+            for side in ("l", "r"):
+                ua, cl = gi.get("upperarm_" + side), gi.get("clavicle_" + side)
+                if not (ua and cl):
+                    continue
+                for v in do.data.vertices:
+                    w = next((g.weight for g in v.groups if g.group == ua.index), 0.0)
+                    if w > 0:
+                        ua.add([v.index], w * 0.3, "REPLACE")          # the cape rides on the shoulder, not the arm
+                        cl.add([v.index], w * 0.7, "ADD")
+            out.append(do)
+            ft = fur_trim("delia_fur", DRAPE_CTX.get("edge_delia", []), fk, do, rig, 0.016)
+            if ft:
+                out.append(ft)
+
     names = [g.name for g in h.vertex_groups]
     TB = {"spine_01", "spine_02", "spine_03", "pelvis"}
     tights_pts = [v.co.copy() for v in me.vertices if any(names[x.group] == "helper-tights" and x.weight > 0.5 for x in v.groups)]
@@ -2988,8 +3109,26 @@ def bake_hair_tint():
         img.pack()
 
 
+def default_max_tex(name):
+    """Exported texture size by role: 2048 for the figures the camera frames (player origins, leaders, the watchman,
+    the finale bodyguards), 1024 for the crowd, townsfolk, district and cast roles. spec["max_tex"] overrides."""
+    if name.startswith(("figure_", "hist_", "cast_bodyguard")) or name == "watchman":
+        return 2048
+    if name.startswith(("npc_", "dist_", "town_", "cast_")):
+        return 1024
+    return 2048
+
+
 def shrink_images(max_size=2048):
+    # eye textures (iris / enhanced iris) keep their size: they are small and carry the face at close range
+    eye_imgs = set()
+    for m in bpy.data.materials:
+        low = m.name.lower()
+        if m.node_tree and ("high-poly" in low or "low-poly" in low):
+            eye_imgs |= {n.image.name for n in m.node_tree.nodes if n.type == "TEX_IMAGE" and n.image}
     for img in bpy.data.images:
+        if img.name in eye_imgs or "eye_enhanced" in img.name.lower():
+            continue
         if img.size[0] > max_size or img.size[1] > max_size:
             img.scale(min(img.size[0], max_size), min(img.size[1], max_size))
 
@@ -3761,10 +3900,11 @@ def leader_props(spec, rig, pts, surf, B, waist_z, knee_z, top_z, kd, doms):
         out.append(o)
     # gold earring in the left lobe
     if spec.get("earring"):
-        sl = [p for (p, d) in pts if d == "head" and brow - 0.09 < p.z < brow - 0.04 and p.x > hcx]
-        lobe = max(sl, key=lambda p: p.x - 0.5 * abs(p.y - hcy)) if sl else Vector((hcx + hw / 2, hcy, brow - 0.07))
+        ear = [p for (p, d) in pts if d == "head" and p.x > hcx + hw * 0.42 and abs(p.y - hcy) < 0.035 and brow - 0.10 < p.z < brow + 0.02]
+        lobe = min(ear, key=lambda p: p.z) if ear else Vector((hcx + hw / 2, hcy, brow - 0.07))
+        # ring threaded through the lobe: its top passes 2 mm inside the lobe tip, the ring hangs below it
         bpy.ops.mesh.primitive_torus_add(major_radius=0.008, minor_radius=0.0015, major_segments=16, minor_segments=6,
-                                         location=lobe + Vector((0.003, 0.0, -0.011)), rotation=(0, math.pi / 2, 0))
+                                         location=lobe + Vector((0.001, 0.0, -0.006)), rotation=(0, math.pi / 2, 0))
         e = bpy.context.object
         e.data.materials.append(M("brass", 0.2)); e.name = "earring"
         _weight_to_bone(e, rig, "head")
@@ -3839,7 +3979,7 @@ def build(name, spec):
     log("=== building", name)
     spec = apply_body(name, spec)
     CURRENT["hair_tint"] = spec.get("hair_tint")
-    CURRENT["max_tex"] = spec.get("max_tex", 2048)
+    CURRENT["max_tex"] = spec.get("max_tex", default_max_tex(name))
     if "skin" not in spec:
         spec = dict(spec, skin=pick_skin(spec.get("macro", {}), spec.get("macro", {}).get("gender", 0.5) < 0.5, spec.get("seed", _seed(name) & 0xffff)))
     if spec.get("hat") in ("bonnet", "kerchief", "cap", "wimple") and not spec.get("veil"):
@@ -4111,7 +4251,7 @@ CAST = {
                       "targets": {"chin-bones-incr": 0.4, "chin-prominent-incr": 0.35, "nose-hump-incr": 0.25, "head-square": 0.3, "l-cheek-bones-incr": 0.3,
                                   "r-cheek-bones-incr": 0.3, "eyebrows-trans-forward": 0.2, "mouth-scale-horiz-decr": 0.2, "nose-scale-vert-incr": 0.2},
                       "coat": "wine", "coat_len": "long", "sash": "zupan_gold", "collar": "zupan_gold", "breeches": "zupan_gold", "stockings": "zupan_gold",
-                      "cape": ("ottoman_green", 0.34, "fur"), "sword": True, "boots": "tan_boot", "boot_height": 0.35, "hat": None, "buttons": "long",
+                      "delia": ("ottoman_green", "fur"), "sword": True, "boots": "tan_boot", "boot_height": 0.35, "hat": None, "buttons": "long",
                       "button_colour": "brass", "grime": 0.12},
     "hist_lichocki": {"macro": {"gender": 0.92, "age": 0.66, "muscle": 0.3, "weight": 0.85, "height": 0.45}, "fixed_body": True, "body": "rotund",
                       "face_variety": False, "skin": "middleage_caucasian_male", "hair": "ponytail01", "hair_tint": "white", "brows": "eyebrow004",
@@ -4134,7 +4274,7 @@ CAST = {
                     "targets": {"l-cheek-bones-incr": 0.5, "r-cheek-bones-incr": 0.5, "l-cheek-volume-decr": 0.4, "r-cheek-volume-decr": 0.4,
                                 "nose-hump-incr": 0.4, "nose-scale-vert-incr": 0.2, "chin-prominent-incr": 0.2, "l-eye-scale-decr": 0.3, "r-eye-scale-decr": 0.3,
                                 "head-oval": 0.3, "mouth-scale-horiz-decr": 0.2},
-                    "hat": "cap", "hat_colour": "grey_coat", "coat": "stocking", "coat_len": "short", "collar": "stocking", "vest": "buff",
+                    "hat": "cap", "hat_colour": "grey_coat", "coat": "stocking", "coat_len": "short", "collar": "stocking", "vest_garment": "buff",
                     "sash": "leather", "breeches": "brown_coat", "stockings": "grey_coat", "boots": "leather", "boot_height": 0.42, "knife": True,
                     "icehook": True, "stubble": True, "buttons": False, "grime": 0.8},
     "hist_margelik": {"macro": {"gender": 0.95, "age": 0.654, "muscle": 0.4, "weight": 0.55, "height": 0.6}, "fixed_body": True, "body": "average",
@@ -4151,7 +4291,7 @@ CAST = {
                                  "eyebrows-trans-forward": 0.6, "l-eye-scale-decr": 0.5, "r-eye-scale-decr": 0.5, "head-square": 0.4, "head-fat-incr": 0.3,
                                  "chin-width-incr": 0.4, "neck-scale-horiz-incr": 0.5, "l-ear-flap-incr": 0.4, "r-ear-flap-incr": 0.4, "stomach-pregnant-incr": 0.4},
                      "pox": True, "scar": "brow", "earring": True, "rings": True, "coat": "green_coat", "coat_len": "mid", "cuffs": "green_coat",
-                     "collar": "saffron", "vest": "buff", "sash": "crimson", "pistol": True, "breeches": "charcoal", "stockings": "grey_coat",
+                     "collar": "saffron", "vest_garment": "buff", "sash": "crimson", "pistol": True, "breeches": "charcoal", "stockings": "grey_coat",
                      "boots": "black", "boot_height": 0.42, "hat": None, "button_colour": "brass", "grime": 0.35},
     "cast_bodyguard_1": {"macro": {"gender": 1.0, "age": 0.55, "muscle": 0.75, "weight": 0.7, "height": 0.72}, "fixed_body": True, "body": "fit",
                          "targets": {"head-square": 0.4, "neck-scale-horiz-incr": 0.5}, "hair": "short04", "hair_tint": "black", "brows": "eyebrow007",
