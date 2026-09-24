@@ -119,9 +119,9 @@ Tools:
 ## Building from a fresh clone
 The generated models (`assets/models/*.glb`, about 2.4 GB) are not in git. Two ways to get them:
 
-**A. Download** `krakow-1795-models-<tag>.zip` from the latest
-[GitHub release](https://github.com/r-melvin/krakow-1795/releases), unzip it in the project root (it contains
-`assets/models/` and `assets/ground/`), then:
+**A. Download** the three `krakow-1795-models-<tag>-{world,people-a,people-b}.zip` assets from the latest
+[GitHub release](https://github.com/r-melvin/krakow-1795/releases) (GitHub caps one asset at 2 GiB), unzip all
+three in the project root (they contain `assets/models/` and `assets/ground/`), then:
 ```
 godot --headless --import --path . && python3 tools/import_settings.py && godot --headless --import --path .
 godot --path .
