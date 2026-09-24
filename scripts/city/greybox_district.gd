@@ -76,7 +76,7 @@ func _environment() -> void:
 	# under awnings instead of dying at the shadow edge. GPU cost, not CPU; toggled by the "gi" setting.
 	var gi: bool = GameState.settings.get("gi", true)
 	e.sdfgi_enabled = gi
-	e.sdfgi_cascades = 4
+	e.sdfgi_cascades = 3
 	e.sdfgi_min_cell_size = 0.35
 	e.sdfgi_bounce_feedback = 0.6
 	e.sdfgi_read_sky_light = true
@@ -109,6 +109,10 @@ func _environment() -> void:
 	e.adjustment_contrast = 1.08
 	env.environment = e
 	add_child(env)
+	var budget := Node.new()
+	budget.name = "ShadowBudget"
+	budget.set_script(preload("res://scripts/city/shadow_budget.gd"))
+	add_child(budget)
 	env.add_to_group("world_env")        # weather.gd drives sky, fog, exposure
 
 	# Low winter moon: cool, long shadows.
@@ -118,6 +122,7 @@ func _environment() -> void:
 	moon.rotation_degrees = Vector3(-34, 40, 0)
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 120
+	moon.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	moon.light_angular_distance = 0.5
 	moon.light_volumetric_fog_energy = 0.4
 	add_child(moon)
@@ -147,7 +152,9 @@ func _environment() -> void:
 		l.light_energy = 9
 		l.omni_range = 24
 		l.omni_attenuation = 1.5
-		l.shadow_enabled = true
+		l.shadow_enabled = false            # granted by the shadow budget when near the camera
+		l.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+		l.add_to_group("shadow_capable")
 		l.light_size = 0.12
 		l.light_specular = 0.7
 		l.light_volumetric_fog_energy = 1.6
@@ -162,7 +169,9 @@ func _environment() -> void:
 	cave.light_color = Color(0.55, 0.95, 0.45)
 	cave.light_energy = 5
 	cave.omni_range = 16
-	cave.shadow_enabled = true
+	cave.shadow_enabled = false
+	cave.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+	cave.add_to_group("shadow_capable")
 	add_child(cave)
 	cave.add_to_group("flame_lights")
 
@@ -181,7 +190,9 @@ func _environment() -> void:
 		b.light_energy = 4
 		b.omni_range = 12
 		b.omni_attenuation = 1.5
-		b.shadow_enabled = true
+		b.shadow_enabled = false
+		b.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+		b.add_to_group("shadow_capable")
 		b.light_volumetric_fog_energy = 1.2
 		add_child(b)
 		b.add_to_group("flame_lights")

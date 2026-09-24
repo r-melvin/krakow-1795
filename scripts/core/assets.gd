@@ -17,7 +17,50 @@ static func instance(name: String) -> Node3D:
 	var inst := ps.instantiate() as Node3D
 	if inst and not name.begins_with("int_"):
 		_weather_pass(inst)
+		_cull_pass(inst, name)
 	return inst
+
+
+## Distance culling by size: small things (props, dressing, vendor wares, weeds) vanish beyond 90 m with a fade,
+## people beyond 150 m, mid-size pieces (carts, stalls, gutters, trees) beyond 220 m; buildings, landmarks and
+## the ground are never culled. Cuts the primitives and draw calls the far town costs every frame.
+const CULL_SMALL := 90.0
+const CULL_FIGURE := 150.0
+const CULL_MID := 220.0
+static func _cull_pass(root: Node3D, name: String) -> void:
+	var is_figure := name.begins_with("figure_") or name.begins_with("hist_") or name.begins_with("cast_") \
+			or name.begins_with("npc_") or name.begins_with("town_") or name.begins_with("dist_") or name == "watchman"
+	var aabb := AABB()
+	var meshes: Array = []
+	_collect_meshes(root, meshes)
+	if meshes.is_empty():
+		return
+	for m in meshes:
+		var mi := m as MeshInstance3D
+		var b := mi.get_aabb()
+		aabb = b if aabb.size == Vector3.ZERO else aabb.merge(b)
+	var size := aabb.get_longest_axis_size()
+	var rng := 0.0
+	if is_figure:
+		rng = CULL_FIGURE
+	elif size < 3.0:
+		rng = CULL_SMALL
+	elif size < 9.0:
+		rng = CULL_MID
+	else:
+		return
+	for m in meshes:
+		var mi := m as MeshInstance3D
+		mi.visibility_range_end = rng
+		mi.visibility_range_end_margin = rng * 0.12
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+
+
+static func _collect_meshes(n: Node, out: Array) -> void:
+	if n is MeshInstance3D:
+		out.append(n)
+	for c in n.get_children():
+		_collect_meshes(c, out)
 
 
 static func place(parent: Node, name: String, pos: Vector3, rot_y: float = 0.0, scale: float = 1.0) -> Node3D:
